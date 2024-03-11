@@ -1,0 +1,103 @@
+@import "_colors.css";
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply font-body text-dark bg-dark-100;
+    }
+
+    svg {
+        @apply fill-current inline-flex;
+    }
+
+    label[for] {
+        cursor: pointer;
+    }
+
+    hr {
+        @apply border-dark-200;
+    }
+
+    small {
+        @apply text-12;
+    }
+
+    a {
+        cursor: pointer;
+        @apply transition-colors;
+
+        &[href]:hover {
+            @apply text-primary;
+        }
+
+        &.link {
+            @apply text-primary;
+        }
+
+        &[aria-disabled="true"] {
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+    }
+
+    select {
+        @apply appearance-none;
+        @apply cursor-pointer;
+    }
+
+    button {
+        &:disabled {
+            @apply pointer-events-none;
+        }
+    }
+
+    input[type="submit"] {
+        @apply cursor-pointer;
+    }
+
+    /* this class is used to calculate width of scrollbar for different browsers */
+    .scrollbar-measure {
+        width: 100px;
+        height: 100px;
+        overflow: scroll;
+        position: absolute;
+        top: -9999px;
+    }
+
+    .custom-scrollbar {
+        &::-webkit-scrollbar {
+            width: 9px;
+            height: 9px;
+        }
+
+        &::-webkit-scrollbar-track {
+            @apply bg-dark-50;
+            border: none
+        }
+
+        &::-webkit-scrollbar-thumb {
+            @apply bg-dark-300 rounded;
+            border: 2px solid transparent;
+            background-clip: content-box;
+            left: 2px;
+            right: 2px;
+        }
+        &:hover {
+            &::-webkit-scrollbar-thumb {
+                @apply bg-dark-400;
+            }
+        }
+    }
+
+    .outline {
+        outline-width: 1px;
+        outline-style: solid;
+    }
+
+    *:focus-visible {
+        outline: none;
+    }
+}

@@ -1,0 +1,45 @@
+{% load i18n %}
+
+{% block content %}
+    <div class="modal-dialog">
+        <div class="modal-content">
+            {% include 'sb_admin/includes/loading_absolute.html' with additional_class="sb-admin-modal-loading" %}
+            <div class="modal-header">
+                <h3 class="text-dark-900 text-18 font-semibold leading-28">{% trans 'Additional info' %} - {{ purchase.purchase_number }}</h3>
+                <svg data-bs-dismiss="modal" aria-label="Close"
+                     class="w-24 h-24 absolute top-16 right-16 cursor-pointer transition-transform hover:rotate-90">
+                    <use xlink:href="#Close-small"></use>
+                </svg>
+            </div>
+
+            <div class="modal-body">
+                <form id="sb-admin-modal-form" hx-indicator=".sb-admin-modal-loading" hx-target="#sb-admin-modal" hx-post="{{ url }}" action="{{ url }}" method="post">
+                    {% if form.errors %}
+                        <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+                            <div class="flex">
+                                <svg class="w-20 h-20 mr-12 text-negative">
+                                    <use xlink:href="#Close-one"></use>
+                                </svg>
+                                <h5 class="font-semibold">
+                                    {% blocktrans count form.errors.items|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                                </h5>
+                            </div>
+                        </div>
+                        {{ form.non_field_errors }}
+                    {% endif %}
+                    {% for fieldset in form.fieldsets %}
+                        <fieldset class="relative {{ fieldset.classes }}">
+                            {% include 'sb_admin/includes/inline_fieldset.html' %}
+                        </fieldset>
+                    {% endfor %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                {% block buttons %}
+                    <button form="sb-admin-modal-form" type="button" class="btn btn-destructive mr-10" data-bs-dismiss="modal">{% trans 'Close' %}</button>
+                    <button form="sb-admin-modal-form" type="submit" class="btn btn-primary">{% trans 'Continue' %}</button>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

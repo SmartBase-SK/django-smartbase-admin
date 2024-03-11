@@ -1,0 +1,7 @@
+.idea
+;;extensions to ignore
+*.pot
+*.pyc
+
+node_modules
+webpack-stats.json

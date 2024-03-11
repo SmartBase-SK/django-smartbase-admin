@@ -1,0 +1,18 @@
+{% extends "sb_admin/inlines/stacked_inline.html" %}
+{% block extra_style %}
+    <style>
+      #mallproduct_set-group .stacked-inline-heading {
+        display: none;
+      }
+
+      #mallproduct_set-group .djn-model-mall-mallproductparametervalue.djn-add-handler {
+        display: none;
+      }
+
+      .djn-dynamic-form-mall-mallproducttoalias {
+        margin-top: -1.5rem;
+      }
+
+    </style>
+{% endblock %}
+{{ block.super }}

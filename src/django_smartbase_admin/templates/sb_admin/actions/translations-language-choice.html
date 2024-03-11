@@ -1,0 +1,12 @@
+{% load widget_tweaks static %}
+<form hx-post="" hx-trigger="change" hx-swap="none">
+    {% for field in languages_form %}
+        <div class="relative">
+            {% render_field field class="input pl-38" %}
+            <label for="{{ field.auto_id }}" class="absolute left-10 top-0 bottom-0 h-full flex items-center pointer-events-none">
+                <img src="{% static flag_url %}" alt="{{ field.value }}" class="w-24 h-18 border border-dark-200 rounded-xs" width="24px" height="18px">
+            </label>
+            {{ field.errors }}
+        </div>
+    {% endfor %}
+</form>

@@ -1,0 +1,13 @@
+<div id="notification-messages" hx-swap-oob="beforeend" class="z-1000 fixed right-0 left-0 xl:left-260 mx-24">
+    {% for message in messages %}
+        {% if message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+            {% include 'sb_admin/partials/messages/alert_success.html' with text=message %}
+        {% elif message.level == DEFAULT_MESSAGE_LEVELS.WARNING %}
+            {% include 'sb_admin/partials/messages/alert_warning.html' with text=message %}
+        {% elif message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+            {% include 'sb_admin/partials/messages/alert_error.html' with text=message %}
+        {% else %}
+            {% include 'sb_admin/partials/messages/alert_success.html' with text=message %}
+        {% endif %}
+    {% endfor %}
+</div>

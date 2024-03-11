@@ -1,0 +1,10 @@
+{% extends "sb_admin/actions/partials/translations_status_row.html" %}
+{% load static %}
+
+{% block edit_link %}
+    <a href="{{ translations_edit_url }}">
+        <svg class='w-20 h-20 ml-16 {{ edit_icon_color }}'>
+            <use xlink:href='#{{ edit_icon }}'></use>
+        </svg>
+    </a>
+{% endblock %}

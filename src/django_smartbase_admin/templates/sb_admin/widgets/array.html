@@ -1,0 +1,62 @@
+{% load i18n %}
+
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="hidden" id="{{ widget.attrs.id }}_wrapper">
+    {% include "sb_admin/widgets/input.html" %}
+</div>
+<div id="{{ widget.attrs.id }}_array_wrapper" data-delimeter="{{ widget.form_field.delimiter }}">
+    {% for array_widget in array_widgets %}
+        <div class="flex mb-8">
+            {% include "sb_admin/widgets/input.html" with widget=array_widget %}
+            <button type="button" class="w-40 h-40 flex-center text-dark flex-shrink-0 ml-4" onclick="this.parentElement.remove();window.recalculateArrayField('{{ widget.attrs.id }}')">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Delete"></use>
+                </svg>
+            </button>
+        </div>
+    {% endfor %}
+</div>
+<div class='hidden'
+     id="{{ widget.attrs.id }}_template">
+    <div class="flex mb-8">
+        {% include "sb_admin/widgets/input.html" with widget=template_widget %}
+        <button type="button" class="w-40 h-40 flex-center text-dark flex-shrink-0 ml-4" onclick="this.parentElement.remove();window.recalculateArrayField('{{ widget.attrs.id }}')">
+            <svg class="w-20 h-20">
+                <use xlink:href="#Delete"></use>
+            </svg>
+        </button>
+    </div>
+</div>
+<button class='btn btn-small btn-icon' type="button" onclick="addArrayField('{{ widget.attrs.id }}')">
+    <svg class="w-20 h-20 text-dark mr-12"
+         aria-expanded="false">
+        <use xlink:href="#Plus"></use>
+    </svg>
+    <span>{% trans "Add" %}</span>
+</button>
+<script>
+    window.recalculateArrayField = window.recalculateArrayField || function (id) {
+        const input = document.getElementById(id + '_wrapper').querySelector('input');
+        const arrayInputsWrapper = document.getElementById(id + '_array_wrapper')
+        const arrayInputs = arrayInputsWrapper.querySelectorAll('input');
+        const arrayValue = [];
+        arrayInputs.forEach((arrayInput) => {
+            arrayValue.push(arrayInput.value);
+        })
+        input.value = arrayValue.join(arrayInputsWrapper.dataset.delimeter)
+    }
+    window.addArrayField = window.addArrayField || function (id) {
+        console.log(id)
+        const template = document.getElementById(id + '_template').children[0];
+        const arrayInputsWrapper = document.getElementById(id + '_array_wrapper');
+        const newArrayInput = template.cloneNode(true);
+        arrayInputsWrapper.appendChild(newArrayInput);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('{{ widget.attrs.id }}_array_wrapper').addEventListener('change', function() {
+            window.recalculateArrayField('{{ widget.attrs.id }}')
+        })
+    });
+</script>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

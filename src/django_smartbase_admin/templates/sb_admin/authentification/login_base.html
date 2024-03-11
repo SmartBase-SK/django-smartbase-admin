@@ -1,0 +1,19 @@
+{% extends "sb_admin/sb_admin_base_no_sidebar.html" %}
+{% load i18n static preferences_tags %}
+
+{% block main_wrapper %}
+    <div class="flex items-center max-h-screen">
+        <img loading="lazy" src="{% static "sb_admin/images/logo.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24">
+        <div class="md:max-w-640 w-full flex justify-center items-center h-screen">
+            <div class="max-w-370 w-full mx-24">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+        <div class="w-full md:block hidden">
+            <picture>
+                <source srcset="{% static 'sb_admin/images/login.webp' %}" type="image/webp">
+                <img src="{% static 'sb_admin/images/login.jpg' %}" alt="SB admin" class="w-full h-screen object-cover">
+            </picture>
+        </div>
+    </div>
+{% endblock %}

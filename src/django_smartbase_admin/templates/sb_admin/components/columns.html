@@ -1,0 +1,24 @@
+{% load i18n %}
+
+<div class="inlin-flex relative js-select-all-wrapper">
+    <button
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            data-bs-popper-placement="bottom-end"
+            class="btn btn-icon">
+        <svg class="w-16 h-16 md:mr-8">
+            <use xlink:href="#Column"></use>
+        </svg>
+        <span>{% trans 'Columns' %}</span>
+    </button>
+    <div class="dropdown-menu w-248 max-h-432">
+        <div class="p-12 font-semibold text-dark-900">
+            {% trans 'Choose Columns' %}
+        </div>
+        <ul id="{{ view_id }}-column-widget" class="column-widget-columns"></ul>
+        <div class="flex items-center relative p-12 border-t border-dark-200">
+            <button class="text-primary cursor-pointer js-clear-all">{% trans 'Clear' %}</button>
+            <button class="text-primary ml-auto cursor-pointer js-select-all">{% trans 'Select All' %}</button>
+        </div>
+    </div>
+</div>

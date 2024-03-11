@@ -1,0 +1,117 @@
+@layer components {
+
+    .tooltip {
+        position: absolute;
+        z-index: 10;
+        display: block;
+        @apply text-12 leading-16;
+        word-wrap: break-word;
+        opacity: 0;
+        @apply py-8;
+
+        &.show {
+            opacity: 1;
+        }
+
+        .tooltip-arrow {
+            position: absolute;
+            display: block;
+            width: 1rem;
+            height: .5rem;
+
+            &:before {
+                position: absolute;
+                content: "";
+                border-color: transparent;
+                border-style: solid;
+            }
+        }
+    }
+
+    .tooltip.bs-tooltip-top {
+
+        .tooltip-arrow {
+            bottom: 0;
+
+            &:before {
+                top: -1px;
+                border-width: .5rem .5rem 0 .5rem;
+                border-top-color: theme('colors.dark.a / 90%');
+            }
+        }
+    }
+
+    .tooltip.bs-tooltip-bottom {
+
+        .tooltip-arrow {
+            top: 0;
+
+            &:before {
+                bottom: -1px;
+                border-width: 0 .5rem .5rem .5rem;
+                border-bottom-color: theme('colors.dark.a / 90%');
+            }
+        }
+    }
+
+    .tooltip.bs-tooltip-end {
+        padding: 0 .5rem;
+
+        .tooltip-arrow {
+            left: 0;
+            width: .5rem;
+            height: .1rem;
+
+            &:before {
+                right: -1px;
+                border-width: .5rem .5rem .5rem 0;
+                border-right-color: theme('colors.dark.a / 90%');
+            }
+        }
+    }
+
+
+
+    .tooltip.bs-tooltip-start {
+        padding: 0 .5rem;
+
+        .tooltip-arrow {
+            right: 0;
+            width: .5rem;
+            height: .1rem;
+
+            &:before {
+                left: -1px;
+                border-width: .5rem 0 .5rem .5rem;
+                border-left-color: theme('colors.dark.a / 90%');
+            }
+        }
+    }
+
+    .tooltip.bs-tooltip-auto {
+        &[data-popper-placement^="top"] {
+            @extend .tooltip.bs-tooltip-top;
+        }
+
+        &[data-popper-placement^="right"] {
+            @extend .tooltip.bs-tooltip-end;
+        }
+
+        &[data-popper-placement^="bottom"] {
+            @extend .tooltip.bs-tooltip-bottom;
+        }
+
+        &[data-popper-placement^="left"] {
+            @extend .tooltip.bs-tooltip-start;
+        }
+    }
+
+    .tooltip-inner {
+        max-width: 200px;
+        @apply p-8;
+        @apply text-light bg-dark-a/90;
+        @apply rounded;
+        @apply shadow-s;
+    }
+
+}

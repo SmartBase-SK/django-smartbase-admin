@@ -1,0 +1,19 @@
+{% block content %}
+    <div {% block attributes %}{% endblock %} class="alert border mb-16 shadow {% block colors %}bg-notice-50 border-notice-100 text-notice-900{% endblock %}">
+        {% if OVERRIDE_CONTENT_OF_NOTIFICATION in message.extra_tags %}
+            {{ text|safe }}
+        {% else %}
+            <div class="flex">
+                {% block icon %}
+                    <svg class="w-20 h-20 mr-12 text-notice">
+                        <use xlink:href="#Info"></use>
+                    </svg>
+                {% endblock %}
+                <h5 class="font-semibold">{{ text|safe }}</h5>
+                <div class="flex ml-auto items-center">
+                    {% include 'sb_admin/partials/messages/alert_close.html' %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

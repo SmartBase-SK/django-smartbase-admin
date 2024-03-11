@@ -1,0 +1,60 @@
+{% load i18n admin_urls %}
+
+{# desktop button #}
+{% if show_buttons %}
+    <a href="{% url opts|admin_urlname:'change' object_id %}?language={{ language }}" class="btn max-sm:hidden{% if basic_info_active %} cms-btn-active{% endif %}">{% trans "Basic Settings" %}</a>
+    <a href="{% url opts|admin_urlname:'advanced' object_id %}?language={{ language }}" class="btn max-sm:hidden{% if advanced_settings_active %} cms-btn-active{% endif %}">{% trans "Advanced Settings" %}</a>
+{% endif %}
+
+{% if show_delete_link %}
+    <a href="{% url opts|admin_urlname:'delete' object_id %}" class="btn btn-destructive max-sm:hidden">
+        <svg class="w-20 h-20 mr-8">
+            <use xlink:href="#Delete"></use>
+        </svg>
+        {% trans "Delete" %}
+    </a>
+{% endif %}
+
+{% if show_save_as_new %}<input type="submit" value="{% trans 'Save as new' %}"  class="btn max-sm:hidden" name="_saveasnew" />{%endif%}
+{% if show_save_and_add_another %}<input type="submit" value="{% trans 'Save and add another' %}"  class="btn max-sm:hidden" name="_addanother" />{% endif %}
+{% if show_save_and_continue %}<input type="submit" value="{% trans 'Save and continue editing' %}" class="btn max-sm:hidden" name="_continue" />{% endif %}
+
+{# dropdown for mobile #}
+<div class="relative md:hidden">
+    <button
+        data-bs-toggle="dropdown"
+        aria-expanded="false"
+        data-bs-popper-placement="top-end"
+        class="btn btn-empty btn-icon">
+        <svg class="w-16 h-16">
+            <use xlink:href="#More"></use>
+        </svg>
+        <span></span>
+    </button>
+    <div class="dropdown-menu w-248 max-h-432">
+        <ul>
+            {% if show_buttons %}
+                <li><a href="{% url opts|admin_urlname:'change' object_id %}?language={{ language }}" class="dropdown-menu-link{% if basic_info_active %} cms-btn-active{% endif %}">{% trans "Basic Settings" %}</a></li>
+                <li><a href="{% url opts|admin_urlname:'advanced' object_id %}?language={{ language }}" class="dropdown-menu-link{% if advanced_settings_active %} cms-btn-active{% endif %}">{% trans "Advanced Settings" %}</a></li>
+            {% endif %}
+
+            {% if show_delete_link %}
+                <li>
+                    <a href="delete/" class="dropdown-menu-link">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Delete"></use>
+                        </svg>
+                        {% trans "Delete" %}
+                    </a>
+                </li>
+            {% endif %}
+
+            {% if show_save_as_new %}<li><input type="submit" value="{% trans 'Save as new' %}"  class="dropdown-menu-link w-full" name="_saveasnew" /></li>{%endif%}
+            {% if show_save_and_add_another %}<li><input type="submit" value="{% trans 'Save and add another' %}"  class="dropdown-menu-link w-full" name="_addanother" /></li>{% endif %}
+            {% if show_save_and_continue %}<li><input type="submit" value="{% trans 'Save and continue editing' %}" class="dropdown-menu-link w-full" name="_continue" /></li>{% endif %}
+        </ul>
+    </div>
+</div>
+
+{# common save for desktop and mobile #}
+{% if show_save %}<input type="submit" value="{% trans 'Save' %}" class="btn btn-secondary" name="_save" />{% endif %}

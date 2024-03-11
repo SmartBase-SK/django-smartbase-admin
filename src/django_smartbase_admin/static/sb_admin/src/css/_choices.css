@@ -1,0 +1,89 @@
+.choices {
+    @apply flex flex-col relative;
+    &:not(.search-on):not(.search-off) {
+        @apply hidden;
+    }
+    &.search-on {
+        @apply pt-40;
+    }
+    &.search-off {
+        .choices__input,
+        .choices__inner > label {
+            @apply hidden;
+        }
+        .choices__list.choices__list--dropdown {
+            @apply mt-0;
+        }
+    }
+}
+
+.choices__inner {
+    order: 1;
+}
+
+.choices__input {
+    @apply absolute top-0 left-0;
+    width: 100% !important;
+    background-color: transparent;
+    padding-right: 0;
+}
+
+.choices__input,
+.choices__list.choices__list--single {
+    + label {
+        @apply flex-center absolute top-0 right-0;
+        @apply w-40 h-40;
+        z-index: -1;
+        >svg {
+            @apply w-20 h-20;
+        }
+    }
+}
+
+.choice__item {
+    @apply relative;
+}
+
+.choices[data-type="select-one"] {
+
+}
+
+.choices__list[role="listbox"] {
+    @apply overflow-auto custom-scrollbar;
+    max-height: 13.5rem;
+}
+
+.choices__list.choices__list--dropdown {
+    @apply -mx-12 mb-4 mt-8;
+    .choices__item {
+        @apply py-8 px-12 text-dark-900;
+        @apply transition-colors;
+        &:not(.has-no-choices):not(.has-no-results) {
+            @apply cursor-pointer hover:bg-dark-100;
+        }
+        &.has-no-choices {
+            @apply pt-4 pb-0;
+        }
+    }
+}
+
+.choices__list.choices__list--single,
+.choices__list.choices__list--multiple {
+    @apply flex flex-wrap gap-4;
+    @apply px-12 pb-0 -mx-12;
+    &:not(:empty) {
+        @apply pt-12;
+        @apply border-t border-dark-200;
+    }
+    .choices__item {
+        @apply flex items-center;
+        @apply bg-dark-100 border border-dark-200 rounded;
+        @apply px-8 py-4;
+        @apply font-medium text-12 leading-16 text-dark-900;
+        svg {
+            @apply w-16 h-16 ml-4 flex text-dark;
+            pointer-events: none;
+        }
+    }
+}
+

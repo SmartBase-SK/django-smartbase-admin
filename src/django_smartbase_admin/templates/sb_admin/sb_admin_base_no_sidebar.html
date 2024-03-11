@@ -1,0 +1,79 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="{{ request.LANGUAGE_CODE }}" data-theme="light" data-color-scheme="light">
+<head>
+    {% include 'sb_admin/fonts.html' %}
+    <meta name="robots" content="noindex"/>
+    <meta name="robots" content="nofollow"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0">
+
+    <title>{% block title %}SBAdmin{% endblock %}</title>
+
+    {% block icons %}
+        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+        <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon/favicon-32x32.png' %}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon/favicon-16x16.png' %}">
+        <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
+        <link rel="mask-icon" href="{% static 'favicon/safari-pinned-tab.svg' %}" color="#e0004d">
+        <link rel="shortcut icon" href="{% static 'favicon/favicon.ico' %}">
+        <meta name="msapplication-TileColor" content="#e0004d">
+        <meta name="msapplication-config" content="{% static 'favicon/browserconfig.xml' %}">
+        <meta name="theme-color" content="#ffffff">
+    {% endblock %}
+    <link rel="stylesheet" href="{% static 'sb_admin/dist/main_style.css' %}">
+    {% block style_init %}{% endblock %}
+
+    <script>window.csrf_token = "{{ csrf_token }}"</script>
+    {% block js_init %}
+        <script>
+            {% if const %}
+                window.sb_admin_const = {{ const|safe }};
+            {% endif %}
+            window.loadJSONScriptData = function (elementId) {
+                return JSON.parse(document.getElementById(elementId).textContent)
+            }
+        </script>
+    {% endblock %}
+
+    {% block extrahead %}{% endblock %}
+    <style>@media (min-width: 1200px){.xl\:\!block {display: block !important;}}</style>
+</head>
+<body hx-ext="remove-me" class="{% block bodyclass %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="hidden">
+    {% block sprites %}
+        {% include 'sb_admin/sprites/sb_admin.svg' %}
+    {% endblock %}
+</div>
+
+{% block main_wrapper %}
+
+{% endblock %}
+
+{% block js %}
+    {% include 'sb_admin/sb_admin_js_trans.html' %}
+    <script>
+        function jQueryLoad() {
+            window.django = {jQuery: jQuery.noConflict(true)}
+        }
+
+        if (!window.django) {
+            var script = document.createElement('script');
+            document.head.appendChild(script);
+            script.async = true;
+            script.type = 'text/javascript';
+            script.src = "{% static 'sb_admin/js/jquery.min.js' %}";
+            script.onload = jQueryLoad;
+        }
+    </script>
+    <script async src="{% static 'sb_admin/js/lazysizes.min.js' %}"></script>
+    <script async src="{% static 'sb_admin/js/lazysizes.bgset.min.js' %}"></script>
+    <script async src="{% static 'sb_admin/js/ls.unveilhooks.min.js' %}"></script>
+    <script src="{% static 'sb_admin/js/htmx.min.js' %}"></script>
+    <script src="{% static 'sb_admin/js/remove-me.js' %}"></script>
+    <script type="text/javascript" src="{% static 'sb_admin/dist/main.js' %}"></script>
+{% endblock %}
+{% block additional_js %}
+{% endblock %}
+</body>
+</html>

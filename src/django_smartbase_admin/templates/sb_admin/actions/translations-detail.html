@@ -1,0 +1,88 @@
+{% extends "sb_admin/sb_admin_base.html" %}
+{% load i18n %}
+
+{% block additional_js %}
+    {{ block.super }}
+    <script type="text/javascript" src="{% static 'sb_admin/dist/translations.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+    <div class="py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+        <a href="{{ back_url }}" class="btn p-0 w-40 mr-16">
+            <svg class="w-20 h-20">
+                <use xlink:href="#Left-small"></use>
+            </svg>
+        </a>
+        <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">{{ title }}</h1>
+    </div>
+
+    <div class="w-full max-w-1180 mx-auto">
+        <div class="card mb-24">
+            <div class="flex -mx-32 pb-24">
+                <div class="w-1/2 px-32 ml-auto">
+                    {% include "sb_admin/actions/translations-language-choice.html" %}
+                </div>
+            </div>
+            <hr class="-mx-24 mb-24">
+            <div class="flex flex-wrap -mx-32">
+                {% for language_code, form_list in translation_forms.items %}
+                    {% with first_lang=forloop.first %}
+                        {% for form in form_list %}
+                            {% if form.non_field_errors %}
+                                <ul class="error__list">
+                                    {% for error in form.non_field_errors %}
+                                        <li class="error__item">{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            <form action="" method="post" class="translation-form" id="{{ FORM_BASE_ID }}{{ language_code }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="{{ TRANSLATION_MODEL_KEY }}" value="{{ form.model_table }}">
+                                {{ form.media }}
+                            </form>
+                            {% for field in form %}
+                                <div class="w-1/{{ translation_forms|length }}{% if field.is_hidden %} hidden{% endif %} px-32 relative" style="order: {{ forloop.counter0 }};">
+                                    <div class="h-full flex flex-col relative js-translation-field-wrapper{% if not forloop.last %} pb-24{% endif %}">
+                                        {{ field }}
+                                        {% if not first_lang %}
+                                            <div class="copy-translations-button-wrapper">
+                                                <button class="btn btn-icon w-40 px-0 js-copy-translation" data-main-lang="{{ main_language_code }}" title="{% trans 'Copy' %}" disabled>
+                                                    <svg class="w-10 h-10">
+                                                        <use xlink:href="#Right-small"></use>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        {% endif %}
+                                        {% if not field.is_hidden %}
+                                            {{ field.errors }}
+                                        {% endif %}
+                                    </div>
+
+                                </div>
+                            {% endfor %}
+
+                        {% endfor %}
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+
+    <div class="detail-view-action-bar">
+        <div>
+            <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                {{ title }}
+            </h2>
+            <div class="flex ml-auto gap-8">
+                <a href="{{ back_url }}" class="btn btn-empty">{% trans 'Back' %}</a>
+                {% for language_code, form_list in translation_forms.items %}
+                    {% if not forloop.first %}
+                        <input type="submit" form="{{ FORM_BASE_ID }}{{ language_code }}" value="Uložiť a pokračovať v úpravách" class="btn max-sm:hidden" name="_continue">
+                        <input type="submit" form="{{ FORM_BASE_ID }}{{ language_code }}" value="{% blocktrans %}Save{% endblocktrans %}" class="btn btn-secondary" name="_save">
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

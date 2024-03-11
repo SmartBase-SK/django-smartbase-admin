@@ -1,0 +1,11 @@
+{% extends "sb_admin/actions/list.html" %}
+{% load widget_tweaks %}
+{% block actions %}
+    {% include "sb_admin/actions/translations-language-choice.html" %}
+    {{ block.super }}
+{% endblock %}
+
+{% block dropdown_actions %}
+    {% include "sb_admin/actions/translations-language-choice.html" %}
+    {{ block.super }}
+{% endblock %}

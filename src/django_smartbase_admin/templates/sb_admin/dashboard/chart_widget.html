@@ -1,0 +1,27 @@
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load sb_admin_tags %}
+
+{% block content_inner %}
+    <div class="card sm:mb-24 p-16">
+        <div class="mt-16">
+            <script type="text/javascript" src="{% static 'sb_admin/dist/chart.js' %}"></script>
+            <div class="flex flex-wrap -m-8 mb-16">
+                {% for sub_widget in sub_widgets %}
+                    <div class="w-1/2 md:w-1/4 p-8">
+                        {% render_widget sub_widget request %}
+                    </div>
+                {% endfor %}
+            </div>
+            <canvas id="{{ widget_id }}-chart"></canvas>
+            {{ initial_data|get_json_script:'initial_data' }}
+            <script>
+                window.SBAdminChart = window.SBAdminChart || {};
+                window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                    "widgetId": "{{ widget_id }}",
+                    "ajaxUrl": "{{ ajax_url }}",
+                    "chartType": "{{ chart_type }}"
+                });
+            </script>
+        </div>
+    </div>
+{% endblock %}

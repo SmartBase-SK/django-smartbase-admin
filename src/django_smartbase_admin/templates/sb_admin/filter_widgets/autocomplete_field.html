@@ -1,0 +1,20 @@
+{% load sb_admin_tags %}
+
+<div class="dropdown-menu max-h-none w-248">
+    <div class="px-12 pt-8">
+        {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
+            <div class="relative">
+                <input form="{{ filter_widget.view_id }}-filter-form" type="hidden"
+                       id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
+                       {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %} value="{{ filter_widget.get_default_value }}"{% endif %}>
+                <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete"
+                        data-autocomplete-data-id="{{ autocomplete_data_id }}">
+                </select>
+            </div>
+            <div class="autocomplete-data-wrapper">
+                {{ filter_widget|get_json_script:autocomplete_data_id }}
+            </div>
+        {% endwith %}
+    </div>
+    {% include "sb_admin/filter_widgets/partials/clear.html" %}
+</div>

@@ -1,0 +1,211 @@
+{% extends "sb_admin/sb_admin_base.html" %}
+{% load i18n admin_urls static admin_modify sb_admin_tags %}
+
+{% block js_init %}
+    {{ block.super }}
+    <script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
+    {{ media }}
+{% endblock %}
+
+{% block js %}
+    {{ block.super }}
+    <script type="text/javascript"
+            id="django-admin-form-add-constants"
+            src="{% static 'admin/js/change_form.js' %}"
+        {% if adminform and add %}
+            data-model-name="{{ opts.model_name }}"
+        {% endif %}>
+    </script>
+    {# JavaScript for prepopulated fields #}
+    {% prepopulated_fields_js %}
+{% endblock %}
+
+{% block content %}
+    {% block form_modal %}
+        {% include 'sb_admin/partials/modal/modal.html' %}
+    {% endblock %}
+    {% get_tabular_context adminform inline_admin_formsets tabs_context as tabular_context %}
+
+    {% block header %}
+        <div class="py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+            {% if not is_popup and has_view_permission %}
+                {% url opts|admin_urlname:'changelist' as changelist_url %}
+                <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Left-small"></use>
+                    </svg>
+                </a>
+            {% endif %}
+            <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">
+                {% include 'sb_admin/includes/change_form_title.html' %}
+            </h1>
+            {% if change and not is_popup %}
+                <ul class="flex ml-auto gap-8 md:gap-16">
+                    <li class="relative md:hidden">
+                        <button
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            data-bs-popper-placement="bottom-end"
+                            class="btn btn-empty btn-icon">
+                            <svg class="w-16 h-16">
+                                <use xlink:href="#More"></use>
+                            </svg>
+                            <span></span>
+                        </button>
+                        <div class="dropdown-menu w-248 max-h-432">
+                            <ul>
+                                {% block dropdown_actions %}
+                                    {% if detail_actions %}
+                                        {% for action in detail_actions %}
+                                            <li>
+                                                <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link">
+                                                    {{ action.title }}
+                                                </a>
+                                            </li>
+                                        {% endfor %}
+                                    {% endif %}
+
+                                    <li>
+                                        {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
+                                        <a href="{% add_preserved_filters history_url %}" class="dropdown-menu-link">{% trans "History" %}</a>
+                                    </li>
+                                {% endblock %}
+                            </ul>
+                        </div>
+                    </li>
+
+
+                    {% block actions %}
+                        <li class="max-sm:hidden">
+                            {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
+                            <a href="{% add_preserved_filters history_url %}" class="btn btn-empty">{% trans "History" %}</a>
+                        </li>
+
+                        {% if detail_actions %}
+                            {% for action in detail_actions %}
+                                <li class="max-sm:hidden">
+                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty">
+                                        {{ action.title }}
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                    {% endblock %}
+                    {% if has_absolute_url %}
+                        <li>
+                            <a href="{{ absolute_url }}" class="btn btn-icon">
+                                <svg class="w-20 h-20 md:mr-8">
+                                    <use xlink:href="#Preview-open"></use>
+                                </svg>
+                                <span>
+                                    {% trans "View on site" %}
+                                </span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+        </div>
+    {% endblock %}
+
+    {% block form %}
+        <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
+              id="{{ opts.model_name }}_form" class="flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+            {% csrf_token %}
+            {% if errors %}
+                <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+                    <div class="flex">
+                        <svg class="w-20 h-20 mr-12 text-negative">
+                            <use xlink:href="#Close-one"></use>
+                        </svg>
+                        <h5 class="font-semibold">
+                            {% blocktrans count errors|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                        </h5>
+                    </div>
+                </div>
+                {{ adminform.form.non_field_errors }}
+            {% endif %}
+            {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+            {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+            {% if save_on_top %}{% block submit_buttons_top %}{% submit_row %}{% endblock %}{% endif %}
+
+            {% if not tabular_context.default_tabs %}
+                <ul class="saved-filters" role="tablist">
+                    {% for tab, tab_content_object in tabular_context.context.items %}
+                        <li role="presentation">
+                            <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ tab|slugify }}" data-bs-toggle="tab"
+                                    data-bs-target="#tabcontent_{{ tab|slugify }}" type="button" role="tab"
+                                    aria-controls="tabcontent_{{ tab|slugify }}" aria-selected="true">
+                                {{ tab }}
+                            </button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            {% for tab, tab_content_object in tabular_context.context.items %}
+                <div class="tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %}{% if forloop.first and not forloop.last %} pt-20{% endif %}" id="tabcontent_{{ tab|slugify }}" role="tabpanel"
+                     aria-labelledby="tab_{{ tab|slugify }}">
+                    <div class="flex max-md:flex-wrap w-full lg:gap-24">
+                        <div class="min-w-0 w-full">
+                            {% for tab_content in tab_content_object.content %}
+                                {% if tab_content.type == 'fieldset' %}
+                                    {% with tab_content.value as fieldset %}
+                                        {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes %}
+                                            {% include "sb_admin/includes/fieldset.html" %}
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                                {% if tab_content.type == 'inline' %}
+                                    {% with tab_content.value as inline_admin_formset %}
+                                        {% include inline_admin_formset.opts.template %}
+                                    {% endwith %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% spaceless %}
+                            <div class="lg:flex-shrink-0 w-full lg:w-370 empty:hidden">
+                                {% for tab_content in tab_content_object.content %}
+                                    {% if tab_content.type == 'fieldset' %}
+                                        {% with tab_content.value as fieldset %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes %}
+                                                {% include "sb_admin/includes/fieldset.html" %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endspaceless %}
+                    </div>
+                </div>
+            {% endfor %}
+
+            {% block admin_change_form_document_ready %}
+                <script type="text/javascript"
+                        id="django-admin-form-add-constants"
+                        src="{% static 'admin/js/change_form.js' %}"
+                    {% if adminform and add %}
+                        data-model-name="{{ opts.model_name }}"
+                    {% endif %}>
+                </script>
+            {% endblock %}
+            {% if is_popup %}
+                {# TODO: check sticky bar in popups #}
+             {% endif %}
+            <div class="detail-view-action-bar">
+                <div>
+                    <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                        {% include 'sb_admin/includes/change_form_title.html' %}
+                    </h2>
+                    <div class="flex ml-auto gap-8">
+                        {% if not is_popup and has_view_permission %}
+                            {% url opts|admin_urlname:'changelist' as changelist_url %}
+                            <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+                        {% endif %}
+
+                        {% submit_row %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    {% endblock %}
+{% endblock %}

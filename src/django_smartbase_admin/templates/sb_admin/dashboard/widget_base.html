@@ -1,0 +1,19 @@
+{% block content %}
+    <form id="{{ widget_id }}-filter-form" action="">
+    </form>
+    
+    {% block filters %}
+        <div class="flex max-sm:flex-wrap max-xs:py-16 sm:mb-24 gap-y-8 justify-between">
+            <div class="min-w-0 sm:-mx-16 -my-12">
+                {% include 'sb_admin/components/filters.html' with filters=settings all_filters_visible=True default_button=True %}
+            </div>
+            <div class="min-w-0 sm:-mx-16 -my-12">
+                {% include 'sb_admin/components/filters.html' with filters=filters all_filters_visible=True default_button=True %}
+            </div>
+        </div>
+    {% endblock %}
+    
+    {% block content_inner %}
+    
+    {% endblock %}
+{% endblock %}    

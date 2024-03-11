@@ -1,0 +1,10 @@
+{% load i18n %}
+
+<div class="dropdown-menu">
+    <div class="relative px-12 py-8">
+        <input form="{{ filter_widget.view_id }}-filter-form" type="text" class="input" placeholder="{% trans 'Type to filter' %}"
+               id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
+               {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %} value="{{ filter_widget.get_default_value }}"{% endif %}>
+    </div>
+    {% include "sb_admin/filter_widgets/partials/clear.html" %}
+</div>

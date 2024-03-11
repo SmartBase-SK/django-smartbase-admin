@@ -1,0 +1,10 @@
+<input class="peer hidden" {% if is_active %}checked{% endif %} form="{{ sub_widget.parent_view.view_id }}-filter-form" type="radio" name="{{ sub_widget.parent_view.view_id }}{{ sub_widget.parent_view.SUB_WIDGET_NAME_SUFFIX }}" value="{{ sub_widget.sub_widget_id }}" id="{{ sub_widget.sub_widget_id }}_input_id">
+<label for="{{ sub_widget.sub_widget_id }}_input_id" class="block rounded p-16 h-full border border-transparent peer-checked:border-dark-300 peer-checked:bg-dark-50">
+    <div id="{{ sub_widget.sub_widget_id }}__wrapper">
+        <div class="font-semibold text-14">{{ sub_widget.title }}</div>
+        <div class="flex">
+            <div id="{{ sub_widget.sub_widget_id }}" class="text-dark-900 text-24 font-semibold min-h-32 mr-8"></div>
+            <div id="{{ sub_widget.sub_widget_id }}_compare" class="ml-auto self-end text-14 font-medium"></div>
+        </div>
+    </div>
+</label>

@@ -1,0 +1,8 @@
+{% load i18n %}
+
+<div class="{{ additional_class|default:"" }} page-loading absolute top-0 bottom-0 right-0 left-0 z-1 bg-light opacity-75">
+    <div class="flex-center w-full h-full flex-col">
+        <div class="loader"></div>
+        <div class="pt-10">{% trans 'Loading...' %}</div>
+    </div>
+</div>
