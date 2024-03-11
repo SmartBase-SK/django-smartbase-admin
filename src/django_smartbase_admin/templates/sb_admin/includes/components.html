@@ -1,0 +1,442 @@
+<div class="alert bg-notice-50 border border-notice-100 text-notice-900">
+    <div class="flex">
+        <svg class="w-20 h-20 mr-12 text-notice">
+            <use xlink:href="#Info"></use>
+        </svg>
+        <h5 class="font-semibold">Attention needed</h5>
+        <div class="flex ml-auto items-center">
+            <a href="#" class="inline-flex items-center text-notice-900 hover:text-notice">
+                <span class="font-medium">
+                    asdasd asd asds d
+                </span>
+                <svg class="w-16 h-16 ml-4">
+                    <use xlink:href="#Right-small"></use>
+                </svg>
+            </a>
+            <svg class="w-16 h-16 ml-24 cursor-pointer hover:text-notice js-alert-close">
+                <use xlink:href="#Close"></use>
+            </svg>
+        </div>
+    </div>
+    <div class="px-32 mt-8">
+        <p class="text-notice-800">Lorem ipsum dolor sit amet, consectetur adipisicing elit. A aliquid beatae
+            dignissimos doloribus earum eveniet inventore maxime modi perferendis quam saepe, soluta voluptate
+            voluptatum! Accusamus aliquid esse exercitationem incidunt voluptatibus?</p>
+        <button class="btn btn-small text-notice-900 border-current bg-transparent shadow-none font-medium mt-8">
+            asdasdad
+        </button>
+    </div>
+</div>
+
+
+<div class="card">
+    <div class="flex gap-24">
+        <div class="relative">
+            <button
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    data-bs-popper-placement="bottom-end"
+                    class="btn">
+                <svg class="w-16 h-16 mr-8">
+                    <use xlink:href="#Column"></use>
+                </svg>
+                <span>
+                   Columns
+                </span>
+            </button>
+            <div class="dropdown-menu w-248">
+                <ul>
+                    <li class="p-12 font-semibold text-dark-900">
+                        Choose Columns
+                    </li>
+                    <li>
+                        <ul class="js-sortable-list">
+                            <li class="relative px-12 py-8 flex">
+                                <input type="checkbox" class="checkbox" name="column" id="column-1">
+                                <label for="column-1" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                        class="ml-4 text-negative">*</span></label>
+                                <div class="js-drag-handle cursor-pointer ml-auto">
+                                    <svg class="w-20 h-20 text-dark-400">
+                                        <use xlink:href="#Drag"></use>
+                                    </svg>
+                                </div>
+                            </li>
+                            <li class="relative px-12 py-8 flex">
+                                <input type="checkbox" class="checkbox" name="column" id="column-2">
+                                <label for="column-2" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                        class="ml-4 text-negative">*</span></label>
+                                <div class="js-drag-handle cursor-pointer ml-auto">
+                                    <svg class="w-20 h-20 text-dark-400">
+                                        <use xlink:href="#Drag"></use>
+                                    </svg>
+                                </div>
+                            </li>
+                            <li class="relative px-12 py-8 flex">
+                                <input type="checkbox" class="checkbox" name="column" id="column-3">
+                                <label for="column-3" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                        class="ml-4 text-negative">*</span></label>
+                                <div class="js-drag-handle cursor-pointer ml-auto">
+                                    <svg class="w-20 h-20 text-dark-400">
+                                        <use xlink:href="#Drag"></use>
+                                    </svg>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="flex items-center relative p-12 border-t border-dark-200">
+                        <button class="btn btn-small btn-primary">Save</button>
+                        <button class="btn btn-small ml-4">Cancel</button>
+                        <span class="text-primary ml-auto">Select All</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="relative">
+            <button
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    class="btn btn-small rounded-full">
+                <span>
+                   Filter Values
+                </span>
+                <svg class="w-16 h-16 ml-4">
+                    <use xlink:href="#Down"></use>
+                </svg>
+            </button>
+            <div class="dropdown-menu">
+                <ul>
+                    <li class="px-12 py-8">
+                        <div class="relative">
+                            <input type="text" class="input pl-10 pr-38" placeholder="placeholder text"
+                                   id="text-input">
+                            <div class="absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                <svg class="w-20 h-20">
+                                    <use xlink:href="#Find"></use>
+                                </svg>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="relative px-12 py-8">
+                        <input type="radio" class="radio" name="rad" id="rad-1">
+                        <label for="rad-1" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                class="ml-4 text-negative">*</span></label>
+                    </li>
+                    <li class="relative px-12 py-8">
+                        <input type="radio" class="radio" name="rad" id="rad-2">
+                        <label for="rad-2" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                class="ml-4 text-negative">*</span></label>
+                    </li>
+                    <li class="relative px-12 py-8">
+                        <input type="radio" class="radio" name="rad" id="rad-3">
+                        <label for="rad-3" class="text-dark-900">jfh akjfh askd jnaskjdf <span
+                                class="ml-4 text-negative">*</span></label>
+                    </li>
+                    <li class="relative px-12 py-8 flex">
+                        <span>Clear</span>
+                        <span class="text-primary ml-auto">Select All</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="relative">
+            <button
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    class="btn btn-small rounded-full bg-dark-100 shadow-none">
+                <span>
+                   Add
+                </span>
+                <svg class="w-16 h-16 ml-4">
+                    <use xlink:href="#Plus"></use>
+                </svg>
+            </button>
+            <div class="dropdown-menu">
+                <ul>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 1</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <hr>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 3</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="relative">
+            <button
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    class="btn btn-small rounded-full bg-dark-100 shadow-none">
+                <span>
+                   Add
+                </span>
+                <svg class="w-16 h-16 ml-4">
+                    <use xlink:href="#Plus"></use>
+                </svg>
+            </button>
+            <div class="dropdown-menu js-input-group">
+                <ul>
+                    <li class="px-12 py-8">
+                        <div class="flex gap-8">
+                            <div class="relative">
+                                <input type="text" class="input" placeholder="placeholder text" id="range-min">
+                            </div>
+                            <div class="relative">
+                                <input type="text" class="input" placeholder="placeholder text" id="range-max">
+                            </div>
+                        </div>
+                    </li>
+                    <li class="px-12 py-8">
+                        <div class="py-8">
+                            <div class="js-range" data-current-min="10" data-current-max="120" data-min="0"
+                                 data-max="200"
+                                 data-step="1" data-min-id="range-min" data-max-id="range-max"></div>
+                        </div>
+                    </li>
+                </ul>
+                <div class="relative px-12 py-8 flex">
+                    <span>Clear</span>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    {% include 'sb_admin/components/buttons.html' %}
+    {% include 'sb_admin/components/inputs.html' %}
+
+    <div class="flex flex-wrap items-center gap-24">
+        <div class="relative">
+            <button data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    class="btn">
+                    <span>
+                       dropdown
+                    </span>
+                <svg class="w-20 h-20 ml-8">
+                    <use xlink:href="#Down"></use>
+                </svg>
+            </button>
+            <div class="dropdown-menu">
+                <ul>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 1</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <hr>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 2</a>
+                    </li>
+                    <li>
+                        <a href="#" class="dropdown-menu-link">Krajina 3</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="relative my-16">
+            <input id="in-stock_id" type="checkbox" name="in-stock" class="toggle">
+            <label for="in-stock_id"></label>
+            <label for="in-stock_id">asdasdasd</label>
+        </div>
+
+        <button id="modal-1-btn" type="button" class="btn" data-bs-toggle="modal" data-bs-target="#modal-1">
+            modal
+        </button>
+        <div id="modal-1" class="modal fade" tabindex="-1" aria-labelledby="modal-1-btn" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="text-dark-900 text-18 font-semibold leading-28">title</h3>
+                        <svg data-bs-dismiss="modal" aria-label="Close"
+                             class="w-24 h-24 absolute top-16 right-16 cursor-pointer transition-transform hover:rotate-90">
+                            <use xlink:href="#Close-small"></use>
+                        </svg>
+                    </div>
+                    <div class="modal-body">
+                        modaaalik
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn" data-bs-dismiss="modal">cancel</button>
+                        <button class="btn">save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-between" style="width: 180px;">
+        <div>
+            <div class="badge">
+                Label
+            </div>
+            <div class="badge badge-positive">
+                Label
+            </div>
+            <div class="badge badge-warning">
+                Label
+            </div>
+            <div class="badge badge-negative">
+                Label
+            </div>
+            <div class="badge badge-neutral">
+                Label
+            </div>
+            <div class="badge badge-primary">
+                Label
+            </div>
+        </div>
+        <div>
+            <div class="badge badge-large">
+                Label
+            </div>
+            <div class="badge badge-large badge-positive">
+                Label
+            </div>
+            <div class="badge badge-large badge-warning">
+                Label
+            </div>
+            <div class="badge badge-large badge-negative">
+                Label
+            </div>
+            <div class="badge badge-large badge-neutral">
+                Label
+            </div>
+            <div class="badge badge-large badge-primary">
+                Label
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <ul class="nav nav-tabs" role="tablist">
+            <li role="presentation">
+                <button class="tab-link active" id="editorial-reviews-tab" data-bs-toggle="tab"
+                        data-bs-target="#nav-editorial-reviews" type="button" role="tab"
+                        aria-controls="nav-editorial-reviews" aria-selected="true">
+                    {% trans "Editorial reviews" %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button class="tab-link" id="nav-reader-reviews-tab" data-bs-toggle="tab"
+                        data-bs-target="#nav-reader-reviews" type="button" role="tab"
+                        aria-controls="nav-reader-reviews"
+                        aria-selected="true">
+                    {% trans "Reader reviews" %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button class="tab-link" id="nav-author-tab" data-bs-toggle="tab" data-bs-target="#nav-author"
+                        type="button"
+                        role="tab" aria-controls="nav-author" aria-selected="true">
+                    {% trans "Author" %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button class="tab-link" id="product-details-tab" data-bs-toggle="tab"
+                        data-bs-target="#product-details" type="button" role="tab" aria-controls="product-details"
+                        aria-selected="true">
+                    {% trans "Product details" %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button class="tab-link" id="awards-tab" data-bs-toggle="tab" data-bs-target="#awards" type="button"
+                        role="tab" aria-controls="awards" aria-selected="true">
+                    {% trans "Awards" %}
+                </button>
+            </li>
+        </ul>
+        <div>
+            <div class="tab-pane fade show active" id="nav-editorial-reviews" role="tabpanel"
+                 aria-labelledby="nav-editorial-reviews-tab">
+                tab 1
+            </div>
+            <div class="tab-pane fade" id="nav-reader-reviews" role="tabpanel"
+                 aria-labelledby="nav-reader-reviews-tab">
+                tab 2
+            </div>
+            <div class="tab-pane fade" id="nav-author" role="tabpanel" aria-labelledby="nav-author-tab">
+                tab 3
+            </div>
+            <div class="tab-pane fade" id="product-details" role="tabpanel" aria-labelledby="product-details-tab">
+                tab 4
+            </div>
+            <div class="tab-pane fade" id="awards" role="tabpanel" aria-labelledby="awards-tab">
+                tab 5
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <ul class="saved-filters">
+            <li>
+                asdasd
+            </li>
+            <li>
+                <button class="active">
+                    asdasd
+                    <div class="relative ml-4">
+                        <svg class="w-24 h-24" data-bs-toggle="dropdown"
+                             aria-expanded="false">
+                            <use xlink:href="#More-one"></use>
+                        </svg>
+                        <div class="dropdown-menu">
+                            <ul>
+                                <li>
+                                    <a href="#" class="dropdown-menu-link">
+                                        <svg class="w-20 h-20 text-dark mr-12"
+                                             aria-expanded="false">
+                                            <use xlink:href="#Minus-the-top"></use>
+                                        </svg>
+                                        Duplicate
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-menu-link">
+                                        <svg class="w-20 h-20 text-dark mr-12"
+                                             aria-expanded="false">
+                                            <use xlink:href="#Delete"></use>
+                                        </svg>
+                                        Delete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </button>
+
+
+            </li>
+            <li>
+                asdasd
+            </li>
+            <li>
+                asdasd
+            </li>
+        </ul>
+    </div>
+
+    <div>
+        <input type="text" id="date-picker" class="js-datepicker-range">
+    </div>
+</div>

@@ -1,0 +1,215 @@
+{% load static i18n %}
+
+<div class="p-32">
+    <div class="flex flex-wrap gap-24">
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input px-38" placeholder="placeholder text" id="text-input">
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Search"></use>
+                    </svg>
+                </label>
+                <div class="absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium pointer-events-none" for="search-select">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <select class="input px-38" id="search-select">
+                    <option value="" selected>Select products</option>
+                    <option value="option-1">option 1</option>
+                    <option value="option-2">option 2</option>
+                </select>
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center pointer-events-none" for="search-select">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Search"></use>
+                    </svg>
+                </label>
+                <label class="absolute right-0 pr-10 rounded-r top-0 bottom-0 flex items-center gap-8 pointer-events-none" for="search-select">
+                    <svg class="w-20 h-20 flex-shrink-0">
+                        <use xlink:href="#Down"></use>
+                    </svg>
+                </label>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input pl-38 pr-66" placeholder="placeholder text" id="text-input">
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Search"></use>
+                    </svg>
+                </label>
+                <div class="absolute right-0 pr-10 rounded-r top-0 bottom-0 flex items-center gap-8">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Sort Alt"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <textarea class="input" placeholder="placeholder text" id="text-input" rows="6"></textarea>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input pl-42 pr-66" placeholder="placeholder text" id="text-input">
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <img src="{% static 'images/sk.svg' %}" alt="sk" width="24" height="18">
+                </label>
+                <div class="absolute right-0 pr-10 rounded-r top-0 bottom-0 flex items-center gap-8">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Sort Alt"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input pl-42 pr-66" placeholder="placeholder text" id="text-input">
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <span class="w-24 h-24 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300 text-12">
+                        AB
+                    </span>
+                </label>
+                <div class="absolute right-0 pr-10 rounded-r top-0 bottom-0 flex items-center gap-8">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Sort Alt"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input pl-26 pr-66" placeholder="placeholder text" id="text-input">
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <span class="inline-flex ml-2 rounded-full bg-success w-6 h-6"></span>
+                </label>
+                <div class="absolute right-0 pr-10 rounded-r top-0 bottom-0 flex items-center gap-8">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Sort Alt"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+                <input type="text" class="input px-38" placeholder="placeholder text" id="text-input" disabled>
+                <label class="absolute left-10 top-0 bottom-0 h-full flex items-center" for="text-input">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Search"></use>
+                    </svg>
+                </label>
+                <div class="absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                    <svg class="w-20 h-20">
+                        <use xlink:href="#Setting-config"></use>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+        
+        <div class="w-1/4">
+            <label class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" for="text-input">
+                Search Config <span class="ml-4 text-negative">*</span>
+            </label>
+            <div class="relative">
+
+                <label for="file" class="input-file js-input-file">
+                    <span class="w-40 h-40 flex-center bg-dark-100 rounded-full mr-16">
+                        <svg class="w-24 h-24 ">
+                            <use xlink:href="#Upload"></use>
+                        </svg>
+                    </span>
+                    <span>
+                        <span class="flex items-center">
+                            {% blocktrans %}
+                                <button class="btn btn-primary-light btn-tiny">Add file</button>
+                                <span class="ml-4 text-dark-900 text-12 leading-16">or move here</span>
+                            {% endblocktrans %}
+                        </span>
+                        <span class="block text-dark-600 text-12 leading-16 mt-8">
+                            {% trans 'JPG, PNG, GIF or WEBP max 10MB' %}
+                        </span>
+                    </span>
+                    <input type="file" id="file">
+                </label>
+            </div>
+            <p class="mt-8 text-12 leading-18">Short or longer input description</p>
+        </div>
+
+        <div class="w-1/4">
+            <div class="relative">
+                <input type="checkbox" class="checkbox" name="check" id="check">
+                <label for="check" class="text-dark-900">jfh akjfh askd jnaskjdf <span class="ml-4 text-negative">*</span></label>
+            </div>
+            <div class="relative">
+                <input type="radio" class="radio" name="rad" id="rad-1">
+                <label for="rad-1" class="text-dark-900">jfh akjfh askd jnaskjdf <span class="ml-4 text-negative">*</span></label>
+            </div>
+            <div class="relative">
+                <input type="radio" class="radio" name="rad" id="rad-2">
+                <label for="rad-2" class="text-dark-900">jfh akjfh askd jnaskjdf <span class="ml-4 text-negative">*</span></label>
+            </div>
+            <div class="relative">
+                <input type="radio" class="radio" name="rad" id="rad-3">
+                <label for="rad-3" class="text-dark-900">jfh akjfh askd jnaskjdf <span class="ml-4 text-negative">*</span></label>
+            </div>
+        </div>
+    </div>
+</div>

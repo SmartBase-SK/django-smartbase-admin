@@ -1,0 +1,22 @@
+@import "_tailwind_base.css";
+
+@import "_tabulator.css";
+@import "_datepicker.css";
+@import "_nouislider.css";
+@import "_inlines.css";
+
+@import "_base.css";
+@import "_components.css";
+@import "_utilities.css";
+
+@import "_choices.css";
+
+.js-ready {
+    .sidebar,
+    [class*=":sidebar"]{
+         @apply transition-transform duration-300 ease-in-out;
+    }
+}
+
+
+

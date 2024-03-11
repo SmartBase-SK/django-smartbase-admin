@@ -1,0 +1,10 @@
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="flex gap-16">
+    {% for widget in widget.subwidgets %}
+        <div class="relative flex-1">
+            {% include widget.template_name with subwidget=True %}
+        </div>
+    {% endfor %}
+</div>
+{% include 'sb_admin/widgets/includes/help_text.html' %}
+

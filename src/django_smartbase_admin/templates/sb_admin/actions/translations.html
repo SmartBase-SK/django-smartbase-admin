@@ -1,0 +1,28 @@
+{% extends "sb_admin/sb_admin_base.html" %}
+{% load i18n %}
+
+{% block content %}
+    <div class="py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+        <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">
+            {% trans 'Translations' %}
+        </h1>
+    </div>
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 sm:gap-24 w-full max-w-1180 mx-auto">
+        {% for view in sub_views %}
+            <div class="card text-center">
+                {% if view.icon %}
+                    <div class="rounded-full flex-center w-56 h-56 mb-16 mx-auto {{ view.icon.class }}">
+                        <svg class="w-32 h-32">
+                            <use xlink:href="{{ view.icon.path }}"></use>
+                        </svg>
+                    </div>
+                {% endif %}
+                <h4 class="text-16 mb-4 font-bold text-dark-900">{{ view.get_menu_label }}</h4>
+                {% if view.description %}
+                    <p class="text-14 text-dark-600">{{ view.description }}</p>
+                {% endif %}
+                <a href="{{ view.get_menu_view_url }}" class="btn mt-16">{% trans 'Show translations' %}</a>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

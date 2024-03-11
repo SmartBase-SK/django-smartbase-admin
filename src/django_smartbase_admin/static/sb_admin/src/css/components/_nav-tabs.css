@@ -1,0 +1,30 @@
+@layer components {
+    .nav-tabs {
+        display: flex;
+        overflow-x: auto;
+
+        .tab-link {
+            @apply block;
+            @apply pt-8 px-32 pb-14;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition-property: color, border;
+            transition-duration: .15s;
+            transition-timing-function: ease-in;
+            white-space: nowrap;
+
+            @screen max-sm {
+                @apply px-24;
+                @apply text-p-small;
+            }
+
+            &:hover {
+                @apply border-light-material;
+            }
+
+            &.active {
+                @apply text-action border-action;
+            }
+        }
+    }
+}

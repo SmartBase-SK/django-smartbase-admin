@@ -1,0 +1,153 @@
+{% extends list_base_template|default:"sb_admin/sb_admin_base.html" %}
+{% load sb_admin_tags i18n %}
+{% load render_bundle from webpack_loader %}
+
+
+{% block content %}
+    {% block form_modal %}
+        {% include 'sb_admin/partials/modal/modal.html' %}
+    {% endblock %}
+    {% block page_header %}
+        <div class="py-16 md:pb-32 flex items-center max-xs:px-20">
+            <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">{{ list_title }}</h1>
+            <ul class="ml-auto flex gap-8 md:gap-16">
+                <li class="relative md:hidden">
+                    <button
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        data-bs-popper-placement="bottom-end"
+                        class="btn btn-empty btn-icon">
+                        <svg class="w-16 h-16">
+                            <use xlink:href="#More"></use>
+                        </svg>
+                        <span></span>
+                    </button>
+                    <div class="dropdown-menu w-248 max-h-432">
+                        <ul>
+                            {% block dropdown_actions %}
+                                {% for list_action in content_context.list_actions %}
+                                    <li>
+                                        <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.location.href='{{ list_action.url }}'{% if not list_action.no_params %} + window.SBAdminTable['{{ view_id }}'].getUrlParamsString(){% endif %}"{% endif %}
+                                            class="dropdown-menu-link">{{ list_action.title }}</a>
+                                    </li>
+                                {% endfor %}
+                            {% endblock %}
+                        </ul>
+                    </div>
+                </li>
+
+                {% block actions %}
+                    {% for list_action in content_context.list_actions %}
+                        <li class="max-sm:hidden">
+                            <button {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.location.href='{{ list_action.url }}'{% if not list_action.no_params %} + window.SBAdminTable['{{ view_id }}'].getUrlParamsString(){% endif %}"{% endif %}
+                                    class="btn btn-empty">{{ list_action.title }}
+                            </button>
+                        </li>
+                    {% endfor %}
+                {% endblock %}
+                {% if content_context.new_url %}
+                    <li>
+                        <a href="{{ content_context.new_url }}" class="btn btn-secondary btn-icon">
+                            <svg class="w-20 h-20 md:mr-8">
+                                <use xlink:href="#Plus"></use>
+                            </svg>
+                            <span>{% trans 'Add' %} {{ model_name }}</span>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    {% endblock %}
+
+    <div class="card p-0">
+        <form id="{{ view_id }}-filter-form" class="filter-form" action=""></form>
+        {% block tabulator_custom_header %}
+            <div id="{{ view_id }}-tabulator-header" class="tabulator-custom-header">
+                {% block table_header %}
+                    {% with 'filters-collapse-button' as filters_collapse_button_id %}
+                        {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}
+                        <div class="flex justify-between max-sm:flex-wrap py-16 md:p-16 md:gap-x-8 gap-y-12">
+                            {% include "sb_admin/config/view.html" with current_views=content_context.current_views %}
+                            {% block tabulator_custom_header_controls %}
+                                <div class="flex items-center flex-shrink-0 gap-8 max-sm:px-16">
+                                    <button id="save-view-modal-button" type="button"
+                                            class="btn btn-tiny btn-primary btn-empty mr-8" data-bs-toggle="modal"
+                                            data-bs-target="#save-view-modal">
+                                        {% trans 'Save view' %}
+                                    </button>
+                                    <button
+                                            id="{{ filters_collapse_button_id }}"
+                                            type="button"
+                                            class="btn collapse-btn btn-icon js-save-state{% if not collapse_opened %} collapsed{% endif %}"
+                                            data-bs-toggle="collapse"
+                                            role="button"
+                                            aria-expanded="{% if collapse_opened %}true{% else %}false{% endif %}"
+                                            data-bs-target="#filters-collapse"
+                                            aria-controls="filters-collapse">
+                                        <svg class="w-16 h-16 md:mr-8">
+                                            <use xlink:href="#Find"></use>
+                                        </svg>
+                                        <span>{% trans 'Search and filter' %}</span>
+                                    </button>
+                                    {% include 'sb_admin/components/columns.html' %}
+                                </div>
+                            {% endblock %}
+                        </div>
+
+                        <div id="filters-collapse" class="collapse border-t border-dark-200 max-sm:overflow-x-auto custom-scrollbar{% if collapse_opened %} show{% endif %}">
+                            {% include 'sb_admin/components/filters.html' with filters=content_context.filters %}
+                        </div>
+                    {% endwith %}
+                {% endblock %}
+                <div id="{{ content_context.const.SELECTED_ROWS_KWARG_NAME }}_bar" class="table-selected-rows-bar fade">
+                    <div class="relative px-16">
+                        <input type="checkbox" class="checkbox" id="table-selected-rows-bar-select-all" name="table-selected-rows-bar-select-all">
+                        <label for="table-selected-rows-bar-select-all" class="!pl-20"></label>
+                    </div>
+                    <span id="{{ content_context.const.SELECTED_ROWS_KWARG_NAME }}_info" class="text-dark-900 whitespace-nowrap"></span>
+                    <div class="ml-auto flex gap-10">
+                        <button type="button"
+                                onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.selectionModule.selectAllData()"
+                                class="btn btn-empty btn-small">{% trans 'Select all' %}
+                        </button>
+                        <button type="button"
+                                onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.selectionModule.selectNoData()"
+                                class="btn btn-empty btn-small">{% trans 'Select none' %}
+                        </button>
+                        {% for list_selection_action in content_context.list_selection_actions %}
+                            <button {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.location.href='{{ list_selection_action.url }}' + window.SBAdminTable['{{ view_id }}'].getUrlParamsString()"{% endif %}
+                                    class="btn btn-small {{ list_selection_action.css_class|default_if_none:'' }}">{{ list_selection_action.title }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endblock %}
+        {% block tabulator_body %}
+        <div id="{{ view_id }}-table"></div>
+        {% endblock %}
+        {% block tabulator_custom_footer %}
+        <div class="tabulator-custom-footer">
+            <div class="flex items-center">
+                <div class="mr-16 max-sm:hidden">{% trans 'For page' %}</div>
+                <div id="{{ view_id }}-page-size-widget"></div>
+            </div>
+            <div id="{{ view_id }}-pagination-widget" class="ml-auto flex items-center"></div>
+        </div>
+        {% endblock %}
+
+
+    </div>
+{% endblock %}
+{% block additional_js %}
+    {% render_bundle "table" "js" config="SB_ADMIN" %}
+    {% block after_table_bundle %}{% endblock %}
+    {{ content_context.tabulator_definition|get_json_script:'tabulator_definition' }}
+    <script>
+        const tabulatorDefinition = window.loadJSONScriptData('tabulator_definition');
+        window.SBAdminTable = window.SBAdminTable || {};
+        window.addEventListener('DOMContentLoaded', () => {
+            window.SBAdminTable["{{ view_id }}"] = new window.SBAdminTableClass(tabulatorDefinition);
+        })
+    </script>
+{% endblock %}

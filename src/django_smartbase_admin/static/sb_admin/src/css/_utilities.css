@@ -1,0 +1,49 @@
+@layer utilities {
+    .fade {
+        transition-property: opacity, visibility;
+        transition-duration: .15s;
+        transition-timing-function: theme('transitionTimingFunction.DEFAULT');
+
+        &:not(.show) {
+            opacity: 0;
+            visibility: hidden;
+        }
+    }
+
+    .collapse {
+        &:not(.show) {
+            @apply hidden;
+        }
+    }
+
+    .collapsing {
+        @apply h-0 overflow-hidden transition-height;
+    }
+
+    .flex-basis-0 {
+        flex-basis: 0;
+    }
+
+    .absolute-center {
+        @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2;
+    }
+
+    .flex-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .visible {
+        display: block !important;
+    }
+
+    .active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .extend-space {
+        @apply -m-8 p-8;
+    }
+}

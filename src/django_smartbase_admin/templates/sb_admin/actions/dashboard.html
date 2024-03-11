@@ -1,0 +1,11 @@
+{% extends "sb_admin/sb_admin_base.html" %}
+{% load i18n sb_admin_tags %}
+
+{% block content %}
+    <div class="w-full max-w-1180 mx-auto">
+        {% for widget in sub_views %}
+            {% render_widget widget request %}
+        {% endfor %}
+    </div>
+{% endblock %}
+

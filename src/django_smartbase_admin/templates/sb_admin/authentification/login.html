@@ -1,0 +1,58 @@
+{% extends "sb_admin/authentification/login_base.html" %}
+{% load i18n static preferences_tags sb_admin_tags %}
+
+{% block content %}
+    {% if form.errors and not form.non_field_errors %}
+        <ul class="errorlist">
+            <li>
+                {% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}
+                    Please correct the errors below.{% endblocktranslate %}
+            </li>
+        </ul>
+    {% endif %}
+    {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div id="content-main">
+
+        {% if user.is_authenticated %}
+            <ul class="errorlist">
+                <li>
+                    {% blocktranslate trimmed %}
+                        You are authenticated as {{ username }}, but are not authorized to
+                        access this page. Would you like to login to a different account?
+                    {% endblocktranslate %}
+                </li>
+            </ul>
+        {% endif %}
+        <h1 class="text-30 text-dark-900 font-bold font-heading line-clamp-1">{% trans 'Welcome back' %}</h1>
+        <h3 class="text-14">{% trans 'Enter your details to enter the application.' %}</h3>
+
+        <form action="{{ app_path }}" method="post" id="login-form" class="pt-8">
+            {% csrf_token %}
+            <div class="my-16">
+                {% sb_admin_render_form_field form.username label_as_placeholder=True %}
+                {{ form.username.errors }}
+            </div>
+            <div class="my-16">
+                {% sb_admin_render_form_field form.password label_as_placeholder=True %}
+                {{ form.password.errors }}
+                <input type="hidden" name="next" value="{{ next }}">
+            </div>
+            <button type="submit" class="w-full btn btn-primary">{% translate 'Log in' %}</button>
+            {% url 'sb_admin:password_reset' as password_reset_url %}
+            {% if password_reset_url %}
+                <div class="py-24 text-14 text-center">
+                    {% trans "Can't sign in?" %}
+                    <a href="{{ password_reset_url }}" class="text-primary">{% translate 'Reset password' %}</a>
+                </div>
+            {% endif %}
+        </form>
+
+    </div>
+{% endblock %}

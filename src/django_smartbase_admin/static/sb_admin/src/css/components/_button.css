@@ -1,0 +1,198 @@
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center flex-shrink-0;
+        @apply h-40;
+        @apply px-16;
+        @apply rounded border border-dark-200;
+        @apply text-dark-900 bg-light shadow-xs;
+        @apply text-14 leading-18 font-medium;
+        transition-property: color, background-color, border, outline, box-shadow;
+        transition-duration: .1s;
+        transition-timing-function: ease-in;
+        overflow: hidden;
+        user-select: none;
+        >span {
+            @apply mr-auto;
+            @apply line-clamp-2;
+        }
+        >svg {
+            @apply w-20 h-20 flex-shrink-0;
+        }
+
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-dark-100 border-dark-300 text-dark-900;
+                &:active {
+                    @apply bg-dark-200 shadow-none text-dark-900;
+                }
+            }
+        }
+
+        &:focus {
+            @apply shadow-focus;
+        }
+
+        &:focus-visible {
+            outline: none;
+        }
+
+        &:disabled {
+            @apply bg-light border-dark-100 shadow-none text-dark;
+            cursor: not-allowed;
+        }
+    }
+
+    .btn-primary {
+        @apply text-light bg-primary border-primary;
+
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-primary-600 border-primary-600 text-light;
+                &:active {
+                    @apply bg-primary-700 border-primary-700 text-light;
+                }
+            }
+        }
+
+        &:focus {
+            @apply shadow-focus;
+        }
+
+        &:disabled {
+            @apply border-dark-a/5;
+        }
+
+        &.btn-empty {
+            @apply bg-primary-50 text-primary;
+            &:not(:disabled) {
+                &:hover {
+                    @apply bg-primary-100 text-primary;
+                    &:active {
+                        @apply bg-primary-100 text-primary;
+                    }
+                }
+            }
+        }
+    }
+
+    .btn-primary-light {
+        @apply text-primary bg-primary-50 border-transparent shadow-none;
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-primary-100 border-transparent;
+                &:active {
+                    @apply bg-primary-100 border-transparent;
+                }
+            }
+        }
+
+        &:focus {
+            @apply shadow-focus;
+        }
+
+        &:disabled {
+            @apply bg-transparent border-transparent;
+        }
+    }
+
+    .btn-secondary {
+        @apply text-dark-900 bg-secondary border-secondary;
+
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-secondary-600 border-secondary-600 text-dark-900;
+
+                &:active {
+                    @apply bg-secondary-700 border-secondary-700;
+                }
+            }
+        }
+
+        &:focus {
+            @apply shadow-focus;
+        }
+
+        &:disabled {
+            @apply border-dark-a/5;
+        }
+    }
+
+    .btn-destructive {
+        @apply text-negative bg-light border-negative-300 shadow-none;
+
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-negative-50 border-negative-400 text-negative;
+
+                &:active {
+                    @apply bg-negative-100 border-negative-400 text-negative;
+                }
+            }
+        }
+
+        &:focus {
+            @apply shadow-focus;
+        }
+
+        &:disabled {
+            @apply border-dark-a/5;
+        }
+    }
+
+    .btn-empty {
+        @apply border-none shadow-none bg-transparent;
+
+        &:not(:disabled) {
+            &:hover {
+                @apply bg-dark-a/5;
+                &:active {
+                    @apply bg-dark-a/10;
+                }
+            }
+        }
+
+        &:disabled {
+            @apply bg-transparent text-dark;
+        }
+    }
+
+    .btn-small {
+        @apply px-12 h-32;
+        >span {
+            @apply line-clamp-1;
+        }
+        >svg {
+            @apply w-16 h-16;
+        }
+    }
+
+    .btn-tiny {
+        @apply px-8 h-24;
+        @apply text-12 leading-16;
+        @apply shadow-none;
+        >span {
+            @apply line-clamp-1;
+        }
+        >svg {
+            @apply w-16 h-16;
+        }
+        &.btn-destructive {
+            @apply border-none bg-negative-50;
+            &:not(:disabled) {
+                &:hover {
+                    @apply bg-negative-100;
+
+                    &:active {
+                        @apply bg-negative-100;
+                    }
+                }
+            }
+        }
+    }
+    .btn-icon {
+        @apply max-sm:w-40 max-sm:px-0 max-sm:!justify-center;
+        >span {
+            @apply max-sm:hidden;
+        }
+    }
+}

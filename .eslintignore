@@ -1,0 +1,4 @@
+.eslintrc.js
+/static/js/**/*.js
+/static/build/**/*.js
+gulpfile.js

@@ -1,0 +1,10 @@
+{% extends "sb_admin/authentification/login_base.html" %}
+{% load i18n static %}
+
+{% block content %}
+    <div id="content-main">
+        <h1 class="text-30 text-dark-900 font-bold font-heading line-clamp-1">{% translate 'Logged out' %}</h1>
+        <h3 class="text-14 my-16">{% translate "Thanks for spending some quality time with the web site today." %}</h3>
+        <a class="w-full btn btn-primary" href="{% url 'admin:index' %}">{% translate 'Log in again' %}</a>
+    </div>
+{% endblock %}

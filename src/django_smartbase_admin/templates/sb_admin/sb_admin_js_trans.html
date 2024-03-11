@@ -1,0 +1,11 @@
+{% load i18n %}
+<script>
+    window.sb_admin_translation_strings = window.sb_admin_translation_strings || {};
+    window.sb_admin_translation_strings["first"] = '{% trans "Move to first" %}';
+    window.sb_admin_translation_strings["last"] = '{% trans "Move to last" %}';
+    window.sb_admin_translation_strings["up"] = '{% trans "Move up" %}';
+    window.sb_admin_translation_strings["down"] = '{% trans "Move down" %}';
+    window.sb_admin_translation_strings["reorder"] = '{% trans "Reorder" %}';
+    window.sb_admin_translation_strings["page"] = '{% blocktrans %}<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class="max-xs:hidden"> items</span>{% endblocktrans %}'
+    window.sb_admin_translation_strings["page_empty"] = '{% blocktrans %}<strong>0</strong> items{% endblocktrans %}'
+</script>

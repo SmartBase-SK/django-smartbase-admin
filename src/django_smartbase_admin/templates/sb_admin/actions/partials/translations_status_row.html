@@ -1,0 +1,16 @@
+{% load static %}
+
+<div class='flex items-center text-16 mb-16 translation-status-row {{ text_color }}'>
+    <img src="{% static flag_url %}" alt="{{ lang.0 }}" class="w-24 h-18 border border-dark-200 rounded-xs" width="24px" height="18px">
+    <span class="ml-8">{{ language_title|safe }}</span>
+    <div class='ml-auto flex'>
+        <svg class='w-20 h-20 {{ status_icon_color }}'>
+            <use xlink:href='#{{ status_icon }}'></use>
+        </svg>
+        {% block edit_link %}
+            <svg class='w-20 h-20 ml-16 {{ edit_icon_color }}' hx-post='{{ translations_edit_url }}' hx-swap='none' hx-params='{{ TRANSLATIONS_SELECTED_LANGUAGES }}' hx-vals='{"{{ TRANSLATIONS_SELECTED_LANGUAGES }}": "{{ lang.0 }}"}' hx-trigger='click'>
+                <use xlink:href='#{{ edit_icon }}'></use>
+            </svg>
+        {% endblock %}
+    </div>
+</div>

@@ -1,0 +1,401 @@
+{% extends list_base_template|default:"sb_admin/actions/list.html" %}
+{% load static i18n thumbnail admin_list smartshop_tags %}
+
+{% block tabulator_custom_header %}
+    {% include 'sb_admin/components/filters.html' with filters=content_context.filters all_filters_visible=True %}
+{% endblock %}
+{% block tabulator_body %}
+    {{ block.super }}
+    {% if category_id and alias_id %}
+        <div id="sortable-items" class="flex flex-wrap pt-10 pl-10">
+            {% for item in data.data %}
+                {% block promo_card %}
+                    {% if promo_cards and forloop.counter in promo_cards %}
+                        {% for promo_card in promo_cards|get_attr_from_dict:forloop.counter %}
+                            <div class="item-card-wrapper border-2 border-solid border-black mr-10 mb-10"
+                                 data-group-key="null"
+                                 data-order="-{{ promo_card.id }}"
+                                 style="{{ promo_card.styles }}">
+                                <div class="promo-card item">
+                                    {{ promo_card.id }} - {{ promo_card.name }}
+                                    P: <span class="counter"></span><br>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endblock %}
+                {% block item %}
+                    <div class="item-wrapper visible cursor-pointer border-2 border-solid border-black mr-10 mb-10" data-group-key="{{ item.group_by_catalog_value }}"
+                         data-order="{{ item.product_category_order_by }}" data-simple-order="{{ forloop.counter }}">
+                        <div class="item">
+                            <img height="76" width="57" class="lazyload" src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% thumbnail item.product_image 'product_detail_icon' %}" alt="">
+                            {% block sorting_product_attributes %}
+                                P: <span class="counter"></span><input type="checkbox" class="ml-10" name="item-selection" value="{{ item.product_category_order_by }}"><br>
+                                {{ item.product_name }}<br>
+                                {{ item.sorting_identifier|default_if_none:'' }}<br>
+                            {% endblock %}
+                        </div>
+                    </div>
+                {% endblock %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="flex-center m-10 mb-30 text-dark-900 text-20">
+            {% trans "Please select a category and domain(in bottom left corner) to sort." %}
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+    <div class="detail-view-action-bar hidden">
+        <div>
+            <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                {% trans 'Operations' %}
+            </h2>
+            <div id="sorting-controls" class="flex ml-auto gap-8 items-end">
+                <button type="button" id="to_first" class="btn btn-secondary">{% trans 'Move to first' %}</button>
+                <div>
+                    <input type="number" placeholder="{% trans 'Position' %}" name="position" class="input" id="position">
+                </div>
+                <button type="button" id="to_position" class="btn btn-secondary">{% trans 'Set' %}</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block style_init %}
+    <style>
+      .tabulator, .tabulator-custom-footer {
+        display: none;
+      }
+
+      .sortable-selected .item {
+        border: 1px solid rgba(27, 33, 255, 0.5) !important;
+      }
+
+      #sortable-items {
+        height: calc(100vh - 365px);
+        overflow: auto;
+      }
+
+      #sortable-items .item {
+        padding: 10px;
+        display: none;
+      }
+
+      #sortable-items .item-card-wrapper .item {
+        display: block;
+      }
+
+      #sortable-items .item-wrapper {
+        width: calc(12.5% - 14px) !important;
+        height: 130px;
+        position: relative;
+      }
+
+      #sortable-items .item-wrapper.visible .item {
+        display: block;
+      }
+
+      #sortable-items .item-wrapper.visible .item img {
+        padding-right: 5px;
+        float: left;
+        width: auto;
+      }
+
+      #sortable-items .item-wrapper.page-end::after {
+        content: " ";
+        position: absolute;
+        display: block;
+        height: 100%;
+        width: 10px;
+        background: red;
+        margin-left: 100%;
+        top: 0;
+        right: -10px;
+      }
+
+      #clipboard {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        height: 30px;
+        border: 1px solid red;
+      }
+
+      #clipboard .product-name {
+        display: none;
+      }
+
+      #clipboard img {
+        height: 30px;
+      }
+
+      .paginator .item-wrapper {
+        display: none;
+      }
+
+      #reorder-overlay {
+        background: #ffffff8f;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9999;
+      }
+
+      #reorder-overlay:after {
+        content: '{% trans 'Reordering please wait' %}';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 32px;
+        font-weight: bold;
+      }
+
+      form input[type=checkbox] {
+        width: 18px !important;
+        cursor: pointer;
+      }
+
+      html, body {
+        overflow: auto;
+      }
+    </style>
+{% endblock %}
+
+{% block additional_js %}
+    {{ block.super }}
+    <script>
+        document.addEventListener('SBAdminTableNewURL', () => {
+            setTimeout(() => {
+                window.location.reload()
+            }, 1)
+        })
+    </script>
+    <script src="{% static 'components/tiles/js/lodash.min.js' %}"></script>
+    <script src="{% static 'js/sortable.min.js' %}"></script>
+    <script src="{% static 'sb_admin/js/lazysizes.min.js' %}"></script>
+    <script>
+        const mainSorting = () => {
+            const requestQueue = [];
+            const perPage = {{ content_context.tabulator_definition.tableInitialPageSize }};
+            const reorderUrl = '{{ reorder_url }}';
+            const pageSize = 24;
+            const numberingFrom = 0;
+            const overlayId = 'reorder-overlay';
+            let overlayEl = document.createElement('div');
+            overlayEl.setAttribute("id", overlayId);
+            let isRequested = false;
+
+            function toggleActionbar() {
+                const lenChecked = document.querySelectorAll('[name="item-selection"]:checked').length;
+                if (lenChecked > 0) {
+                    document.querySelector('.detail-view-action-bar').classList.remove('hidden')
+                } else {
+                    document.querySelector('.detail-view-action-bar').classList.add('hidden')
+                }
+            }
+
+            document.querySelectorAll('[name="item-selection"]').forEach(el => {
+                el.addEventListener('change', (e) => {
+                    toggleActionbar();
+                })
+            })
+
+            function processQueue() {
+                if (!isRequested) {
+                    const formData = requestQueue.shift();
+                    if (!formData) {
+                        return
+                    }
+                    isRequested = true;
+                    fetch('', {
+                        method: 'POST',
+                        body: formData,
+                        redirect: "manual"
+                    }).then(response => {
+                        return response;
+                    }).then((response) => {
+                        if (response.type === "opaqueredirect") {
+                            addOverlay();
+                            requestReorder().then((response) => {
+                                requestQueue.unshift(formData);
+                                isRequested = false;
+                                processQueue();
+                                removeOverlay();
+                            }).catch((err) => {
+                                window.location = response.url
+                            })
+                        } else {
+                            isRequested = false;
+                            processQueue();
+                        }
+                    }).catch(error => {
+                        console.log(error)
+                    }).finally(() => {
+                    });
+                }
+            }
+
+            function callApi(group_keys, prev_group_key, position) {
+                const formData = new FormData();
+                const promoCardsIndexed = getPromoCardIndexes();
+                changeOrders();
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                formData.append('promo_cards_indexes', JSON.stringify(promoCardsIndexed));
+                group_keys.forEach(item => {
+                    if (item) {
+                        formData.append('group_keys[]', item);
+                    }
+                })
+                if (prev_group_key) {
+                    formData.append('prev_group_key', prev_group_key);
+                }
+                if (position) {
+                    formData.append('position', position);
+                }
+                requestQueue.push(formData);
+                processQueue();
+            }
+
+            function moveSelectedToAbsolutePosition(position) {
+                console.log(position)
+                let selectedItems = [];
+                let selectedItemsGroupKeys = [];
+                let selectedItemObjs = [];
+                let selectedItem = null;
+
+                document.querySelectorAll("input[name='item-selection']:checked").forEach(el => {
+                    selectedItemObjs.push(el);
+                    selectedItems.push(el.value);
+                    selectedItemsGroupKeys.push(el.closest('.item-wrapper').dataset.groupKey);
+                    el.checked = false;
+                })
+                toggleActionbar();
+
+                let order = window.sortable.toArray();
+                let orderWithoutSelected = order.filter(function (x) {
+                    return selectedItems.indexOf(x) < 0;
+                });
+                let relativePositionOnPage = position - numberingFrom;
+                if (relativePositionOnPage < 0 || relativePositionOnPage > perPage) {
+                    selectedItemObjs.forEach(elem => elem.closest('.item-wrapper').remove())
+                } else {
+                    let newOrder = orderWithoutSelected.slice(0, relativePositionOnPage).concat(selectedItems.concat(orderWithoutSelected.slice(relativePositionOnPage)));
+
+                    let oldAnimate = window.sortable.options.animation;
+                    if (Math.abs(selectedItemObjs[0].closest('.item-wrapper').dataset.simpleOrder - position) > 40) {
+                        /* disable animation if position difference is too large and animation becomes laggy */
+                        window.sortable.options.animation = 0;
+                    }
+
+                    window.sortable.sort(newOrder, true);
+                    window.sortable.options.animation = oldAnimate;
+                }
+
+                callApi(selectedItemsGroupKeys, null, position);
+            }
+
+            function getPromoCardIndexes() {
+                const order = window.sortable.toArray();
+                const promoCards = {};
+                order.forEach((element, index) => {
+                    if (element < 0) {
+                        promoCards[Math.abs(element)] = index + 1;
+                    }
+                });
+                return promoCards;
+            }
+
+            function getPrevNotPromo(el) {
+                let prev = el.previousElementSibling;
+                while (prev && prev.dataset.order < 0) {
+                    prev = prev.previousElementSibling;
+                }
+                return prev;
+            }
+
+            function requestReorder() {
+                return fetch(reorderUrl, {
+                    method: 'GET',
+                })
+            }
+
+            function addOverlay() {
+                if (!document.getElementById(overlayId)) {
+                    document.body.appendChild(overlayEl);
+                }
+            }
+
+            function removeOverlay() {
+                if (document.getElementById(overlayId)) {
+                    document.body.removeChild(overlayEl);
+                }
+            }
+
+            function changeOrders() {
+                document.querySelectorAll('[data-order]').forEach((el, index) => {
+                    el.querySelector('.counter').innerText = numberingFrom + index + 1;
+                });
+                markPageEnds();
+            }
+
+            function markPageEnds() {
+                document.querySelectorAll('.item-wrapper').forEach((el, index) => {
+                    if ((index + 1) % pageSize === 0) {
+                        el.classList.add('page-end');
+                    } else if (el.classList.contains("page-end")) {
+                        el.classList.remove("page-end")
+                    }
+                });
+            }
+
+            document.getElementById('to_first').addEventListener('click', () => {
+                moveSelectedToAbsolutePosition(0);
+            });
+            document.getElementById('position').addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    moveSelectedToAbsolutePosition(document.getElementById('position').value - 1);
+                }
+            });
+            document.getElementById('to_position').addEventListener('click', () => {
+                moveSelectedToAbsolutePosition(document.getElementById('position').value - 1);
+            });
+            let items = document.getElementById('sortable-items');
+            changeOrders();
+            window.sortable = Sortable.create(items, {
+                group: 'shared',
+                animation: 150,
+                selectedClass: "sortable-selected",
+                ghostClass: "sortable-ghost",
+                dragClass: "sortable-drag",
+                dataIdAttr: 'data-order',
+                scroll: true,
+                scrollSensitivity: 100,
+                bubbleScroll: true,
+                /* Called by any change to the list (add / update / remove) */
+                onSort: function (/**Event*/evt) {
+                    console.log(evt)
+                    const prev = getPrevNotPromo(evt.item);
+                    callApi(
+                        [evt.item.dataset.groupKey],
+                        prev ? prev.dataset.groupKey : null,
+                        null
+                    )
+                },
+            });
+            const unique_length = [...new Set(window.sortable.toArray())].length;
+            const all_length = window.sortable.toArray().length;
+            if (unique_length !== all_length) {
+                alert('Something is wrong with ordering.')
+            }
+            markPageEnds();
+        }
+
+        mainSorting()
+    </script>
+{% endblock %}

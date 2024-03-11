@@ -1,0 +1,40 @@
+{% load i18n thumbnail %}
+
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="relative input-file-wrapper">
+    <div class="input-file js-input-file{% if widget.is_initial %} filled{% endif %}">
+        <div class="flex items-center flex-shrink-0">
+            <img src="{% if widget.is_initial %}{% thumbnail widget.value 'admin_image_field' %}{% endif %}" alt="" class="js-input-file-image object-cover w-64 h-64 rounded-xs border border-dark-300 mr-16" width="64" height="64">
+            <span class="w-40 h-40 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon">
+                <svg class="w-24 h-24">
+                    <use xlink:href="#Upload"></use>
+                </svg>
+            </span>
+        </div>
+        <div class="js-input-file-empty">
+            <span class="flex items-center">
+                    <button class="btn btn-primary-light btn-tiny">{% trans 'Add file' %}</button>
+                    <span class="ml-4 text-dark-900 text-12 leading-16">{% trans 'or move here' %}</span>
+            </span>
+            {% if not subwidget and widget.form_field.help_text %}
+                <p class="text-dark-600 mt-8 text-12 leading-16">{{ widget.form_field.help_text }}</p>
+            {% endif %}
+        </div>
+        <div class="js-input-file-filled min-w-0">
+            <div class="js-input-file-filename text-12 whitespace-normal break-words">
+                {% if widget.is_initial %}
+                    <a class="link" target="_blank" href="{{ widget.value.url }}">{{ widget.value }}</a>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-4 mt-8">
+                <label for="{{ widget.attrs.id }}" type="button" class="btn btn-tiny input-file-edit-btn">{% trans 'Edit' %}</label>
+                <button type="button" class="btn btn-tiny btn-destructive js-input-file-delete">{% trans 'Delete' %}</button>
+                {% if widget.is_initial and not widget.required %}
+                    <input type="checkbox" class="hidden" name="{{ widget.checkbox_name }}" id="{{ widget.checkbox_id }}"{% if widget.attrs.disabled %} disabled{% endif %}>
+                {% endif %}
+            </div>
+        </div>
+        {% include "sb_admin/widgets/input.html" %}
+    </div>
+</div>
+

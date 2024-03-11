@@ -1,0 +1,6 @@
+{% load sb_admin_tags %}
+{% get_item fieldsets_context fieldset.name as fieldset_context %}
+
+<fieldset class="card sm:mb-24 relative {{ fieldset.classes }}">
+    {% include 'sb_admin/includes/inline_fieldset.html' %}
+</fieldset>

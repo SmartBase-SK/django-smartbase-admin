@@ -1,0 +1,7 @@
+{% if not subwidget %}
+    {% if widget.form_field.label or option.label %}
+        <label for="{{ widget.attrs.id }}"{% if label_classes %} class="{{ label_classes }}"{% endif %}>
+            {% if widget.form_field %}{{ widget.form_field.label }}{% endif %}{% if option.label %}{{ option.label }}{% endif %} {% if widget.form_field.required %}<span class="ml-4 text-negative">*</span>{% endif %}
+        </label>
+    {% endif %}
+{% endif %}

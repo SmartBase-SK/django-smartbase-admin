@@ -1,0 +1,16 @@
+{% load i18n %}
+
+<div class="relative px-12 py-8 flex">
+    {% if not all_filters_visible %}
+        <button type="button"
+                class="text-primary"
+            onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.hideFilter('{{ filter_field.filter_field }}')">
+            {% trans 'Remove' %}
+        </button>
+    {% endif %}
+    <button type="button"
+            class="text-primary ml-auto"
+            onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')">
+        {% trans 'Clear' %}
+    </button>
+</div>

@@ -1,0 +1,80 @@
+@layer components {
+    input[type="checkbox"].toggle {
+        @apply absolute opacity-0 top-0;
+        z-index: -1;
+        & ~ label {
+            @apply relative flex pl-56 text-14 top-2 font-medium text-dark-900;
+        }
+        & + label {
+            @apply absolute block pl-0;
+            @apply w-44 h-24 top-0 left-0;
+            @apply bg-dark-200 rounded-full transition-colors;
+            @apply outline outline-transparent outline-2 outline-offset-2;
+
+            &::before,
+            &::after {
+                @apply absolute block;
+                content: '';
+            }
+
+            &::before {
+                @apply w-20 h-20 top-2 left-2;
+                @apply bg-light rounded-full shadow-xs;
+                transition: left 0.15s ease-in-out;
+            }
+
+            &::after {
+                @apply w-20 h-20 top-2 left-2;
+                opacity: 0;
+                transition: opacity 0.15s ease-in-out, left 0.15s ease-in-out;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.7072 7.70712L10.7072 17.7071C10.3167 18.0976 9.68349 18.0976 9.29297 17.7071L4.29297 12.7071L5.70718 11.2929L10.0001 15.5858L19.293 6.29291L20.7072 7.70712Z' fill='%239CA3AF' fill-rule='nonzero'/%3E%3C/svg%3E%0A");
+                background-size: 1rem;
+                background-position: center;
+            }
+        }
+
+        &:not(:disabled) {
+            &:hover {
+                & + label {
+                    @apply bg-dark-300;
+                }
+            }
+
+            &:focus + label {
+                @apply outline-primary;
+            }
+        }
+
+
+
+        &:checked {
+            & + label {
+                @apply bg-primary;
+                &::before,
+                &::after {
+                    left: calc(100% - 1.375rem);
+                    opacity: 1;
+                }
+            }
+
+            &:not(:disabled) {
+                &:hover {
+                    & + label {
+                        @apply bg-primary-600;
+                        &::after {
+                            opacity: 0.5;
+                        }
+                    }
+                }
+            }
+        }
+
+        ~ p {
+            @apply pl-56 mt-0 text-14 leading-20;
+        }
+    }
+}
+
+.djn-td input[type="checkbox"].toggle + label + label {
+    font-size: 0;
+}

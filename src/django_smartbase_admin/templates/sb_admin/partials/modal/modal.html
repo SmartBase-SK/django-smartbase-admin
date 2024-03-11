@@ -1,0 +1,38 @@
+{% load i18n %}
+
+<div id="sb-admin-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body" style="min-height: 200px;">
+                {% include 'sb_admin/includes/loading_absolute.html' with additional_class="sb-admin-modal-loading htmx-request" %}
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const modalId = "sb-admin-modal";
+        const modalEl = document.getElementById(modalId);
+        const modalLoadingInnerHTML = modalEl.querySelector('.sb-admin-modal-loading').parentElement.outerHTML;
+
+        document.body.addEventListener("hideModal", (e) => {
+            const modalEl = e.detail.elt.closest("#" + modalId);
+            const modalInstance = bootstrap5.Modal.getInstance(modalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        });
+
+        modalEl.addEventListener("show.bs.modal", () => {
+            /*flush content of modal to prevent stale data inside*/
+            modalEl.querySelector(".modal-content").innerHTML = modalLoadingInnerHTML;
+        });
+
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            document.querySelectorAll('[hx-target="' + '#' + modalId + '"]').forEach(el => {
+                /*disable ongoing HTMX requests*/
+                htmx.trigger(el, 'htmx:abort');
+            });
+        });
+    });
+</script>

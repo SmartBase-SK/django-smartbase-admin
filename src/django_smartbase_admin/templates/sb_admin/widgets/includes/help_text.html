@@ -1,0 +1,3 @@
+{% if not subwidget and widget.form_field.help_text %}
+    <p class="mt-8 text-12 leading-16">{{ widget.form_field.help_text|safe }}</p>
+{% endif %}

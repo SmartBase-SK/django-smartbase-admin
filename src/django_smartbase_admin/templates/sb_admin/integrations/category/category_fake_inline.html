@@ -1,0 +1,18 @@
+{% include "sb_admin/inlines/table_inline.html" %}
+
+<style>
+    #categoryfakerelationshipcategory_set-group tr.has_original td.field-new_category, .djn-th.new-category{
+        display: none;
+    }
+    #categoryfakerelationshipcategory_set-group tr {
+        position: relative;
+    }
+    .djn-tr.form-row:not(.has_original) td.field-new_category{
+        position: absolute;
+        left: 40px;
+        top: 0;
+        height: 40px;
+        min-height: 0;
+        overflow: hidden;
+    }
+</style>

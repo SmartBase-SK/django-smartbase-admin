@@ -1,0 +1,179 @@
+.tabular {
+    @apply overflow-x-auto custom-scrollbar;
+}
+
+.djn-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    white-space: nowrap;
+    min-width: 100%;
+    @apply h-full;
+    > .djn-thead {
+        th {
+            @apply p-8 h-48;
+            @apply transition-colors;
+            @apply bg-dark-100 text-dark-600;
+            @apply text-14 font-normal text-left;
+            /*
+            &:first-child {
+                @apply border-l border-dark-200;
+            }
+            &:last-child {
+                @apply border-r border-dark-200;
+            }
+             */
+            &.original {
+                @apply w-40 min-w-40;
+                &:not(.is-sortable) {
+                    @apply hidden;
+                    + td {
+                        border-left: 0;
+                    }
+                }
+            }
+        }
+        td {
+            @apply text-14 font-normal;
+        }
+    }
+    > .djn-tbody {
+        td {
+            @apply relative;
+            @apply min-h-56;
+            @apply border-b border-dark-200;
+            label:first-child:not(.input-file-edit-btn) {
+                @apply hidden;
+            }
+            &:not(:first-child) {
+                @apply border-l;
+            }
+            /*
+            &:last-child {
+                @apply border-r;
+            }
+            */
+            &.original {
+                @apply w-40 min-w-40;
+                &:not(.is-sortable) {
+                    @apply hidden;
+                    + td {
+                        border-left: 0;
+                    }
+                }
+                >p {
+                    @apply hidden;
+                }
+            }
+            >input[type="text"], select {
+                @apply min-w-160 h-full;
+            }
+            >.autocomplete-data-wrapper + p {
+                @apply hidden;
+            }
+            &.field-image {
+                @apply max-w-370;
+            }
+            .input:not(.choices__input) {
+                @apply border-0 rounded-none shadow-none;
+            }
+            .btn:not(.input-file-edit-btn) {
+                @apply border-0 rounded-none shadow-none;
+            }
+            .toggle ~ label {
+                @apply ml-8;
+            }
+            .input-file-wrapper > .input-file {
+                @apply border-0;
+            }
+        }
+        &:last-child {
+            >tr:last-child {
+                >td {
+                    &:first-child {
+                        @apply rounded-bl;
+                    }
+                    &:last-child {
+                        @apply rounded-br;
+                    }
+                }
+            }
+        }
+        &.ui-sortable-placeholder {
+            td {
+                @apply bg-primary-50;
+                @apply h-56;
+            }
+        }
+        &.has-errors {
+            td {
+                vertical-align: top;
+            }
+        }
+    }
+    >*:nth-last-child(2) {
+        td,th {
+            &:first-child {
+                @apply rounded-bl;
+            }
+            &:last-child {
+                @apply rounded-br;
+            }
+        }
+    }
+}
+
+
+.inline-group .empty-form {
+    display: none !important;
+}
+
+.djn-item {
+    position: relative;
+}
+
+.djn-drag-handler {
+    @apply flex mr-8 cursor-move;
+    @apply absolute top-1/2 -translate-y-1/2 left-8;
+}
+
+.stacked-row {
+    .form-row {
+        @apply mb-24 flex flex-col;
+        > div {
+            > label:first-child,
+            > .help {
+                display: none;
+            }
+        }
+        > .errorlist {
+            order: 1;
+        }
+    }
+}
+
+.checkbox-row > label {
+    display: none;
+}
+
+fieldset.module > h2 {
+    @apply flex items-center text-18 mb-24 font-semibold text-dark-900;
+    &.stacked-inline-heading {
+        @apply text-24 max-sm:px-24;
+    }
+}
+
+.djn-group {
+    .djn-group {
+        &.djn-group-nested {
+            margin: 0;
+            border: 0;
+        }
+        > fieldset {
+            >.stacked-inline-heading,
+            >.djn-add-item {
+                @apply px-24;
+            }
+        }
+    }
+}
+

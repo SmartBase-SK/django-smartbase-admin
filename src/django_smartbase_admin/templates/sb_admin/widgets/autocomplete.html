@@ -1,0 +1,41 @@
+{% load sb_admin_tags i18n %}
+{% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
+    <div class="relative">
+        {% include 'sb_admin/widgets/includes/field_label.html' %}
+        <div id="{{ widget.attrs.id }}-wrapper">
+            <button
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    data-bs-offset="[0, 8]"
+                    class="btn px-10 font-normal w-full"
+            >
+                <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label }}</span>
+                <svg class="ml-8">
+                    <use xlink:href="#Down"></use>
+                </svg>
+            </button>
+            <div class="dropdown-menu max-h-none w-248">
+                <div class="px-12 pt-8">
+                    {% include 'sb_admin/widgets/input.html' %}
+                    <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete"
+                            data-autocomplete-data-id="{{ autocomplete_data_id }}">
+                    </select>
+                </div>
+                {% if widget.form_field.required %}
+                    <div class="pb-8"></div>
+                {% else %}
+                    <div class="relative px-12 py-8 flex">
+                        <button type="button"
+                                class="text-primary js-clear-autocomplete">
+                            {% trans 'Clear' %}
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="autocomplete-data-wrapper">
+        {{ filter_widget|get_json_script:autocomplete_data_id }}
+    </div>
+    {% include 'sb_admin/widgets/includes/help_text.html' %}
+{% endwith %}

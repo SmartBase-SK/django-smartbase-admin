@@ -1,0 +1,12 @@
+<div class="dropdown-menu">
+    <div class="px-12 py-8 relative">
+        <select form="{{ filter_widget.view_id }}-filter-form" type="radio" class="input pl-10 pr-38"
+               id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
+               {% if not all_filters_visible %}disabled{% endif %}>
+            {% for choice in filter_widget.choices %}
+                <option value="{{ choice.0 }}"{% if filter_widget.get_default_value == choice.0 %} selected{% endif %}>{{ choice.1 }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% include "sb_admin/filter_widgets/partials/clear.html" %}
+</div>

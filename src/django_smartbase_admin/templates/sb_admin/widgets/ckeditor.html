@@ -1,0 +1,6 @@
+{% load static %}
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="django-ckeditor-widget" data-field-id="{{ widget.attrs.id }}">
+    <textarea name="{{ widget.name }}"{% include "sb_admin/widgets/attrs.html" %} data-processed="0" data-config="{{ widget.config }}" data-external-plugin-resources="{{ widget.external_plugin_resources }}" data-id="{{ widget.attrs.id }}" data-type="ckeditortype">{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+</div>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

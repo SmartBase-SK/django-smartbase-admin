@@ -1,0 +1,28 @@
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load render_bundle from webpack_loader %}
+{% load sb_admin_tags %}
+
+{% block content_inner %}
+    <div class="card sm:mb-24 p-16">
+        <div class="mt-16">
+            {% render_bundle "chart" "js" config="SB_ADMIN" %}
+            <div class="flex flex-wrap -m-8 mb-16">
+                {% for sub_widget in sub_widgets %}
+                    <div class="w-1/2 md:w-1/4 p-8">
+                        {% render_widget sub_widget request %}
+                    </div>
+                {% endfor %}
+            </div>
+            <canvas id="{{ widget_id }}-chart"></canvas>
+            {{ initial_data|get_json_script:'initial_data' }}
+            <script>
+                window.SBAdminChart = window.SBAdminChart || {};
+                window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                    "widgetId": "{{ widget_id }}",
+                    "ajaxUrl": "{{ ajax_url }}",
+                    "chartType": "{{ chart_type }}"
+                });
+            </script>
+        </div>
+    </div>
+{% endblock %}
