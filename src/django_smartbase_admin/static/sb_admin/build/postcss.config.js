@@ -5,7 +5,7 @@ module.exports = (api) => {
             'postcss-extend': {},
             'postcss-advanced-variables': {},
             'tailwindcss/nesting': {},
-            tailwindcss: {config: '.src/django_smartbase_admin/static/sb_admin/build/tailwind.config.js'},
+            tailwindcss: {config: './src/django_smartbase_admin/static/sb_admin/build/tailwind.config.js'},
             'postcss-hexrgba':{},
             'postcss-automath': {},
             autoprefixer: {},

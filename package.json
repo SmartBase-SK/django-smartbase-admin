@@ -1,8 +1,8 @@
 {
   "name": "SmartBaseShop",
   "scripts": {
-    "dev": "gulp svg-sprites --gulpfile gulpfile.js && webpack --watch --config static/sb_admin/build/webpack.dev.js",
-    "build": "gulp svg-sprites --gulpfile gulpfile.js && webpack --progress --config static/sb_admin/build/webpack.prod.js",
+    "dev": "gulp svg-sprites --gulpfile gulpfile.js && webpack --watch --config src/django_smartbase_admin/static/sb_admin/build/webpack.dev.js",
+    "build": "gulp svg-sprites --gulpfile gulpfile.js && webpack --progress --config src/django_smartbase_admin/static/sb_admin/build/webpack.prod.js",
     "svg-sprites": "gulp svg-sprites --gulpfile gulpfile.js",
     "commitlint": "commitlint --from=HEAD~$COMMIT_COUNT",
     "release": "standard-version release --issueUrlFormat='http://redmine.smartbase.sk/issues/{{id}}' --compareUrlFormat='{{host}}/dev/django_smartshop/compare/{{previousTag}}...{{currentTag}}' --commitUrlFormat='{{host}}/dev/django_smartshop/commit/{{hash}}'",
