@@ -1,0 +1,296 @@
+.query-builder {
+    select:not(.select2-hidden-accessible), input {
+        @apply !w-full input;
+    }
+
+    .select2 {
+        @apply !input;
+    }
+
+    .rules-group-container {
+        @apply !p-0 !m-0;
+        @apply !bg-transparent !border-dark-200 !rounded;
+
+        &::before,
+        &::after {
+            @apply hidden;
+        }
+
+        .rules-group-header {
+            @apply flex flex-wrap items-center gap-16;
+            @apply p-16 mb-0;
+            @apply bg-dark-100;
+
+            .drag-handle {
+                @apply order-1;
+            }
+
+            button[data-not] {
+                @apply relative h-24 !p-0 !mr-16;
+                @apply flex items-center gap-6;
+                @apply !bg-transparent !shadow-none !border-none;
+                @apply md:!text-16 font-semibold capitalize;
+
+                &::before {
+                    content: "";
+                    @apply relative block h-24 flex-shrink-0;
+                    width: 2.75rem;
+                    @apply bg-light;
+                    @apply border border-dark-300 outline outline-transparent;
+                    @apply transition-colors rounded-full;
+                }
+
+                &::after {
+                    content: "";
+                    @apply absolute left-2 top-2 flex-shrink-0;
+                    @apply block w-20 h-20;
+                    @apply bg-dark-200 rounded-full;
+                    transition: left .15s ease-in-out, background-color .15s ease-in-out;
+                }
+
+                &:not(.active):hover {
+                    &::before {
+                        @apply border-dark-400;
+                    }
+                }
+
+                &.active {
+                    &::before {
+                        @apply bg-primary border-primary;
+                    }
+
+                    &::after {
+                        @apply bg-light;
+                        left: calc(2.75rem - 22px);
+                        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M13.8051 5.13812L7.13845 11.8048C6.8781 12.0651 6.45599 12.0651 6.19564 11.8048L2.8623 8.47145L3.80511 7.52865L6.66704 10.3906L12.8623 4.19531L13.8051 5.13812Z" fill="%239CA3AF"/></svg>');
+                        background-repeat: no-repeat;
+                        background-size: contain;
+                        background-position: center;
+                    }
+                }
+            }
+
+            .group-conditions {
+                @apply flex items-center mr-auto order-2;
+            }
+
+            .group-actions {
+                @apply flex items-center flex-wrap gap-y-8;
+                @apply order-3;
+            }
+
+            .btn {
+                @apply h-32;
+            }
+        }
+
+        .rules-list {
+            @apply flex flex-col gap-16;
+            @apply m-16 !pl-0;
+        }
+
+        .group-conditions {
+            label.btn {
+                @apply flex-center !py-4 !px-8;
+                @apply !bg-light !text-dark !shadow-none;
+
+                &.active {
+                    @apply !bg-primary-600 !text-light;
+                }
+            }
+        }
+    }
+
+    .rule-container {
+        /*@apply flex items-center gap-8;*/
+        @apply grid gap-8;
+        grid-template-columns: repeat(18, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        @apply !py-8 md:!py-16 !m-0;
+        @apply !bg-dark-100 !border-dark-200 !rounded;
+
+        &::before,
+        &::after {
+            @apply hidden;
+        }
+
+        .drag-handle {
+            @apply flex w-full my-auto mx-0 justify-center;
+            grid-row-start: 1;
+            grid-column-start: 1;
+            grid-row-end: 3;
+            grid-column-end: 2;
+
+            &::before {
+                @apply w-20;
+            }
+        }
+
+        .rule-filter-container {
+            grid-row-start: 1;
+            grid-column-start: 2;
+            grid-row-end: 2;
+            grid-column-end: 18;
+        }
+
+        .rule-operator-container {
+            @apply w-full !mr-0;
+            grid-row-start: 2;
+            grid-column-start: 2;
+            grid-row-end: 2;
+            grid-column-end: 10;
+
+            &:empty {
+                @apply input cursor-not-allowed border-none;
+            }
+        }
+
+        .rule-value-container {
+            @apply w-full !mr-0;
+            grid-row-start: 2;
+            grid-column-start: 10;
+            grid-row-end: 3;
+            grid-column-end: 18;
+
+            &:empty {
+                @apply input cursor-not-allowed;
+            }
+
+            input[type="text"] {
+                @apply px-10;
+            }
+        }
+
+        .rule-header {
+            @apply grid w-full h-full my-auto mx-0;
+            grid-row-start: 1;
+            grid-column-start: 18;
+            grid-row-end: 3;
+            grid-column-end: 19;
+
+            .btn-group {
+                @apply flex-center;
+
+                .btn {
+                    @apply mr-0;
+                }
+            }
+        }
+    }
+
+    .drag-handle {
+        @apply max-sm:!hidden w-20 h-20 flex-shrink-0;
+
+        i {
+            @apply hidden;
+        }
+
+        &::before {
+            content: "";
+            @apply block w-full h-full;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.24967 5.83333C7.17013 5.83333 7.91634 5.08712 7.91634 4.16667C7.91634 3.24619 7.17013 2.5 6.24967 2.5C5.32922 2.5 4.58301 3.24619 4.58301 4.16667C4.58301 5.08712 5.32922 5.83333 6.24967 5.83333ZM7.91634 10C7.91634 10.9205 7.17013 11.6667 6.24967 11.6667C5.32922 11.6667 4.58301 10.9205 4.58301 10C4.58301 9.07954 5.32922 8.33333 6.24967 8.33333C7.17013 8.33333 7.91634 9.07954 7.91634 10ZM7.91634 15.8333C7.91634 16.7538 7.17013 17.5 6.24967 17.5C5.32922 17.5 4.58301 16.7538 4.58301 15.8333C4.58301 14.9129 5.32922 14.1667 6.24967 14.1667C7.17013 14.1667 7.91634 14.9129 7.91634 15.8333ZM13.7497 5.83333C14.6701 5.83333 15.4163 5.08712 15.4163 4.16667C15.4163 3.24619 14.6701 2.5 13.7497 2.5C12.8292 2.5 12.083 3.24619 12.083 4.16667C12.083 5.08712 12.8292 5.83333 13.7497 5.83333ZM15.4163 10C15.4163 10.9205 14.6701 11.6667 13.7497 11.6667C12.8292 11.6667 12.083 10.9205 12.083 10C12.083 9.07954 12.8292 8.33333 13.7497 8.33333C14.6701 8.33333 15.4163 9.07954 15.4163 10ZM15.4163 15.8333C15.4163 16.7538 14.6701 17.5 13.7497 17.5C12.8292 17.5 12.083 16.7538 12.083 15.8333C12.083 14.9129 12.8292 14.1667 13.7497 14.1667C14.6701 14.1667 15.4163 14.9129 15.4163 15.8333Z" fill="%239CA3AF"/></svg>');
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+    }
+
+    .rule-header {
+        @apply order-2;
+    }
+
+    .btn[data-delete] {
+        @apply w-20 h-20 flex-shrink-0;
+        @apply !p-0 !m-0;
+        @apply !bg-transparent !text-transparent border-none shadow-none;
+
+        i {
+            @apply hidden;
+        }
+
+        &::before {
+            content: "";
+            @apply block w-full h-full;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M8.03741 0.833374C7.73308 0.833374 7.45295 0.999272 7.30666 1.26614L6.17347 3.33337H3.75033H1.66699V5.00004H2.91699V18.3334C2.91699 18.7936 3.29009 19.1667 3.75033 19.1667H16.2503C16.7106 19.1667 17.0837 18.7936 17.0837 18.3334V5.00004H18.3337V3.33337H16.2503H13.832L12.7249 1.27237C12.5797 1.00203 12.2977 0.833374 11.9908 0.833374H8.03741ZM11.9401 3.33337L11.4925 2.50004H8.53093L8.07412 3.33337H11.9401ZM6.66699 5.00004H4.58366V17.5H15.417V5.00004H13.3337H6.66699ZM7.50033 13.75V8.33337H9.16699V13.75H7.50033ZM10.8337 8.33337V13.75H12.5003V8.33337H10.8337Z" fill="%239CA3AF"/></svg>');
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+
+        &:hover {
+            @apply !bg-transparent !border-transparent;
+        }
+    }
+
+    .rule-filter-container {
+        @apply w-full;
+    }
+
+    .rule-operator-container {
+        @apply w-full md:w-1/2;
+    }
+
+    .rules-list {
+        @apply empty:!hidden;
+    }
+
+    .rule-value-container {
+        @apply flex !pl-0 !border-none;
+
+        .select2 {
+            @apply max-w-full min-w-0 !p-0 rounded overflow-hidden;
+
+            &:hover {
+                @apply !border-dark-400;
+            }
+
+            .select2-selection {
+                @apply h-full !border-none;
+
+                & > span {
+                    @apply h-full flex items-center overflow-ellipsis;
+                }
+
+                .select2-selection__arrow {
+                    @apply bg-light !top-0 !right-0;
+                }
+            }
+        }
+    }
+
+    button[data-add] {
+        @apply flex items-center gap-4 !px-12;
+        @apply !text-14 font-semibold;
+        @apply !shadow-xs;
+
+        &::before {
+            content: "";
+            @apply inline-block w-16 h-16 flex-shrink-0;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.34605 8.66671L7.34082 12.6659L8.67415 12.6676L8.67938 8.66671H12.6663V7.33337H8.68112L8.68635 3.33426L7.35302 3.33252L7.34779 7.33337H3.33301V8.66671H7.34605Z" fill="%23111827"/></svg>');
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+    }
+}
+
+.select2-search {
+    @apply md:!p-8;
+
+    &__field {
+        @apply !input !px-8;
+    }
+}
+
+.select2-dropdown {
+    @apply !border-dark-300 !rounded overflow-hidden;
+}
+
+.select2-results__option {
+    @apply !text-14 md:!p-10;
+    transition: background-color .05s ease-in-out, color .05s ease-in-out;
+
+    &--highlighted {
+       @apply !bg-primary !text-light;
+    }
+}

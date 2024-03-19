@@ -222,7 +222,7 @@ class SBAdminAutocompleteWidget(
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
         context["widget"]["attrs"]["data-empty-label"] = getattr(
-            self.form_field, "empty_label", None
+            self.form_field, "empty_label", "---------"
         )
         query_suffix = "__in"
         if not self.is_multiselect():
@@ -284,3 +284,36 @@ class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashW
 class SBAdminHiddenWidget(SBAdminBaseWidget, forms.Widget):
     template_name = "sb_admin/widgets/hidden.html"
     input_type = "hidden"
+
+
+class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
+    template_name = "sb_admin/widgets/code.html"
+    input_type = "text"
+
+    def __init__(self, form_field=None, *args, **kwargs):
+        super().__init__(form_field, *args, **kwargs)
+        self.attrs = {
+            "code-mirror-options": json.dumps(
+                {
+                    "mode": "django",
+                    "theme": "dracula",
+                    "lineWrapping": "true",
+                }
+            ),
+            "code-mirror-width": "100%",
+            "code-mirror-height": "300",
+        } | self.attrs
+
+    class Media:
+        css = {
+            "all": [
+                "sb_admin/css/codemirror/codemirror.min.css",
+                "sb_admin/css/codemirror/dracula.min.css",
+            ],
+        }
+        js = [
+            "sb_admin/js/codemirror/codemirror.min.js",
+            "sb_admin/js/codemirror/overlay.min.js",
+            "sb_admin/js/codemirror/django.min.js",
+            "sb_admin/src/js/code.js",
+        ]

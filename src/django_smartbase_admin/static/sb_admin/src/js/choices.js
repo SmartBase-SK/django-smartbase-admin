@@ -2,7 +2,7 @@ import Choices from "choices.js"
 import {createIcon} from "./utils"
 
 
-export const choicesJSOptions = {
+export const choicesJSOptions = (choiceInput) => ({
     'allowHTML': true,
     'classNames': {
         'inputCloned': 'input choices__input choices__input--cloned'
@@ -24,6 +24,9 @@ export const choicesJSOptions = {
             },
             choice: (templateOptions, choice, selectText) => {
                 const originalItem = Choices.defaults.templates.choice.call(this, templateOptions, choice, selectText)
+                if(!choiceInput.hasAttribute('multiple')) {
+                    return originalItem
+                }
                 const input = document.createElement('input')
                 input.id = `checkbox-${choice.elementId}`
                 input.name = `checkbox-name-${choice.elementId}`
@@ -43,7 +46,7 @@ export const choicesJSOptions = {
             }
         }
     },
-}
+})
 
 
 export const choicesJSListeners = {
@@ -72,7 +75,7 @@ export const choicesJSListeners = {
             })
         }
         inputEl.value = JSON.stringify(choiceValue)
-    }
+    },
 }
 
 
@@ -84,7 +87,7 @@ export default class ChoicesJS {
             const inputEl = document.getElementById(inputElId)
             const choicesJS = new Choices(choiceInput, {
                 renderSelectedChoices: 'always',
-                ...choicesJSOptions
+                ...choicesJSOptions(choiceInput)
             })
             choiceInput.addEventListener('addItem', () => {
                 choicesJSListeners.addItem(choicesJS, inputEl)

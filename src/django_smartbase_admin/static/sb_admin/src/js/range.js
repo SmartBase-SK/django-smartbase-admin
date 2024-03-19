@@ -1,46 +1,49 @@
-import noUiSlider from "nouislider"
 
 export default class Range {
     constructor(selector_override, options_override) {
         const selector = selector_override || '.js-range'
+        this.separator = ' - '
         document.querySelectorAll(selector).forEach(el => {
             this.initRange(el, options_override)
-            //TODO: formatters
         })
     }
 
-    initRange(el, options_override) {
-        noUiSlider.create(el, this.getOptions(el, options_override))
-        // min max inputs
-        const minId = el.dataset['minId']
-        const maxId = el.dataset['maxId']
-        if(minId && maxId) {
-            const inputs = [
-                el.closest('.js-input-group').querySelector(`#${minId}`),
-                el.closest('.js-input-group').querySelector(`#${maxId}`)
-            ]
-            el.noUiSlider.on('update', function (values, handle) {
-                inputs[handle].value = values[handle]
+    initRange(base_input) {
+        const from_input = document.getElementById(`${base_input.id}_from`)
+        const to_input = document.getElementById(`${base_input.id}_to`)
+        const elems = [from_input, to_input]
+        elems.forEach(el => {
+            el.addEventListener('blur', () => {
+                const data = {}
+                if(from_input.value) {
+                    data.from = {
+                        value: from_input.value,
+                        label: from_input.value,
+                    }
+                }
+                if(to_input.value) {
+                    data.to = {
+                        value: to_input.value,
+                        label: to_input.value,
+                    }
+                }
+                base_input.value = JSON.stringify(data)
+                base_input.dispatchEvent(new Event('change'))
             })
-            inputs[0].addEventListener('change', (e)=>{
-                el.noUiSlider.set([e.target.value, null])
-            })
-            inputs[1].addEventListener('change', (e)=>{
-                el.noUiSlider.set([null, e.target.value])
-            })
-        }
-    }
-
-    getOptions(el, options_override) {
-        return {
-            connect: true,
-            start: [parseFloat(el.dataset['currentMin']), parseFloat(el.dataset['currentMax'])],
-            step: parseFloat(el.dataset['step']) || null,
-            range: {
-                'min': [parseFloat(el.dataset['min'])],
-                'max': [parseFloat(el.dataset['max'])]
-            },
-            ...options_override
-        }
+        })
+        base_input.addEventListener('SBTableFilterFormLoad', () => {
+            if(!base_input.value){
+                return
+            }
+            const onLoadData = JSON.parse(base_input.value)
+            from_input.value = onLoadData.from.value
+            to_input.value = onLoadData.to.value
+        })
+        base_input.addEventListener('clear', () => {
+            base_input.value = ""
+            from_input.value = ""
+            to_input.value = ""
+            base_input.dispatchEvent(new Event('change'))
+        })
     }
 }

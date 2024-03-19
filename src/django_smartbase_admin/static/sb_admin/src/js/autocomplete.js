@@ -52,11 +52,13 @@ export default class Autocomplete {
         if (isInlineEmptyForm) {
             return
         }
-        const wrapperEl = document.querySelector(`#${inputElId}-wrapper > button`)
-        const deleteButton = document.querySelector(`#${inputElId}-wrapper .js-clear-autocomplete`)
+        const wrapperEl = document.querySelector(`#${inputElId}-wrapper`)
+        const wrapperElButton = document.querySelector(`#${inputElId}-wrapper > button`)
+        const addNewButton = wrapperEl.querySelector(`.js-add-new-button`)
+        const deleteButton = wrapperEl.querySelector(`.js-clear-autocomplete`)
         const options = JSON.parse(choiceInput.dataset.autocompleteOptions || "{}")
         const choicesJS = new Choices(choiceInput, {
-            ...choicesJSOptions,
+            ...choicesJSOptions(choiceInput),
             placeholderValue: 'Search',
             searchPlaceholderValue: 'Search',
             searchResultLimit: 999,
@@ -72,6 +74,8 @@ export default class Autocomplete {
         choicesJS.SBcurrentPage = 1
         choicesJS.SBhasNextPage = true
         choicesJS.SBinitialised = false
+        choicesJS.SBaddNewButton = addNewButton
+        choicesJS.SBwrapperElButton = wrapperElButton
 
         choicesJS.input.element.addEventListener('input', debounce((e) => {
             choicesJS.SBcurrentSearchTerm = e.target.value
@@ -86,12 +90,16 @@ export default class Autocomplete {
         choiceInput.addEventListener('removeItem', () => {
             choicesJSListeners.removeItem(choicesJS, inputEl)
         })
-        choiceInput.addEventListener('change', () => {
+        choiceInput.addEventListener('change', (e) => {
+            if(!e.target.hasAttribute('multiple')) {
+                choicesJS.SBwrapperElButton.click()
+            }
             inputEl.dispatchEvent(new CustomEvent('SBAutocompleteChange'))
         })
-        wrapperEl?.addEventListener('show.bs.dropdown', () => {
+        wrapperElButton?.addEventListener('show.bs.dropdown', () => {
             choicesJS.SBhasNextPage = true
             choicesJS.SBcurrentPage = 1
+            choicesJS.clearInput()
             this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, !choicesJS.SBinitialised)
         })
         inputEl.addEventListener('clear', (e) => {
@@ -101,6 +109,12 @@ export default class Autocomplete {
                 choicesJS.SBcurrentPage = 1
                 this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, false)
             }
+        })
+        addNewButton?.addEventListener('click', (event) => {
+            choicesJS.clearStore()
+            choicesJS.setValue([event.currentTarget.dataset.value])
+            choicesJS.SBwrapperElButton.click()
+            filterInputValueChangedUtil(inputEl)
         })
         inputEl.addEventListener('clearSelectedItems', () => {
             choicesJS.removeActiveItems(null)
@@ -160,6 +174,20 @@ export default class Autocomplete {
         }
     }
 
+    toggleAddNew(choicesJS, label, show=false) {
+        if(!choicesJS.SBaddNewButton) {
+            return
+        }
+        const buttonText = choicesJS.SBaddNewButton.querySelector('.js-add-item-label')
+        buttonText.innerText = label
+        choicesJS.SBaddNewButton.dataset.value = label
+        if(show) {
+            choicesJS.SBaddNewButton.parentElement.classList.remove('hidden')
+        } else {
+            choicesJS.SBaddNewButton.parentElement.classList.add('hidden')
+        }
+    }
+
     search(searchTerm, choicesJS, inputEl, autocompleteData, requestedPage, initialisation = false) {
         const autocompleteRequestData = new FormData()
         const autocompleteForwardData = {}
@@ -182,6 +210,8 @@ export default class Autocomplete {
         }).then(response => response.json())
             .then(res => {
                 let currentChoices = []
+                let exactSearchTermMatched = false
+
                 if (requestedPage !== 1) {
                     currentChoices = choicesJS._store.choices
                 }
@@ -213,10 +243,17 @@ export default class Autocomplete {
                     choicesJS.clearStore()
                 }
 
+                choicesJSChoices.forEach((choice) => {
+                    if(choice.label === searchTerm) {
+                        exactSearchTermMatched = true
+                    }
+                })
+
+                this.toggleAddNew(choicesJS, searchTerm, searchTerm && !exactSearchTermMatched)
                 choicesJS.setChoices(choicesJSChoices, 'value', 'label', true)
 
                 if (initialisation) {
-                    if (choicesJSChoices.length < window.sb_admin_const.AUTOCOMPLETE_PAGE_SIZE) {
+                    if (choicesJSChoices.length < window.sb_admin_const.AUTOCOMPLETE_PAGE_SIZE && !choicesJS.SBaddNewButton) {
                         this.initialisation(choicesJS, false)
                     } else {
                         this.initialisation(choicesJS, true)

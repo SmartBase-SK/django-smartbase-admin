@@ -489,9 +489,7 @@ class SBAdminTranslationStatusMixin:
 
     @admin.display(description="")
     def sbadmin_translation_status(self, obj):
-        from django_smartbase_admin_configuration import SmartShopConfiguration
-
-        if not SmartShopConfiguration.is_i18n_enabled():
+        if not SBAdminTranslationsService.is_i18n_enabled():
             return self.get_empty_state()
 
         translations_view_id = SBAdminTranslationsService.get_translation_view_id(
@@ -574,7 +572,7 @@ class SBAdmin(
         )
 
     def register_autocomplete_views(self, request):
-        self.get_form(request, self.model())()
+        self.get_form(request)()
 
     def get_fieldsets(self, request, obj):
         fieldsets = []
