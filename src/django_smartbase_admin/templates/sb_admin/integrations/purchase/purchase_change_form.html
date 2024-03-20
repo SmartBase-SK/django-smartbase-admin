@@ -147,7 +147,7 @@
                     {% block payment_states %}
                         {% for state, value in original.next_payment_states.items %}
                             {% if state != 'CANCEL' %}
-                                {% url 'admin:payment-action-with-form' purchase=original.pk action=state as action_url %}
+                                {% url 'admin:payment-action' purchase=original.pk action=state as action_url %}
                                 {% if value.instance.get_comment_form %}
                                     <a data-bs-toggle="modal" data-bs-target="#sb-admin-modal" hx-target="#sb-admin-modal"
                                        hx-get="{{ action_url }}"

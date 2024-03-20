@@ -21,8 +21,19 @@
                             data-autocomplete-data-id="{{ autocomplete_data_id }}">
                     </select>
                 </div>
+                {% if filter_widget.allow_add %}
+                    <div class="relative p-12 flex border-dark-200 border-t hidden">
+                        <button type="button"
+                                class="text-primary text-left w-full js-add-new-button">
+                            <svg class="mr-8 w-20 h-20">
+                                <use xlink:href="#Add-one"></use>
+                            </svg>
+                            <span>{% trans 'Add' %} '<span class="js-add-item-label"></span>'</span>
+                        </button>
+                    </div>
+                {% endif %}
                 {% if widget.form_field.required %}
-                    <div class="pb-8"></div>
+                        <div class="pb-8"></div>
                 {% else %}
                     <div class="relative px-12 py-8 flex">
                         <button type="button"
