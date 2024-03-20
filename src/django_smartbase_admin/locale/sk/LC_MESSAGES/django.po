@@ -166,11 +166,11 @@ msgstr "Zmazať viacero objektov"
 
 #, python-format
 msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Odstránenie vybraných %(object_name)s '%(escaped_object)s' vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
 
 #, python-format
 msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
-msgstr "Odstránenie vybraných %(object_name)s '%(escaped_object)s' vyžaduje odstránenie týchto súvisiacich objektov:"
+msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie týchto súvisiacich objektov:"
 
 #, python-format
 msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
@@ -470,7 +470,7 @@ msgid ""
 "                        "
 msgstr ""
 "\n"
-"                            <em>V okolí zatiaľ nie sú žiadne %(object).</em>\n"
+"                            <em>V okolí zatiaľ nie sú žiadne %(object)s.</em>\n"
 "                            <br>\n"
 "                            <a href=\"%(add_url)s\" class=\"addlink\">Pridať %(object)s</a> teraz.\n"
 "                        "
