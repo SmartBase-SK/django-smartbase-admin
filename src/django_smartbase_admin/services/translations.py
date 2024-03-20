@@ -149,3 +149,7 @@ class SBAdminTranslationsService(object):
                 "fields": ["sbadmin_translation_status"],
             },
         )
+
+    @classmethod
+    def is_i18n_enabled(cls):
+        return len(settings.LANGUAGES) > 1

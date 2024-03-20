@@ -187,6 +187,20 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         return Q(**{f"{self.field.filter_field}__in": filter_value})
 
 
+class NumberRangeFilterWidget(SBAdminFilterWidget):
+    template_name = "sb_admin/filter_widgets/number_range_field.html"
+
+    def get_base_filter_query_for_parsed_value(self, request, filter_value):
+        from_value = filter_value.get("from", {}).get("value", None)
+        to_value = filter_value.get("to", {}).get("value", None)
+        result = Q()
+        if from_value:
+            result &= Q(**{f"{self.field.filter_field}__gte": from_value})
+        if to_value:
+            result &= Q(**{f"{self.field.filter_field}__lte": to_value})
+        return result
+
+
 class DateFilterWidget(SBAdminFilterWidget):
     DATE_RANGE_SPLIT = " - "
     DATE_FORMAT = "%Y-%m-%d"
@@ -323,6 +337,7 @@ class AutocompleteFilterWidget(
     forward = None
     label_lambda = None
     value_lambda = None
+    allow_add = False
 
     def get_field_name(self):
         return self.field.name
@@ -342,6 +357,7 @@ class AutocompleteFilterWidget(
         value_lambda=None,
         multiselect=None,
         forward=None,
+        allow_add=None,
         **kwargs,
     ) -> None:
         super().__init__(template_name, default_value, **kwargs)
@@ -354,6 +370,7 @@ class AutocompleteFilterWidget(
         self.multiselect = multiselect if multiselect is not None else self.multiselect
         self.multiselect = self.multiselect if self.multiselect is not None else True
         self.forward = forward or self.forward
+        self.allow_add = allow_add or self.allow_add
 
     def init_filter_widget_static(self, field, view, configuration):
         super().init_filter_widget_static(field, view, configuration)
@@ -406,6 +423,19 @@ class AutocompleteFilterWidget(
         return Q(**{f"{self.field.filter_field}__in": parsed_value})
 
     @classmethod
+    def should_add_query(cls, model_field, search_term, numeric_term):
+        search_string = search_term and (
+            isinstance(model_field, fields.CharField)
+            or isinstance(model_field, fields.TextField)
+        )
+        search_numeric = numeric_term and (
+            isinstance(model_field, fields.AutoField)
+            or isinstance(model_field, fields.IntegerField)
+            or isinstance(model_field, fields.DecimalField)
+        )
+        return search_string or search_numeric
+
+    @classmethod
     def get_default_search_query(
         cls, request, queryset, model, search_term, language_code
     ):
@@ -417,16 +447,7 @@ class AutocompleteFilterWidget(
             pass
         search_query = Q()
         for model_field in model._meta.get_fields():
-            if (
-                isinstance(model_field, fields.CharField)
-                or isinstance(model_field, fields.TextField)
-            ) or (
-                numeric_term
-                and (
-                    isinstance(model_field, fields.AutoField)
-                    or isinstance(model_field, fields.IntegerField)
-                )
-            ):
+            if cls.should_add_query(model_field, search_term, numeric_term):
                 search_query |= Q(**{f"{model_field.name}__icontains": search_term})
         if SBAdminTranslationsService.is_translated_model(model):
             for (
@@ -442,16 +463,7 @@ class AutocompleteFilterWidget(
                     condition=Q(**{f"{rel_name}__language_code": language_code}),
                 )
                 model_field = translation_model._meta.get_field(field_name)
-                if (
-                    isinstance(model_field, fields.CharField)
-                    or isinstance(model_field, fields.TextField)
-                ) or (
-                    numeric_term
-                    and (
-                        isinstance(model_field, fields.AutoField)
-                        or isinstance(model_field, fields.IntegerField)
-                    )
-                ):
+                if cls.should_add_query(model_field, search_term, numeric_term):
                     search_query |= Q(
                         **{
                             f"{annotate_name}__{model_field.name}__icontains": search_term

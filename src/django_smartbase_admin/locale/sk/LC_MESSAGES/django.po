@@ -1,0 +1,631 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-03-20 13:23+0100\n"
+"PO-Revision-Date: 2023-11-15 15:21+0100\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: sk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+"X-Generator: Poedit 3.4.1\n"
+
+msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
+msgstr "Pre vybratie viacerých súborov podržte “Control”, alebo “Command” na Mac-u."
+
+msgid "Clear"
+msgstr "Vymazať"
+
+msgid "Currently"
+msgstr "Aktuálne"
+
+msgid "Change file"
+msgstr "Zmeniť súbor"
+
+msgid "Exit Reorder"
+msgstr "Ukončiť preusporiadanie"
+
+#, python-brace-format
+msgid "Reorder {self.model._meta.verbose_name}"
+msgstr ""
+
+msgid "Download XLSX"
+msgstr "Stiahnuť XLSX"
+
+msgid "Export Selected"
+msgstr "Exportovať vybrané"
+
+msgid "Delete Selected"
+msgstr "Odstrániť vybrané"
+
+msgid "All"
+msgstr "Všetky"
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully. You may edit it again below."
+msgstr ""
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully."
+msgstr ""
+
+msgid "Year"
+msgstr "Rok"
+
+msgid "Month"
+msgstr "Mesiac"
+
+msgid "Week"
+msgstr "Týždeň"
+
+msgid "Day"
+msgstr "Deň"
+
+msgid "Previous Period"
+msgstr "Predchádzajúce obdobie"
+
+msgid "Previous Year"
+msgstr "Minulý rok"
+
+msgid "Resolution"
+msgstr "Rozlíšenie"
+
+msgid "Compare"
+msgstr "Porovnať"
+
+msgid "Date"
+msgstr "Dátum"
+
+msgid "Last 30 days"
+msgstr "Posledných 30 dní"
+
+msgid "Last Quarter"
+msgstr "Posledný štvrťrok"
+
+msgid "Last Year"
+msgstr "Posledný rok"
+
+msgid "Today"
+msgstr "Dnes"
+
+msgid "Last 7 days"
+msgstr "Posledných 7 dní"
+
+msgid "Last 90 days"
+msgstr "Posledných 90 dní"
+
+msgid "Last 12 months"
+msgstr "Posledných 12 mesiacov"
+
+msgid "Translations"
+msgstr "Preklady"
+
+msgid "History"
+msgstr "História"
+
+msgid "View on site"
+msgstr "Zobraziť na stránke"
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Opravte chybu nižšie."
+msgstr[1] "Opravte chyby nižšie."
+msgstr[2] "Opravte chyby nižšie."
+
+msgid "Back"
+msgstr "Naspäť"
+
+msgid "Change password"
+msgstr "Zmeniť heslo"
+
+#, python-format
+msgid "Enter a new password for the user <strong>%(username)s</strong>."
+msgstr "Vytvorte nové heslo pre používateľa <strong>%(username)s</strong>."
+
+#, python-format
+msgid "Delete %(object)s"
+msgstr "Zmazať %(object)s"
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie týchto súvisiacich objektov:"
+
+#, python-format
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr "Ste si istý že chcete odstrániť %(object_name)s \"%(escaped_object)s\"? Všetky nasledujúce položky budú odstránené:"
+
+msgid "Summary"
+msgstr "Zhrnutie"
+
+msgid "Objects"
+msgstr "Objekty"
+
+msgid "No, take me back"
+msgstr "Nie, ísť späť"
+
+msgid "Yes, I’m sure"
+msgstr "Áno, som si istý"
+
+msgid "Home"
+msgstr "Domov"
+
+msgid "Delete multiple objects"
+msgstr "Zmazať viacero objektov"
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie týchto súvisiacich objektov:"
+
+#, python-format
+msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky nasledujúce položky a ich súvisiace objekty budú odstránené:"
+
+msgid "Add"
+msgstr "Pridať"
+
+msgid "Save view"
+msgstr "Uložiť zobrazenie"
+
+msgid "Search and filter"
+msgstr "Hľadať a filtrovať"
+
+msgid "Select all"
+msgstr "Vybrať všetky"
+
+msgid "Select none"
+msgstr "Odstrániť výber"
+
+msgid "For page"
+msgstr "Veľkost strany"
+
+msgid "Date/time"
+msgstr "Datum/čas"
+
+msgid "User"
+msgstr "Užívateľ"
+
+msgid "Action"
+msgstr "Akcia"
+
+msgid "This object doesn't have a change history. It probably wasn't added via this admin site."
+msgstr "Tento objekt nemá históriu zmien. Pravdepodobne nebolo pridané cez túto admin stránku."
+
+msgid "Copy"
+msgstr "Kopírovať"
+
+msgid "Save"
+msgstr "Uložiť"
+
+msgid "Show translations"
+msgstr "Zobraziť preklady"
+
+#, python-format
+msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
+msgstr ""
+
+msgid "Welcome back"
+msgstr "Vitajte späť"
+
+msgid "Enter your details to enter the application."
+msgstr "Pre vstup do aplikácie zadajte prihlasovacie údaje."
+
+msgid "Log in"
+msgstr "Prihlásiť sa"
+
+msgid "Can't sign in?"
+msgstr "Nedarí sa vám prihlásiť?"
+
+msgid "Reset password"
+msgstr "Reset hesla"
+
+msgid "Logged out"
+msgstr "Odhlásený"
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr "Ďakujeme za váš čas strávený na našej stránke."
+
+msgid "Log in again"
+msgstr "Prihlásiť sa znovu"
+
+msgid "Password change"
+msgstr "Zmena hesla"
+
+msgid "Your password was changed."
+msgstr "Vaše heslo bolo zmenené."
+
+msgid "Please enter your old password, for security’s sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgstr "Prosím, uveďte svoje staré heslo a následne dvakrát uveďte vaše nové heslo, aby sme mohli overiť, že ste ho napísali správne."
+
+msgid "Change my password"
+msgstr "Zmeniť moje heslo"
+
+msgid "Password reset"
+msgstr "Reset hesla"
+
+msgid "Your password has been set.  You may go ahead and log in now."
+msgstr "Vaše heslo bolo nastavené, môžete sa prihlásiť."
+
+msgid "Please enter your new password twice so we can verify you typed it in correctly."
+msgstr "Prosím napíšte svoje heslo dvakrát aby sme mohli overiť, že ste ho napísali správne."
+
+msgid "The password reset link was invalid, possibly because it has already been used.  Please request a new password reset."
+msgstr "Odkaz na obnovu hesla je neplatný, pravdepodobne už bol použitý. Prosím, vyžiadajte si reset hesla ešte raz."
+
+msgid "We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgstr "Na e-mailovú adresu, ktorú ste zadali, sme vám odoslali inštrukcie pre obnovu hesla."
+
+msgid "If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your spam folder."
+msgstr "Ak ste stále nedostali email, prosím skontrolujte si, či zadaná mailová adresa sa zhoduje s mailovou adresou zadanou pri registrácii prípadne si skontrolujte SPAM priečinok. "
+
+#, python-format
+msgid "You're receiving this email because you requested a password reset for your user account at %(site_name)s."
+msgstr "Tento e-mail ste dostali preto, lebo ste požiadali o obnovenie hesla pre užívateľský účet na stránke %(site_name)s."
+
+msgid "Please go to the following page and choose a new password:"
+msgstr "Prosím, choďte na túto stránku a zvoľte si nové heslo:"
+
+msgid "Your username, in case you’ve forgotten:"
+msgstr "Vaše používateľské meno, v prípade, že ste ho zabudli:"
+
+msgid "Thanks for using our site!"
+msgstr "Ďakujeme, že používate našu stránku!"
+
+#, python-format
+msgid "The %(site_name)s team"
+msgstr "%(site_name)s  tím."
+
+msgid "Forgotten your password? Enter your email address below, and we’ll email instructions for setting a new one."
+msgstr "Zabudli ste heslo? Napíšte svoj email, kde vám zašleme inštrukcie pre reset hesla"
+
+msgid "Reset my password"
+msgstr "Reset hesla"
+
+msgid "Columns"
+msgstr "Stĺpce"
+
+msgid "Choose Columns"
+msgstr "Vyberte stĺpce"
+
+msgid "Select All"
+msgstr "Vybrať všetky"
+
+msgid "Remove"
+msgstr "Odstrániť"
+
+msgid ""
+"\n"
+"                                <button class=\"btn btn-primary-light btn-tiny\">Add file</button>\n"
+"                                <span class=\"ml-4 text-dark-900 text-12 leading-16\">or move here</span>\n"
+"                            "
+msgstr ""
+"\n"
+"                                <button class=\"btn btn-primary-light btn-tiny\">Pridať súbor</button>\n"
+"                                <span class=\"ml-4 text-dark-900 text-12 leading-16\">alebo pridajte potiahnutím</span>\n"
+"                            "
+
+msgid "JPG, PNG, GIF or WEBP max 10MB"
+msgstr "JPG, PNG, GIF alebo WEBP max 10MB"
+
+msgid "Delete"
+msgstr "Zmazať"
+
+msgid "Save view as"
+msgstr "Uložiť zobrazenie ako"
+
+msgid "New view"
+msgstr "Nové zobrazenie"
+
+msgid "View name"
+msgstr "Názov zobrazenia"
+
+msgid "or save as"
+msgstr "alebo uložiť ako"
+
+msgid "Cancel"
+msgstr "Zrušiť"
+
+msgid "Yes"
+msgstr "Áno"
+
+msgid "No"
+msgstr "Nie"
+
+msgid "From"
+msgstr "Od"
+
+msgid "To"
+msgstr "Do"
+
+msgid "Type to filter"
+msgstr "Začnite písať"
+
+#, python-format
+msgid "Add %(name)s"
+msgstr "Pridať %(name)s"
+
+msgid "Editorial reviews"
+msgstr "Redakčné recenzie"
+
+msgid "Reader reviews"
+msgstr ""
+
+msgid "Author"
+msgstr "Autor"
+
+msgid "Product details"
+msgstr ""
+
+msgid "Awards"
+msgstr "Ocenenia"
+
+msgid "Loading..."
+msgstr "Načítavanie..."
+
+msgid "Change"
+msgstr "Zmeniť"
+
+msgid "View"
+msgstr "Zobraziť"
+
+#, python-format
+msgid "Add another %(verbose_name)s"
+msgstr "Pridať ďalší %(verbose_name)s"
+
+msgid "results"
+msgstr "výsledky"
+
+msgid "List of pages"
+msgstr "Zoznam stránok"
+
+msgid "Page Tree"
+msgstr "Strom stránok"
+
+msgid "Reset filter"
+msgstr "Vymazať filtre"
+
+msgid "Search"
+msgstr "Vyhľadať"
+
+msgid "Sites"
+msgstr "Stránky"
+
+#, python-format
+msgid ""
+"\n"
+"                                                Restore deleted %(name)s\n"
+"                                            "
+msgstr ""
+"\n"
+"                                                Obnoviť odstránené %(name)s\n"
+"                                            "
+
+#, python-format
+msgid ""
+"\n"
+"                                New %(name)s\n"
+"                            "
+msgstr ""
+"\n"
+"                                Nový %(name)s\n"
+"                            "
+
+msgid "Main Navigation"
+msgstr "Hlavná navigácia"
+
+msgid "Options"
+msgstr "Možnosti"
+
+msgid "Paste"
+msgstr "Vložiť"
+
+msgid "Successfully moved"
+msgstr "Úspešne presunuté"
+
+msgid "Changes within the tree might require a refresh."
+msgstr ""
+
+msgid "Error:"
+msgstr "Chyba:"
+
+msgid "This page cannot be copied because an application is attached to it. See the Page's Advanced settings to manage apphooks."
+msgstr ""
+
+msgid "Are you sure you want to § this page?"
+msgstr "Naozaj chcete § túto stránku?"
+
+msgid "Reload"
+msgstr "Obnoviť"
+
+msgid "New node"
+msgstr "Nový uzol"
+
+msgid "nodes"
+msgstr ""
+
+msgid "Menu"
+msgstr "Menu"
+
+#, python-format
+msgid ""
+"\n"
+"                            <em>There is no %(object)s around yet.</em>\n"
+"                            <br>\n"
+"                            <a href=\"%(add_url)s\" class=\"addlink\">Add %(object)s</a> now.\n"
+"                        "
+msgstr ""
+"\n"
+"                            <em>V okolí zatiaľ nie sú žiadne %(object)s.</em>\n"
+"                            <br>\n"
+"                            <a href=\"%(add_url)s\" class=\"addlink\">Pridať %(object)s</a> teraz.\n"
+"                        "
+
+msgid "Duplicates"
+msgstr "Duplikáty"
+
+msgid "Go back to admin homepage"
+msgstr "Naspäť na adminovú domovskú stránku"
+
+msgid "Go back to Filer app"
+msgstr "Naspäť do koreňového priečinka"
+
+msgid "Filer"
+msgstr "Filer"
+
+msgid "Go back to root folder"
+msgstr "Naspäť do koreňového priečinka"
+
+msgid "root"
+msgstr "koreň"
+
+#, python-format
+msgid "Go back to '%(folder_name)s' folder"
+msgstr "Späť do priečinka '%(folder_name)s'"
+
+msgid "Go back to the parent folder"
+msgstr "Späť do rodičovského priečinka"
+
+msgid "Folder Icon"
+msgstr "Ikona priečinka"
+
+msgid "Go back to"
+msgstr "Naspäť na"
+
+msgid "folder"
+msgstr "priečinok"
+
+msgid "Show menu"
+msgstr "Zobraziť menu"
+
+msgid "Change current folder details"
+msgstr "Zmeniť detaily priečinka"
+
+msgid "Close"
+msgstr "Zatvoriť"
+
+msgid "Limit"
+msgstr "Limit"
+
+msgid "Check it to limit the search to current folder"
+msgstr "Vybrať pre limitované hľadanie v aktuálnom priečinku"
+
+msgid "Limit the search to current folder"
+msgstr "Limitovať vyhľadávanie na aktuálny priečinok"
+
+msgid "Click here to run search for entered phrase"
+msgstr "Kliknite sem pre vyhladanie zadanej frázy"
+
+msgid "Move"
+msgstr "Presunúť"
+
+msgid "Dropdown"
+msgstr ""
+
+msgid "Adds a new Folder"
+msgstr "Pridaá nový priečinok"
+
+msgid "New Folder"
+msgstr "Nový priečinok"
+
+msgid "Upload Files"
+msgstr "Nahrať súbory"
+
+msgid "You have to select a folder first"
+msgstr "Najprv si vyberte priečinok"
+
+msgid "Please select a category and domain(in bottom left corner) to sort."
+msgstr "Vyberte kategóriu a doménu (v ľavom dolnom rohu), ktorú chcete zoradiť."
+
+msgid "Operations"
+msgstr "Operácie"
+
+msgid "Move to first"
+msgstr "Presunúť na prvé miesto"
+
+msgid "Position"
+msgstr "Pozícia"
+
+msgid "Set"
+msgstr "Nastaviť"
+
+msgid "Reordering please wait"
+msgstr "Poradie sa upravuje, prosím čakajte"
+
+msgid "Logout"
+msgstr "Odhlásiť sa"
+
+msgid "Choose domain"
+msgstr "Zvoľte si doménu"
+
+msgid "Move to last"
+msgstr "Presunúť na posledné miesto"
+
+msgid "Move up"
+msgstr "Posunúť vyššie"
+
+msgid "Move down"
+msgstr "Posunúť nižšie"
+
+msgid "Reorder"
+msgstr "Preusporiadať"
+
+#, python-brace-format
+msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
+msgstr "<strong>${from} - ${to}</strong> z <strong>${total}</strong><span class=\"max-xs:hidden\"> položiek</span>"
+
+msgid "<strong>0</strong> items"
+msgstr "<strong>0</strong> položiek"
+
+msgid "Basic Settings"
+msgstr "Základné nastavenia"
+
+msgid "Advanced Settings"
+msgstr "Rozšírené nastavenia"
+
+msgid "Save as new"
+msgstr "Uložiť"
+
+msgid "Save and add another"
+msgstr "Uložiť a pridať ďalšie"
+
+msgid "Save and continue editing"
+msgstr "Uložiť a pokračovať v úpravách"
+
+msgid "Add file"
+msgstr "Pridať súbor"
+
+msgid "or move here"
+msgstr "alebo pridajte potiahnutím"
+
+msgid "Edit"
+msgstr "Upraviť"
+
+msgid "Not Translated"
+msgstr "Nepreložené"
+
+msgid "Incomplete"
+msgstr "Nekompletné"
+
+msgid "Translated"
+msgstr "Preložené"
+
+msgid "Status"
+msgstr "Stav"
+
+msgid " of "
+msgstr ""

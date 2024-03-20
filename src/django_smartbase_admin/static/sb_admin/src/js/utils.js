@@ -58,6 +58,7 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
 
 export const filterInputValueChangedUtil = (field) => {
     const filterId = field.dataset.filterId || field.id
+    const separator = field.dataset.labelSeparator || ', '
     const valueElem = document.querySelector(`#${filterId}-value`)
     if(!valueElem) {
         return
@@ -86,7 +87,7 @@ export const filterInputValueChangedUtil = (field) => {
             }
             labelArray.push(item.label)
         }
-        let resultLabel = labelArray.join(', ')
+        let resultLabel = labelArray.join(separator)
         if(hasMaxEntries) {
             resultLabel = resultLabel.substring(0, resultLabel.length)
             resultLabel += `... +${entries.length - window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN + 1}`
@@ -101,7 +102,13 @@ export const filterInputValueChangedUtil = (field) => {
             if(label) {
                 valueElem.innerHTML = label.innerText
             } else {
-                const radioLabel = document.querySelector(`label[for=${field.id}_${field.value}]`)
+                let radioLabel
+                try {
+                    radioLabel = document.querySelector(`label[for=${field.id}_${field.value}]`)
+                } catch (e) {
+                    // if invalid selector is presented
+                    radioLabel = null
+                }
                 if (radioLabel) {
                     valueElem.innerHTML = radioLabel.innerText
                 } else {

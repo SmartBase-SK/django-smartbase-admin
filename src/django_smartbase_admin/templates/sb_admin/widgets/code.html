@@ -1,0 +1,8 @@
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<textarea name="{{ widget.name }}"{% include "sb_admin/widgets/attrs.html" %}>
+{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+{% include 'sb_admin/widgets/includes/help_text.html' %}
+
+<script>
+    initCodeWidget(document.getElementById('{{ widget.attrs.id }}'))
+</script>

@@ -67,7 +67,10 @@
     }
 }
 
-.choices__list.choices__list--single,
+.choices__list.choices__list--single {
+  display: none;
+}
+
 .choices__list.choices__list--multiple {
     @apply flex flex-wrap gap-4;
     @apply px-12 pb-0 -mx-12;

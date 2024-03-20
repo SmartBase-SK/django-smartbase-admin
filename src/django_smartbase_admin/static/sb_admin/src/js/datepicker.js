@@ -319,11 +319,7 @@ const customActionsPlugin = (fp) => {
 
 export default class Datepicker {
     constructor() {
-        let documentLocale = document.documentElement.lang || 'default'
-        if (documentLocale === 'en') {
-            documentLocale = 'default'
-        }
-        flatpickr.localize(this.getLocale(documentLocale))
+        flatpickr.localize(this.getLocale(document.documentElement.lang || 'en'))
         this.initWidgets()
 
         document.addEventListener('formset:added', () => {
@@ -349,6 +345,7 @@ export default class Datepicker {
             '.js-datepicker-range': {
                 inline: true,
                 mode: "range",
+                allowInput: true,
                 plugins: [
                     monthYearViewsPlugin,
                     customActionsPlugin
@@ -358,11 +355,13 @@ export default class Datepicker {
                 enableTime: true,
                 noCalendar: true,
                 dateFormat: "H:i",
+                allowInput: true,
                 time_24hr: true
             },
             '.js-datetimepicker': {
                 enableTime: true,
                 dateFormat: "d.m.Y H:i",
+                allowInput: true,
                 time_24hr: true,
                 plugins: [
                     monthYearViewsPlugin,
@@ -378,9 +377,15 @@ export default class Datepicker {
                 }
                 flatpickr(datePickerEl, {
                     onReady: (selectedDates, dateStr, instance) => {
-                        this.createClear(instance)
+                        const isInTable = datePickerEl.closest('[data-filter-input-name]')
+                        if(!isInTable) {
+                            this.createClear(instance)
+                        }
                         instance.nextMonthNav?.replaceChildren(createIcon('Right-small'))
                         instance.prevMonthNav?.replaceChildren(createIcon('Left-small'))
+                        datePickerEl.addEventListener('clear', () => {
+                            instance.clear()
+                        })
                     },
                     ...datePickerSelector[selector],
                     ...sbadminDatepickerData.flatpickrOptions
@@ -398,7 +403,6 @@ export default class Datepicker {
         clear.addEventListener('click', (e) => {
             e.preventDefault()
             datePickerInstance.clear()
-            document.getElementById(`${datePickerInstance.element.id}_custom`).click()
         })
         clear.classList.add('px-12', 'py-8', 'inline-block', 'text-primary', 'text-14')
         el.append(clear)
