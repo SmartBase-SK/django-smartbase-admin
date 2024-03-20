@@ -174,7 +174,7 @@ msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie týchto 
 
 #, python-format
 msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
-msgstr "Ste si istý že chcete odstrániť vybrané %(object_name)s \"%(escaped_object)s\"? Všetky nasledujúce položky budú odstránené:"
+msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky nasledujúce položky a ich súvisiace objekty budú odstránené:"
 
 msgid "Add"
 msgstr "Pridať"
