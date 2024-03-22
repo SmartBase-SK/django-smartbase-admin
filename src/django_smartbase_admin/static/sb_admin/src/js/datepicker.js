@@ -319,7 +319,11 @@ const customActionsPlugin = (fp) => {
 
 export default class Datepicker {
     constructor() {
-        flatpickr.localize(this.getLocale(document.documentElement.lang || 'en'))
+        let documentLocale = document.documentElement.lang || 'default'
+        if (documentLocale === 'en') {
+            documentLocale = 'default'
+        }
+        flatpickr.localize(this.getLocale(documentLocale))
         this.initWidgets()
 
         document.addEventListener('formset:added', () => {
