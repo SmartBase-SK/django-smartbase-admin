@@ -20,7 +20,7 @@ class SBAdminBaseWidget(ContextMixin):
         super().__init__(*args, **kwargs)
         self.form_field = form_field
 
-    def init_widget_dynamic(self, form_field):
+    def init_widget_dynamic(self, form, form_field, field_name, view, request):
         self.form_field = form_field
 
     def get_context(self, name, value, attrs):
@@ -191,6 +191,7 @@ class SBAdminAutocompleteWidget(
 ):
     template_name = "sb_admin/widgets/autocomplete.html"
     view = None
+    form = None
     field_name = None
     threadsafe_request = None
     initialised = None
@@ -198,13 +199,14 @@ class SBAdminAutocompleteWidget(
     def __init__(self, form_field=None, *args, **kwargs):
         super().__init__(form_field, *args, **kwargs)
 
-    def init_widget_dynamic(self, form_field, field_name, view, request):
-        super().init_widget_dynamic(form_field)
+    def init_widget_dynamic(self, form, form_field, field_name, view, request):
+        super().init_widget_dynamic(form, form_field, field_name, view, request)
         if self.initialised:
             return
         self.initialised = True
         self.field_name = field_name
         self.view = view
+        self.form = form
         self.threadsafe_request = request
         self.init_autocomplete_widget_static(
             self.field_name,

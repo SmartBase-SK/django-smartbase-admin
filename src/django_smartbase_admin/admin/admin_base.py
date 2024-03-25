@@ -144,9 +144,9 @@ class SBAdminFormFieldWidgetsMixin:
                 form_field_widget_instance = SBAdminAutocompleteWidget(
                     form_field, model=db_field.target_field.model, multiselect=False
                 )
-                form_field_widget_instance.init_widget_dynamic(
-                    form_field, db_field.name, self, request
-                )
+            form_field_widget_instance.init_widget_dynamic(
+                self, form_field, db_field.name, self, request
+            )
             form_field.widget = form_field_widget_instance
         return form_field
 
@@ -162,9 +162,9 @@ class SBAdminFormFieldWidgetsMixin:
                     form_field,
                     model=db_field.target_field.model,
                 )
-                form_field_widget_instance.init_widget_dynamic(
-                    form_field, db_field.name, self, request
-                )
+            form_field_widget_instance.init_widget_dynamic(
+                self, form_field, db_field.name, self, request
+            )
             form_field.widget = form_field_widget_instance
             if form_field.help_text == _(
                 "Hold down “Control”, or “Command” on a Mac, to select more than one."
@@ -192,13 +192,13 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:
-            if isinstance(self.fields[field].widget, SBAdminAutocompleteWidget):
-                self.fields[field].widget.init_widget_dynamic(
-                    self.fields[field],
-                    field,
-                    self.view,
-                    self.threadsafe_request,
-                )
+            self.fields[field].widget.init_widget_dynamic(
+                self,
+                self.fields[field],
+                field,
+                self.view,
+                self.threadsafe_request,
+            )
         for field in self.declared_fields:
             form_field = self.fields.get(field)
             if form_field:
