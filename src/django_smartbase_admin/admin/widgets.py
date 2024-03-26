@@ -244,6 +244,7 @@ class SBAdminAutocompleteWidget(
                         }
                     )
                 context["widget"]["value"] = json.dumps(selected_options)
+                context["widget"]["value_list"] = selected_options
         return context
 
     def is_multiselect(self):
