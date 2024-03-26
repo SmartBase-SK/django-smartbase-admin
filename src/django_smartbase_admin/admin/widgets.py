@@ -113,7 +113,7 @@ class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
 
 
 class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultiple):
-    template_name = "sb_admin/widgets/multiple_choice_field.html"
+    template_name = "sb_admin/widgets/checkbox_select.html"
     option_template_name = "sb_admin/widgets/checkbox_option.html"
 
     def __init__(self, form_field=None, attrs=None, choices=()):
