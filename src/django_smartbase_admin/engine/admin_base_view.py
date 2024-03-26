@@ -515,6 +515,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             getattr(field, "filter_field", field): ""
             for field in list_fields
             if field in list_filter
+            or getattr(field, "name", None) in list_filter
             or getattr(field, "filter_field", None) in list_filter
         }
         url_params = None
