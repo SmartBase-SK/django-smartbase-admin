@@ -1,6 +1,30 @@
-{# TODO: create custom radio and checkbox group widgets #}
-{% with id=widget.attrs.id %}<div{% if id %} id="{{ id }}"{% endif %}{% if widget.attrs.class %} class="{{ widget.attrs.class }}"{% endif %}>{% for group, options, index in widget.optgroups %}{% if group %}
-  <div><label>{{ group }}</label>{% endif %}{% for option in options %}<div>
-    {% include option.template_name with widget=option %}</div>{% endfor %}{% if group %}
-  </div>{% endif %}{% endfor %}
-</div>{% endwith %}
+<div class="relative">
+    {% include 'sb_admin/widgets/includes/field_label.html' %}
+    <div id="{{ widget.attrs.id }}-wrapper" class="js-multiselect">
+        <button
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                data-bs-offset="[0, 8]"
+                class="btn px-10 font-normal w-full"
+        >
+            <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label }}</span>
+            <svg class="ml-8">
+                <use xlink:href="#Down"></use>
+            </svg>
+        </button>
+        <div class="dropdown-menu max-h-none w-248">
+            {% for group, options, index in widget.optgroups %}
+                {% if group %}
+                    <div><label>{{ group }}</label>
+                {% endif %}
+                {% for option in options %}
+                    <div class="px-12 py-8">
+                        {% include option.template_name with widget=option %}
+                    </div>
+                {% endfor %}
+                {% if group %}</div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% include 'sb_admin/widgets/includes/help_text.html' %}
