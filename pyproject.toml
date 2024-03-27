@@ -8,7 +8,6 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 django = ">= 4.1, < 6.0"
-django = "^5.0.3"
 django-ckeditor = "^6.7.1"
 django-admin-inline-paginator = "^0.4.0"
 django-nested-admin = "^4.0.2"
