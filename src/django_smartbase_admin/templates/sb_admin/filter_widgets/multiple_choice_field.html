@@ -1,18 +1,24 @@
-<div class="dropdown-menu max-h-none w-248">
-    <div class="px-12 py-8">
-        <div class="relative">
-            <input form="{{ filter_widget.view_id }}-filter-form" type="hidden"
+<div class="js-simple-multiselect-wrapper dropdown-menu">
+    <input form="{{ filter_widget.view_id }}-filter-form"
+               class="js-simple-multiselect"
+               type="hidden"
                    id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
                    {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %}
                    value="{{ filter_widget.get_default_value }}"{% endif %}>
-            <select class="js-choice" name="{{ filter_widget.input_name }}"
-                    data-input-el-id="{{ filter_widget.input_id }}" multiple>
-                {% for choice in filter_widget.choices %}
-                    <option value="{{ choice.0 }}"{% if filter_widget.get_default_value == choice.0 %}
-                            selected{% endif %}>{{ choice.1 }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-    {% include "sb_admin/filter_widgets/partials/clear.html" %}
+    <ul class="relative py-8">
+        {% for choice in filter_widget.choices %}
+            <li>
+                <div class="relative px-12 py-8">
+                    <input type="checkbox"
+                           value="{{ choice.0 }}"
+                           name="{{ filter_widget.input_name }}_dummy"
+                           class="checkbox"
+                           id="{{ filter_widget.input_id }}_{{ forloop.counter0 }}" {% if filter_widget.get_default_value == choice.0 %} checked{% endif %} data-label="{{ choice.1 }}">
+                    <label for="{{ filter_widget.input_id }}_{{ forloop.counter0 }}">
+                        {{ choice.1 }}
+                    </label>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
 </div>
