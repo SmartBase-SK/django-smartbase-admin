@@ -21,6 +21,7 @@ import Sorting from "./sorting"
 import Autocomplete from "./autocomplete"
 import ChoicesJS from "./choices"
 import {setCookie} from "./utils"
+import Multiselect from "./multiselect"
 
 class Main {
     constructor() {
@@ -50,6 +51,7 @@ class Main {
         new Sorting()
         new Autocomplete()
         new ChoicesJS()
+        new Multiselect()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)

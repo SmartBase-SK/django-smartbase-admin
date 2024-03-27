@@ -10,7 +10,9 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic.base import ContextMixin
 from filer.fields.image import AdminImageWidget
 
-from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
+from django_smartbase_admin.engine.filter_widgets import (
+    AutocompleteFilterWidget,
+)
 
 
 class SBAdminBaseWidget(ContextMixin):
@@ -107,6 +109,18 @@ class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
     def __init__(self, form_field=None, attrs=None, choices=()):
         super().__init__(
             form_field, attrs={"class": "radio", **(attrs or {})}, choices=choices
+        )
+
+
+class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultiple):
+    template_name = "sb_admin/widgets/checkbox_select.html"
+    option_template_name = "sb_admin/widgets/checkbox_option.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=()):
+        super().__init__(
+            form_field,
+            choices=choices,
+            attrs={"class": "checkbox", **(attrs or {})},
         )
 
 
