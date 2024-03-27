@@ -4,6 +4,7 @@ from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
 from django.contrib.postgres.forms import SimpleArrayField
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
@@ -107,7 +108,7 @@ class SBAdminFormFieldWidgetsMixin:
         forms.HiddenInput: SBAdminHiddenWidget,
     }
 
-    django_widget_to_widget = {forms.PasswordInput: SBAdminPasswordInputWidget}
+    django_widget_to_widget = {forms.PasswordInput: SBAdminPasswordInputWidget, AdminTextareaWidget: SBAdminTextareaWidget}
 
     def assign_widget_to_form_field(self, form_field):
         form_field.view = self
