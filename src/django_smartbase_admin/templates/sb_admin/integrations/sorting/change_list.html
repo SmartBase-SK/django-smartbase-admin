@@ -28,7 +28,7 @@
                     <div class="item-wrapper visible cursor-pointer border-2 border-solid border-black mr-10 mb-10" data-group-key="{{ item.group_by_catalog_value }}"
                          data-order="{{ item.product_category_order_by }}" data-simple-order="{{ forloop.counter }}">
                         <div class="item">
-                            <img height="76" width="57" class="lazyload" src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% thumbnail item.product_image 'product_detail_icon' %}" alt="">
+                            <img height="76" width="57" class="lazyload" src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% thumbnail item.product_image '76x57' crop=True replace_alpha='#fff' %}" alt="">
                             {% block sorting_product_attributes %}
                                 P: <span class="counter"></span><input type="checkbox" class="ml-10" name="item-selection" value="{{ item.product_category_order_by }}"><br>
                                 {{ item.product_name }}<br>

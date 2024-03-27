@@ -4,6 +4,7 @@ from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
 from django.contrib.postgres.forms import SimpleArrayField
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
@@ -107,7 +108,7 @@ class SBAdminFormFieldWidgetsMixin:
         forms.HiddenInput: SBAdminHiddenWidget,
     }
 
-    django_widget_to_widget = {forms.PasswordInput: SBAdminPasswordInputWidget}
+    django_widget_to_widget = {forms.PasswordInput: SBAdminPasswordInputWidget, AdminTextareaWidget: SBAdminTextareaWidget}
 
     def assign_widget_to_form_field(self, form_field):
         form_field.view = self
@@ -144,9 +145,9 @@ class SBAdminFormFieldWidgetsMixin:
                 form_field_widget_instance = SBAdminAutocompleteWidget(
                     form_field, model=db_field.target_field.model, multiselect=False
                 )
-                form_field_widget_instance.init_widget_dynamic(
-                    form_field, db_field.name, self, request
-                )
+            form_field_widget_instance.init_widget_dynamic(
+                self, form_field, db_field.name, self, request
+            )
             form_field.widget = form_field_widget_instance
         return form_field
 
@@ -162,9 +163,9 @@ class SBAdminFormFieldWidgetsMixin:
                     form_field,
                     model=db_field.target_field.model,
                 )
-                form_field_widget_instance.init_widget_dynamic(
-                    form_field, db_field.name, self, request
-                )
+            form_field_widget_instance.init_widget_dynamic(
+                self, form_field, db_field.name, self, request
+            )
             form_field.widget = form_field_widget_instance
             if form_field.help_text == _(
                 "Hold down “Control”, or “Command” on a Mac, to select more than one."
@@ -192,13 +193,13 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:
-            if isinstance(self.fields[field].widget, SBAdminAutocompleteWidget):
-                self.fields[field].widget.init_widget_dynamic(
-                    self.fields[field],
-                    field,
-                    self.view,
-                    self.threadsafe_request,
-                )
+            self.fields[field].widget.init_widget_dynamic(
+                self,
+                self.fields[field],
+                field,
+                self.view,
+                self.threadsafe_request,
+            )
         for field in self.declared_fields:
             form_field = self.fields.get(field)
             if form_field:
