@@ -724,7 +724,7 @@ class SBAdminInline(
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name == self.sortable_field_name:
-            formfield.widget = SBAdminHiddenWidget()
+            formfield.widget = HiddenInput()
         return formfield
 
     def get_formset(self, request, obj=None, **kwargs):
