@@ -193,6 +193,8 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:
+            if not hasattr(self.fields[field].widget, 'init_widget_dynamic'):
+                continue
             self.fields[field].widget.init_widget_dynamic(
                 self,
                 self.fields[field],
@@ -722,7 +724,7 @@ class SBAdminInline(
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name == self.sortable_field_name:
-            formfield.widget = HiddenInput()
+            formfield.widget = SBAdminHiddenWidget()
         return formfield
 
     def get_formset(self, request, obj=None, **kwargs):
