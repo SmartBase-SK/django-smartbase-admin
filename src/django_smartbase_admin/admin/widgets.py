@@ -159,7 +159,7 @@ class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
         )
 
 
-class SBAdminSplitDateTimeWidget(forms.SplitDateTimeWidget):
+class SBAdminSplitDateTimeWidget(SBAdminBaseWidget, forms.SplitDateTimeWidget):
     template_name = "sb_admin/widgets/splitdatetime.html"
 
     def __init__(self, form_field=None, attrs=None):

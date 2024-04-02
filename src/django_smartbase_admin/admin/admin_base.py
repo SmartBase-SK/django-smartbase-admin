@@ -193,6 +193,8 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:
+            if not hasattr(self.fields[field].widget, 'init_widget_dynamic'):
+                continue
             self.fields[field].widget.init_widget_dynamic(
                 self,
                 self.fields[field],
