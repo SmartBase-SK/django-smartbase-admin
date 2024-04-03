@@ -376,43 +376,6 @@
         }
     }
 
-    .purchase-process-steps {
-        @apply flex items-start py-32 text-center flex-wrap;
-        >li {
-            @apply flex-1 text-center relative p-8 min-w-128 max-w-128;
-            &:before {
-                content: '';
-                @apply block w-full border-b border-dark-200;
-                @apply absolute left-0 right-0 top-32;
-            }
-            &:first-child{
-                &:before {
-                    @apply w-1/2 left-auto;
-                }
-            }
-            &:last-child {
-                &:before {
-                    @apply w-1/2 right-auto;
-                }
-            }
-            >span {
-                @apply w-48 h-48;
-                @apply flex-center rounded-full mx-auto relative;
-                @apply bg-primary text-light border-8 border-dark-100;
-            }
-            >p {
-                @apply mt-8 text-14;
-            }
-            &.active {
-                ~ li {
-                    > span {
-                        @apply bg-dark-200 text-dark;
-                    }
-                }
-            }
-        }
-    }
-
     .mermaid {
         &:not([data-processed="true"]) {
             @apply hidden;
