@@ -5,3 +5,4 @@
 
 node_modules
 webpack-stats.json
+**/sb_admin/dist/
