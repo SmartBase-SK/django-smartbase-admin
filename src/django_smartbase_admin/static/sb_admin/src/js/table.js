@@ -188,7 +188,7 @@ class SBAdminTable {
     }
 
     paramsObjectToUrlString(params) {
-        return "?" + this.constants.BASE_PARAMS_NAME + "=" + JSON.stringify(params)
+        return "?" + this.constants.BASE_PARAMS_NAME + "=" + encodeURIComponent(JSON.stringify(params))
     }
 
     getUrlParamsString() {
