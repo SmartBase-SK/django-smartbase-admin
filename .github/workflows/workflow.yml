@@ -26,7 +26,7 @@ jobs:
       with:
         python-version: "3.x"
     - run: ls -la ./dist
-    - run: ls -la ./src
+    - run: ls -la ./src/django_smartbase_admin/static/sb_admin
     - name: Install pypa/build
       run: python3 -m pip install poetry
     - name: Build a binary wheel and a source tarball
