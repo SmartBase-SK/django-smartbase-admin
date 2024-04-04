@@ -29,7 +29,7 @@ jobs:
       run: python3 -m pip install poetry
     - name: Build a binary wheel and a source tarball
       run: poetry build
-    - run: tar -tf dist/django_smartbase_admin-0.2.5.tar.gz
+    - run: tar -tf dist/django_smartbase_admin-0.2.6.tar.gz
     - name: Store the distribution packages
       uses: actions/upload-artifact@v3
       with:
