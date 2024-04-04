@@ -4,6 +4,9 @@ version = "0.2.5"
 description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
+include = [
+    "**/sb_admin/dist/"
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
