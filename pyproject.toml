@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "django-smartbase-admin"
-version = "0.2.5"
+version = "0.2.6"
 description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
+include = [
+    "**/static/sb_admin/dist/**/*"
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
