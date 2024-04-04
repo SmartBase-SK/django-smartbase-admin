@@ -16,8 +16,7 @@ jobs:
     - name: Run install
       uses: borales/actions-yarn@v4
       with:
-        cmd: install # will run `yarn install` command
-    - run: ls -la
+        cmd: install # will run `yarn install` command    
     - name: Build production bundle
       uses: borales/actions-yarn@v4
       with:
@@ -26,6 +25,8 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.x"
+    - run: ls -la ./dist
+    - run: ls -la ./src
     - name: Install pypa/build
       run: python3 -m pip install poetry
     - name: Build a binary wheel and a source tarball
