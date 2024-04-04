@@ -5,7 +5,7 @@ description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
 include = [
-    "**/sb_admin/dist/"
+    "src/django_smartbase_admin/static/sb_admin/dist/**"
 ]
 
 [tool.poetry.dependencies]
