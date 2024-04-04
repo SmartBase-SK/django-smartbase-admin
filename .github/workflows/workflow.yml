@@ -21,12 +21,11 @@ jobs:
       uses: borales/actions-yarn@v4
       with:
         cmd: build
+    - run: ls -la ./src/django_smartbase_admin/static/sb_admin/dist
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.x"
-    - run: ls -la ./dist
-    - run: ls -la ./src/django_smartbase_admin/static/sb_admin
+        python-version: "3.x"    
     - name: Install pypa/build
       run: python3 -m pip install poetry
     - name: Build a binary wheel and a source tarball
