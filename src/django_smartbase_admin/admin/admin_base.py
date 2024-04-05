@@ -108,7 +108,10 @@ class SBAdminFormFieldWidgetsMixin:
         forms.HiddenInput: SBAdminHiddenWidget,
     }
 
-    django_widget_to_widget = {forms.PasswordInput: SBAdminPasswordInputWidget, AdminTextareaWidget: SBAdminTextareaWidget}
+    django_widget_to_widget = {
+        forms.PasswordInput: SBAdminPasswordInputWidget,
+        AdminTextareaWidget: SBAdminTextareaWidget,
+    }
 
     def assign_widget_to_form_field(self, form_field):
         form_field.view = self
@@ -193,7 +196,7 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:
-            if not hasattr(self.fields[field].widget, 'init_widget_dynamic'):
+            if not hasattr(self.fields[field].widget, "init_widget_dynamic"):
                 continue
             self.fields[field].widget.init_widget_dynamic(
                 self,
@@ -658,7 +661,7 @@ class SBAdmin(
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
-        return self.action_list(request, extra_context)
+        return self.action_list(request, extra_context=extra_context)
 
 
 class SBAdminInline(
