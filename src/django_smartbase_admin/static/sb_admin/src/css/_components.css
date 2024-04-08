@@ -138,7 +138,7 @@
         }
 
         &.active {
-            @apply text-primary font-semibold bg-light;
+            @apply text-primary font-semibold bg-primary-100;
 
             svg {
                 @apply text-primary;

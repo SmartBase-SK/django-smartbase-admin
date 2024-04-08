@@ -12,16 +12,9 @@
         th {
             @apply p-8 h-48;
             @apply transition-colors;
-            @apply bg-dark-100 text-dark-600;
+            @apply bg-dark-50 text-dark-600;
             @apply text-14 font-normal text-left;
-            /*
-            &:first-child {
-                @apply border-l border-dark-200;
-            }
-            &:last-child {
-                @apply border-r border-dark-200;
-            }
-             */
+            @apply border-y border-dark-200;
             &.original {
                 @apply w-40 min-w-40;
                 &:not(.is-sortable) {

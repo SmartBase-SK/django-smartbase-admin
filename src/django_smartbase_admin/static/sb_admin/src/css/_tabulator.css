@@ -25,7 +25,7 @@
     white-space: nowrap;
     overflow: hidden;
     user-select: none;
-    @apply border-b border-dark-200 bg-dark-100 text-dark-600;
+    @apply border-b border-dark-200 bg-dark-50 text-dark-600;
 }
 
 .tabulator .tabulator-header.tabulator-header-hidden {
@@ -51,13 +51,18 @@
     vertical-align: bottom;
     overflow: hidden;
     @apply transition-colors;
-    @apply bg-dark-100 text-dark-600;
+    @apply bg-dark-50 text-dark-600;
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content {
     box-sizing: border-box;
     position: relative;
     @apply p-8 min-h-48 flex items-center;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title-holder {
+    display: flex;
+    align-items: center;
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title-holder.tabulator-col-sorter-element {
@@ -84,10 +89,6 @@
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-sorter {
     display: flex;
     align-items: center;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    @apply right-2;
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-sorter .tabulator-arrow {
@@ -127,7 +128,7 @@
 }
 
 .tabulator .tabulator-header .tabulator-col.tabulator-sortable .tabulator-col-title {
-    @apply pr-20;
+    @apply pr-10;
 }
 
 .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort="ascending"] .tabulator-col-content .tabulator-col-sorter .tabulator-arrow {
