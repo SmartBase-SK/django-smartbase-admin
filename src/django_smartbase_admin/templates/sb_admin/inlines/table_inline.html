@@ -136,6 +136,9 @@
                                             {% endspaceless %}
                                         </td>
 
+                                        {% block table_inline_after_sortable %}
+                                        {% endblock %}
+
                                         {% for fieldset in inline_admin_form %}
                                             {% for line in fieldset %}
                                                 {% for field in line %}
@@ -154,25 +157,9 @@
                                                 {% endfor %}
                                             {% endfor %}
                                         {% endfor %}
-                                        {% if inline_admin_formset.formset.can_delete %}
-                                            {% if inline_admin_form.original %}
-                                                <td>
-                                                    <div class="relative min-h-40 flex items-center delete djn-delete-handler {{ inline_admin_formset.handler_classes|join:" " }}">
-                                                        {% render_field inline_admin_form.deletion_field.field class="checkbox checkbox-delete" %}
-                                                        <label for="{{ inline_admin_form.deletion_field.field.auto_id }}">
-                                                            <svg class="w-20 h-20"><use xlink:href="#Delete"></use></svg>
-                                                        </label>
-                                                    </div>
-                                                </td>
-                                            {% else %}
-                                                <td class="delete">
-                                                    <a
-                                                    class="flex-center h-40 inline-deletelink djn-remove-handler {{ inline_admin_formset.handler_classes|join:" " }}"
-                                                    href="javascript:void(0)"><svg class="w-20 h-20 text-dark-300 hover:text-dark-400"><use xlink:href="#Delete"></use></svg></a>
-                                                </td>
-                                            {% endif %}
-                                        {% endif %}
-
+                                        {% block table_inline_delete_button %}
+                                            {% include "sb_admin/includes/table_inline_delete_button.html" %}
+                                        {% endblock %}
                                     </tr>
 
                                     {% if inline_admin_form.form.inlines %}

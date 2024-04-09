@@ -1,0 +1,36 @@
+{% load i18n %}
+
+{% block content %}
+    <div class="modal-dialog">
+        <div class="modal-content">
+            {% include 'sb_admin/includes/loading_absolute.html' with additional_class="sb-admin-modal-loading" %}
+            {% block modal_content %}
+                <div class="modal-header">
+                    {% block modal_header %}
+                        <h3 class="text-dark-900 text-18 font-semibold leading-28">{% block modal_title %}{{ modal_title }}{% endblock %}</h3>
+                        <svg data-bs-dismiss="modal" aria-label="Close"
+                             class="w-24 h-24 absolute top-16 right-16 cursor-pointer transition-transform hover:rotate-90">
+                            <use xlink:href="#Close-small"></use>
+                        </svg>
+                    {% endblock %}
+                </div>
+                <div class="modal-body">
+                    {% block modal_body %}
+                        {{ form.non_field_errors }}
+                        <form id="sb-admin-modal-form" hx-indicator=".sb-admin-modal-loading" hx-target="#sb-admin-modal" hx-post="{{ request.get_full_path }}" action="{{ request.get_full_path }}" method="post">
+                            {% block modal_form_body %}
+                                {{ form.as_p }}
+                            {% endblock %}
+                        </form>
+                    {% endblock %}
+                </div>
+                <div class="modal-footer">
+                    {% block modal_footer %}
+                        <button form="sb-admin-modal-form" type="button" class="btn btn-destructive mr-10" data-bs-dismiss="modal">{% trans 'Close' %}</button>
+                        <button form="sb-admin-modal-form" type="submit" class="btn btn-primary">{% trans 'Continue' %}</button>
+                    {% endblock %}
+                </div>
+            {% endblock %}
+        </div>
+    </div>
+{% endblock %}

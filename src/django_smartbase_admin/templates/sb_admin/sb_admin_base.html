@@ -3,7 +3,7 @@
 {% block main_wrapper %}
     <div class="w-full h-full min-h-full xl:pl-260">
         {% include 'sb_admin/navigation.html' %}
-        <div class="min-h-screen sm:p-24 relative flex flex-col">
+        <div class="min-h-screen sm:p-24 relative flex flex-col {% block view_class %}{% endblock %}">
             {% include "sb_admin/includes/loading.html" %}
             {% include "sb_admin/includes/notifications.html" %}
 

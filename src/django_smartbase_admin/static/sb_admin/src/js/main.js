@@ -40,6 +40,9 @@ class Main {
         document.addEventListener('formset:added', (e) => {
             this.initDropdowns(e.target)
             this.initFileInputs(e.target)
+            if (e.target !== e.target.parentNode.firstChild) {
+                e.target.parentNode.insertBefore(e.target, e.target.parentNode.firstChild)
+            }
         })
         document.addEventListener('openUrl', (e) => {
             window.open(e.detail.url, e.detail?.target || '_blank')

@@ -7,12 +7,14 @@
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
                     data-bs-offset="[0, 8]"
-                    class="btn px-10 font-normal w-full"
+                    class="autocomplete-button btn px-10 font-normal w-full"
             >
-                <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label }}</span>
-                <svg class="ml-8">
-                    <use xlink:href="#Down"></use>
-                </svg>
+                {% block autocomplete_button_text %}
+                    <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label }}</span>
+                    <svg class="ml-8">
+                        <use xlink:href="#Down"></use>
+                    </svg>
+                {% endblock %}
             </button>
             <div class="dropdown-menu max-h-none w-248">
                 <div class="px-12 pt-8">
@@ -33,7 +35,7 @@
                     </div>
                 {% endif %}
                 {% if widget.form_field.required %}
-                        <div class="pb-8"></div>
+                    <div class="pb-8"></div>
                 {% else %}
                     <div class="relative px-12 py-8 flex">
                         <button type="button"
