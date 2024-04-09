@@ -12,6 +12,8 @@ register = template.Library()
 
 class SBAdminJSONEncoder(DjangoJSONEncoder):
     def default(self, o):
+        if callable(o):
+            return o.__name__
         to_json_method = getattr(o, "to_json", None)
         if to_json_method:
             return to_json_method()
