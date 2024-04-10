@@ -37,12 +37,14 @@
                 {% if widget.form_field.required %}
                     <div class="pb-8"></div>
                 {% else %}
-                    <div class="relative px-12 py-8 flex">
-                        <button type="button"
-                                class="text-primary js-clear-autocomplete">
-                            {% trans 'Clear' %}
-                        </button>
-                    </div>
+                    {% if not filter_widget.hide_clear_button %}
+                        <div class="relative px-12 py-8 flex">
+                            <button type="button"
+                                    class="text-primary js-clear-autocomplete">
+                                {% trans 'Clear' %}
+                            </button>
+                        </div>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>

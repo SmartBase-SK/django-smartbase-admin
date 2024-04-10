@@ -338,6 +338,7 @@ class AutocompleteFilterWidget(
     label_lambda = None
     value_lambda = None
     allow_add = False
+    hide_clear_button = False
 
     def get_field_name(self):
         return self.field.name
@@ -358,6 +359,7 @@ class AutocompleteFilterWidget(
         multiselect=None,
         forward=None,
         allow_add=None,
+        hide_clear_button=None,
         **kwargs,
     ) -> None:
         super().__init__(template_name, default_value, **kwargs)
@@ -371,6 +373,11 @@ class AutocompleteFilterWidget(
         self.multiselect = self.multiselect if self.multiselect is not None else True
         self.forward = forward or self.forward
         self.allow_add = allow_add or self.allow_add
+        self.hide_clear_button = (
+            hide_clear_button
+            if hide_clear_button is not None
+            else self.hide_clear_button
+        )
 
     def init_filter_widget_static(self, field, view, configuration):
         super().init_filter_widget_static(field, view, configuration)
