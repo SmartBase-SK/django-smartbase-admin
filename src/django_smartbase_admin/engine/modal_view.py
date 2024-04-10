@@ -8,6 +8,11 @@ class ActionModalView(FormView):
     template_name = "sb_admin/partials/modal/modal_content.html"
     form_class = None
     modal_title = ""
+    view = None
+
+    def __init__(self, view=None, *args, **kwargs):
+        self.view = view
+        super().__init__(*args, **kwargs)
 
     def process_form_valid(self, request, form):
         response = HttpResponse()
@@ -18,6 +23,15 @@ class ActionModalView(FormView):
             {},
         )
         return response
+
+    def get_form_class(self):
+        form_class = super().get_form_class()
+
+        class Form(form_class):
+            view = self.view
+            threadsafe_request = self.request
+
+        return Form
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
@@ -36,11 +50,6 @@ class ActionModalView(FormView):
 
 
 class ListActionModalView(ActionModalView):
-    view = None
-
-    def __init__(self, view=None, *args, **kwargs):
-        self.view = view
-        super().__init__(*args, **kwargs)
 
     def process_form_valid(self, request, form):
         response = super().process_form_valid(request, form)

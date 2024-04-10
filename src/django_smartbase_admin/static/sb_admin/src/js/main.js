@@ -52,7 +52,7 @@ class Main {
         new Datepicker()
         new Range()
         new Sorting()
-        new Autocomplete()
+        this.autocomplete = new Autocomplete()
         new ChoicesJS()
         new Multiselect()
         document.addEventListener('click', (e) => {
