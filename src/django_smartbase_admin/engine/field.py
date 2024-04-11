@@ -4,7 +4,10 @@ from django.db.models.functions import Concat
 from django.utils.formats import get_format
 
 from django_smartbase_admin.engine.const import ANNOTATE_KEY
-from django_smartbase_admin.engine.field_formatter import datetime_formatter, boolean_formatter
+from django_smartbase_admin.engine.field_formatter import (
+    datetime_formatter,
+    boolean_formatter,
+)
 from django_smartbase_admin.engine.filter_widgets import (
     StringFilterWidget,
     BooleanFilterWidget,
@@ -32,7 +35,13 @@ class TabulatorFieldOptions(JSONSerializableMixin):
 
 
 class XLSXFieldOptions(JSONSerializableMixin):
-    pass
+    title = None
+    field = None
+
+    def __init__(self, title: str = None, field: str = None) -> None:
+        super().__init__()
+        self.title = title
+        self.field = field
 
 
 class SBAdminField(JSONSerializableMixin):
@@ -216,7 +225,7 @@ class SBAdminField(JSONSerializableMixin):
         return data
 
     def serialize_xlsx(self):
-        data = self.to_json()
+        data = {"title": self.title, "field": self.field, "formatter": self.formatter}
         if self.xlsx_options:
             data.update(self.xlsx_options.to_json())
         return data
