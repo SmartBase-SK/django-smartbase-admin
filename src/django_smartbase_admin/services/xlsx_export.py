@@ -1,9 +1,11 @@
 import io
+import re
 from copy import copy
 
 import xlsxwriter
 from django.http import HttpResponse
 from django.utils.encoding import smart_str
+from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy
 
 from django_smartbase_admin.engine.const import Formatter
@@ -63,8 +65,9 @@ class SBAdminXLSXExportService(object):
         for data_row in data:
             for column in columns:
                 data_col = data_row.get(column["field"], "")
+                column_formatter = column.get("formatter", None)
                 image_write = False
-                if column.get("formatter", None) == Formatter.IMAGE.value:
+                if column_formatter == Formatter.IMAGE.value:
                     if row >= header_rows_count:
                         try:
                             worksheet.write_formula(
@@ -76,6 +79,10 @@ class SBAdminXLSXExportService(object):
                             image_write = True
                         except ValueError:
                             pass
+                if column_formatter == Formatter.HTML.value:
+                    # replace all possible variants of <br> with new line
+                    data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
+                    data_col = strip_tags(data_col).strip()
                 if not image_write:
                     worksheet.write(
                         row,
