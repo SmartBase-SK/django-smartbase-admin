@@ -41,3 +41,11 @@ def array_badge_formatter(object_id, value_list):
 
 def newline_separated_array_badge_formatter(object_id, value_list):
     return format_array(value_list, separator="<br>")
+
+
+def rich_text_formatter(object_id, value):
+    return f'<div style="max-width: 500px; white-space: normal;">{value}</div>'
+
+
+def link_formatter(object_id, value):
+    return f'<a href="{value}">{value}</a>'

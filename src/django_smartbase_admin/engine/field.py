@@ -1,10 +1,12 @@
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.db.models import Count, Value, CharField, F, DateTimeField, BooleanField
 from django.db.models.functions import Concat
-from django.utils.formats import get_format
 
-from django_smartbase_admin.engine.const import ANNOTATE_KEY
-from django_smartbase_admin.engine.field_formatter import datetime_formatter, boolean_formatter
+from django_smartbase_admin.engine.const import ANNOTATE_KEY, Formatter
+from django_smartbase_admin.engine.field_formatter import (
+    datetime_formatter,
+    boolean_formatter,
+)
 from django_smartbase_admin.engine.filter_widgets import (
     StringFilterWidget,
     BooleanFilterWidget,
@@ -32,7 +34,17 @@ class TabulatorFieldOptions(JSONSerializableMixin):
 
 
 class XLSXFieldOptions(JSONSerializableMixin):
-    pass
+    title = None
+    field = None
+    formatter = None
+
+    def __init__(
+        self, title: str = None, field: str = None, formatter: Formatter = None
+    ) -> None:
+        super().__init__()
+        self.title = title
+        self.field = field
+        self.formatter = formatter
 
 
 class SBAdminField(JSONSerializableMixin):
@@ -77,7 +89,7 @@ class SBAdminField(JSONSerializableMixin):
         list_visible=None,
         list_collapsed=None,
         auto_created=None,
-        formatter=None,
+        formatter: Formatter = None,
         tabulator_editor=None,
         python_formatter=None,
         tabulator_options: "TabulatorFieldOptions" = None,
@@ -216,7 +228,11 @@ class SBAdminField(JSONSerializableMixin):
         return data
 
     def serialize_xlsx(self):
-        data = self.to_json()
+        data = {
+            "title": self.title,
+            "field": self.field,
+            "formatter": self.formatter,
+        }
         if self.xlsx_options:
             data.update(self.xlsx_options.to_json())
         return data
