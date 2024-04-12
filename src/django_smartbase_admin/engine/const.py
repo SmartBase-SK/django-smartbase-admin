@@ -19,6 +19,7 @@ class Action(Enum):
 class Formatter(Enum):
     IMAGE = "image"
     DETAIL_LINK = "detail_link"
+    HTML = "html"
 
 
 DEFAULT_PAGE_SIZE = 20
