@@ -10,7 +10,7 @@
                     aria-expanded="false"
                     class="js-filter-dropdown-button empty {% if default_button %}btn{% else %}filter-dropdown-button{% endif %}">
                 <span>
-                   {{ filter_field.title }}: <span
+                   {{ filter_field.title|capfirst }}: <span
                         id="{{ filter_field.filter_widget.input_id }}-value">{{ filter_field.filter_widget.get_default_label|default_if_none:"" }}</span>
                 </span>
                 <svg class="w-16 h-16" title="{% trans 'Remove' %}" onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')">
