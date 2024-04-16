@@ -89,7 +89,9 @@ class SBAdminToggleWidget(SBAdminBaseWidget, forms.CheckboxInput):
 
 
 class SBAdminCKEditorWidget(SBAdminBaseWidget, CKEditorWidget):
-    template_name = "sb_admin/widgets/ckeditor.html"
+
+    def __init__(self, form_field=None, attrs=None):
+        super().__init__(form_field, template_name="sb_admin/widgets/ckeditor.html", attrs=attrs)
 
 
 class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
