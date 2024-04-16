@@ -273,7 +273,7 @@
 }
 
 .tabulator-page {
-    @apply flex-center w-40 h-40;
+    @apply flex-center min-w-40 h-40 px-2;
     @apply border border-dark-200 text-dark-900 font-medium;
     @apply relative;
     @apply shadow-xs;
