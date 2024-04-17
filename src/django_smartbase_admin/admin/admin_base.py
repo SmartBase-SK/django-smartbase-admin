@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
-from filer.fields.image import AdminImageFormField
+from filer.fields.image import AdminImageFormField, FilerImageField
 from nested_admin.nested import (
     NestedModelAdmin,
     NestedTabularInline,
@@ -59,10 +59,9 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminToggleWidget,
     SBAdminNullBooleanSelectWidget,
     SBAdminArrayWidget,
-    SBAdminImageWidget,
     SBAdminPasswordInputWidget,
     SBAdminReadOnlyPasswordHashWidget,
-    SBAdminHiddenWidget,
+    SBAdminHiddenWidget, SBAdminFilerImageWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -103,7 +102,7 @@ class SBAdminFormFieldWidgetsMixin:
         forms.TypedChoiceField: SBAdminSelectWidget,
         forms.NullBooleanField: SBAdminNullBooleanSelectWidget,
         SimpleArrayField: SBAdminArrayWidget,
-        AdminImageFormField: SBAdminImageWidget,
+        AdminImageFormField: SBAdminFilerImageWidget,
         ReadOnlyPasswordHashWidget: SBAdminReadOnlyPasswordHashWidget,
         forms.HiddenInput: SBAdminHiddenWidget,
     }

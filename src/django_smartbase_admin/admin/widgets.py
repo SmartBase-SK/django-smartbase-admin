@@ -1,19 +1,26 @@
 import json
+import logging
 
 from ckeditor.widgets import CKEditorWidget
 from django import forms
 from django.contrib.admin.widgets import (
-    AdminURLFieldWidget,
+    AdminURLFieldWidget, ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.http import urlencode
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.views.generic.base import ContextMixin
+from filer import settings as filer_settings
+from filer.models import File
 from filer.fields.image import AdminImageWidget
 
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
 )
-
+logger = logging.getLogger(__name__)
 
 class SBAdminBaseWidget(ContextMixin):
     sb_admin_widget = True
@@ -286,12 +293,59 @@ class SBAdminFileWidget(SBAdminBaseWidget, forms.ClearableFileInput):
     input_text = _("Change file")
 
 
-class SBAdminImageWidget(SBAdminBaseWidget, AdminImageWidget):
+class SBAdminFilerImageWidget(SBAdminBaseWidget, AdminImageWidget):
+    template_name = "sb_admin/widgets/filer_image_input.html"
+
     def __init__(self, form_field=None, *args, **kwargs):
         self.form_field = form_field
         super(AdminImageWidget, self).__init__(
             form_field.rel, form_field.view.admin_site
         )
+
+    def render(self, name, value, attrs=None, renderer=None):
+        obj = self.obj_for_value(value)
+        css_id = attrs.get('id', 'id_image_x')
+        related_url = None
+        change_url = ''
+        if value:
+            try:
+                file_obj = File.objects.get(pk=value)
+                related_url = file_obj.logical_folder.get_admin_directory_listing_url_path()
+                change_url = file_obj.get_admin_change_url()
+            except Exception as e:
+                # catch exception and manage it. We can re-raise it for debugging
+                # purposes and/or just logging it, provided user configured
+                # proper logging configuration
+                if filer_settings.FILER_ENABLE_LOGGING:
+                    logger.error('Error while rendering file widget: %s', e)
+                if filer_settings.FILER_DEBUG:
+                    raise
+        if not related_url:
+            related_url = reverse('admin:filer-directory_listing-last')
+        params = self.url_parameters()
+        params['_pick'] = 'file'
+        if params:
+            lookup_url = '?' + urlencode(sorted(params.items()))
+        else:
+            lookup_url = ''
+        if 'class' not in attrs:
+            # The JavaScript looks for this hook.
+            attrs['class'] = 'vForeignKeyRawIdAdminField'
+        # rendering the super for ForeignKeyRawIdWidget on purpose here because
+        # we only need the input and none of the other stuff that
+        # ForeignKeyRawIdWidget adds
+        hidden_input = super(ForeignKeyRawIdWidget, self).render(name, value, attrs)  # grandparent super
+        context = {
+            'hidden_input': hidden_input,
+            'lookup_url': '{}{}'.format(related_url, lookup_url),
+            'change_url': change_url,
+            'object': obj,
+            'lookup_name': name,
+            'id': css_id,
+            'admin_icon_delete': ('admin/img/icon-deletelink.svg'),
+        }
+        html = render_to_string(self.template_name, context)
+        return mark_safe(html)
 
 
 class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashWidget):
