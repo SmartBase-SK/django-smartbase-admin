@@ -193,21 +193,23 @@
             {% if is_popup %}
                 {# TODO: check sticky bar in popups #}
              {% endif %}
-            <div class="detail-view-action-bar">
-                <div>
-                    <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
-                        {% include 'sb_admin/includes/change_form_title.html' %}
-                    </h2>
-                    <div class="flex ml-auto gap-8">
-                        {% if not is_popup and has_view_permission %}
-                            {% url opts|admin_urlname:'changelist' as changelist_url %}
-                            <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
-                        {% endif %}
+            {% block action_bar %}
+                <div class="detail-view-action-bar">
+                    <div>
+                        <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                            {% include 'sb_admin/includes/change_form_title.html' %}
+                        </h2>
+                        <div class="flex ml-auto gap-8">
+                            {% if not is_popup and has_view_permission %}
+                                {% url opts|admin_urlname:'changelist' as changelist_url %}
+                                <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+                            {% endif %}
 
-                        {% submit_row %}
+                            {% submit_row %}
+                        </div>
                     </div>
                 </div>
-            </div>
+            {% endblock %}
         </form>
     {% endblock %}
 {% endblock %}
