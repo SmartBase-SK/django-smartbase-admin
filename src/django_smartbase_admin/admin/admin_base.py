@@ -366,9 +366,9 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         for inline_view in inlines:
             if issubclass(inline_view, SBAdminInline):
                 inline_view_instance = inline_view(model, admin_site)
-                configuration.view_map[inline_view_instance.get_id()] = (
-                    inline_view_instance
-                )
+                configuration.view_map[
+                    inline_view_instance.get_id()
+                ] = inline_view_instance
                 inline_view_instance.init_view_static(
                     configuration, inline_view_instance.model, admin_site
                 )

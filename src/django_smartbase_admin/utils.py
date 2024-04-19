@@ -34,9 +34,7 @@ def render_notifications(request):
 
 class FormFieldsetMixin(forms.Form):
     def fieldsets(self):
-        meta = getattr(self, "_meta", None)
-        if not meta:
-            meta = getattr(self, "Meta", None)
+        meta = getattr(self, "Meta", None)
 
         if not meta or not meta.fieldsets:
             yield Fieldset(form=self, fields=self.fields)

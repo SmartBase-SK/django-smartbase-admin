@@ -3,4 +3,7 @@
 
 <fieldset class="card sm:mb-24 relative {{ fieldset.classes }}">
     {% include 'sb_admin/includes/inline_fieldset.html' %}
+
+    {% block after_fieldset %}
+    {% endblock %}
 </fieldset>

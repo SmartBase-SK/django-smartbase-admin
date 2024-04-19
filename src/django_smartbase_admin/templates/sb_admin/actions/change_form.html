@@ -151,11 +151,13 @@
                         <div class="min-w-0 w-full">
                             {% for tab_content in tab_content_object.content %}
                                 {% if tab_content.type == 'fieldset' %}
-                                    {% with tab_content.value as fieldset %}
-                                        {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes %}
-                                            {% include "sb_admin/includes/fieldset.html" %}
-                                        {% endif %}
-                                    {% endwith %}
+                                    {% block tab_content_fieldset %}
+                                        {% with tab_content.value as fieldset %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes %}
+                                                {% include "sb_admin/includes/fieldset.html" %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endblock %}
                                 {% endif %}
                                 {% if tab_content.type == 'inline' %}
                                     {% with tab_content.value as inline_admin_formset %}
