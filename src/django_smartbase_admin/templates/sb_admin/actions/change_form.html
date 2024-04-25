@@ -160,6 +160,8 @@
                                     {% endblock %}
                                 {% endif %}
                                 {% if tab_content.type == 'inline' %}
+                                    {% block before_inline_tab %}
+                                    {% endblock %}
                                     {% with tab_content.value as inline_admin_formset %}
                                         {% include inline_admin_formset.opts.template %}
                                     {% endwith %}
