@@ -1,3 +1,4 @@
+import json
 import urllib.parse
 
 from ckeditor.fields import RichTextFormField
@@ -25,6 +26,7 @@ from nested_admin.nested import (
     NestedGenericStackedInline,
 )
 
+from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 
 parler_enabled = None
@@ -366,9 +368,9 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         for inline_view in inlines:
             if issubclass(inline_view, SBAdminInline):
                 inline_view_instance = inline_view(model, admin_site)
-                configuration.view_map[
-                    inline_view_instance.get_id()
-                ] = inline_view_instance
+                configuration.view_map[inline_view_instance.get_id()] = (
+                    inline_view_instance
+                )
                 inline_view_instance.init_view_static(
                     configuration, inline_view_instance.model, admin_site
                 )
@@ -653,11 +655,37 @@ class SBAdmin(
     def get_new_url(self):
         return reverse(f"sb_admin:{self.get_id()}_add")
 
+    def get_previous_next_context(self, request, object_id):
+        if not object_id:
+            return {}
+        try:
+            all_params = json.loads(
+                urllib.parse.parse_qs(
+                    urllib.parse.unquote(request.GET["_changelist_filters"])
+                )["params"][0]
+            )
+        except:
+            all_params = {}
+        list_action = SBAdminListAction(self, request, all_params=all_params)
+        all_ids = list(
+            list_action.build_final_data_count_queryset()
+            .order_by(*list_action.get_order_by_from_request())
+            .values_list("id", flat=True)
+        )
+        index = all_ids.index(int(object_id))
+        previous_id = None if index == 0 else all_ids[index - 1]
+        next_id = None if index == len(all_ids) - 1 else all_ids[index + 1]
+        return {
+            "previous_url": self.get_detail_url(previous_id),
+            "next_url": self.get_detail_url(next_id),
+        }
+
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request, object_id))
         extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
+        extra_context.update(self.get_previous_next_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):

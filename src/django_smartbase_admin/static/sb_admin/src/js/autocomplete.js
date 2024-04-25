@@ -60,6 +60,7 @@ export default class Autocomplete {
         const choicesJS = new Choices(choiceInput, {
             ...choicesJSOptions(choiceInput),
             placeholderValue: 'Search',
+            searchChoices: false,
             searchPlaceholderValue: 'Search',
             searchResultLimit: 999,
 

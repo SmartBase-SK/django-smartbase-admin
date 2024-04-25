@@ -41,11 +41,15 @@ class SBAdminListAction(SBAdminAction):
         page_size=None,
         tabulator_definition=None,
         list_actions=None,
+        all_params=None,
     ) -> None:
         super().__init__(view, request)
-        self.all_params = json.loads(
-            request.request_data.request_get.get(f"{BASE_PARAMS_NAME}", "{}")
-        )
+        if all_params is None:
+            self.all_params = json.loads(
+                request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
+            )
+        else:
+            self.all_params = all_params
         if not self.all_params:
             self.all_params = {}
         self.params = self.all_params.get(self.view.get_id(), {})
@@ -216,30 +220,36 @@ class SBAdminListAction(SBAdminAction):
             values.extend(self.view.sbadmin_list_display_data)
         return values
 
-    def get_data(self, page_num=None, page_size=None, additional_filter=None):
-        data_queryset = self.get_data_queryset()
+    def build_final_data_count_queryset(self, additional_filter=None):
         additional_filter = additional_filter or Q()
+        filter_fields = self.get_filter_fields_from_request()
+        return (
+            self.get_data_queryset(visible_fields=filter_fields)
+            .filter(self.get_filter_from_request())
+            .filter(additional_filter)
+        )
 
-        page_num = page_num or int(self.table_params.get(TABLE_PARAMS_PAGE_NAME, 1))
-        page_size = page_size or self.page_size
-
+    def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
+        additional_filter = additional_filter or Q()
         from_item = (page_num - 1) * page_size
         to_item = page_num * page_size
-
+        data_queryset = self.get_data_queryset()
         base_qs = (
             data_queryset.values(*self.get_data_queryset_values())
             .filter(self.get_filter_from_request())
             .filter(additional_filter)
         )
-        filter_fields = self.get_filter_fields_from_request()
-        total_count = (
-            self.get_data_queryset(visible_fields=filter_fields)
-            .filter(self.get_filter_from_request())
-            .filter(additional_filter)
-            .count()
-        )
+        return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
+
+    def get_data(self, page_num=None, page_size=None, additional_filter=None):
+        additional_filter = additional_filter or Q()
+
+        page_num = page_num or int(self.table_params.get(TABLE_PARAMS_PAGE_NAME, 1))
+        page_size = page_size or self.page_size
+
+        total_count = self.build_final_data_count_queryset(additional_filter).count()
         final_data = list(
-            base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
+            self.build_final_data_queryset(page_num, page_size, additional_filter)
         )
 
         self.process_final_data(final_data)
