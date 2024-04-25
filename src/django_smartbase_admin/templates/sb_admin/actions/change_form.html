@@ -203,6 +203,21 @@
                         <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
                             {% include 'sb_admin/includes/change_form_title.html' %}
                         </h2>
+                        {% if previous_url or next_url %}
+                            <div class="flex items-center gap-8 mr-8">
+                                <{% if previous_url %}a href="{{ previous_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Prev' %}">
+                                    <svg class="w-20 h-20">
+                                        <use xlink:href="#Left"></use>
+                                    </svg>
+                                </{% if previous_url %}a{% else %}button{% endif %}>
+                                <div class="text-12">{% blocktrans %}<strong>{{ current_index }}</strong> / {{ all_objects_count }}{% endblocktrans %}</div>
+                                <{% if next_url %}a href="{{ next_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Next' %}">
+                                    <svg class="w-20 h-20">
+                                        <use xlink:href="#Right"></use>
+                                    </svg>
+                                </{% if next_url %}a{% else %}button{% endif %}>
+                            </div>
+                        {% endif %}
                         <div class="flex ml-auto gap-8">
                             {% if not is_popup and has_view_permission %}
                                 {% url opts|admin_urlname:'changelist' as changelist_url %}

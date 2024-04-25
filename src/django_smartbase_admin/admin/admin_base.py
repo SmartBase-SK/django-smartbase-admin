@@ -556,6 +556,7 @@ class SBAdmin(
     object_history_template = "sb_admin/actions/object_history.html"
 
     sbadmin_fieldsets = None
+    sbadmin_previous_next_buttons_enabled = False
     sbadmin_tabs = None
     request_data = None
     menu_label = None
@@ -656,13 +657,14 @@ class SBAdmin(
         return reverse(f"sb_admin:{self.get_id()}_add")
 
     def get_previous_next_context(self, request, object_id):
-        if not object_id:
+        if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
+        changelist_filters = request.GET.get("_changelist_filters", "")
         try:
             all_params = json.loads(
-                urllib.parse.parse_qs(
-                    urllib.parse.unquote(request.GET["_changelist_filters"])
-                )["params"][0]
+                urllib.parse.parse_qs(urllib.parse.unquote(changelist_filters))[
+                    "params"
+                ][0]
             )
         except:
             all_params = {}
@@ -676,8 +678,18 @@ class SBAdmin(
         previous_id = None if index == 0 else all_ids[index - 1]
         next_id = None if index == len(all_ids) - 1 else all_ids[index + 1]
         return {
-            "previous_url": self.get_detail_url(previous_id),
-            "next_url": self.get_detail_url(next_id),
+            "previous_url": (
+                f"{self.get_detail_url(previous_id)}?_changelist_filters={changelist_filters}"
+                if previous_id
+                else None
+            ),
+            "current_index": index + 1,
+            "all_objects_count": len(all_ids),
+            "next_url": (
+                f"{self.get_detail_url(next_id)}?_changelist_filters={changelist_filters}"
+                if next_id
+                else None
+            ),
         }
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
