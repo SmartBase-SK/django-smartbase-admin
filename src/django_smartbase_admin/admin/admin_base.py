@@ -194,6 +194,7 @@ class SBAdminFormFieldWidgetsMixin:
 
 class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
     threadsafe_request = None
+    view = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
