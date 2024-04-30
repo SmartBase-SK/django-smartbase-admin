@@ -154,7 +154,7 @@ class SBAdminListAction(SBAdminAction):
                 "filters": self.get_filters(),
                 "list_actions": self.list_actions
                 or self.view._get_sbadmin_list_actions(),
-                "list_selection_actions": self.view.get_sbadmin_list_selection_actions(),
+                "list_selection_actions": self.view.get_sbadmin_list_selection_actions_grouped(),
                 "config_url": self.view.get_config_url(),
                 "new_url": (
                     self.view.get_new_url()

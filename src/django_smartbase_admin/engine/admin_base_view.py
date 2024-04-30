@@ -395,6 +395,14 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_selection_actions
 
+    def get_sbadmin_list_selection_actions_grouped(self):
+        result = {}
+        for action in self.get_sbadmin_list_selection_actions():
+            if not result.get(action.group):
+                result.update({action.group: []})
+            result[action.group].append(action)
+        return result
+
     def get_sbadmin_xlsx_options(self):
         self.sbadmin_xlsx_options = self.sbadmin_xlsx_options or SBAdminXLSXOptions(
             header_cell_format=SBAdminXLSXFormat(

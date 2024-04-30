@@ -6,7 +6,13 @@ class SBAdminCustomAction(object):
     open_in_modal = False
 
     def __init__(
-        self, title, url, css_class=None, no_params=False, open_in_modal=False
+        self,
+        title,
+        url,
+        css_class=None,
+        no_params=False,
+        open_in_modal=False,
+        group=None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -14,6 +20,7 @@ class SBAdminCustomAction(object):
         self.css_class = css_class
         self.no_params = no_params
         self.open_in_modal = open_in_modal
+        self.group = group
 
 
 class SBAdminAction(object):

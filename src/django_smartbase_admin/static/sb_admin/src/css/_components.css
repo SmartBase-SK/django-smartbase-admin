@@ -339,7 +339,7 @@
 
     .table-selected-rows-bar {
         @apply flex items-center h-48 pr-16 py-8;
-        @apply bg-light;
+        @apply bg-light custom-scrollbar;
         @apply absolute top-full right-0 left-0;
         margin-top: 1px;
         overflow-x: auto;
