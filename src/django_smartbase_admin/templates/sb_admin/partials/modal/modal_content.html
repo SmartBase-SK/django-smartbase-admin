@@ -16,10 +16,26 @@
                 </div>
                 <div class="modal-body">
                     {% block modal_body %}
-                        {{ form.non_field_errors }}
                         <form id="sb-admin-modal-form" hx-indicator=".sb-admin-modal-loading" hx-target="#sb-admin-modal" hx-post="{{ request.get_full_path }}" action="{{ request.get_full_path }}" method="post">
+                            {% if form.errors %}
+                                <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+                                    <div class="flex">
+                                        <svg class="w-20 h-20 mr-12 text-negative">
+                                            <use xlink:href="#Close-one"></use>
+                                        </svg>
+                                        <h5 class="font-semibold">
+                                            {% blocktrans count form.errors.items|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                                        </h5>
+                                    </div>
+                                </div>
+                                {{ form.non_field_errors }}
+                            {% endif %}
                             {% block modal_form_body %}
-                                {{ form.as_p }}
+                                {% for fieldset in form.fieldsets %}
+                                    <fieldset class="relative {{ fieldset.classes }}">
+                                        {% include 'sb_admin/includes/inline_fieldset.html' %}
+                                    </fieldset>
+                                {% endfor %}
                             {% endblock %}
                         </form>
                     {% endblock %}

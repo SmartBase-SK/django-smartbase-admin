@@ -28,6 +28,7 @@ from nested_admin.nested import (
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.utils import FormFieldsetMixin
 
 parler_enabled = None
 try:
@@ -192,7 +193,7 @@ class SBAdminFormFieldWidgetsMixin:
         return form_field
 
 
-class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin):
+class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
     threadsafe_request = None
     view = None
 
