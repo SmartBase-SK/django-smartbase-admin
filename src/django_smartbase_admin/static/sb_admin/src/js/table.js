@@ -257,6 +257,7 @@ class SBAdminTable {
             this.tableHistoryEnabled = false
         }
         tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
+        tabulatorOptions['ajaxConfig']['headers']['X-TabulatorRequest'] = true
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         document.addEventListener("SBAdminReloadTableData", function () {
