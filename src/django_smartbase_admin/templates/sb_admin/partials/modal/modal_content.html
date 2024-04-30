@@ -55,6 +55,7 @@
             choiceElements.forEach((choiceInput) => {
                 window.SBAdmin.autocomplete.initAutocomplete(choiceInput);
             })
+            document.body.dispatchEvent(new Event('SBModalShown'));
         })();
     </script>
 {% endblock %}

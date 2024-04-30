@@ -23,13 +23,16 @@ export default class Autocomplete {
                 choiceInput.setAttribute('data-autocomplete-data-id', choiceInput.getAttribute('data-autocomplete-data-id').replace('__prefix__', totalFormsCount))
                 this.initAutocomplete(choiceInput, totalFormsCount)
             })
-            event.target.querySelectorAll('.js-autocomplete-detail').forEach(item => {
-                item.addEventListener('SBAutocompleteChange', (e) => {
-                    filterInputValueChangedUtil(e.target)
-                })
-            })
+            this.handleDynamiclyAddedAutocomplete(event.target)
         })
-        document.querySelectorAll('.js-autocomplete-detail').forEach(item => {
+        document.body.addEventListener('SBModalShown', () => {
+            this.handleDynamiclyAddedAutocomplete(document.getElementById('sb-admin-modal'))
+        })
+        this.handleDynamiclyAddedAutocomplete(document)
+    }
+
+    handleDynamiclyAddedAutocomplete(el) {
+        el.querySelectorAll('.js-autocomplete-detail').forEach(item => {
             filterInputValueChangedUtil(item)
             item.addEventListener('SBAutocompleteChange', (e) => {
                 filterInputValueChangedUtil(e.target)
