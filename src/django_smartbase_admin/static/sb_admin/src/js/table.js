@@ -199,6 +199,9 @@ class SBAdminTable {
     ajaxUrlGenerator(url, config, params) {
         this.lastTableParams = params
         this.updateUrlState()
+        if (this.tabulatorOptions['ajaxConfig']['method'] === 'POST') {
+            return this.tableAjaxUrl
+        }
         return this.tableAjaxUrl + this.getUrlParamsString()
     }
 
@@ -237,6 +240,12 @@ class SBAdminTable {
             ajaxURLGenerator: (url, config, params) => {
                 return this.ajaxUrlGenerator(url, config, params)
             },
+            ajaxParams: () => {
+                if (this.tabulatorOptions['ajaxConfig']['method'] === 'POST') {
+                    return this.getAllUrlParams()
+                }
+                return {}
+            },
             dataSendParams: {
                 "size": this.constants.TABLE_PARAMS_SIZE_NAME,
                 "page": this.constants.TABLE_PARAMS_PAGE_NAME,
@@ -244,6 +253,10 @@ class SBAdminTable {
             },
             ...this.tabulatorOptions
         }
+        if (tabulatorOptions['ajaxConfig']['method'] === 'POST'){
+            this.tableHistoryEnabled = false
+        }
+        tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         document.addEventListener("SBAdminReloadTableData", function () {
