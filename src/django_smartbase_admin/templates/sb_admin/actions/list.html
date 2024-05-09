@@ -28,7 +28,7 @@
                                 {% for list_action in content_context.list_actions %}
                                     <li>
                                         <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.location.href='{{ list_action.url }}'{% if not list_action.no_params %} + window.SBAdminTable['{{ view_id }}'].getUrlParamsString(){% endif %}"{% endif %}
-                                            class="dropdown-menu-link">{{ list_action.title }}</a>
+                                            class="dropdown-menu-link {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                                     </li>
                                 {% endfor %}
                             {% endblock %}
@@ -40,7 +40,7 @@
                     {% for list_action in content_context.list_actions %}
                         <li class="max-sm:hidden">
                             <button {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.location.href='{{ list_action.url }}'{% if not list_action.no_params %} + window.SBAdminTable['{{ view_id }}'].getUrlParamsString(){% endif %}"{% endif %}
-                                    class="btn btn-empty">{{ list_action.title }}
+                                    class="btn btn-empty {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}
                             </button>
                         </li>
                     {% endfor %}

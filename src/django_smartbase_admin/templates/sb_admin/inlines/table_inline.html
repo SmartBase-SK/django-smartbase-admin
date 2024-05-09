@@ -20,7 +20,7 @@
                     <div class="ml-auto flex gap-8">
                         {% for list_action in inline_admin_formset.opts.get_context_data.inline_list_actions %}
                             <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %}{% endif %} href="{{ list_action.url }}"
-                                    class="btn">{{ list_action.title }}</a>
+                                    class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
                         {% if inline_admin_formset.has_add_permission %}
                             <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">

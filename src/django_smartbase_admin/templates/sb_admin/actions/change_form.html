@@ -60,7 +60,7 @@
                                     {% if detail_actions %}
                                         {% for action in detail_actions %}
                                             <li>
-                                                <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link">
+                                                <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link {{ action.css_class|default_if_none:'' }}">
                                                     {{ action.title }}
                                                 </a>
                                             </li>
@@ -86,7 +86,7 @@
                         {% if detail_actions %}
                             {% for action in detail_actions %}
                                 <li class="max-sm:hidden">
-                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty">
+                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty {{ action.css_class|default_if_none:'' }}">
                                         {{ action.title }}
                                     </a>
                                 </li>
