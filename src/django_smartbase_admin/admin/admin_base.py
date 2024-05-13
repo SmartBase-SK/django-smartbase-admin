@@ -116,7 +116,15 @@ class SBAdminFormFieldWidgetsMixin:
         AdminTextareaWidget: SBAdminTextareaWidget,
     }
 
-    def assign_widget_to_form_field(self, form_field):
+    def get_form_field_widget_class(self, form_field, db_field, request):
+        return self.formfield_widgets.get(form_field.__class__)
+
+    def get_autocomplete_widget(self, request, form_field, model, multiselect=False):
+        return request.request_data.configuration.get_autocomplete_widget(
+            request, form_field, model, multiselect
+        )
+
+    def assign_widget_to_form_field(self, form_field, db_field=None, request=None):
         form_field.view = self
         if getattr(form_field.widget, "sb_admin_widget", None):
             if not form_field.widget.form_field:
@@ -125,7 +133,7 @@ class SBAdminFormFieldWidgetsMixin:
 
         widget = self.django_widget_to_widget.get(form_field.widget.__class__)
         if not widget:
-            widget = self.formfield_widgets.get(form_field.__class__)
+            widget = self.get_form_field_widget_class(form_field, db_field, request)
 
         if not widget:
             return form_field
@@ -144,12 +152,19 @@ class SBAdminFormFieldWidgetsMixin:
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
         if form_field:
             form_field.view = self
-            form_field_widget = self.formfield_widgets.get(form_field.__class__)
-            if form_field_widget:
-                form_field_widget_instance = form_field_widget(form_field=form_field)
+            form_field_widget_class = self.get_form_field_widget_class(
+                form_field, db_field, request
+            )
+            if form_field_widget_class:
+                form_field_widget_instance = form_field_widget_class(
+                    form_field=form_field
+                )
             else:
-                form_field_widget_instance = SBAdminAutocompleteWidget(
-                    form_field, model=db_field.target_field.model, multiselect=False
+                form_field_widget_instance = self.get_autocomplete_widget(
+                    request,
+                    form_field,
+                    db_field.target_field.model,
+                    multiselect=False,
                 )
             form_field_widget_instance.init_widget_dynamic(
                 self, form_field, db_field.name, self, request
@@ -161,13 +176,19 @@ class SBAdminFormFieldWidgetsMixin:
         form_field = super().formfield_for_manytomany(db_field, request, **kwargs)
         if form_field:
             form_field.view = self
-            form_field_widget = self.formfield_widgets.get(form_field.__class__)
-            if form_field_widget:
-                form_field_widget_instance = form_field_widget(form_field=form_field)
+            form_field_widget_class = self.get_form_field_widget_class(
+                form_field, db_field, request
+            )
+            if form_field_widget_class:
+                form_field_widget_instance = form_field_widget_class(
+                    form_field=form_field
+                )
             else:
-                form_field_widget_instance = SBAdminAutocompleteWidget(
+                form_field_widget_instance = self.get_autocomplete_widget(
+                    request,
                     form_field,
-                    model=db_field.target_field.model,
+                    db_field.target_field.model,
+                    multiselect=True,
                 )
             form_field_widget_instance.init_widget_dynamic(
                 self, form_field, db_field.name, self, request
@@ -189,7 +210,7 @@ class SBAdminFormFieldWidgetsMixin:
 
         form_field = super().formfield_for_dbfield(db_field, request, **kwargs)
         if form_field:
-            form_field = self.assign_widget_to_form_field(form_field)
+            form_field = self.assign_widget_to_form_field(form_field, db_field, request)
         return form_field
 
 
@@ -387,18 +408,14 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         inlines = []
         for inline_class in inline_classes:
             inline = inline_class(self.model, self.admin_site)
-            if hasattr(inline, "init_inline_dynamic"):
-                inline.init_inline_dynamic(request, obj)
-                inline.init_view_dynamic(request, request.request_data)
             if request:
-                if not (
-                    inline.has_view_or_change_permission(request, obj)
-                    or inline.has_add_permission(request, obj)
-                    or inline.has_delete_permission(request, obj)
-                ):
+                if not inline.has_view_or_change_permission(request, obj):
                     continue
                 if not inline.has_add_permission(request, obj):
                     inline.max_num = 0
+            if hasattr(inline, "init_inline_dynamic"):
+                inline.init_inline_dynamic(request, obj)
+                inline.init_view_dynamic(request, request.request_data)
             inlines.append(inline)
         return inlines
 

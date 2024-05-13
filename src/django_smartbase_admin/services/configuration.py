@@ -10,7 +10,9 @@ class SBAdminConfigurationService(object):
         user_roles = ["ANONYMOUS"]
         if not request_data.user.is_anonymous:
             user_roles = request_data.user.groups.values_list("name", flat=True)
-        return configuration_class().get_configuration_for_roles(user_roles)
+        return configuration_class(
+            request_data=request_data
+        ).get_configuration_for_roles(user_roles)
 
     @classmethod
     def get_view_url_identifier(cls, view_id):

@@ -9,6 +9,12 @@ from django_smartbase_admin.utils import to_list
 
 
 class SBAdminConfigurationBase(object):
+    request_data = None
+
+    def __init__(self, request_data=None):
+        super().__init__()
+        self.request_data = request_data
+
     def get_configuration_for_roles(self, user_roles):
         raise NotImplementedError
 
@@ -135,6 +141,13 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
                 )
             return allowed
         return request.user.is_staff
+
+    def get_autocomplete_widget(self, request, form_field, model, multiselect=False):
+        from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+        return SBAdminAutocompleteWidget(
+            form_field, model=model, multiselect=multiselect
+        )
 
     def apply_global_filter_to_queryset(
         self, qs, request, request_data, global_filter_data_map

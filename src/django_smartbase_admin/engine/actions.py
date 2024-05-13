@@ -1,6 +1,10 @@
+from django.utils.text import slugify
+
+
 class SBAdminCustomAction(object):
     title = None
     url = None
+    slug = None
     css_class = None
     no_params = False
     open_in_modal = False
@@ -9,6 +13,7 @@ class SBAdminCustomAction(object):
         self,
         title,
         url,
+        slug=None,
         css_class=None,
         no_params=False,
         open_in_modal=False,
@@ -17,6 +22,7 @@ class SBAdminCustomAction(object):
         super().__init__()
         self.title = title
         self.url = url
+        self.slug = slug if slug is not None else slugify(title)
         self.css_class = css_class
         self.no_params = no_params
         self.open_in_modal = open_in_modal

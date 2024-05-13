@@ -283,6 +283,10 @@ class SBAdminAutocompleteWidget(
         return None
 
 
+class SBAdminAutocompleteMultiselectWidget(SBAdminAutocompleteWidget):
+    multiselect = True
+
+
 class SBAdminFileWidget(SBAdminBaseWidget, forms.ClearableFileInput):
     template_name = "sb_admin/widgets/clearable_file_input.html"
     clear_checkbox_label = _("Clear")
