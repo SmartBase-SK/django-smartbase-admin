@@ -65,10 +65,24 @@ class SBAdminBaseView(object):
     def has_delete_permission(self, request, obj=None):
         return self.has_permission(request, obj, "delete")
 
+    def has_permission_for_action(self, request, action_id):
+        return self.has_permission(
+            request,
+            obj=None,
+            permission=action_id,
+        )
+
     def has_view_or_change_permission(self, request, obj=None):
         return self.has_view_permission(request, obj) or self.has_change_permission(
             request, obj
         )
+
+    def process_actions_permissions(self, request, actions):
+        result = []
+        for action in actions:
+            if self.has_permission_for_action(request, action.action_id):
+                result.append(action)
+        return result
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         if not self.has_view_or_change_permission(request):
@@ -96,6 +110,9 @@ class SBAdminBaseView(object):
         action_function = getattr(self, action, None)
         if not action_function:
             raise Http404
+        permitted_action = self.has_permission_for_action(request, action)
+        if not permitted_action:
+            raise PermissionDenied
         return action_function(request, modifier)
 
     def get_action_url(self, action, modifier="template"):
@@ -367,7 +384,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 *list_actions,
                 SBAdminCustomAction(
                     title=_(f"Reorder {self.model._meta.verbose_name}"),
-                    url=self.get_action_url(Action.ENTER_REORDER.value),
+                    view=self,
+                    action_id=Action.ENTER_REORDER.value,
                     no_params=True,
                 ),
             ]
@@ -378,7 +396,8 @@ class SBAdminBaseListView(SBAdminBaseView):
             self.sbadmin_list_actions = [
                 SBAdminCustomAction(
                     title=_("Download XLSX"),
-                    url=self.get_action_url(action=Action.XLSX_EXPORT.value),
+                    view=self,
+                    action_id=Action.XLSX_EXPORT.value,
                 )
             ]
         return self.sbadmin_list_actions
@@ -388,19 +407,24 @@ class SBAdminBaseListView(SBAdminBaseView):
             self.sbadmin_list_selection_actions = [
                 SBAdminCustomAction(
                     title=_("Export Selected"),
-                    url=self.get_action_url(action=Action.XLSX_EXPORT.value),
+                    view=self,
+                    action_id=Action.XLSX_EXPORT.value,
                 ),
                 SBAdminCustomAction(
                     title=_("Delete Selected"),
-                    url=self.get_action_url(action=Action.BULK_DELETE.value),
+                    view=self,
+                    action_id=Action.BULK_DELETE.value,
                     css_class="btn-destructive",
                 ),
             ]
         return self.sbadmin_list_selection_actions
 
-    def get_sbadmin_list_selection_actions_grouped(self):
+    def get_sbadmin_list_selection_actions_grouped(self, request):
         result = {}
-        for action in self.get_sbadmin_list_selection_actions():
+        list_selection_actions = self.process_actions_permissions(
+            request, self.get_sbadmin_list_selection_actions()
+        )
+        for action in list_selection_actions:
             if not result.get(action.group):
                 result.update({action.group: []})
             result[action.group].append(action)

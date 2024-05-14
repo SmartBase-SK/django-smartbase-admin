@@ -119,17 +119,6 @@ class SBAdminListAction(SBAdminAction):
             if field.field in values
         ]
 
-    def process_actions_permissions(self, actions):
-        result = []
-        for action in actions:
-            if self.view.has_permission(
-                self.threadsafe_request,
-                obj=None,
-                permission=action,
-            ):
-                result.append(action)
-        return result
-
     def get_template_data(self):
         context_data = self.view.get_context_data(self.threadsafe_request)
         constants = {
@@ -166,7 +155,6 @@ class SBAdminListAction(SBAdminAction):
         tabulator_definition["constants"] = constants
 
         list_actions = self.list_actions or self.view._get_sbadmin_list_actions()
-        list_selection_actions = self.view.get_sbadmin_list_selection_actions_grouped()
 
         context_data.update(
             {
@@ -174,9 +162,11 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
-                "list_actions": self.process_actions_permissions(list_actions),
-                "list_selection_actions": self.process_actions_permissions(
-                    list_selection_actions
+                "list_actions": self.view.process_actions_permissions(
+                    self.threadsafe_request, list_actions
+                ),
+                "list_selection_actions": self.view.get_sbadmin_list_selection_actions_grouped(
+                    self.threadsafe_request
                 ),
                 "config_url": self.view.get_config_url(),
                 "new_url": (
