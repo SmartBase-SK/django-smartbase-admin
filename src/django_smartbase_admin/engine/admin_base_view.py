@@ -50,7 +50,7 @@ class SBAdminBaseView(object):
 
     def has_permission(self, request, obj=None, permission=None):
         return SBAdminViewService.has_permission(
-            request, self, self.model, obj, permission
+            request=request, view=self, model=self.model, obj=obj, permission=permission
         )
 
     def has_add_permission(self, request, obj=None):
@@ -65,11 +65,11 @@ class SBAdminBaseView(object):
     def has_delete_permission(self, request, obj=None):
         return self.has_permission(request, obj, "delete")
 
-    def has_permission_for_action(self, request, action_id):
+    def has_permission_for_action(self, request, action):
         return self.has_permission(
-            request,
+            request=request,
             obj=None,
-            permission=action_id,
+            permission=action,
         )
 
     def has_view_or_change_permission(self, request, obj=None):
@@ -80,7 +80,7 @@ class SBAdminBaseView(object):
     def process_actions_permissions(self, request, actions):
         result = []
         for action in actions:
-            if self.has_permission_for_action(request, action.action_id):
+            if self.has_permission_for_action(request, action):
                 result.append(action)
         return result
 
@@ -110,6 +110,9 @@ class SBAdminBaseView(object):
         action_function = getattr(self, action, None)
         if not action_function:
             raise Http404
+        action = SBAdminCustomAction(
+            title=action, view=self, action_id=action, action_modifier=modifier
+        )
         permitted_action = self.has_permission_for_action(request, action)
         if not permitted_action:
             raise PermissionDenied

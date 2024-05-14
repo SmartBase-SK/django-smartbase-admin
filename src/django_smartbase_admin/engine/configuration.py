@@ -4,6 +4,7 @@ from django.contrib.auth import get_permission_codename
 from django.db.models import Q
 
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY
 from django_smartbase_admin.utils import to_list
 
@@ -126,9 +127,18 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     ):
         return qs
 
+    def has_action_permission(
+        self, request, request_data, view, model, obj, permission
+    ):
+        return request.user.is_staff
+
     def has_permission(
         self, request, request_data, view, model=None, obj=None, permission=None
     ):
+        if isinstance(permission, SBAdminCustomAction):
+            return self.has_action_permission(
+                request, request_data, view, model, obj, permission
+            )
         if model:
             opts = model._meta
             codename = get_permission_codename(permission, opts)

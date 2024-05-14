@@ -1,5 +1,4 @@
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.text import slugify
 
 
 class SBAdminCustomAction(object):
@@ -7,6 +6,7 @@ class SBAdminCustomAction(object):
     url = None
     view = None
     action_id = None
+    action_modifier = None
     css_class = None
     no_params = False
     open_in_modal = False
