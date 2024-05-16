@@ -15,7 +15,7 @@
                            class="checkbox"
                            id="{{ filter_widget.input_id }}_{{ forloop.counter0 }}" {% if filter_widget.get_default_value == choice.0 %} checked{% endif %} data-label="{{ choice.1 }}">
                     <label for="{{ filter_widget.input_id }}_{{ forloop.counter0 }}">
-                        {{ choice.1 }}
+                        {{ choice.1|safe }}
                     </label>
                 </div>
             </li>
