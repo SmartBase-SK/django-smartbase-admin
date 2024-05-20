@@ -29,6 +29,7 @@ from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     ANNOTATE_KEY,
     CONFIG_NAME,
+    TABLE_PARAMS_FULL_TEXT_SEARCH,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -135,6 +136,7 @@ class SBAdminListAction(SBAdminAction):
             "COLUMNS_DATA_COLLAPSED_NAME": COLUMNS_DATA_COLLAPSED_NAME,
             "TABLE_PARAMS_NAME": TABLE_PARAMS_NAME,
             "TABLE_PARAMS_SIZE_NAME": TABLE_PARAMS_SIZE_NAME,
+            "TABLE_PARAMS_FULL_TEXT_SEARCH": TABLE_PARAMS_FULL_TEXT_SEARCH,
             "FILTER_DATA_NAME": FILTER_DATA_NAME,
             "BASE_PARAMS_NAME": BASE_PARAMS_NAME,
             "TABLE_PARAMS_PAGE_NAME": TABLE_PARAMS_PAGE_NAME,
@@ -162,6 +164,8 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
+                "tabulator_header_template_name": self.view.get_tabulator_header_template_name(),
+                "search_field_placeholder": self.view.get_search_field_placeholder(),
                 "list_actions": self.view.process_actions_permissions(
                     self.threadsafe_request, list_actions
                 ),
@@ -233,14 +237,27 @@ class SBAdminListAction(SBAdminAction):
             values.extend(self.view.sbadmin_list_display_data)
         return values
 
+    def filter_queryset_by_full_text(self, base_qs):
+        full_text_search_query_value = self.filter_data.get(
+            TABLE_PARAMS_FULL_TEXT_SEARCH, None
+        )
+        base_qs, search_use_distinct = self.view.get_search_results(
+            self.threadsafe_request, base_qs, full_text_search_query_value
+        )
+        if search_use_distinct:
+            base_qs = base_qs.distinct()
+        return base_qs
+
     def build_final_data_count_queryset(self, additional_filter=None):
         additional_filter = additional_filter or Q()
         filter_fields = self.get_filter_fields_from_request()
-        return (
+        base_qs = (
             self.get_data_queryset(visible_fields=filter_fields)
             .filter(self.get_filter_from_request())
             .filter(additional_filter)
         )
+        base_qs = self.filter_queryset_by_full_text(base_qs)
+        return base_qs
 
     def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
         additional_filter = additional_filter or Q()
@@ -252,6 +269,7 @@ class SBAdminListAction(SBAdminAction):
             .filter(self.get_filter_from_request())
             .filter(additional_filter)
         )
+        base_qs = self.filter_queryset_by_full_text(base_qs)
         return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):

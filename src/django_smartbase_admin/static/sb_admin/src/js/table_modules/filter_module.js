@@ -41,6 +41,9 @@ export class FilterModule extends SBAdminTableModule {
 
     filterInputValueChanged(field) {
         const valueElem = filterInputValueChangedUtil(field)
+        if(!valueElem) {
+            return
+        }
         this.changeFilterButtonState(valueElem)
     }
 

@@ -23,6 +23,7 @@ from django_smartbase_admin.engine.const import (
     DETAIL_STRUCTURE_RIGHT_CLASS,
     GLOBAL_FILTER_ALIAS_WIDGET_ID,
     OVERRIDE_CONTENT_OF_NOTIFICATION,
+    FilterVersions,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
@@ -202,6 +203,8 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_xlsx_options = None
     sbadmin_table_history_enabled = True
     sbadmin_list_reorder_field = None
+    search_field_placeholder = _("Search...")
+    filters_version = FilterVersions.FILTERS_VERSION_1
 
     def activate_reorder(self, request):
         request.reorder_active = True
@@ -359,6 +362,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "filterModule",
                 "tableParamsModule",
                 "detailViewModule",
+                "fullTextSearchModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",
@@ -623,3 +627,17 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_context_data(self, request):
         return {}
+
+    def get_filters_version(self):
+        return self.filters_version
+
+    def get_tabulator_header_template_name(self):
+        filters_version = self.get_filters_version()
+        if filters_version is FilterVersions.FILTERS_VERSION_2:
+            return "sb_admin/actions/partials/tabulator_header_v2.html"
+        else:
+            # default
+            return "sb_admin/actions/partials/tabulator_header_v1.html"
+
+    def get_search_field_placeholder(self):
+        return self.search_field_placeholder
