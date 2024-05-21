@@ -210,7 +210,6 @@ class SBAdminListAction(SBAdminAction):
         return search_fields
 
     def get_filter_fields_from_request(self):
-        search_fields = self.get_search_fields(self.threadsafe_request)
         filter_fields = list(
             SBAdminViewService.get_filter_fields_and_values_from_request(
                 self.threadsafe_request,
@@ -218,7 +217,10 @@ class SBAdminListAction(SBAdminAction):
                 self.filter_data,
             ).keys()
         )
-        return filter_fields + search_fields
+        if self.is_search_query():
+            search_fields = self.get_search_fields(self.threadsafe_request)
+            filter_fields.extend(search_fields)
+        return filter_fields
 
     def get_annotates(self, visible_fields=None):
         column_fields = (
@@ -289,25 +291,32 @@ class SBAdminListAction(SBAdminAction):
             queryset = queryset.filter(Q.create(term_queries))
         return queryset
 
+    def is_search_query(self):
+        full_text_search_query_value = self.filter_data.get(
+            TABLE_PARAMS_FULL_TEXT_SEARCH, None
+        )
+        return bool(full_text_search_query_value)
+
     def search_in_queryset(self, base_qs):
         full_text_search_query_value = self.filter_data.get(
             TABLE_PARAMS_FULL_TEXT_SEARCH, None
         )
         if not full_text_search_query_value:
-            return base_qs, False
+            return base_qs
         base_qs = self.get_search_results(
             self.threadsafe_request, base_qs, full_text_search_query_value
         )
-        return base_qs, True
+        return base_qs
 
     def build_final_data_count_queryset(self, additional_filter=None):
         additional_filter = additional_filter or Q()
         filter_fields = self.get_filter_fields_from_request()
-        base_qs = self.get_data_queryset(visible_fields=filter_fields).filter(
-            additional_filter
+        base_qs = (
+            self.get_data_queryset(visible_fields=filter_fields)
+            .filter(self.get_filter_from_request())
+            .filter(additional_filter)
         )
-        base_qs, filtered_by_search = self.search_in_queryset(base_qs)
-        base_qs = base_qs.filter(self.get_filter_from_request())
+        base_qs = self.search_in_queryset(base_qs)
         return base_qs
 
     def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
@@ -315,11 +324,12 @@ class SBAdminListAction(SBAdminAction):
         from_item = (page_num - 1) * page_size
         to_item = page_num * page_size
         data_queryset = self.get_data_queryset()
-        base_qs = data_queryset.values(*self.get_data_queryset_values()).filter(
-            additional_filter
+        base_qs = (
+            data_queryset.values(*self.get_data_queryset_values())
+            .filter(self.get_filter_from_request())
+            .filter(additional_filter)
         )
-        base_qs, filtered_by_search = self.search_in_queryset(base_qs)
-        base_qs = base_qs.filter(self.get_filter_from_request())
+        base_qs = self.search_in_queryset(base_qs)
         return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):
