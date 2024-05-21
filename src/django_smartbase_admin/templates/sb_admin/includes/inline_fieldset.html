@@ -16,7 +16,7 @@
     </header>
 {% endif %}
 {% for line in fieldset %}
-    <div class="{% if forloop.last %}-mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
+    <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
         {% if line.fields|length > 1 %}
             <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
 

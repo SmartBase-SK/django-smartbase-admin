@@ -656,6 +656,8 @@ class SBAdmin(
         return self.menu_label or self.model._meta.verbose_name_plural
 
     def get_action_url(self, action, modifier="template"):
+        if not hasattr(self, action):
+            raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
             f"sb_admin:{self.get_id()}_action",
             kwargs={
