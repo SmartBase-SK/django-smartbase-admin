@@ -71,6 +71,8 @@ export class TableParamsModule extends SBAdminTableModule {
         const paginationWidget = document.querySelector(`#${this.table.paginationWidgetId}`)
         const pageSizeWidget = document.querySelector(`#${this.table.pageSizeWidgetId}`)
 
+        this.createPagination(paginationWidget)
+        this.createPageSize(pageSizeWidget)
         this.table.tabulator.on("dataProcessed", () => {
             this.createPagination(paginationWidget)
             this.createPageSize(pageSizeWidget)
