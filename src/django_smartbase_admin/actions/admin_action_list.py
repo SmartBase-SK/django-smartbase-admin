@@ -4,6 +4,7 @@ import math
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.text import smart_split, unescape_string_literal
 
 from django_smartbase_admin.engine.actions import SBAdminAction
 from django_smartbase_admin.engine.const import (
@@ -164,7 +165,9 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
-                "tabulator_header_template_name": self.view.get_tabulator_header_template_name(),
+                "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
+                    self.threadsafe_request
+                ),
                 "search_field_placeholder": self.view.get_search_field_placeholder(),
                 "list_actions": self.view.process_actions_permissions(
                     self.threadsafe_request, list_actions
@@ -197,9 +200,13 @@ class SBAdminListAction(SBAdminAction):
         )
 
     def get_filter_fields_from_request(self):
+        search_fields = self.view.get_search_fields(self.threadsafe_request)
         return list(
             SBAdminViewService.get_filter_fields_and_values_from_request(
-                self.threadsafe_request, self.column_fields, self.filter_data
+                self.threadsafe_request,
+                self.column_fields,
+                self.filter_data,
+                search_fields,
             ).keys()
         )
 
@@ -237,26 +244,60 @@ class SBAdminListAction(SBAdminAction):
             values.extend(self.view.sbadmin_list_display_data)
         return values
 
-    def filter_queryset_by_full_text(self, base_qs):
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Return a tuple containing a queryset to implement the search
+        and a boolean indicating if the results may contain duplicates.
+        """
+
+        # Apply keyword searches.
+        def construct_search(field_name):
+            if field_name.startswith("^"):
+                return "%s__istartswith" % field_name[1:]
+            elif field_name.startswith("="):
+                return "%s__iexact" % field_name[1:]
+            elif field_name.startswith("@"):
+                return "%s__search" % field_name[1:]
+            # Otherwise, use the field with icontains.
+            return "%s__icontains" % field_name
+
+        search_fields = self.view.get_search_fields(request)
+        if search_fields and search_term:
+            orm_lookups = [
+                construct_search(str(search_field)) for search_field in search_fields
+            ]
+            term_queries = []
+            for bit in smart_split(search_term):
+                if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
+                    bit = unescape_string_literal(bit)
+                or_queries = Q.create(
+                    [(orm_lookup, bit) for orm_lookup in orm_lookups],
+                    connector=Q.OR,
+                )
+                term_queries.append(or_queries)
+            queryset = queryset.filter(Q.create(term_queries))
+        return queryset
+
+    def search_in_queryset(self, base_qs):
         full_text_search_query_value = self.filter_data.get(
             TABLE_PARAMS_FULL_TEXT_SEARCH, None
         )
-        base_qs, search_use_distinct = self.view.get_search_results(
+        if not full_text_search_query_value:
+            return base_qs, False
+        base_qs = self.get_search_results(
             self.threadsafe_request, base_qs, full_text_search_query_value
         )
-        if search_use_distinct:
-            base_qs = base_qs.distinct()
-        return base_qs
+        return base_qs, True
 
     def build_final_data_count_queryset(self, additional_filter=None):
         additional_filter = additional_filter or Q()
         filter_fields = self.get_filter_fields_from_request()
-        base_qs = (
-            self.get_data_queryset(visible_fields=filter_fields)
-            .filter(self.get_filter_from_request())
-            .filter(additional_filter)
+        base_qs = self.get_data_queryset(visible_fields=filter_fields).filter(
+            additional_filter
         )
-        base_qs = self.filter_queryset_by_full_text(base_qs)
+        base_qs, filtered_by_search = self.search_in_queryset(base_qs)
+        if not filtered_by_search:
+            base_qs = base_qs.filter(self.get_filter_from_request())
         return base_qs
 
     def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
@@ -264,12 +305,12 @@ class SBAdminListAction(SBAdminAction):
         from_item = (page_num - 1) * page_size
         to_item = page_num * page_size
         data_queryset = self.get_data_queryset()
-        base_qs = (
-            data_queryset.values(*self.get_data_queryset_values())
-            .filter(self.get_filter_from_request())
-            .filter(additional_filter)
+        base_qs = data_queryset.values(*self.get_data_queryset_values()).filter(
+            additional_filter
         )
-        base_qs = self.filter_queryset_by_full_text(base_qs)
+        base_qs, filtered_by_search = self.search_in_queryset(base_qs)
+        if not filtered_by_search:
+            base_qs = base_qs.filter(self.get_filter_from_request())
         return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):

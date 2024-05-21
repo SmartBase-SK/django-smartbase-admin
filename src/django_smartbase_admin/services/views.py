@@ -121,7 +121,7 @@ class SBAdminViewService(object):
 
     @classmethod
     def get_filter_fields_and_values_from_request(
-        cls, request, available_filters, filter_data
+        cls, request, available_filters, filter_data, search_fields=None
     ):
         filter_fields_and_value = {}
         for field in available_filters:

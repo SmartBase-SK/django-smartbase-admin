@@ -71,7 +71,7 @@ class Main {
         if(window.location.hash) {
             document.querySelector(`#tab_${window.location.hash.slice(1)}`)?.click()
         }
-        const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]')
+        const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]:not([data-bs-disable-history])')
         tabEls.forEach(tab => {
             tab.addEventListener('shown.bs.tab', function (event) {
                 window.location.hash = event.target.id.split("tab_")[1]

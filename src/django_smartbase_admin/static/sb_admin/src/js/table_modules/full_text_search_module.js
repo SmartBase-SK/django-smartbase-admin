@@ -11,4 +11,8 @@ export class FullTextSearchModule extends SBAdminTableModule {
         const searchValue = params[this.table.constants.FILTER_DATA_NAME]?.[this.table.constants.TABLE_PARAMS_FULL_TEXT_SEARCH]
         this.searchInputEl.value = searchValue || ""
     }
+
+    getUrlParamsForSave() {
+        return {}
+    }
 }

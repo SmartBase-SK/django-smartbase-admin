@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
-from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY
+from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY, FilterVersions
 from django_smartbase_admin.utils import to_list
 
 
@@ -36,6 +36,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     autocomplete_map = None
     menu_items = None
     global_filter_form = None
+    filters_version = FilterVersions.FILTERS_VERSION_1
 
     def __init__(
         self,
@@ -43,6 +44,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         registered_views=None,
         menu_items=None,
         global_filter_form=None,
+        filters_version=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -51,6 +53,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.global_filter_form = global_filter_form or self.global_filter_form
         self.init_configuration_static()
         self.autocomplete_map = {}
+        self.filters_version = filters_version or self.filters_version
 
     def init_registered_views(self):
         registered_views = []

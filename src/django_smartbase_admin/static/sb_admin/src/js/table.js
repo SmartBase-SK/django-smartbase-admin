@@ -8,6 +8,7 @@ import {FilterModule} from "./table_modules/filter_module"
 import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
+import { FilterOptionsModule } from "./table_modules/filter_options_module"
 
 
 class SBAdminTable {
@@ -278,4 +279,5 @@ window.SBAdminTableModulesClass = {
     'movableColumnsModule': MovableColumnsModule,
     'dataEditModule': DataEditModule,
     'fullTextSearchModule': FullTextSearchModule,
+    'filterOptionsModule': FilterOptionsModule,
 }

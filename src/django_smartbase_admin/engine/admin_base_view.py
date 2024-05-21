@@ -204,7 +204,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_table_history_enabled = True
     sbadmin_list_reorder_field = None
     search_field_placeholder = _("Search...")
-    filters_version = FilterVersions.FILTERS_VERSION_1
+    filters_version = None
 
     def activate_reorder(self, request):
         request.reorder_active = True
@@ -363,6 +363,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "tableParamsModule",
                 "detailViewModule",
                 "fullTextSearchModule",
+                "filterOptionsModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",
@@ -628,11 +629,13 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_context_data(self, request):
         return {}
 
-    def get_filters_version(self):
-        return self.filters_version
+    def get_filters_version(self, request):
+        return (
+            self.filters_version or request.request_data.configuration.filters_version
+        )
 
-    def get_tabulator_header_template_name(self):
-        filters_version = self.get_filters_version()
+    def get_tabulator_header_template_name(self, request):
+        filters_version = self.get_filters_version(request)
         if filters_version is FilterVersions.FILTERS_VERSION_2:
             return "sb_admin/actions/partials/tabulator_header_v2.html"
         else:
