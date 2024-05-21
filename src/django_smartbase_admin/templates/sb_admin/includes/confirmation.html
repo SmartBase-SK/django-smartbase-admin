@@ -1,0 +1,35 @@
+{% load sekizai_tags i18n static %}
+
+{% block confirmation_content %}
+    <div id="{% block confirmation_modal_id %}confirmation-modal{% endblock %}" class="modal fade" data-bs-backdrop="static">
+        <div class="modal-dialog" style="max-width: 408px;">
+            <div class="modal-content">
+                <div class="text-center w-full pt-24 js-modal-icon">
+                    <div class="w-48 h-48 bg-negative-50 rounded-full mx-auto text-negative flex-center">
+                        <svg class="h-24 w-24 stroke-current stroke-1.5">
+                            <use xlink:href="#Attention"></use>
+                        </svg>
+                    </div>
+                </div>
+                {% block modal_content %}
+                    <div>
+                        <svg data-bs-dismiss="modal" aria-label="Close"
+                             class="w-24 h-24 absolute top-16 right-16 cursor-pointer transition-transform hover:rotate-90">
+                            <use xlink:href="#Close-small"></use>
+                        </svg>
+                    </div>
+                    <div class="modal-body js-modal-body">
+                        <h3 class="font-semibold text-18 mb-8 w-full text-center">{% trans 'Are you sure?' %}</h3>
+                    </div>
+                    <div class="modal-footer js-modal-footer">
+                        <button class="btn mr-4 js-modal-close js-modal-close-button" aria-label="Close">
+                            {% trans 'Cancel' %}
+                        </button>
+                        <button class="btn btn-destructive ml-4 js-modal-submit js-modal-close">{% trans 'Confirm' %}</button>
+                    </div>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+    <script src="{% static 'sb_admin/dist/confirmation_modal.js' %}"></script>
+{% endblock %}

@@ -68,6 +68,10 @@ export class ColumnDisplayModule extends SBAdminTableModule {
         const cols = this.table.tabulator.getColumns(true)
 
         const widget = document.querySelector(`#${this.table.columnWidgetId}`)
+        if(!widget) {
+            // column selector is not used
+            return
+        }
         widget.innerHTML = ''
 
         cols.forEach((colProxy) => {

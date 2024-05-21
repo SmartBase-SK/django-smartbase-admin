@@ -10,6 +10,7 @@ const entries = {
     chart: './src/django_smartbase_admin/static/sb_admin/src/js/chart.js',
     main_style: './src/django_smartbase_admin/static/sb_admin/src/css/style.css',
     translations: './src/django_smartbase_admin/static/sb_admin/src/js/translations.js',
+    confirmation_modal: './src/django_smartbase_admin/static/sb_admin/src/js/confirmation_modal.js',
 };
 
 const projectRoot = process.env.PWD || process.cwd();

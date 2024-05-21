@@ -3,7 +3,7 @@
 <form id="view_form"
       method="post"
       action="{{ content_context.config_url }}"
-      class="max-sm:px-16 overflow-x-auto"
+      class="list-view-view-form max-sm:px-16 overflow-x-auto"
 >
     {% csrf_token %}
     <div class="flex">
@@ -15,28 +15,17 @@
                             data-params="{{ view.url_params }}">
                         <span>{{ view.name }}</span>
                         {% if view.detail_url %}
-                            <div class="relative ml-4">
-                                <svg class="w-24 h-24" data-bs-toggle="dropdown"
-                                     data-bs-popper-placement="bottom-end"
-                                     aria-expanded="false">
-                                    <use xlink:href="#More-one"></use>
-                                </svg>
-                                <div class="dropdown-menu w-192">
-                                    <ul>
-                                        <li>
-                                            <a hx-delete="{{ view.detail_url }}" href="#" class="dropdown-menu-link">
-                                                <svg class="w-20 h-20 text-dark mr-12"
-                                                     aria-expanded="false">
-                                                    <use xlink:href="#Delete"></use>
-                                                </svg>
-                                                {% trans 'Delete' %}
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                            <svg hx-delete="{{ view.detail_url }}"
+                                 hx-trigger="confirmDeleteView from:body"
+                                 hx-swap="none"
+                                 class="ml-8 w-20 h-20"
+                                 data-show-confirm
+                                 data-submit-event="confirmDeleteView"
+                                 data-confirm-body="<h3 class='mb-8 font-semibold w-full text-18 text-center'>{% trans 'Remove View' %}</h3><p class='w-full text-center'>{% trans 'Do you want to remove table view?' %}</p>"
+                            >
+                                <use xlink:href="#Close-small"></use>
+                            </svg>
                         {% endif %}
-
                     </button>
                 </li>
             {% endfor %}
@@ -87,3 +76,4 @@
            id="{{ content_context.const.URL_PARAMS_NAME }}" form="view_form">
 
 </form>
+{% include 'sb_admin/includes/confirmation.html' %}

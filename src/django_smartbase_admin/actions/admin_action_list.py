@@ -31,6 +31,7 @@ from django_smartbase_admin.engine.const import (
     ANNOTATE_KEY,
     CONFIG_NAME,
     TABLE_PARAMS_FULL_TEXT_SEARCH,
+    TABLE_PARAMS_SELECTED_FILTER_TYPE,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -138,6 +139,7 @@ class SBAdminListAction(SBAdminAction):
             "TABLE_PARAMS_NAME": TABLE_PARAMS_NAME,
             "TABLE_PARAMS_SIZE_NAME": TABLE_PARAMS_SIZE_NAME,
             "TABLE_PARAMS_FULL_TEXT_SEARCH": TABLE_PARAMS_FULL_TEXT_SEARCH,
+            "TABLE_PARAMS_SELECTED_FILTER_TYPE": TABLE_PARAMS_SELECTED_FILTER_TYPE,
             "FILTER_DATA_NAME": FILTER_DATA_NAME,
             "BASE_PARAMS_NAME": BASE_PARAMS_NAME,
             "TABLE_PARAMS_PAGE_NAME": TABLE_PARAMS_PAGE_NAME,
@@ -199,16 +201,24 @@ class SBAdminListAction(SBAdminAction):
             self.threadsafe_request, self.column_fields, self.filter_data
         )
 
+    def get_search_fields(self, request):
+        search_fields_definition = self.view.get_search_fields(request)
+        search_fields = []
+        for field in self.column_fields:
+            if field.name in search_fields_definition:
+                search_fields.append(field)
+        return search_fields
+
     def get_filter_fields_from_request(self):
-        search_fields = self.view.get_search_fields(self.threadsafe_request)
-        return list(
+        search_fields = self.get_search_fields(self.threadsafe_request)
+        filter_fields = list(
             SBAdminViewService.get_filter_fields_and_values_from_request(
                 self.threadsafe_request,
                 self.column_fields,
                 self.filter_data,
-                search_fields,
             ).keys()
         )
+        return filter_fields + search_fields
 
     def get_annotates(self, visible_fields=None):
         column_fields = (
@@ -261,10 +271,11 @@ class SBAdminListAction(SBAdminAction):
             # Otherwise, use the field with icontains.
             return "%s__icontains" % field_name
 
-        search_fields = self.view.get_search_fields(request)
+        search_fields = self.get_search_fields(request)
         if search_fields and search_term:
             orm_lookups = [
-                construct_search(str(search_field)) for search_field in search_fields
+                construct_search(str(search_field.filter_field))
+                for search_field in search_fields
             ]
             term_queries = []
             for bit in smart_split(search_term):
@@ -296,8 +307,7 @@ class SBAdminListAction(SBAdminAction):
             additional_filter
         )
         base_qs, filtered_by_search = self.search_in_queryset(base_qs)
-        if not filtered_by_search:
-            base_qs = base_qs.filter(self.get_filter_from_request())
+        base_qs = base_qs.filter(self.get_filter_from_request())
         return base_qs
 
     def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
@@ -309,8 +319,7 @@ class SBAdminListAction(SBAdminAction):
             additional_filter
         )
         base_qs, filtered_by_search = self.search_in_queryset(base_qs)
-        if not filtered_by_search:
-            base_qs = base_qs.filter(self.get_filter_from_request())
+        base_qs = base_qs.filter(self.get_filter_from_request())
         return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):

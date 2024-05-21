@@ -2,9 +2,13 @@
 
 <div id="{{ view_id }}-tabulator-header" class="tabulator-custom-header">
     {% block table_header %}
-        <div class="border-b border-dark-200 flex justify-between max-sm:flex-wrap py-16 md:p-16 md:gap-x-8 gap-y-12">
+        <div class="filters-options-tabs-header">
             <ul class="saved-filters js-filters-options" role="tablist">
-                <input form="{{ view_id }}-filter-form" type="hidden" value="tab_quick_search" id="id_selected_filter_option" name="selected_filter_option">
+                <input form="{{ view_id }}-filter-form"
+                       type="hidden"
+                       value="tab_quick_search"
+                       id="id_{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}"
+                       name="{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}">
                 <li role="presentation">
                     <button class="relative show active"
                             id="tab_quick_search"
@@ -42,41 +46,54 @@
                 </li>
 
             </ul>
-            {% include 'sb_admin/components/columns.html' %}
         </div>
+        <div class="border-dark-200 border-t">
+            <div class="tab-pane  fade active show min-h-64 content-center" id="quick_search_content" role="tabpanel" aria-labelledby="tab_quick_search">
+                <div class="py-12 px-16">
 
-        <div class="tab-pane fade active show min-h-64 content-center" id="quick_search_content" role="tabpanel" aria-labelledby="tab_quick_search">
-            <div class="py-12 px-16">
-                <div class="flex gap-12">
-                    <input type="text"
-                           name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                           class="input w-1/6"
-                           form="{{ view_id }}-filter-form"
-                           id="id_{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                           placeholder="{{ content_context.search_field_placeholder }}">
-                    <button class="btn btn-primary">{% trans 'Search' %}</button>
+                    <div class="flex gap-12">
+                        <div class="relative w-full">
+                            <input type="text"
+                                   name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                   class="input pl-38 pr-38"
+                                   form="{{ view_id }}-filter-form"
+                                   id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                   placeholder="{{ content_context.search_field_placeholder }}">
+                            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                <svg class="w-20 h-20">
+                                    <use xlink:href="#Search"></use>
+                                </svg>
+                            </div>
+                            <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')" class="w-20 h-20">
+                                    <use xlink:href="#Close-small"></use>
+                                </svg>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary">{% trans 'Search' %}</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="tab-pane fade min-h-64 content-center" id="saved_views_content" role="tabpanel" aria-labelledby="tab_saved_views">
-            {% with 'filters-collapse-button' as filters_collapse_button_id %}
-                {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}
-                <div class="flex justify-between max-sm:flex-wrap py-12 px-16 gap-y-12">
-                    {% include "sb_admin/config/view.html" with current_views=content_context.current_views %}
-                    {% block tabulator_custom_header_controls %}
-                        <div class="flex items-center flex-shrink-0 gap-8 max-sm:px-16">
-                            <button id="save-view-modal-button" type="button"
-                                    class="btn btn-tiny btn-primary btn-empty mr-8" data-bs-toggle="modal"
-                                    data-bs-target="#save-view-modal">
-                                {% trans 'Save view' %}
-                            </button>
-                        </div>
-                    {% endblock %}
-                </div>
-            {% endwith %}
-        </div>
-        <div class="tab-pane fade min-h-64 content-center max-sm:overflow-x-auto custom-scrollbar" id="advanced_filters_content" role="tabpanel" aria-labelledby="tab_advanced_filters">
-            {% include 'sb_admin/components/filters.html' with filters=content_context.filters %}
+            <div class="tab-pane fade min-h-64 content-center" id="saved_views_content" role="tabpanel" aria-labelledby="tab_saved_views">
+                {% with 'filters-collapse-button' as filters_collapse_button_id %}
+                    {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}
+                    <div class="flex justify-between max-sm:flex-wrap py-12 px-16 gap-y-12">
+                        {% include "sb_admin/config/view.html" with current_views=content_context.current_views %}
+                        {% block tabulator_custom_header_controls %}
+                            <div class="flex items-center flex-shrink-0 gap-8 max-sm:px-16">
+                                <button id="save-view-modal-button" type="button"
+                                        class="btn btn-tiny btn-primary btn-empty mr-8" data-bs-toggle="modal"
+                                        data-bs-target="#save-view-modal">
+                                    {% trans 'Save view' %}
+                                </button>
+                            </div>
+                        {% endblock %}
+                    </div>
+                {% endwith %}
+            </div>
+            <div class="tab-pane  fade min-h-64 content-center max-sm:overflow-x-auto custom-scrollbar" id="advanced_filters_content" role="tabpanel" aria-labelledby="tab_advanced_filters">
+                {% include 'sb_admin/components/filters.html' with filters=content_context.filters %}
+            </div>
         </div>
     {% endblock %}
     {% include 'sb_admin/actions/partials/selected_rows_actions.html' %}
