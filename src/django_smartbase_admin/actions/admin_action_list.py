@@ -4,6 +4,7 @@ import math
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.text import smart_split, unescape_string_literal
 
 from django_smartbase_admin.engine.actions import SBAdminAction
 from django_smartbase_admin.engine.const import (
@@ -29,6 +30,8 @@ from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     ANNOTATE_KEY,
     CONFIG_NAME,
+    TABLE_PARAMS_FULL_TEXT_SEARCH,
+    TABLE_PARAMS_SELECTED_FILTER_TYPE,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -135,6 +138,8 @@ class SBAdminListAction(SBAdminAction):
             "COLUMNS_DATA_COLLAPSED_NAME": COLUMNS_DATA_COLLAPSED_NAME,
             "TABLE_PARAMS_NAME": TABLE_PARAMS_NAME,
             "TABLE_PARAMS_SIZE_NAME": TABLE_PARAMS_SIZE_NAME,
+            "TABLE_PARAMS_FULL_TEXT_SEARCH": TABLE_PARAMS_FULL_TEXT_SEARCH,
+            "TABLE_PARAMS_SELECTED_FILTER_TYPE": TABLE_PARAMS_SELECTED_FILTER_TYPE,
             "FILTER_DATA_NAME": FILTER_DATA_NAME,
             "BASE_PARAMS_NAME": BASE_PARAMS_NAME,
             "TABLE_PARAMS_PAGE_NAME": TABLE_PARAMS_PAGE_NAME,
@@ -162,6 +167,10 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
+                "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
+                    self.threadsafe_request
+                ),
+                "search_field_placeholder": self.view.get_search_field_placeholder(),
                 "list_actions": self.view.process_actions_permissions(
                     self.threadsafe_request, list_actions
                 ),
@@ -192,12 +201,26 @@ class SBAdminListAction(SBAdminAction):
             self.threadsafe_request, self.column_fields, self.filter_data
         )
 
+    def get_search_fields(self, request):
+        search_fields_definition = self.view.get_search_fields(request)
+        search_fields = []
+        for field in self.column_fields:
+            if field.name in search_fields_definition:
+                search_fields.append(field)
+        return search_fields
+
     def get_filter_fields_from_request(self):
-        return list(
+        filter_fields = list(
             SBAdminViewService.get_filter_fields_and_values_from_request(
-                self.threadsafe_request, self.column_fields, self.filter_data
+                self.threadsafe_request,
+                self.column_fields,
+                self.filter_data,
             ).keys()
         )
+        if self.is_search_query():
+            search_fields = self.get_search_fields(self.threadsafe_request)
+            filter_fields.extend(search_fields)
+        return filter_fields
 
     def get_annotates(self, visible_fields=None):
         column_fields = (
@@ -233,14 +256,68 @@ class SBAdminListAction(SBAdminAction):
             values.extend(self.view.sbadmin_list_display_data)
         return values
 
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Return a tuple containing a queryset to implement the search
+        and a boolean indicating if the results may contain duplicates.
+        """
+
+        # Apply keyword searches.
+        def construct_search(field_name):
+            if field_name.startswith("^"):
+                return "%s__istartswith" % field_name[1:]
+            elif field_name.startswith("="):
+                return "%s__iexact" % field_name[1:]
+            elif field_name.startswith("@"):
+                return "%s__search" % field_name[1:]
+            # Otherwise, use the field with icontains.
+            return "%s__icontains" % field_name
+
+        search_fields = self.get_search_fields(request)
+        if search_fields and search_term:
+            orm_lookups = [
+                construct_search(str(search_field.filter_field))
+                for search_field in search_fields
+            ]
+            term_queries = []
+            for bit in smart_split(search_term):
+                if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
+                    bit = unescape_string_literal(bit)
+                or_queries = Q.create(
+                    [(orm_lookup, bit) for orm_lookup in orm_lookups],
+                    connector=Q.OR,
+                )
+                term_queries.append(or_queries)
+            queryset = queryset.filter(Q.create(term_queries))
+        return queryset
+
+    def is_search_query(self):
+        full_text_search_query_value = self.filter_data.get(
+            TABLE_PARAMS_FULL_TEXT_SEARCH, None
+        )
+        return bool(full_text_search_query_value)
+
+    def search_in_queryset(self, base_qs):
+        full_text_search_query_value = self.filter_data.get(
+            TABLE_PARAMS_FULL_TEXT_SEARCH, None
+        )
+        if not full_text_search_query_value:
+            return base_qs
+        base_qs = self.get_search_results(
+            self.threadsafe_request, base_qs, full_text_search_query_value
+        )
+        return base_qs
+
     def build_final_data_count_queryset(self, additional_filter=None):
         additional_filter = additional_filter or Q()
         filter_fields = self.get_filter_fields_from_request()
-        return (
+        base_qs = (
             self.get_data_queryset(visible_fields=filter_fields)
             .filter(self.get_filter_from_request())
             .filter(additional_filter)
         )
+        base_qs = self.search_in_queryset(base_qs)
+        return base_qs
 
     def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
         additional_filter = additional_filter or Q()
@@ -252,6 +329,7 @@ class SBAdminListAction(SBAdminAction):
             .filter(self.get_filter_from_request())
             .filter(additional_filter)
         )
+        base_qs = self.search_in_queryset(base_qs)
         return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):

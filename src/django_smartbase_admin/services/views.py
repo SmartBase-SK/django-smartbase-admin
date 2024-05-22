@@ -4,10 +4,12 @@ import pickle
 from django.db.models import Q, FilteredRelation, F, Value, CharField
 from django.shortcuts import redirect
 
-from django_smartbase_admin.engine.const import BASE_PARAMS_NAME, FILTER_DATA_NAME
+from django_smartbase_admin.engine.const import (
+    BASE_PARAMS_NAME,
+    FILTER_DATA_NAME,
+)
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
-from django_smartbase_admin.utils import to_list
 
 
 class SBAdminViewService(object):

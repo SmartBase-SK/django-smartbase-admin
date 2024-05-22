@@ -22,6 +22,11 @@ class Formatter(Enum):
     HTML = "html"
 
 
+class FilterVersions(Enum):
+    FILTERS_VERSION_1 = "version_1"
+    FILTERS_VERSION_2 = "version_2"
+
+
 DEFAULT_PAGE_SIZE = 20
 PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 AUTOCOMPLETE_PAGE_SIZE = 20
@@ -45,6 +50,8 @@ TABLE_PARAMS_NAME = "tableParams"
 TABLE_PARAMS_SIZE_NAME = "size"
 TABLE_PARAMS_PAGE_NAME = "page"
 TABLE_PARAMS_SORT_NAME = "sort"
+TABLE_PARAMS_FULL_TEXT_SEARCH = "sb_admin_full_search"
+TABLE_PARAMS_SELECTED_FILTER_TYPE = "sb_selected_filter_type"
 FILTER_DATA_NAME = "filterData"
 BASE_PARAMS_NAME = "params"
 AUTOCOMPLETE_SEARCH_NAME = "__search_term__"

@@ -41,6 +41,9 @@ export class FilterModule extends SBAdminTableModule {
 
     filterInputValueChanged(field) {
         const valueElem = filterInputValueChangedUtil(field)
+        if(!valueElem) {
+            return
+        }
         this.changeFilterButtonState(valueElem)
     }
 
@@ -77,6 +80,9 @@ export class FilterModule extends SBAdminTableModule {
     showFilter(field, focus=true) {
         const fieldElem = this.getFormField(field)
         const filterElem = document.querySelector(`#${this.table.viewId}-${field}-wrapper`)
+        if (!filterElem) {
+            return
+        }
         if (focus && (!filterElem || !filterElem.classList.contains('hidden'))) {
             // TODO: why it's here
             this.focusOnFilterInput(filterElem)
