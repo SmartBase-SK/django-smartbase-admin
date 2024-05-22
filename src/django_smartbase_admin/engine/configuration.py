@@ -132,7 +132,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
 
     def has_action_permission(self, request, request_data, view, model, obj, action):
         if model:
-            return self.has_permission(request, request_data, view, model, obj, "view")
+            return self.has_permission(
+                request, request_data, view, model, obj, "view"
+            ) or self.has_permission(request, request_data, view, model, obj, "change")
         return request.user.is_staff
 
     def has_permission(
