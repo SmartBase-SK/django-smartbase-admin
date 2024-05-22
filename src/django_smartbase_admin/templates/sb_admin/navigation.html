@@ -8,7 +8,7 @@
             </svg>
         </div>
         <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
-                 alt="SBAdmin" width="106" height="16">
+             alt="SBAdmin" width="106" height="16">
         <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300 ml-auto">
             {{ username_data.initials }}
         </div>
@@ -34,8 +34,8 @@
                             <div class="menu-item">
                                 <a href="{{ menu_item.get_url|default:menu_item.sub_items.0.get_url }}"
                                    class="inline-flex w-full p-8 justify-start collapse-btn{% if not menu_item.is_active %} collapsed{% endif %}"
-                                    aria-expanded="{% if menu_item.is_active %}true{% else %}false{% endif %}"
-                                    >
+                                   aria-expanded="{% if menu_item.is_active %}true{% else %}false{% endif %}"
+                                >
                                     {% if menu_item.get_icon %}
                                         <svg class="w-20 h-20 mr-8 flex-shrink-0">
                                             <use xlink:href="#{{ menu_item.get_icon }}"></use>
@@ -69,54 +69,54 @@
                     </li>
                 {% endfor %}
             </ul>
-{#            <hr class="my-32">#}
-{#            <div class="text-14 mb-24 px-16">#}
-{#                Pomoc a podpora#}
-{#            </div>#}
-{#            <ul class="-my-2 px-16">#}
-{#                <li class="py-2">#}
-{#                    <div class="menu-item">#}
-{#                        <a href="#" class="inline-flex w-full p-8">#}
-{#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
-{#                                <use xlink:href="#Accept-email"></use>#}
-{#                            </svg>#}
-{#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
-{#                        </a>#}
-{#                    </div>#}
-{#                </li>#}
-{#                <li class="py-2">#}
-{#                    <div class="menu-item">#}
-{#                        <a href="#" class="inline-flex w-full p-8">#}
-{#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
-{#                                <use xlink:href="#Accept-email"></use>#}
-{#                            </svg>#}
-{#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
-{#                        </a>#}
-{#                    </div>#}
-{#                </li>#}
-{#            </ul>#}
+            {#            <hr class="my-32">#}
+            {#            <div class="text-14 mb-24 px-16">#}
+            {#                Pomoc a podpora#}
+            {#            </div>#}
+            {#            <ul class="-my-2 px-16">#}
+            {#                <li class="py-2">#}
+            {#                    <div class="menu-item">#}
+            {#                        <a href="#" class="inline-flex w-full p-8">#}
+            {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
+            {#                                <use xlink:href="#Accept-email"></use>#}
+            {#                            </svg>#}
+            {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
+            {#                        </a>#}
+            {#                    </div>#}
+            {#                </li>#}
+            {#                <li class="py-2">#}
+            {#                    <div class="menu-item">#}
+            {#                        <a href="#" class="inline-flex w-full p-8">#}
+            {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
+            {#                                <use xlink:href="#Accept-email"></use>#}
+            {#                            </svg>#}
+            {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
+            {#                        </a>#}
+            {#                    </div>#}
+            {#                </li>#}
+            {#            </ul>#}
         </div>
         <footer class="mt-auto border-t border-dark-200">
             {#            Global Search #}
-{#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
-{#                <div class="flex gap-x-4">#}
-{#                    <div class="key">#}
-{#                        ⌘#}
-{#                    </div>#}
-{#                    <div class="key">#}
-{#                        K#}
-{#                    </div>#}
-{#                </div>#}
-{##}
-{#                <div class="text-dark">#}
-{#                    Rýchla navigácia#}
-{#                </div>#}
-{#            </div>#}
+            {#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
+            {#                <div class="flex gap-x-4">#}
+            {#                    <div class="key">#}
+            {#                        ⌘#}
+            {#                    </div>#}
+            {#                    <div class="key">#}
+            {#                        K#}
+            {#                    </div>#}
+            {#                </div>#}
+            {##}
+            {#                <div class="text-dark">#}
+            {#                    Rýchla navigácia#}
+            {#                </div>#}
+            {#            </div>#}
             <div class="relative">
                 <div class="dropdown-btn flex items-center w-full p-16 cursor-pointer min-h-72"
-                    data-bs-toggle="dropdown"
-                    data-bs-offset="[16,8]"
-                    data-bs-popper-placement="top-start">
+                     data-bs-toggle="dropdown"
+                     data-bs-offset="[16,8]"
+                     data-bs-popper-placement="top-start">
                     <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300">
                         {{ username_data.initials }}
                     </div>
@@ -129,9 +129,13 @@
                     </svg>
                 </div>
                 <div class="dropdown-menu max-h-432">
+                    <form id="logout-form" method="post" action="{% url 'sb_admin:logout' %}" class="hidden">
+                        {% csrf_token %}
+                    </form>
+
                     <ul>
                         <li class="flex items-center p-12 text-dark-900 border-b border-dark-100 cursor-pointer hover:bg-dark-100"
-                            onclick="window.location='{% url "sb_admin:logout" %}'">
+                            onclick="document.getElementById('logout-form').submit();">
                             <svg class="w-16 h-16 flex-shrink-0 mr-8">
                                 <use xlink:href="#Logout"></use>
                             </svg>
