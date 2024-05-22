@@ -239,7 +239,9 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
         for field in self.declared_fields:
             form_field = self.fields.get(field)
             if form_field:
-                self.assign_widget_to_form_field(form_field)
+                self.assign_widget_to_form_field(
+                    form_field, request=self.threadsafe_request
+                )
 
 
 class SBAdminBaseForm(
