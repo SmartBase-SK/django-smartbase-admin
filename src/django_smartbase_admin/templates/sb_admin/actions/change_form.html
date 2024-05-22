@@ -29,7 +29,7 @@
     {% get_tabular_context adminform inline_admin_formsets tabs_context as tabular_context %}
 
     {% block header %}
-        <div class="py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+        <div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
             {% if not is_popup and has_view_permission %}
                 {% url opts|admin_urlname:'changelist' as changelist_url %}
                 <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
@@ -112,7 +112,7 @@
 
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
-              id="{{ opts.model_name }}_form" class="flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+              id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
             {% csrf_token %}
             {% if errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
