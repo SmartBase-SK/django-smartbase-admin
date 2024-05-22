@@ -155,12 +155,19 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             return allowed
         return request.user.is_staff
 
-    def get_autocomplete_widget(self, request, form_field, model, multiselect=False):
+    def get_autocomplete_widget(
+        self, view, request, form_field, db_field, model, multiselect=False
+    ):
         from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 
         return SBAdminAutocompleteWidget(
             form_field, model=model, multiselect=multiselect
         )
+
+    def get_form_field_widget_class(
+        self, view, request, form_field, db_field, default_widget_class
+    ):
+        return default_widget_class
 
     def apply_global_filter_to_queryset(
         self, qs, request, request_data, global_filter_data_map

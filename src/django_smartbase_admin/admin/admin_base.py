@@ -117,11 +117,16 @@ class SBAdminFormFieldWidgetsMixin:
     }
 
     def get_form_field_widget_class(self, form_field, db_field, request):
-        return self.formfield_widgets.get(form_field.__class__)
+        default_widget_class = self.formfield_widgets.get(form_field.__class__)
+        return request.request_data.configuration.get_form_field_widget_class(
+            self, request, form_field, db_field, default_widget_class
+        )
 
-    def get_autocomplete_widget(self, request, form_field, model, multiselect=False):
+    def get_autocomplete_widget(
+        self, request, form_field, db_field, model, multiselect=False
+    ):
         return request.request_data.configuration.get_autocomplete_widget(
-            request, form_field, model, multiselect
+            self, request, form_field, db_field, model, multiselect
         )
 
     def assign_widget_to_form_field(self, form_field, db_field=None, request=None):
@@ -163,6 +168,7 @@ class SBAdminFormFieldWidgetsMixin:
                 form_field_widget_instance = self.get_autocomplete_widget(
                     request,
                     form_field,
+                    db_field,
                     db_field.target_field.model,
                     multiselect=False,
                 )
