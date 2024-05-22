@@ -170,6 +170,7 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
                     self.threadsafe_request
                 ),
+                "search_fields": self.view.get_search_fields(self.threadsafe_request),
                 "search_field_placeholder": self.view.get_search_field_placeholder(),
                 "list_actions": self.view.process_actions_permissions(
                     self.threadsafe_request, list_actions

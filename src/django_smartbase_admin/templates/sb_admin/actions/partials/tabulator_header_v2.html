@@ -6,21 +6,22 @@
             <ul class="saved-filters js-filters-options py-12 px-16" role="tablist">
                 <input form="{{ view_id }}-filter-form"
                        type="hidden"
-                       value="tab_quick_search"
+                       value="{% if content_context.search_fields %}tab_quick_search{% else %}tab_saved_views{% endif %}"
                        id="id_{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}"
                        name="{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}">
-                <li role="presentation">
-                    <button class="relative show active"
-                            id="tab_quick_search"
-                            data-bs-disable-history
-                            data-bs-toggle="tab"
-                            data-bs-target="#quick_search_content"
-                            type="button" role="tab" aria-controls="quick_search_content"
-                            aria-selected="true">
-                        {% trans 'Quick Search' %}
-                    </button>
-                </li>
-
+                {% if content_context.search_fields %}
+                    <li role="presentation">
+                        <button class="relative show active"
+                                id="tab_quick_search"
+                                data-bs-disable-history
+                                data-bs-toggle="tab"
+                                data-bs-target="#quick_search_content"
+                                type="button" role="tab" aria-controls="quick_search_content"
+                                aria-selected="true">
+                            {% trans 'Quick Search' %}
+                        </button>
+                    </li>
+                {% endif %}
                 <li role="presentation">
                     <button class="relative"
                             id="tab_saved_views"
@@ -48,7 +49,8 @@
             </ul>
         </div>
         <div class="border-dark-200 border-t">
-            <div class="tab-pane  fade active show min-h-64 content-center" id="quick_search_content" role="tabpanel" aria-labelledby="tab_quick_search">
+            {% if content_context.search_fields %}
+                <div class="tab-pane  fade active show min-h-64 content-center" id="quick_search_content" role="tabpanel" aria-labelledby="tab_quick_search">
                 <div class="py-12 px-16">
 
                     <div class="flex gap-12">
@@ -74,6 +76,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
             <div class="tab-pane fade min-h-64 content-center" id="saved_views_content" role="tabpanel" aria-labelledby="tab_saved_views">
                 {% with 'filters-collapse-button' as filters_collapse_button_id %}
                     {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}

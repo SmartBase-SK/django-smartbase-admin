@@ -26,7 +26,7 @@ export class FilterOptionsModule extends SBAdminTableModule {
         const targetTabValue = params[this.table.constants.FILTER_DATA_NAME]?.[this.table.constants.TABLE_PARAMS_SELECTED_FILTER_TYPE]
         if (targetTabValue) {
             targetInput.value = targetTabValue
-            document.getElementById(targetTabValue).click()
         }
+        document.getElementById(targetInput.value).click()
     }
 }
