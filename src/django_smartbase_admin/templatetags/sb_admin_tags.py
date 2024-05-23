@@ -58,12 +58,13 @@ def render_widget(widget, request):
     return widget.render(request)
 
 
-@register.simple_tag
-def sb_admin_render_form_field(form_field, label_as_placeholder=False):
+@register.simple_tag(takes_context=True)
+def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
+    request = context["request"]
     from django_smartbase_admin.admin.admin_base import SBAdminFormFieldWidgetsMixin
 
     form_field.field = SBAdminFormFieldWidgetsMixin().assign_widget_to_form_field(
-        form_field.field
+        form_field.field, request=request
     )
     if label_as_placeholder:
         form_field.field.widget.attrs["placeholder"] = form_field.field.label
