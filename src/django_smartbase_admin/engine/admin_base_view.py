@@ -310,6 +310,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             for field in self.get_sbamin_list_display(request)
         ]
 
+    def get_search_fields(self, request):
+        return []
+
     def get_list_ordering(self):
         return self.ordering or []
 

@@ -118,6 +118,9 @@ class SBAdminFormFieldWidgetsMixin:
 
     def get_form_field_widget_class(self, form_field, db_field, request):
         default_widget_class = self.formfield_widgets.get(form_field.__class__)
+        if not hasattr(request, "request_data"):
+            # in case of login the view is not wrapped and we have no request_data present
+            return default_widget_class
         return request.request_data.configuration.get_form_field_widget_class(
             self, request, form_field, db_field, default_widget_class
         )
