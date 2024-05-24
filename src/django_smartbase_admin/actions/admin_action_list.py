@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import smart_split, unescape_string_literal
 
+from django_smartbase_admin.actions.advanced_filters import QueryBuilderService
 from django_smartbase_admin.engine.actions import SBAdminAction
 from django_smartbase_admin.engine.const import (
     XLSX_PAGE_CHUNK_SIZE,
@@ -167,6 +168,9 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
+                "advanced_filters_data": QueryBuilderService.get_advanced_filters_context_data(
+                    self
+                ),
                 "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
                     self.threadsafe_request
                 ),
@@ -198,9 +202,11 @@ class SBAdminListAction(SBAdminAction):
         return order_by
 
     def get_filter_from_request(self):
-        return SBAdminViewService.get_filter_from_request(
+        base_filters = SBAdminViewService.get_filter_from_request(
             self.threadsafe_request, self.column_fields, self.filter_data
         )
+        advanced_filters = QueryBuilderService.get_filters_for_list_action(self)
+        return base_filters & advanced_filters
 
     def get_search_fields(self, request):
         search_fields_definition = self.view.get_search_fields(request)
@@ -217,6 +223,9 @@ class SBAdminListAction(SBAdminAction):
                 self.column_fields,
                 self.filter_data,
             ).keys()
+        )
+        filter_fields.extend(
+            QueryBuilderService.get_filters_fields_for_list_action(self)
         )
         if self.is_search_query():
             search_fields = self.get_search_fields(self.threadsafe_request)

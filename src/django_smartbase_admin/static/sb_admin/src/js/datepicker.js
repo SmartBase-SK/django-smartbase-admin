@@ -323,6 +323,8 @@ export default class Datepicker {
         if (documentLocale === 'en') {
             documentLocale = 'default'
         }
+        this.monthYearViewsPlugin = monthYearViewsPlugin
+        this.customActionsPlugin = customActionsPlugin
         flatpickr.localize(this.getLocale(documentLocale))
         this.initWidgets()
 
@@ -341,6 +343,13 @@ export default class Datepicker {
         const datePickerSelector = {
             '.js-datepicker': {
                 dateFormat: "d.m.Y",
+                allowInput: true,
+                plugins: [
+                    monthYearViewsPlugin,
+                ]
+            },
+            '.js-datepicker-not-inline': {
+                mode: "range",
                 allowInput: true,
                 plugins: [
                     monthYearViewsPlugin,
@@ -375,6 +384,7 @@ export default class Datepicker {
 
         Object.keys(datePickerSelector).forEach(selector => {
             document.querySelectorAll(selector).forEach(datePickerEl => {
+                console.log(datePickerEl)
                 let sbadminDatepickerData = {}
                 if(datePickerEl.dataset.sbadminDatepicker) {
                     sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)

@@ -7,6 +7,11 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from django_smartbase_admin.actions.advanced_filters import (
+    AllOperators,
+    STRING_ATTRIBUTES,
+    NUMBER_ATTRIBUTES,
+)
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_SEARCH_NAME,
@@ -117,9 +122,18 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         context["filter_widget"] = self
         return context
 
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.EQUAL,
+            AllOperators.NOT_EQUAL,
+        ]
+
 
 class StringFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/string_field.html"
+
+    def get_advanced_filter_operators(self):
+        return STRING_ATTRIBUTES
 
     @classmethod
     def is_used_for_model_field_type(cls, model_field):
@@ -133,6 +147,16 @@ class StringFilterWidget(SBAdminFilterWidget):
 
 class BooleanFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/boolean_field.html"
+
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.EQUAL,
+            AllOperators.NOT_EQUAL,
+        ]
+
+    def parse_value_from_input(self, request, filter_value):
+        value = super().parse_value_from_input(request, filter_value)
+        return json.loads(value)
 
     @classmethod
     def is_used_for_model_field_type(cls, model_field):
@@ -162,6 +186,12 @@ class ChoiceFilterWidget(SBAdminFilterWidget):
         )
         self.choices = self.choices or choices
 
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.EQUAL,
+            AllOperators.NOT_EQUAL,
+        ]
+
     def get_default_label(self):
         if self.default_label:
             return self.default_label
@@ -186,19 +216,32 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
         return Q(**{f"{self.field.filter_field}__in": filter_value})
 
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.IN,
+            AllOperators.NOT_IN,
+        ]
 
-class NumberRangeFilterWidget(SBAdminFilterWidget):
+
+class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/number_range_field.html"
 
-    def get_base_filter_query_for_parsed_value(self, request, filter_value):
+    def parse_value_from_input(self, request, filter_value):
+        filter_value = super().parse_value_from_input(request, filter_value)
         from_value = filter_value.get("from", {}).get("value", None)
         to_value = filter_value.get("to", {}).get("value", None)
+        return [from_value, to_value]
+
+    def get_base_filter_query_for_parsed_value(self, request, filter_value):
         result = Q()
-        if from_value:
-            result &= Q(**{f"{self.field.filter_field}__gte": from_value})
-        if to_value:
-            result &= Q(**{f"{self.field.filter_field}__lte": to_value})
+        if filter_value[0] is not None:
+            result &= Q(**{f"{self.field.filter_field}__gte": filter_value[0]})
+        if filter_value[1] is not None:
+            result &= Q(**{f"{self.field.filter_field}__lte": filter_value[1]})
         return result
+
+    def get_advanced_filter_operators(self):
+        return NUMBER_ATTRIBUTES
 
 
 class DateFilterWidget(SBAdminFilterWidget):
@@ -242,6 +285,9 @@ class DateFilterWidget(SBAdminFilterWidget):
             if default_value_shortcut_index is not None
             else self.default_value_shortcut_index
         )
+
+    def get_advanced_filter_operators(self):
+        return NUMBER_ATTRIBUTES
 
     def get_shortcuts(self):
         now = timezone.now()
@@ -290,6 +336,8 @@ class DateFilterWidget(SBAdminFilterWidget):
 
         :returns: date or array or dates, is_range
         """
+        if filter_value is None:
+            return [None, None], False
         date_format = cls.DATE_FORMAT
         date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
         if len(date_range) == 2:
@@ -298,7 +346,7 @@ class DateFilterWidget(SBAdminFilterWidget):
             return [date_from, date_to], True
         else:
             date_value = datetime.strptime(filter_value, date_format)
-            return [date_value, date_value], True
+            return date_value, False
 
     @classmethod
     def get_value_from_date_or_range(cls, date_or_range):
@@ -307,6 +355,10 @@ class DateFilterWidget(SBAdminFilterWidget):
         date_from = datetime.strftime(date_or_range[0], cls.DATE_FORMAT)
         date_to = datetime.strftime(date_or_range[1], cls.DATE_FORMAT)
         return f"{date_from}{cls.DATE_RANGE_SPLIT}{date_to}"
+
+    def parse_value_from_input(self, request, filter_value):
+        date_or_range, _ = self.get_date_or_range_from_value(filter_value)
+        return date_or_range
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
         date_or_range, is_range = self.get_date_or_range_from_value(filter_value)
@@ -322,6 +374,7 @@ class DateFilterWidget(SBAdminFilterWidget):
             )
         else:
             date_value = date_or_range
+            # TODO date_or_range je vzdy pole o dvoch ? ak ano tak tuna sa da pole mozno chyba...
             return Q(**{f"{self.field.filter_field}": date_value})
 
 
@@ -529,3 +582,11 @@ class AutocompleteFilterWidget(
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         return context
+
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.IN,
+            AllOperators.NOT_IN,
+            AllOperators.IS_NULL,
+            AllOperators.IS_NOT_NULL,
+        ]

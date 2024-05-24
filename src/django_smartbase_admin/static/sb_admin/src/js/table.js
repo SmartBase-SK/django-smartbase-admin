@@ -5,6 +5,7 @@ import {ColumnDisplayModule} from "./table_modules/column_display_module"
 import {TableParamsModule} from "./table_modules/table_params_module"
 import {DetailViewModule} from "./table_modules/detail_view_module"
 import {FilterModule} from "./table_modules/filter_module"
+import {AdvancedFilterModule} from "./table_modules/advanced_filter_module"
 import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
@@ -19,6 +20,7 @@ class SBAdminTable {
         this.moduleInstances = this.initModules(options.modules)
         this.viewId = options.viewId
         this.filterFormId = options.filterFormId
+        this.advancedFilterId = options.advancedFilterId
         this.columnWidgetId = options.columnWidgetId
         this.paginationWidgetId = options.paginationWidgetId
         this.pageSizeWidgetId = options.pageSizeWidgetId
@@ -275,6 +277,7 @@ window.SBAdminTableModulesClass = {
     'selectionModule': SelectionModule,
     'columnDisplayModule': ColumnDisplayModule,
     'filterModule': FilterModule,
+    'advancedFilterModule': AdvancedFilterModule,
     'tableParamsModule': TableParamsModule,
     'detailViewModule': DetailViewModule,
     'movableColumnsModule': MovableColumnsModule,

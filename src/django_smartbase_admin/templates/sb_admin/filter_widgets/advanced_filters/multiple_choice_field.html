@@ -1,0 +1,42 @@
+<div class="relative">
+    <div id="{{ filter_widget.input_id }}-wrapper" class="js-simple-multiselect-wrapper">
+        <button
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            data-bs-offset="[0, 8]"
+            data-bs-auto-close="outside"
+            class="btn !rounded px-10 font-normal w-full"
+        >
+            <span id="{{ filter_widget.input_id }}-value" class="js-value"></span>
+            <svg class="ml-8">
+                <use xlink:href="#Down"></use>
+            </svg>
+        </button>
+        <div id="{{ filter_widget.input_id }}-dropdown" class="dropdown-menu">
+            <input type="hidden"
+                   class="js-simple-multiselect"
+                   form="{{ filter_widget.view_id }}-advanced-filter"
+                   id="{{ filter_widget.input_id }}"
+                   name="{{ filter_widget.input_name }}">
+            <ul class="relative py-8">
+                {% for choice in filter_widget.choices %}
+                    <li>
+                        <div class="relative px-12 py-8">
+                            <input
+                                type="checkbox"
+                                value="{{ choice.0 }}"
+                                name="{{ filter_widget.input_name }}_dummy"
+                                class="checkbox"
+                                id="{{ filter_widget.input_id }}_{{ forloop.counter0 }}"
+                                data-label="{{ choice.1 }}"
+                            >
+                            <label for="{{ filter_widget.input_id }}_{{ forloop.counter0 }}">
+                                {{ choice.1|safe }}
+                            </label>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>

@@ -85,7 +85,7 @@ export default class Multiselect {
         wrapper.addEventListener('change', () => {
             this.setLabel(wrapper, valueEl)
         })
-        clearEl.addEventListener('click', () => {
+        clearEl?.addEventListener('click', () => {
             this.clearAll(wrapper, valueEl)
         })
         this.setLabel(wrapper, valueEl)

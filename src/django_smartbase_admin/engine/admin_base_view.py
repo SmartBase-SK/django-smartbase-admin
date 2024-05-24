@@ -340,6 +340,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         view_id = self.get_id()
         tabulator_definition = {
             "viewId": view_id,
+            "advancedFilterId": f"{view_id}" + "-advanced-filter",
             "filterFormId": f"{view_id}" + "-filter-form",
             "columnWidgetId": f"{view_id}" + "-column-widget",
             "paginationWidgetId": f"{view_id}" + "-pagination-widget",
@@ -363,6 +364,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "selectionModule",
                 "columnDisplayModule",
                 "filterModule",
+                "advancedFilterModule",
                 "tableParamsModule",
                 "detailViewModule",
                 "fullTextSearchModule",

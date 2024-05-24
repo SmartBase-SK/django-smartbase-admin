@@ -1,0 +1,15 @@
+{% load i18n %}
+
+
+<div class="px-12 py-8 relative flex">
+    <input form="{{ filter_widget.view_id }}-filter-form" type="hidden" class="input js-range"
+           data-label-separator=" - "
+           id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}">
+    <input type="text" class="input mr-8"
+           placeholder="{% trans 'From' %}"
+           id="{{ filter_widget.input_id }}_from" name="{{ filter_widget.input_name }}_from">
+
+    <input type="text" class="input"
+           placeholder="{% trans 'To' %}"
+           id="{{ filter_widget.input_id }}_to" name="{{ filter_widget.input_name }}_to">
+</div>
