@@ -8,7 +8,7 @@
         {% include 'sb_admin/partials/modal/modal.html' %}
     {% endblock %}
     {% block page_header %}
-        <div class="py-16 md:pb-32 flex items-center max-xs:px-20">
+        <div class="list-view-header py-16 md:pb-32 flex items-center max-xs:px-20">
             <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">{{ list_title|capfirst }}</h1>
             <ul class="ml-auto flex gap-8 md:gap-16">
                 <li class="relative md:hidden">
@@ -65,7 +65,7 @@
                 {% include content_context.tabulator_header_template_name %}
             {% endblock %}
             {% block tabulator_body %}
-            <div id="{{ view_id }}-table"></div>
+            <div id="{{ view_id }}-table" class="list-view-table"></div>
             {% endblock %}
             {% block tabulator_custom_footer %}
             <div class="tabulator-custom-footer">

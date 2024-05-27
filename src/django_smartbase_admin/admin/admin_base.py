@@ -196,6 +196,7 @@ class SBAdminFormFieldWidgetsMixin:
                 form_field_widget_instance = self.get_autocomplete_widget(
                     request,
                     form_field,
+                    db_field,
                     db_field.target_field.model,
                     multiselect=True,
                 )

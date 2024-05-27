@@ -42,7 +42,7 @@
                 {% include 'sb_admin/includes/change_form_title.html' %}
             </h1>
             {% if change and not is_popup %}
-                <ul class="flex ml-auto gap-8 md:gap-16">
+                <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
                     <li class="relative md:hidden">
                         <button
                             data-bs-toggle="dropdown"
@@ -145,7 +145,7 @@
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="tabcontent_{{ tab|slugify }}" role="tabpanel"
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="tabcontent_{{ tab|slugify }}" role="tabpanel"
                      aria-labelledby="tab_{{ tab|slugify }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">

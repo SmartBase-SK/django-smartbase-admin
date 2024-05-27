@@ -1,5 +1,5 @@
 .query-builder {
-    select:not(.select2-hidden-accessible), input {
+    select:not(.select2-hidden-accessible), input:not(.checkbox):not(.choices__input) {
         @apply !w-full input;
     }
 
@@ -203,6 +203,7 @@
         @apply w-20 h-20 flex-shrink-0;
         @apply !p-0 !m-0;
         @apply !bg-transparent !text-transparent border-none shadow-none;
+        font-size: 0;
 
         i {
             @apply hidden;
@@ -222,8 +223,9 @@
         }
     }
 
-    .rule-filter-container {
-        @apply w-full;
+    .rule-filter-container, .rule-operator-container {
+        width: 250px !important;
+        flex-shrink: 0;
     }
 
     .rule-operator-container {
@@ -291,6 +293,69 @@
     transition: background-color .05s ease-in-out, color .05s ease-in-out;
 
     &--highlighted {
-       @apply !bg-primary !text-light;
+        @apply !bg-primary !text-light;
+    }
+}
+
+
+.query-builder-advanced.query-builder {
+    @apply w-full;
+
+    .rules-group-container {
+        @apply flex flex-wrap;
+        @apply border-0;
+    }
+
+    .rules-group-header {
+        @apply hidden;
+    }
+
+    .rules-group-body {
+        @apply w-full pt-12 pb-24;
+    }
+
+    .rules-list {
+        @apply m-0;
+    }
+
+    .rule-container {
+        @apply flex items-center border-0 !bg-transparent !p-0;
+    }
+
+    .group-conditions {
+        @apply !hidden;
+    }
+
+    .group-actions {
+        @apply flex justify-between w-full;
+
+        [data-add="group"] {
+            @apply hidden;
+        }
+    }
+
+    .rule-header {
+        @apply w-auto shrink-0 mx-4;
+    }
+
+    .error-container {
+        @apply w-20 h-20 shrink-0;
+        i {
+            @apply hidden;
+        }
+        &::before {
+            content: "";
+            @apply block w-full h-full;
+            background-image: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="fill: %23EF4444;"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.22183 4.22182C6.21136 2.23232 8.96273 1 12 1C15.0373 1 17.7886 2.23231 19.7782 4.22182L19.0711 4.92893L19.7782 4.22183C21.7677 6.21136 23 8.96273 23 12C23 15.0373 21.7677 17.7886 19.7782 19.7782C17.7886 21.7677 15.0373 23 12 23C8.96273 23 6.21136 21.7677 4.22183 19.7782L4.92893 19.0711L4.22182 19.7782C2.23231 17.7886 1 15.0373 1 12C1 8.96273 2.23232 6.21136 4.22182 4.22183L4.22183 4.22182ZM12 3C9.51447 3 7.26584 4.00626 5.63603 5.63604C4.00625 7.26585 3 9.51447 3 12C3 14.4855 4.00627 16.7342 5.63604 18.3639C7.26584 19.9937 9.51447 21 12 21C14.4855 21 16.7342 19.9937 18.3639 18.3639C19.9937 16.7342 21 14.4855 21 12C21 9.51447 19.9937 7.26584 18.3639 5.63604C16.7342 4.00627 14.4855 3 12 3ZM12 18.5C12.6903 18.5 13.25 17.9403 13.25 17.25C13.25 16.5597 12.6903 16 12 16C11.3097 16 10.75 16.5597 10.75 17.25C10.75 17.9403 11.3097 18.5 12 18.5ZM11 6V14H13V6H11Z"/></svg>');
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+        }
+    }
+
+    .btn-success {
+        border: 1px solid #D1D5DB;
+        background: #ECEDF0;
+        color: var(--color-dark-600);
     }
 }

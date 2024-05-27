@@ -50,12 +50,12 @@ class Main {
         })
 
         new Sidebar()
-        new Datepicker()
-        new Range()
+        this.datepicker = new Datepicker()
+        this.range = new Range()
         new Sorting()
         this.autocomplete = new Autocomplete()
         new ChoicesJS()
-        new Multiselect()
+        this.multiselect = new Multiselect()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)

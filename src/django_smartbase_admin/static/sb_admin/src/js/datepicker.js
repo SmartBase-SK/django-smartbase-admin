@@ -337,10 +337,17 @@ export default class Datepicker {
         return l.default[locale]
     }
 
-    initWidgets() {
+    initWidgets(parentEl=null) {
         const datePickerSelector = {
             '.js-datepicker': {
                 dateFormat: "d.m.Y",
+                allowInput: true,
+                plugins: [
+                    monthYearViewsPlugin,
+                ]
+            },
+            '.js-datepicker-not-inline': {
+                mode: "range",
                 allowInput: true,
                 plugins: [
                     monthYearViewsPlugin,
@@ -372,9 +379,12 @@ export default class Datepicker {
                 ]
             }
         }
+        if(!parentEl) {
+            parentEl = document
+        }
 
         Object.keys(datePickerSelector).forEach(selector => {
-            document.querySelectorAll(selector).forEach(datePickerEl => {
+            parentEl.querySelectorAll(selector).forEach(datePickerEl => {
                 let sbadminDatepickerData = {}
                 if(datePickerEl.dataset.sbadminDatepicker) {
                     sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)

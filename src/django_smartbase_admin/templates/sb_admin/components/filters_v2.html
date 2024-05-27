@@ -1,0 +1,90 @@
+{% load i18n static sb_admin_tags %}
+
+<script src="{% static 'sb_admin/js/querybuilder/jQuery.extendext.js' %}"></script>
+<script src="{% static 'sb_admin/js/querybuilder/query-builder.min.js' %}"></script>
+<link href="{% static 'sb_admin/css/querybuilder/query-builder.default.min.css' %}" rel="stylesheet">
+<ul class="query-builder-wrapper py-12 px-16 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
+    <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced">
+    </div>
+    <script>
+        window.addEventListener("SBinitQueryBuilder", (event) => {
+            const SBTable = event.detail.SBTable.table
+            $("#{{ view_id }}-advanced-filter").on("afterCreateRuleInput.queryBuilder", function(event, rule) {
+                setTimeout(() => {
+                    //next tick
+                    SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
+                }, 0)
+            })
+            $("#{{ view_id }}-advanced-filter").on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
+                setTimeout(() => {
+                    SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
+                }, 0)
+            })
+            $("#{{ view_id }}-advanced-filter").queryBuilder({
+                {% if content_context.advanced_filters_data.current_rules %}
+                    rules: {{ content_context.advanced_filters_data.current_rules|safe }},
+                {% endif %}
+                operators: {{ content_context.advanced_filters_data.all_operators|safe }},
+                templates: {
+                    group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
+                        return `
+                        <div id="${group_id}" class="rules-group-container">
+                          <div class="rules-group-header">
+                            <div class="btn-group group-conditions">
+                              ${conditions.map(condition => `
+                                <label class="btn btn-sm btn-primary">
+                                  <input type="radio" name="${group_id}_cond" value="${condition}"> ${translate("conditions", condition)}
+                                </label>
+                              `).join("\n")}
+                            </div>
+                            ${settings.display_errors ? `
+                              <div class="error-container"><i class="${icons.error}"></i></div>
+                            ` : ""}
+                          </div>
+                          <div class=rules-group-body>
+                            <div class=rules-list></div>
+                          </div>
+                            <div class="btn-group float-end group-actions">
+                              <button type="button" class="btn btn-sm btn-success" data-add="rule">
+                                <i class="${icons.add_rule}"></i> ${translate("add_rule")}
+                              </button>
+                              ${settings.allow_groups === -1 || settings.allow_groups >= level ? `
+                                <button type="button" class="btn btn-sm btn-success" data-add="group">
+                                  <i class="${icons.add_group}"></i> ${translate("add_group")}
+                                </button>
+                              ` : ""}
+                              ${level > 1 ? `
+                                <button type="button" class="btn btn-sm btn-danger" data-delete="group">
+                                  <i class="${icons.remove_group}"></i> ${translate("delete_group")}
+                                </button>
+                              ` : ""}
+                              <button type="button" class="btn btn-sm btn-success" data-execute>
+                                {% trans "Execute query" %}
+                              </button>
+                            </div>
+                        </div>`
+                    }
+                },
+                allow_groups: false,
+                allow_empty: true,
+                filters: [
+                    {% for filter in content_context.advanced_filters_data.filters %}
+                        {
+                            id: '{{ filter.id }}',
+                            field: '{{ filter.field }}',
+                            type: '{{ filter.type }}',
+                            label: '{{ filter.label }}',
+                            operators: {{ filter.operators|safe }},
+                            input: function(rule, name) {
+                                return `{{ filter.input|safe }}`.replaceAll(
+                                    '{{ content_context.advanced_filters_data.prefix_to_replace }}',
+                                    name
+                                )
+                            }
+                        },
+                    {% endfor %}
+                ]
+            })
+        })
+    </script>
+</ul>
