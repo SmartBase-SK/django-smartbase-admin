@@ -2,9 +2,10 @@ import Dropdown from 'bootstrap/js/dist/dropdown'
 import Collapse from 'bootstrap/js/dist/collapse'
 import Tab from 'bootstrap/js/dist/tab'
 import Modal from 'bootstrap/js/dist/modal'
-// eslint-disable-next-line no-unused-vars
-import Popper from '@popperjs/core'
 import Tooltip from 'bootstrap/js/dist/tooltip'
+
+// remove Modal focus trap to fix interaction with fields in modals inside another modal
+Modal.prototype._initializeFocusTrap = function () { return { activate: function () { }, deactivate: function () { } } }
 
 window.bootstrap5 = {
     Modal: Modal,

@@ -96,6 +96,7 @@ class SBAdminTable {
     }
 
     loadFromUrlAfterInit() {
+        window.htmx.process(this.tabulator.rowManager.tableElement)
         this.tabulator.on("dataProcessed", () => {
             window.htmx.process(this.tabulator.rowManager.tableElement)
         })
