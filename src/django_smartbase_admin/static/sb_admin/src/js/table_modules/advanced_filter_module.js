@@ -18,21 +18,33 @@ export class AdvancedFilterModule extends SBAdminTableModule {
             },
             ".js-datepicker-not-inline": (rule, ruleEl, widgetEl) => {
                 this.dateOperatorUpdate(rule, ruleEl, widgetEl)
-            },
+            }
         }
         this.afterUpdateRuleOperatorFunctions = {
             ".js-range": this.rangeOperatorUpdate,
-            ".js-datepicker-not-inline": this.dateOperatorUpdate,
+            ".js-datepicker-not-inline": this.dateOperatorUpdate
         }
     }
 
     loadFromUrl() {
-        window.dispatchEvent(new CustomEvent('SBinitQueryBuilder', {detail: {SBTable: this}}))
+        const params = this.table.getParamsFromUrl()
+        const emptyRules = {
+            "condition": "AND",
+            "rules": [{empty: true}]
+        }
+        let filterData = params[this.table.constants.ADVANCED_FILTER_DATA_NAME]
+        if(!filterData?.rules || filterData.rules.length === 0) {
+            filterData = emptyRules
+        }
+        window.dispatchEvent(new CustomEvent("SBinitOrUpdateQueryBuilder", { detail: { SBTable: this, filterData: filterData } }))
     }
 
     afterInit() {
-        document.querySelector("[data-execute]").addEventListener("click", () => {
-            this.table.refreshTableDataIfNotUrlLoad()
+        document.addEventListener("click", (event) => {
+            const executeButton = event.target.closest("[data-execute]")
+            if(executeButton) {
+                this.table.refreshTableDataIfNotUrlLoad()
+            }
         })
     }
 
@@ -68,9 +80,9 @@ export class AdvancedFilterModule extends SBAdminTableModule {
 
     getUrlParams() {
         const queryBuilder = document.querySelector(`#${this.table.advancedFilterId}`)
-        const rules = $(queryBuilder).queryBuilder("getRules", {allow_invalid: true, skip_empty: true})
+        const rules = $(queryBuilder).queryBuilder("getRules", { allow_invalid: true, skip_empty: true })
         return {
-            "advancedFilterData": rules
+            [this.table.constants.ADVANCED_FILTER_DATA_NAME]: rules
         }
     }
 

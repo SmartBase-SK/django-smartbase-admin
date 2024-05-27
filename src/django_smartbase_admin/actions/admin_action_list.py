@@ -34,6 +34,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     FilterVersions,
+    ADVANCED_FILTER_DATA_NAME,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -148,6 +149,7 @@ class SBAdminListAction(SBAdminAction):
             "TABLE_PARAMS_FULL_TEXT_SEARCH": TABLE_PARAMS_FULL_TEXT_SEARCH,
             "TABLE_PARAMS_SELECTED_FILTER_TYPE": TABLE_PARAMS_SELECTED_FILTER_TYPE,
             "FILTER_DATA_NAME": FILTER_DATA_NAME,
+            "ADVANCED_FILTER_DATA_NAME": ADVANCED_FILTER_DATA_NAME,
             "BASE_PARAMS_NAME": BASE_PARAMS_NAME,
             "TABLE_PARAMS_PAGE_NAME": TABLE_PARAMS_PAGE_NAME,
             "TABLE_PARAMS_SORT_NAME": TABLE_PARAMS_SORT_NAME,

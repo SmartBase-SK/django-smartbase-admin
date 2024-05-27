@@ -7,27 +7,27 @@
     <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced">
     </div>
     <script>
-        window.addEventListener("SBinitQueryBuilder", (event) => {
-            const SBTable = event.detail.SBTable.table
-            $("#{{ view_id }}-advanced-filter").on("afterCreateRuleInput.queryBuilder", function(event, rule) {
+        window.addEventListener("SBinitOrUpdateQueryBuilder", (event) => {
+            const SBTable = event.detail.SBTable.table;
+            const filterData = event.detail.filterData;
+            const queryBuilderEl$ = $("#{{ view_id }}-advanced-filter");
+            queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function(event, rule) {
                 setTimeout(() => {
                     //next tick
                     SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
                 }, 0)
             })
-            $("#{{ view_id }}-advanced-filter").on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
+            queryBuilderEl$.on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
                 setTimeout(() => {
                     SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
                 }, 0)
             })
-            $("#{{ view_id }}-advanced-filter").queryBuilder({
-                {% if content_context.advanced_filters_data.current_rules %}
-                    rules: {{ content_context.advanced_filters_data.current_rules|safe }},
-                {% endif %}
-                operators: {{ content_context.advanced_filters_data.all_operators|safe }},
-                templates: {
-                    group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
-                        return `
+            if (!queryBuilderEl$[0].queryBuilder) {
+                queryBuilderEl$.queryBuilder({
+                    operators: {{ content_context.advanced_filters_data.all_operators|safe }},
+                    templates: {
+                        group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
+                            return `
                         <div id="${group_id}" class="rules-group-container">
                           <div class="rules-group-header">
                             <div class="btn-group group-conditions">
@@ -63,28 +63,30 @@
                               </button>
                             </div>
                         </div>`
-                    }
-                },
-                allow_groups: false,
-                allow_empty: true,
-                filters: [
-                    {% for filter in content_context.advanced_filters_data.filters %}
-                        {
-                            id: '{{ filter.id }}',
-                            field: '{{ filter.field }}',
-                            type: '{{ filter.type }}',
-                            label: '{{ filter.label }}',
-                            operators: {{ filter.operators|safe }},
-                            input: function(rule, name) {
-                                return `{{ filter.input|safe }}`.replaceAll(
-                                    '{{ content_context.advanced_filters_data.prefix_to_replace }}',
-                                    name
-                                )
-                            }
-                        },
-                    {% endfor %}
-                ]
-            })
+                        }
+                    },
+                    allow_groups: false,
+                    allow_empty: true,
+                    filters: [
+                        {% for filter in content_context.advanced_filters_data.filters %}
+                            {
+                                id: '{{ filter.id }}',
+                                field: '{{ filter.field }}',
+                                type: '{{ filter.type }}',
+                                label: '{{ filter.label }}',
+                                operators: {{ filter.operators|safe }},
+                                input: function(rule, name) {
+                                    return `{{ filter.input|safe }}`.replaceAll(
+                                        '{{ content_context.advanced_filters_data.prefix_to_replace }}',
+                                        name
+                                    )
+                                }
+                            },
+                        {% endfor %}
+                    ]
+                })
+            }
+            queryBuilderEl$.queryBuilder("setRules", filterData)
         })
     </script>
 </ul>
