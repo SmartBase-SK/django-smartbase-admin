@@ -125,7 +125,9 @@ class SBAdminListAction(SBAdminAction):
         ]
 
     def is_jquery_required(self, request):
-        return self.view.get_filters_version() == FilterVersions.FILTERS_VERSION_2
+        return (
+            self.view.get_filters_version(request) == FilterVersions.FILTERS_VERSION_2
+        )
 
     def get_template_data(self):
         context_data = self.view.get_context_data(self.threadsafe_request)
@@ -172,6 +174,7 @@ class SBAdminListAction(SBAdminAction):
                 "tabulator_definition": tabulator_definition,
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
+                "is_jquery_required": self.is_jquery_required(self.threadsafe_request),
                 "advanced_filters_data": QueryBuilderService.get_advanced_filters_context_data(
                     self
                 ),

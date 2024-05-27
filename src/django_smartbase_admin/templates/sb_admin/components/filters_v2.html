@@ -71,6 +71,7 @@
                     {% for filter in content_context.advanced_filters_data.filters %}
                         {
                             id: '{{ filter.id }}',
+                            field: '{{ filter.field }}',
                             type: '{{ filter.type }}',
                             label: '{{ filter.label }}',
                             operators: {{ filter.operators|safe }},

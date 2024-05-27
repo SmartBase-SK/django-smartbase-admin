@@ -70,6 +70,7 @@ STRING_ATTRIBUTES = [
 @dataclass
 class QueryBuilderFilter:
     id: str
+    field: str
     type: str = "string"
     label: Optional[str] = None
     input: Optional[str] = None
@@ -84,6 +85,7 @@ class QueryBuilderFilter:
         operators = [operator.value for operator in operators]
         return cls(
             id=filter_widget.input_id,
+            field=filter_widget.field.field,
             label=filter_widget.field.title,
             operators=operators,
             input=render_to_string(

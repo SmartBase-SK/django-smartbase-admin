@@ -158,13 +158,9 @@ class SBAdminBaseView(object):
     def get_sbadmin_detail_actions(self, object_id):
         return self.sbadmin_detail_actions
 
-    def is_jquery_required(self, request):
-        return False
-
     def get_global_context(self, request, object_id=None):
         return {
             "view_id": self.get_id(),
-            "is_jquery_required": self.is_jquery_required(request),
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
