@@ -4,8 +4,10 @@ export default class Multiselect {
         const selectorDetail = '.js-simple-multiselect-detail'
         this.wrapperSelector = '.js-simple-multiselect-wrapper'
         document.addEventListener('change', e => {
-            const multiselectInput = e.target.closest(this.wrapperSelector)?.querySelector(selector)
-            if (multiselectInput) {
+            const wrapperEl = e.target.closest(this.wrapperSelector)
+            const multiselectInput = wrapperEl?.querySelector(selector)
+            const changedCheckbox = wrapperEl?.querySelector('[type="checkbox"]')
+            if (multiselectInput && changedCheckbox) {
                 let checked = []
                 this.getCheckboxes(multiselectInput).forEach(el => {
                     if (el.checked) {
@@ -16,7 +18,7 @@ export default class Multiselect {
                     }
                 })
                 multiselectInput.value = JSON.stringify(checked)
-                multiselectInput.dispatchEvent(new Event('change'))
+                multiselectInput.dispatchEvent(new Event('change', {bubbles: true}))
             }
         })
         document.querySelectorAll(selector).forEach(el => {

@@ -126,6 +126,8 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         return [
             AllOperators.EQUAL,
             AllOperators.NOT_EQUAL,
+            AllOperators.IS_NULL,
+            AllOperators.IS_NOT_NULL,
         ]
 
 
@@ -147,12 +149,6 @@ class StringFilterWidget(SBAdminFilterWidget):
 
 class BooleanFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/boolean_field.html"
-
-    def get_advanced_filter_operators(self):
-        return [
-            AllOperators.EQUAL,
-            AllOperators.NOT_EQUAL,
-        ]
 
     def parse_value_from_input(self, request, filter_value):
         value = super().parse_value_from_input(request, filter_value)
@@ -186,12 +182,6 @@ class ChoiceFilterWidget(SBAdminFilterWidget):
         )
         self.choices = self.choices or choices
 
-    def get_advanced_filter_operators(self):
-        return [
-            AllOperators.EQUAL,
-            AllOperators.NOT_EQUAL,
-        ]
-
     def get_default_label(self):
         if self.default_label:
             return self.default_label
@@ -220,6 +210,8 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         return [
             AllOperators.IN,
             AllOperators.NOT_IN,
+            AllOperators.IS_NULL,
+            AllOperators.IS_NOT_NULL,
         ]
 
 
@@ -228,8 +220,15 @@ class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
 
     def parse_value_from_input(self, request, filter_value):
         filter_value = super().parse_value_from_input(request, filter_value)
-        from_value = filter_value.get("from", {}).get("value", None)
-        to_value = filter_value.get("to", {}).get("value", None)
+        try:
+            from_value = float(filter_value.get("from", {}).get("value", None))
+        except ValueError:
+            from_value = None
+        try:
+            to_value = float(filter_value.get("to", {}).get("value", None))
+        except ValueError:
+            to_value = None
+
         return [from_value, to_value]
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):

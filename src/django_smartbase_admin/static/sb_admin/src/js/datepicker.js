@@ -384,7 +384,6 @@ export default class Datepicker {
 
         Object.keys(datePickerSelector).forEach(selector => {
             document.querySelectorAll(selector).forEach(datePickerEl => {
-                console.log(datePickerEl)
                 let sbadminDatepickerData = {}
                 if(datePickerEl.dataset.sbadminDatepicker) {
                     sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)

@@ -1,215 +1,27 @@
-{% load i18n %}
+{% load i18n static %}
 
-<script>
-    /*!
- * jQuery.extendext 1.0.0
- *
- * Copyright 2014-2019 Damien "Mistic" Sorel (http://www.strangeplanet.fr)
- * Licensed under MIT (http://opensource.org/licenses/MIT)
- *
- * Based on jQuery.extend by jQuery Foundation, Inc. and other contributors
- */
-
-    (function(root, factory) {
-        if (typeof define === "function" && define.amd) {
-            define(["jquery"], factory)
-        } else if (typeof module === "object" && module.exports) {
-            module.exports = factory(require("jquery"))
-        } else {
-            factory(root.jQuery)
-        }
-    }(this, function($) {
-        "use strict"
-
-        $.extendext = function() {
-            var options, name, src, copy, copyIsArray, clone,
-                target = arguments[0] || {},
-                i = 1,
-                length = arguments.length,
-                deep = false,
-                arrayMode = "default"
-
-            // Handle a deep copy situation
-            if (typeof target === "boolean") {
-                deep = target
-
-                // Skip the boolean and the target
-                target = arguments[i++] || {}
-            }
-
-            // Handle array mode parameter
-            if (typeof target === "string") {
-                arrayMode = target.toLowerCase()
-                if (arrayMode !== "concat" && arrayMode !== "replace" && arrayMode !== "extend") {
-                    arrayMode = "default"
-                }
-
-                // Skip the string param
-                target = arguments[i++] || {}
-            }
-
-            // Handle case when target is a string or something (possible in deep copy)
-            if (typeof target !== "object" && !$.isFunction(target)) {
-                target = {}
-            }
-
-            // Extend jQuery itself if only one argument is passed
-            if (i === length) {
-                target = this
-                i--
-            }
-
-            for (; i < length; i++) {
-                // Only deal with non-null/undefined values
-                if ((options = arguments[i]) !== null) {
-                    // Special operations for arrays
-                    if ($.isArray(options) && arrayMode !== "default") {
-                        clone = target && $.isArray(target) ? target : []
-
-                        switch (arrayMode) {
-                            case "concat":
-                                target = clone.concat($.extend(deep, [], options))
-                                break
-
-                            case "replace":
-                                target = $.extend(deep, [], options)
-                                break
-
-                            case "extend":
-                                options.forEach(function(e, i) {
-                                    if (typeof e === "object") {
-                                        var type = $.isArray(e) ? [] : {}
-                                        clone[i] = $.extendext(deep, arrayMode, clone[i] || type, e)
-
-                                    } else if (clone.indexOf(e) === -1) {
-                                        clone.push(e)
-                                    }
-                                })
-
-                                target = clone
-                                break
-                        }
-
-                    } else {
-                        // Extend the base object
-                        for (name in options) {
-                            copy = options[name]
-
-                            // Prevent never-ending loop
-                            if (name === "__proto__" || target === copy) {
-                                continue
-                            }
-
-                            // Recurse if we're merging plain objects or arrays
-                            if (deep && copy && ($.isPlainObject(copy) ||
-                                (copyIsArray = $.isArray(copy)))) {
-                                src = target[name]
-
-                                // Ensure proper type for the source value
-                                if (copyIsArray && !Array.isArray(src)) {
-                                    clone = []
-                                } else if (!copyIsArray && !$.isPlainObject(src)) {
-                                    clone = {}
-                                } else {
-                                    clone = src
-                                }
-                                copyIsArray = false
-
-                                // Never move original objects, clone them
-                                target[name] = $.extendext(deep, arrayMode, clone, copy)
-
-                                // Don't bring in undefined values
-                            } else if (copy !== undefined) {
-                                target[name] = copy
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Return the modified object
-            return target
-        }
-    }))
-</script>
-<script src="
-https://cdn.jsdelivr.net/npm/jQuery-QueryBuilder@3.0.0/dist/js/query-builder.min.js
-"></script>
-<link href="
-https://cdn.jsdelivr.net/npm/jQuery-QueryBuilder@3.0.0/dist/css/query-builder.default.min.css
-" rel="stylesheet">
-<ul id="filters-wrapper-v2" class="py-12 px-16 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
+<script src="{% static 'sb_admin/js/querybuilder/jQuery.extendext.js' %}"></script>
+<script src="{% static 'sb_admin/js/querybuilder/query-builder.min.js' %}"></script>
+<link href="{% static 'sb_admin/css/querybuilder/query-builder.default.min.css' %}" rel="stylesheet">
+<ul class="query-builder-wrapper py-12 px-16 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
     <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced">
     </div>
     <script>
-        window.addEventListener("SBAdminLoaded", () => {
-            $.fn.extend({
-                SBAutocomplete: function(element, plugin_config) {
-                },
-                SBDate: function(element, plugin_config) {
-                }
-            })
+        window.addEventListener("SBinitQueryBuilder", (event) => {
+            const SBTable = event.detail.SBTable.table
             $("#{{ view_id }}-advanced-filter").on("afterCreateRuleInput.queryBuilder", function(event, rule) {
                 setTimeout(() => {
                     //next tick
-                    const ruleEl = rule.$el[0]
-                    if (rule.filter.plugin === "SBAutocomplete") {
-                        SBAdmin.autocomplete.initAutocomplete(ruleEl.querySelector(".js-autocomplete"))
-                    }
-                    if(ruleEl.querySelector(".js-simple-multiselect")) {
-                        SBAdmin.multiselect.initMultiselect(ruleEl.querySelector(".js-simple-multiselect"))
-                        ruleEl.querySelector(".js-simple-multiselect").dispatchEvent(new CustomEvent('SBTableFilterFormLoad'))
-                    }
-                    if(ruleEl.querySelector(".js-range")) {
-                        SBAdmin.range.initRange(ruleEl.querySelector(".js-range"))
-                    }
-                    window.SBAdminTable['{{ view_id }}'].moduleInstances.advancedFilterModule.initFilters(ruleEl)
+                    SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
                 }, 1)
             })
             $("#{{ view_id }}-advanced-filter").on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
-                if (rule.filter.plugin !== "SBDate") {
-                    return
-                }
-
-                setTimeout(() => {
-                    //next tick
-                    const datePickerEl = rule.$el[0].querySelector(".js-datepicker-not-inline")
-                    if (!datePickerEl) {
-                        return
-                    }
-                    let newMode = "single"
-                    if (["between", "not_between"].includes(rule.operator.type)) {
-                        newMode = "range"
-                    }
-                    if (!datePickerEl._flatpickr) {
-                        // not yet initialized, init nad set right mode
-                        const sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)
-                        sbadminDatepickerData.flatpickrOptions.mode = newMode
-                        datePickerEl.dataset.sbadminDatepicker = JSON.stringify(sbadminDatepickerData)
-                        SBAdmin.datepicker.initWidgets()
-                    } else {
-                        // update mode
-                        const flatPickr = datePickerEl._flatpickr
-                        const currentMode = flatPickr.config.mode
-
-                        if (newMode !== currentMode) {
-                            flatPickr.set("mode", newMode)
-                            flatPickr.clear()
-                        }
-                    }
-                }, 1)
+                SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
             })
             $("#{{ view_id }}-advanced-filter").queryBuilder({
                 {% if content_context.advanced_filters_data.current_rules %}
                     rules: {{ content_context.advanced_filters_data.current_rules|safe }},
                 {% endif %}
-                icons: {
-                    add_group: "fas fa-plus-square",
-                    add_rule: "fas fa-plus-circle",
-                    remove_group: "fas fa-minus-square",
-                    remove_rule: "fas fa-minus-circle",
-                    error: "fas fa-exclamation-triangle"
-                },
                 operators: {{ content_context.advanced_filters_data.all_operators|safe }},
                 templates: {
                     group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
@@ -260,7 +72,6 @@ https://cdn.jsdelivr.net/npm/jQuery-QueryBuilder@3.0.0/dist/css/query-builder.de
                             type: '{{ filter.type }}',
                             label: '{{ filter.label }}',
                             operators: {{ filter.operators|safe }},
-                            plugin: '{{ filter.plugin|default:"" }}',
                             input: function(rule, name) {
                                 return `{{ filter.input|safe }}`.replaceAll(
                                     '{{ content_context.advanced_filters_data.prefix_to_replace }}',
@@ -274,5 +85,3 @@ https://cdn.jsdelivr.net/npm/jQuery-QueryBuilder@3.0.0/dist/css/query-builder.de
         })
     </script>
 </ul>
-{% block additional_js %}
-{% endblock %}

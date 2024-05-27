@@ -28,7 +28,7 @@ export default class Range {
                     }
                 }
                 base_input.value = JSON.stringify(data)
-                base_input.dispatchEvent(new Event('change'))
+                base_input.dispatchEvent(new Event('change', {bubbles: true}))
             })
         })
         base_input.addEventListener('SBTableFilterFormLoad', () => {

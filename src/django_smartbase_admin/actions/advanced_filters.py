@@ -2,13 +2,12 @@ import copy
 import json
 from dataclasses import dataclass, asdict
 from dataclasses import field as dataclass_field
-from enum import Enum
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from django.db import models
 from django.db.models import Q
-from django.utils.translation import gettext_lazy as _
 from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.engine.const import ADVANCED_FILTER_DATA_NAME
 
@@ -18,17 +17,6 @@ if TYPE_CHECKING:
     )
 
 QB_JS_PREFIX = "SB_REPLACE_ME"
-QB_JS_SEPARATOR = "__"
-
-
-class QueryBuilderFilterType(Enum):
-    STRING = "string"
-    INTEGER = "integer"
-    DOUBLE = "double"
-    DATE = "date"
-    TIME = "time"
-    DATETIME = "datetime"
-    BOOLEAN = "boolean"
 
 
 class AllOperators(models.TextChoices):
@@ -53,13 +41,6 @@ class AllOperators(models.TextChoices):
     IS_NULL = "is_null", _("Is null")
     IS_NOT_NULL = "is_not_null", _("Is not null")
 
-
-ZERO_INPUTS_OPERATORS = {
-    AllOperators.IS_EMPTY.value,
-    AllOperators.IS_NOT_EMPTY.value,
-    AllOperators.IS_NULL.value,
-    AllOperators.IS_NOT_NULL.value,
-}
 
 NUMBER_ATTRIBUTES = [
     AllOperators.BETWEEN,
@@ -89,49 +70,21 @@ STRING_ATTRIBUTES = [
 @dataclass
 class QueryBuilderFilter:
     id: str
-    type: str
-    field: Optional[str] = None
+    type: str = "string"
     label: Optional[str] = None
     input: Optional[str] = None
-    default_value: Optional[Any] = None
-    input_event: Optional[str] = "change"
-    multiple: Optional[bool] = False
-    placeholder: Optional[str] = None
-    validation: Optional[Dict[str, Any]] = dataclass_field(default_factory=dict)
     operators: Optional[List[str]] = dataclass_field(default_factory=list)
-    default_operator: Optional[str] = None
-    plugin: Optional[str] = None
-    plugin_config: Optional[Dict[str, Any]] = dataclass_field(default_factory=dict)
-    data: Optional[Dict[str, Any]] = dataclass_field(default_factory=dict)
 
     @classmethod
     def from_filter_widget(cls, filter_widget: "SBAdminFilterWidget"):
-        from django_smartbase_admin.engine.filter_widgets import (
-            SBAdminFilterWidget,
-            AutocompleteFilterWidget,
-            DateFilterWidget,
-        )
-
-        widget_to_querybuilder_plugin = {
-            AutocompleteFilterWidget: "SBAutocomplete",
-            DateFilterWidget: "SBDate",
-        }
-
         filter_widget_for_context = copy.copy(filter_widget)
         filter_widget_for_context.input_id = QB_JS_PREFIX
         filter_widget_for_context.input_name = QB_JS_PREFIX
-        querybuilder_plugin = None
-        for widget_class, plugin in widget_to_querybuilder_plugin.items():
-            if isinstance(filter_widget, widget_class):
-                querybuilder_plugin = plugin
-                break
         operators = filter_widget.get_advanced_filter_operators()
         operators = [operator.value for operator in operators]
         return cls(
             id=filter_widget.input_id,
             label=filter_widget.field.title,
-            type=QueryBuilderFilterType.STRING.value,
-            plugin=querybuilder_plugin,
             operators=operators,
             input=render_to_string(
                 template_name=filter_widget.template_name.replace(
@@ -152,12 +105,11 @@ class QueryBuilderData:
     all_operators: str = ""
     operators_translations: str = ""
     prefix_to_replace: str = QB_JS_PREFIX
-    prefix_separator: str = QB_JS_SEPARATOR
 
 
 class QueryBuilderService:
     # Map QueryBuilder operators to Django ORM lookups
-    operator_map = {
+    OPERATOR_MAP = {
         AllOperators.EQUAL.value: "__exact",
         AllOperators.NOT_EQUAL.value: "__exact",
         AllOperators.LESS.value: "__lt",
@@ -180,7 +132,14 @@ class QueryBuilderService:
         AllOperators.IS_NOT_NULL.value: "__isnull",
     }
 
-    negative_operators = [
+    ZERO_INPUTS_OPERATORS = {
+        AllOperators.IS_EMPTY.value,
+        AllOperators.IS_NOT_EMPTY.value,
+        AllOperators.IS_NULL.value,
+        AllOperators.IS_NOT_NULL.value,
+    }
+
+    NEGATIVE_OPERATORS = [
         AllOperators.NOT_IN.value,
         AllOperators.NOT_EQUAL.value,
         AllOperators.NOT_BEGINS_WITH.value,
@@ -188,6 +147,13 @@ class QueryBuilderService:
         AllOperators.NOT_ENDS_WITH.value,
         AllOperators.IS_NOT_EMPTY.value,
         AllOperators.IS_NOT_NULL.value,
+    ]
+
+    LIST_OPERATORS = [
+        AllOperators.NOT_IN.value,
+        AllOperators.IN.value,
+        AllOperators.BETWEEN.value,
+        AllOperators.NOT_BETWEEN.value,
     ]
 
     @classmethod
@@ -216,25 +182,28 @@ class QueryBuilderService:
                 value = field.filter_widget.parse_value_from_input(
                     request, rule["value"]
                 )
+                if operator not in cls.LIST_OPERATORS and isinstance(value, list):
+                    value = value[0]
+
                 all_fields.append(field)
 
-                if operator in ZERO_INPUTS_OPERATORS:
+                if operator in cls.ZERO_INPUTS_OPERATORS:
+                    filter_value = (
+                        True
+                        if operator in [AllOperators.IS_NULL, AllOperators.IS_NOT_NULL]
+                        else ""
+                    )
                     q = Q(
                         **{
-                            f"{field.filter_field}{cls.operator_map[operator]}": (
-                                True
-                                if operator
-                                in [AllOperators.IS_NULL, AllOperators.IS_NOT_NULL]
-                                else ""
-                            ),
+                            f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": filter_value,
                         }
                     )
                 else:
                     q = Q(
-                        **{f"{field.filter_field}{cls.operator_map[operator]}": value}
+                        **{f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": value}
                     )
 
-                if operator in cls.negative_operators:
+                if operator in cls.NEGATIVE_OPERATORS:
                     q = ~q
 
                 queries.append(q)
@@ -284,7 +253,7 @@ class QueryBuilderService:
         operators = []
         operators_translations = all_operators
         for key, label in all_operators.items():
-            if key in ZERO_INPUTS_OPERATORS:
+            if key in cls.ZERO_INPUTS_OPERATORS:
                 number_of_inputs = 0
             else:
                 number_of_inputs = 1
