@@ -209,7 +209,12 @@ class QueryBuilderService:
 
                 if operator in cls.NEGATIVE_OPERATORS:
                     q = ~q
-
+                q = field.filter_widget.get_advanced_filter_query_for_parsed_value(
+                    request,
+                    value,
+                    q,
+                    rule,
+                )
                 queries.append(q)
 
             if condition == "AND":
@@ -276,8 +281,8 @@ class QueryBuilderService:
             )
         current_rules = list_action.params.get(ADVANCED_FILTER_DATA_NAME, {})
         current_rules = (
-            json.dumps(list_action.params.get(ADVANCED_FILTER_DATA_NAME, {}))
-            if current_rules
+            json.dumps(current_rules)
+            if current_rules and current_rules.get("rules", [])
             else ""
         )
         operators, operators_translations = cls.get_all_operators_for_query_builder()

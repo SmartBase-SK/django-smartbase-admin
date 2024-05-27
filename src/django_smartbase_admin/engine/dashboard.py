@@ -537,7 +537,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
             request_data_modified_date_filter = copy(request_data)
             request_copy.request_data = request_data_modified_date_filter
             request_data_modified_date_filter.request_get._mutable = True
-            date_range, is_range = DateFilterWidget.get_date_or_range_from_value(
+            date_range = DateFilterWidget.get_range_from_value(
                 request_data_modified_date_filter.request_get.get(
                     self.date_annotate_field
                 )

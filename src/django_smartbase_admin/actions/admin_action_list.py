@@ -33,6 +33,7 @@ from django_smartbase_admin.engine.const import (
     CONFIG_NAME,
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
+    FilterVersions,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -122,6 +123,9 @@ class SBAdminListAction(SBAdminAction):
             for field in self.column_fields
             if field.field in values
         ]
+
+    def is_jquery_required(self, request):
+        return self.view.get_filters_version() == FilterVersions.FILTERS_VERSION_2
 
     def get_template_data(self):
         context_data = self.view.get_context_data(self.threadsafe_request)

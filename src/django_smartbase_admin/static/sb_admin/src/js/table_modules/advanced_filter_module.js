@@ -68,7 +68,7 @@ export class AdvancedFilterModule extends SBAdminTableModule {
 
     getUrlParams() {
         const queryBuilder = document.querySelector(`#${this.table.advancedFilterId}`)
-        const rules = $(queryBuilder).queryBuilder("getRules", {allow_invalid: true})
+        const rules = $(queryBuilder).queryBuilder("getRules", {allow_invalid: true, skip_empty: true})
         return {
             "advancedFilterData": rules
         }

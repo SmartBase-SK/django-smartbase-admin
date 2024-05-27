@@ -94,6 +94,11 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     def get_base_filter_query_for_parsed_value(self, request, parsed_value):
         return Q(**{f"{self.field.filter_field}__icontains": parsed_value})
 
+    def get_advanced_filter_query_for_parsed_value(
+        self, request, parsed_value, original_query, rule
+    ):
+        return original_query
+
     def to_json(self):
         return {"input_id": self.input_id}
 
@@ -152,6 +157,8 @@ class BooleanFilterWidget(SBAdminFilterWidget):
 
     def parse_value_from_input(self, request, filter_value):
         value = super().parse_value_from_input(request, filter_value)
+        if value is None:
+            return None
         return json.loads(value)
 
     @classmethod
@@ -222,11 +229,11 @@ class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
         filter_value = super().parse_value_from_input(request, filter_value)
         try:
             from_value = float(filter_value.get("from", {}).get("value", None))
-        except ValueError:
+        except (ValueError, TypeError):
             from_value = None
         try:
             to_value = float(filter_value.get("to", {}).get("value", None))
-        except ValueError:
+        except (ValueError, TypeError):
             to_value = None
 
         return [from_value, to_value]
@@ -329,23 +336,23 @@ class DateFilterWidget(SBAdminFilterWidget):
         return isinstance(model_field, fields.DateField)
 
     @classmethod
-    def get_date_or_range_from_value(cls, filter_value):
+    def get_range_from_value(cls, filter_value):
         """
-        Get single date or date-range from string filter value
+        Get date-range from string filter value
 
-        :returns: date or array or dates, is_range
+        :returns: array, is_range
         """
         if filter_value is None:
-            return [None, None], False
+            return [None, None]
         date_format = cls.DATE_FORMAT
         date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
         if len(date_range) == 2:
             date_from = datetime.strptime(date_range[0], date_format)
             date_to = datetime.strptime(date_range[1], date_format)
-            return [date_from, date_to], True
+            return [date_from, date_to]
         else:
             date_value = datetime.strptime(filter_value, date_format)
-            return date_value, False
+            return [date_value, date_value]
 
     @classmethod
     def get_value_from_date_or_range(cls, date_or_range):
@@ -356,25 +363,18 @@ class DateFilterWidget(SBAdminFilterWidget):
         return f"{date_from}{cls.DATE_RANGE_SPLIT}{date_to}"
 
     def parse_value_from_input(self, request, filter_value):
-        date_or_range, _ = self.get_date_or_range_from_value(filter_value)
-        return date_or_range
+        return self.get_range_from_value(filter_value)
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
-        date_or_range, is_range = self.get_date_or_range_from_value(filter_value)
-        if is_range:
-            date_from = date_or_range[0]
-            # add one day to include all 'to' date hours, this is needed instead of casting datetime to date in DB
-            date_to = date_or_range[1] + timedelta(days=1)
-            return Q(
-                **{
-                    f"{self.field.filter_field}__gte": date_from,
-                    f"{self.field.filter_field}__lte": date_to,
-                }
-            )
-        else:
-            date_value = date_or_range
-            # TODO date_or_range je vzdy pole o dvoch ? ak ano tak tuna sa da pole mozno chyba...
-            return Q(**{f"{self.field.filter_field}": date_value})
+        date_from = filter_value[0]
+        # add one day to include all 'to' date hours, this is needed instead of casting datetime to date in DB
+        date_to = filter_value[1] + timedelta(days=1)
+        return Q(
+            **{
+                f"{self.field.filter_field}__gte": date_from,
+                f"{self.field.filter_field}__lte": date_to,
+            }
+        )
 
 
 class AutocompleteFilterWidget(
