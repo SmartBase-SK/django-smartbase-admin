@@ -311,11 +311,11 @@
     }
 
     .rules-group-body {
-        @apply w-full pt-12 pb-24;
+        @apply w-full pb-8;
     }
 
     .rules-list {
-        @apply m-0;
+        @apply m-0 gap-8;
     }
 
     .rule-container {
@@ -352,10 +352,7 @@
             background-position: center;
         }
     }
-
-    .btn-success {
-        border: 1px solid #D1D5DB;
-        background: #ECEDF0;
-        color: var(--color-dark-600);
+    [data-execute] {
+        @apply mt-24;
     }
 }

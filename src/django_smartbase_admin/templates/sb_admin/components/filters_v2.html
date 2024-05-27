@@ -3,7 +3,7 @@
 <script src="{% static 'sb_admin/js/querybuilder/jQuery.extendext.js' %}"></script>
 <script src="{% static 'sb_admin/js/querybuilder/query-builder.min.js' %}"></script>
 <link href="{% static 'sb_admin/css/querybuilder/query-builder.default.min.css' %}" rel="stylesheet">
-<ul class="query-builder-wrapper py-12 px-16 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
+<ul class="query-builder-wrapper p-24 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
     <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced">
     </div>
     <script>
@@ -49,7 +49,7 @@
                                 <i class="${icons.add_rule}"></i> ${translate("add_rule")}
                               </button>
                               ${settings.allow_groups === -1 || settings.allow_groups >= level ? `
-                                <button type="button" class="btn btn-sm btn-success" data-add="group">
+                                <button type="button" class="btn btn-sm" data-add="group">
                                   <i class="${icons.add_group}"></i> ${translate("add_group")}
                                 </button>
                               ` : ""}
@@ -58,7 +58,7 @@
                                   <i class="${icons.remove_group}"></i> ${translate("delete_group")}
                                 </button>
                               ` : ""}
-                              <button type="button" class="btn btn-sm btn-success" data-execute>
+                              <button type="button" class="btn btn-sm btn-primary" data-execute>
                                 {% trans "Execute query" %}
                               </button>
                             </div>
