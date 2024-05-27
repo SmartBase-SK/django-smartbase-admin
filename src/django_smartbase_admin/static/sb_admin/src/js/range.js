@@ -36,8 +36,8 @@ export default class Range {
                 return
             }
             const onLoadData = JSON.parse(base_input.value)
-            from_input.value = onLoadData.from.value
-            to_input.value = onLoadData.to.value
+            from_input.value = onLoadData.from?.value
+            to_input.value = onLoadData.to?.value
         })
         base_input.addEventListener('clear', () => {
             base_input.value = ""

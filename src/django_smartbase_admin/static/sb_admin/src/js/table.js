@@ -82,7 +82,7 @@ class SBAdminTable {
         this.callModuleAction('loadFromUrl')
         if (this.tabulator) {
             this.loadFromUrlAfterInit()
-            this.tabulator.replaceData()
+            this.tabulator.setData()
         }
     }
 
@@ -90,7 +90,7 @@ class SBAdminTable {
         if (!this.loadingFromUrl) {
             // apply fixed height to prevent loosing scroll position
             this.tabulator.element.style.height = `${this.tabulator.element.offsetHeight}px`
-            this.tabulator.replaceData().finally(() => {
+            this.tabulator.setData().finally(() => {
                 // restore height according to options height
                 this.tabulator.element.style.height = this.tabulator.options.height
             })

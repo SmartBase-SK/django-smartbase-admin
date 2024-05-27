@@ -364,11 +364,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "selectionModule",
                 "columnDisplayModule",
                 "filterModule",
-                "advancedFilterModule",
                 "tableParamsModule",
                 "detailViewModule",
-                "fullTextSearchModule",
-                "filterOptionsModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",
@@ -388,6 +385,14 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "selectable": "highlight",
             },
         }
+        if self.get_filters_version(request) == FilterVersions.FILTERS_VERSION_2:
+            tabulator_definition["modules"].extend(
+                [
+                    "advancedFilterModule",
+                    "fullTextSearchModule",
+                    "filterOptionsModule",
+                ]
+            )
         return tabulator_definition
 
     def _get_sbadmin_list_actions(self):
@@ -638,6 +643,14 @@ class SBAdminBaseListView(SBAdminBaseView):
         return (
             self.filters_version or request.request_data.configuration.filters_version
         )
+
+    def get_filters_template_name(self, request):
+        filters_version = self.get_filters_version(request)
+        if filters_version is FilterVersions.FILTERS_VERSION_2:
+            return "sb_admin/components/filters_v2.html"
+        else:
+            # default
+            return "sb_admin/components/filters.html"
 
     def get_tabulator_header_template_name(self, request):
         filters_version = self.get_filters_version(request)

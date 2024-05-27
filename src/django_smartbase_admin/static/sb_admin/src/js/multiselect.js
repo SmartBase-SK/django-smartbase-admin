@@ -6,8 +6,8 @@ export default class Multiselect {
         document.addEventListener('change', e => {
             const wrapperEl = e.target.closest(this.wrapperSelector)
             const multiselectInput = wrapperEl?.querySelector(selector)
-            const changedCheckbox = wrapperEl?.querySelector('[type="checkbox"]')
-            if (multiselectInput && changedCheckbox) {
+            const isCheckboxClicked = e.target.type === 'checkbox'
+            if (multiselectInput && isCheckboxClicked) {
                 let checked = []
                 this.getCheckboxes(multiselectInput).forEach(el => {
                     if (el.checked) {

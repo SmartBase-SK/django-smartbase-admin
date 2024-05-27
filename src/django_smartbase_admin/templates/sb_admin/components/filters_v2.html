@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static sb_admin_tags %}
 
 <script src="{% static 'sb_admin/js/querybuilder/jQuery.extendext.js' %}"></script>
 <script src="{% static 'sb_admin/js/querybuilder/query-builder.min.js' %}"></script>
@@ -13,10 +13,12 @@
                 setTimeout(() => {
                     //next tick
                     SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
-                }, 1)
+                }, 0)
             })
             $("#{{ view_id }}-advanced-filter").on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
-                SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
+                setTimeout(() => {
+                    SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
+                }, 0)
             })
             $("#{{ view_id }}-advanced-filter").queryBuilder({
                 {% if content_context.advanced_filters_data.current_rules %}

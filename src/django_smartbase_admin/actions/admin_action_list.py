@@ -171,6 +171,9 @@ class SBAdminListAction(SBAdminAction):
                 "advanced_filters_data": QueryBuilderService.get_advanced_filters_context_data(
                     self
                 ),
+                "filters_template_name": self.view.get_filters_template_name(
+                    self.threadsafe_request
+                ),
                 "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
                     self.threadsafe_request
                 ),

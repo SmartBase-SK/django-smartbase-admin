@@ -172,6 +172,10 @@ class QueryBuilderService:
                     queries.append(sub_q)
                     continue
 
+                if rule["field"] is None or "value" not in rule:
+                    # rule is not valid skip
+                    continue
+
                 # Single rule
                 field_name = rule["field"].replace(f"{view_id}-", "")
                 field = column_fields.get(field_name)

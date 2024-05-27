@@ -15,7 +15,10 @@ export class AdvancedFilterModule extends SBAdminTableModule {
             ".js-range": (rule, ruleEl, widgetEl) => {
                 window.SBAdmin.range.initRange(widgetEl)
                 widgetEl.dispatchEvent(new CustomEvent("SBTableFilterFormLoad"))
-            }
+            },
+            ".js-datepicker-not-inline": (rule, ruleEl, widgetEl) => {
+                this.dateOperatorUpdate(rule, ruleEl, widgetEl)
+            },
         }
         this.afterUpdateRuleOperatorFunctions = {
             ".js-range": this.rangeOperatorUpdate,
@@ -65,7 +68,7 @@ export class AdvancedFilterModule extends SBAdminTableModule {
 
     getUrlParams() {
         const queryBuilder = document.querySelector(`#${this.table.advancedFilterId}`)
-        const rules = $(queryBuilder).queryBuilder("getRules")
+        const rules = $(queryBuilder).queryBuilder("getRules", {allow_invalid: true})
         return {
             "advancedFilterData": rules
         }
@@ -90,7 +93,7 @@ export class AdvancedFilterModule extends SBAdminTableModule {
             const sbadminDatepickerData = JSON.parse(widgetEl.dataset.sbadminDatepicker)
             sbadminDatepickerData.flatpickrOptions.mode = newMode
             widgetEl.dataset.sbadminDatepicker = JSON.stringify(sbadminDatepickerData)
-            window.SBAdmin.datepicker.initWidgets()
+            window.SBAdmin.datepicker.initWidgets(ruleEl)
         } else {
             // update mode
             const flatPickr = widgetEl._flatpickr

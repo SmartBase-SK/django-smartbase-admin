@@ -253,5 +253,4 @@ class Main {
 
 window.addEventListener('DOMContentLoaded', () => {
     window.SBAdmin = new Main()
-    window.dispatchEvent(new CustomEvent("SBAdminLoaded"))
 })

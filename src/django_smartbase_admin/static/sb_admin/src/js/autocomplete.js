@@ -100,21 +100,18 @@ export default class Autocomplete {
             }
             inputEl.dispatchEvent(new CustomEvent('SBAutocompleteChange'))
         })
+        const initLoad = () => {
+            choicesJS.SBhasNextPage = true
+            choicesJS.SBcurrentPage = 1
+            choicesJS.clearInput()
+            this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, !choicesJS.SBinitialised)
+        }
+
         if(wrapperElButton){
             // filter in dropdown
-            wrapperElButton.addEventListener('show.bs.dropdown', () => {
-                choicesJS.SBhasNextPage = true
-                choicesJS.SBcurrentPage = 1
-                choicesJS.clearInput()
-                this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, !choicesJS.SBinitialised)
-            })
+            wrapperElButton.addEventListener('show.bs.dropdown', initLoad)
         } else {
-            choicesJS.input.element.addEventListener('focus', () => {
-                choicesJS.SBhasNextPage = true
-                choicesJS.SBcurrentPage = 1
-                choicesJS.clearInput()
-                this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, !choicesJS.SBinitialised)
-            })
+            choicesJS.input.element.addEventListener('focus', initLoad)
         }
         inputEl.addEventListener('clear', (e) => {
             choicesJS.clearStore()
