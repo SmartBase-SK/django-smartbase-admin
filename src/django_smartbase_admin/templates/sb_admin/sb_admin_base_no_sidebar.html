@@ -41,7 +41,7 @@
     {% block extrahead %}{% endblock %}
     <style>@media (min-width: 1200px){.xl\:\!block {display: block !important;}}</style>
 </head>
-<body hx-ext="remove-me" class="{% block bodyclass %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body hx-ext="remove-me" class="{{ view_id }} {% block bodyclass %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 <div class="hidden">
     {% block sprites %}
         {% include 'sb_admin/sprites/sb_admin.svg' %}
