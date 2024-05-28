@@ -52,6 +52,13 @@ export const getObjectOrValue = (value) => {
 export const filterInputValueChangeListener = (inputSelector, callbackFunction) => {
     document.querySelectorAll(inputSelector).forEach((input) => {
         input.addEventListener('change', callbackFunction)
+        input.addEventListener('keypress', (event) => {
+            if (event.keyCode === 13) {
+                event.preventDefault()
+                callbackFunction(event)
+                return true
+            }
+        })
         input.addEventListener('SBAutocompleteChange', callbackFunction)
     })
 }

@@ -311,7 +311,10 @@ class SBAdminBaseListView(SBAdminBaseView):
         ]
 
     def get_search_fields(self, request):
-        return []
+        if hasattr(super(SBAdminBaseListView, self), "get_search_fields"):
+            return super().get_search_fields(request)
+        else:
+            return []
 
     def get_list_ordering(self):
         return self.ordering or []
