@@ -64,7 +64,7 @@ class SBAdminViewRequestData(object):
             view=kwargs.get("view"),
             action=kwargs.get("action"),
             modifier=kwargs.get("modifier"),
-            object_id=kwargs.get("id"),
+            object_id=kwargs.get("id") or kwargs.get("object_id"),
             user=request.user,
             request_meta=request.META,
             request_get=request.GET,
