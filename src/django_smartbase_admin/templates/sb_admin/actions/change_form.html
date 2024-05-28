@@ -131,7 +131,7 @@
             {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
             {% if save_on_top %}{% block submit_buttons_top %}{% submit_row %}{% endblock %}{% endif %}
 
-            {% if not tabular_context.default_tabs %}
+            {% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %}
                 <ul class="saved-filters" role="tablist">
                     {% for tab, tab_content_object in tabular_context.context.items %}
                         <li role="presentation">
