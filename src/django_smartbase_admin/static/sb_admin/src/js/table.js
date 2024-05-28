@@ -211,15 +211,6 @@ class SBAdminTable {
     }
 
     buildTabulatorTable() {
-        this.defaultRowSelectionFormatter = Tabulator.moduleBindings.format.formatters.rowSelection
-        const self = this
-
-        class ResponsiveLayoutOnDemandPatch extends Tabulator.moduleBindings.responsiveLayout {
-            update() {
-            }
-        }
-
-        Tabulator.moduleBindings.responsiveLayout = ResponsiveLayoutOnDemandPatch
         Tabulator.extendModule("format", "formatters", {
             detail_link: function (cell) {
                 const dataId = cell.getData()[self.tableIdColumnName]
@@ -230,6 +221,16 @@ class SBAdminTable {
                 return "<a href='" + self.tableDetailUrl.replace(self.constants.OBJECT_ID_PLACEHOLDER, dataId) + "'>" + cellContent + "</a>"
             }
         })
+
+        this.defaultRowSelectionFormatter = Tabulator.moduleBindings.format.formatters.rowSelection
+        const self = this
+
+        class ResponsiveLayoutOnDemandPatch extends Tabulator.moduleBindings.responsiveLayout {
+            update() {
+            }
+        }
+
+        Tabulator.moduleBindings.responsiveLayout = ResponsiveLayoutOnDemandPatch
 
         const tableHeaderVisible = this.callModuleAction('requiresHeader')
         if (!tableHeaderVisible) {
