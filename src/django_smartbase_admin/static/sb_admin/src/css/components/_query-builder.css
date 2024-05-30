@@ -131,6 +131,7 @@
             grid-column-start: 2;
             grid-row-end: 2;
             grid-column-end: 18;
+            margin-right: 0 !important;
         }
 
         .rule-operator-container {
@@ -327,7 +328,7 @@
     }
 
     .group-actions {
-        @apply flex justify-between w-full;
+        @apply flex gap-8 w-full;
 
         [data-add="group"] {
             @apply hidden;
@@ -351,8 +352,5 @@
             background-size: contain;
             background-position: center;
         }
-    }
-    [data-execute] {
-        @apply mt-24;
     }
 }

@@ -6,13 +6,18 @@
     <link href="{% static 'sb_admin/css/querybuilder/query-builder.default.min.css' %}" rel="stylesheet">
 
     {% block query_builder_custom_options %}
-    	<script type="application/json" id="query-builder-custom-options">{}</script>
+    	<script type="application/json" id="query-builder-custom-options">
+            {
+                "lang": {
+                    "view_results": "{% trans "View Results" %}"
+                }
+            }
+        </script>
     {% endblock %}
 
 
-    <ul class="query-builder-wrapper p-24 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
-        <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced">
-        </div>
+    <div class="query-builder-wrapper p-24 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
+        <div id="{{ view_id }}-advanced-filter" class="query-builder-advanced"></div>
         <script>
             window.addEventListener("SBinitOrUpdateQueryBuilder", (event) => {
                 const SBTable = event.detail.SBTable.table;
@@ -38,6 +43,7 @@
                         operators: {{ content_context.advanced_filters_data.all_operators|safe }},
                         templates: {
                             group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
+                                console.log(group_id, level, conditions, icons, settings, translate, builder)
                                 return `
                             <div id="${group_id}" class="rules-group-container">
                               <div class="rules-group-header">
@@ -70,7 +76,7 @@
                                     </button>
                                   ` : ""}
                                   <button type="button" class="btn btn-sm btn-primary" data-execute>
-                                    {% trans "View Results" %}
+                                    ${translate("view_results")}
                                   </button>
                                 </div>
                             </div>`
@@ -101,5 +107,5 @@
                 queryBuilderEl$.queryBuilder("setRules", filterData)
             })
         </script>
-    </ul>
+    </div>
 {% endblock %}
