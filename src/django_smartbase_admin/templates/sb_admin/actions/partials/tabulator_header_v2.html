@@ -18,7 +18,9 @@
                                 data-bs-target="#quick_search_content"
                                 type="button" role="tab" aria-controls="quick_search_content"
                                 aria-selected="true">
-                            {% trans 'Quick Search' %}
+                            {% block quick_search_name %}
+                            	{% trans 'Quick Search' %}
+                            {% endblock %}
                         </button>
                     </li>
                 {% endif %}
@@ -30,7 +32,9 @@
                             data-bs-target="#saved_views_content"
                             type="button" role="tab" aria-controls="saved_views_content"
                             aria-selected="false">
-                        {% trans 'Saved Views' %}
+                        {% block save_view_name %}
+                            {% trans 'Saved Views' %}
+                        {% endblock %}
                     </button>
                 </li>
 
@@ -42,7 +46,9 @@
                             data-bs-target="#advanced_filters_content"
                             type="button" role="tab" aria-controls="advanced_filters_content"
                             aria-selected="false">
-                        {% trans 'Advanced Filters' %}
+                        {% block advanced_filters_name %}
+                            {% trans 'Advanced Filters' %}
+                        {% endblock %}
                     </button>
                 </li>
 
