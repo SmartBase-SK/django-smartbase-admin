@@ -211,6 +211,7 @@ class SBAdminTable {
     }
 
     buildTabulatorTable() {
+        this.lastTableParams = {}
         Tabulator.extendModule("format", "formatters", {
             detail_link: function (cell) {
                 const dataId = cell.getData()[self.tableIdColumnName]

@@ -23,6 +23,8 @@ def querydict_to_dict(query_dict):
 
 
 def to_list(item):
+    if item is None:
+        return []
     if not (isinstance(item, list) or isinstance(item, tuple)):
         item = [item]
     return item

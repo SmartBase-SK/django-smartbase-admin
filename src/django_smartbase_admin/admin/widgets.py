@@ -215,7 +215,9 @@ class SBAdminAutocompleteWidget(
     initialised = None
 
     def __init__(self, form_field=None, *args, **kwargs):
+        attrs = kwargs.pop("attrs", None)
         super().__init__(form_field, *args, **kwargs)
+        self.attrs = {} if attrs is None else attrs.copy()
 
     def init_widget_dynamic(self, form, form_field, field_name, view, request):
         super().init_widget_dynamic(form, form_field, field_name, view, request)
@@ -241,8 +243,8 @@ class SBAdminAutocompleteWidget(
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
-        context["widget"]["attrs"]["data-empty-label"] = getattr(
-            self.form_field, "empty_label", "---------"
+        context["widget"]["attrs"]["data-empty-label"] = (
+            getattr(self.form_field, "empty_label", "---------") or "---------"
         )
         query_suffix = "__in"
         if not self.is_multiselect():

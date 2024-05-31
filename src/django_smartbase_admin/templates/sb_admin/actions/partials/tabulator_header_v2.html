@@ -6,9 +6,11 @@
             <ul class="saved-filters js-filters-options py-12 px-16" role="tablist">
                 <input form="{{ view_id }}-filter-form"
                        type="hidden"
-                       value="{% if content_context.search_fields %}tab_quick_search{% else %}tab_saved_views{% endif %}"
+                       value=""
                        id="id_{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}"
                        name="{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}">
+                {% block table_header_before_tabs_header %}
+                {% endblock %}
                 {% if content_context.search_fields %}
                     <li role="presentation">
                         <button class="relative show active"
@@ -51,39 +53,45 @@
                         {% endblock %}
                     </button>
                 </li>
-
+                {% block table_header_after_tabs_header %}
+                {% endblock %}
             </ul>
         </div>
         <div class="border-dark-200 border-t">
+            {% block table_header_before_tabs %}
+            {% endblock %}
             {% if content_context.search_fields %}
-                <div class="tab-pane  fade active show min-h-64 content-center" id="quick_search_content" role="tabpanel" aria-labelledby="tab_quick_search">
-                <div class="py-12 px-16">
+                <div class="tab-pane  fade active show min-h-64 content-center" id="quick_search_content"
+                     role="tabpanel" aria-labelledby="tab_quick_search">
+                    <div class="py-12 px-16">
 
-                    <div class="flex gap-12">
-                        <div class="relative w-full">
-                            <input type="text"
-                                   name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                                   class="input pl-38 pr-38"
-                                   form="{{ view_id }}-filter-form"
-                                   id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                                   placeholder="{{ content_context.search_field_placeholder }}">
-                            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
-                                <svg class="w-20 h-20">
-                                    <use xlink:href="#Search"></use>
-                                </svg>
+                        <div class="flex gap-12">
+                            <div class="relative w-full">
+                                <input type="text"
+                                       name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                       class="input pl-38 pr-38"
+                                       form="{{ view_id }}-filter-form"
+                                       id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                       placeholder="{{ content_context.search_field_placeholder }}">
+                                <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                    <svg class="w-20 h-20">
+                                        <use xlink:href="#Search"></use>
+                                    </svg>
+                                </div>
+                                <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                    <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')"
+                                         class="w-20 h-20">
+                                        <use xlink:href="#Close-small"></use>
+                                    </svg>
+                                </div>
                             </div>
-                            <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
-                                <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')" class="w-20 h-20">
-                                    <use xlink:href="#Close-small"></use>
-                                </svg>
-                            </div>
+                            <button class="btn btn-primary">{% trans 'Search' %}</button>
                         </div>
-                        <button class="btn btn-primary">{% trans 'Search' %}</button>
                     </div>
                 </div>
-            </div>
             {% endif %}
-            <div class="tab-pane fade min-h-64 content-center" id="saved_views_content" role="tabpanel" aria-labelledby="tab_saved_views">
+            <div class="tab-pane fade min-h-64 content-center" id="saved_views_content" role="tabpanel"
+                 aria-labelledby="tab_saved_views">
                 {% with 'filters-collapse-button' as filters_collapse_button_id %}
                     {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}
                     <div class="flex justify-between max-sm:flex-wrap py-12 px-16 gap-y-12">
@@ -101,9 +109,12 @@
                     </div>
                 {% endwith %}
             </div>
-            <div class="tab-pane  fade min-h-64 content-center max-sm:overflow-x-auto custom-scrollbar" id="advanced_filters_content" role="tabpanel" aria-labelledby="tab_advanced_filters">
+            <div class="tab-pane  fade min-h-64 content-center max-sm:overflow-x-auto custom-scrollbar"
+                 id="advanced_filters_content" role="tabpanel" aria-labelledby="tab_advanced_filters">
                 {% include 'sb_admin/components/filters_v2.html' with filters=content_context.filters %}
             </div>
+            {% block table_header_after_tabs %}
+            {% endblock %}
         </div>
     {% endblock %}
     {% include 'sb_admin/actions/partials/selected_rows_actions.html' %}

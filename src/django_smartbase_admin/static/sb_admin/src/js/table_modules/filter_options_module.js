@@ -22,6 +22,10 @@ export class FilterOptionsModule extends SBAdminTableModule {
         if (!targetInput) {
             return
         }
+        if (targetInput.value === "") {
+            const filterOptionsWrapper = document.querySelector(".js-filters-options")
+            targetInput.value = filterOptionsWrapper.querySelector('[data-bs-toggle="tab"]').id
+        }
         const params = this.table.getParamsFromUrl()
         const targetTabValue = params[this.table.constants.FILTER_DATA_NAME]?.[this.table.constants.TABLE_PARAMS_SELECTED_FILTER_TYPE]
         if (targetTabValue) {

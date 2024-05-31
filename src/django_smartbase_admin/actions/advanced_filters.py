@@ -9,8 +9,6 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
 
-from django_smartbase_admin.engine.const import ADVANCED_FILTER_DATA_NAME
-
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.filter_widgets import (
         SBAdminFilterWidget,
@@ -228,7 +226,7 @@ class QueryBuilderService:
 
     @classmethod
     def get_filters_for_list_action(cls, list_action):
-        querybuilder_filters = list_action.params.get(ADVANCED_FILTER_DATA_NAME, {})
+        querybuilder_filters = list_action.advanced_filter_data
         if not querybuilder_filters:
             return Q()
         view_id = list_action.view.get_id()
@@ -243,7 +241,7 @@ class QueryBuilderService:
 
     @classmethod
     def get_filters_fields_for_list_action(cls, list_action):
-        querybuilder_filters = list_action.params.get(ADVANCED_FILTER_DATA_NAME, {})
+        querybuilder_filters = list_action.advanced_filter_data
         if not querybuilder_filters:
             return []
         view_id = list_action.view.get_id()
@@ -281,7 +279,7 @@ class QueryBuilderService:
             filters.append(
                 QueryBuilderFilter.from_filter_widget(column_field.filter_widget)
             )
-        current_rules = list_action.params.get(ADVANCED_FILTER_DATA_NAME, {})
+        current_rules = list_action.advanced_filter_data
         current_rules = (
             json.dumps(current_rules)
             if current_rules and current_rules.get("rules", [])

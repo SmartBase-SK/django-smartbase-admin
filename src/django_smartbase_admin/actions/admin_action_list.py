@@ -68,6 +68,7 @@ class SBAdminListAction(SBAdminAction):
             self.all_params = {}
         self.params = self.all_params.get(self.view.get_id(), {})
         self.filter_data = self.params.get(FILTER_DATA_NAME, {})
+        self.advanced_filter_data = self.params.get(ADVANCED_FILTER_DATA_NAME, {})
         self.table_params = self.params.get(TABLE_PARAMS_NAME, {})
         self.columns_data = self.params.get(COLUMNS_DATA_NAME, {})
         self.selection_data = self.params.get(SELECTION_DATA_NAME, {})

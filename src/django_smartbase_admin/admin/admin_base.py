@@ -229,6 +229,8 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
     view = None
 
     def __init__(self, *args, **kwargs):
+        self.view = kwargs.pop("view", self.view)
+        self.threadsafe_request = kwargs.pop("request", self.threadsafe_request)
         super().__init__(*args, **kwargs)
         for field in self.fields:
             if not hasattr(self.fields[field].widget, "init_widget_dynamic"):
