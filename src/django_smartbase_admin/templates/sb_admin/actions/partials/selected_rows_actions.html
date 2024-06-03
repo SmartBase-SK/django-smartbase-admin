@@ -32,7 +32,7 @@
                         {% for list_selection_action in list_selection_action_group %}
                             <li>
                                 {{ list_selection_action.items }}
-                                <a{% if list_selection_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_selection_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}"
+                                <a {% if list_selection_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_selection_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}"
                                                                                                                                                                                 {% else %}onclick="window.location.href='{{ list_selection_action.url }}' + window.SBAdminTable['{{ view_id }}'].getUrlParamsString()"{% endif %}
                                                                                                                                                                                 class="dropdown-menu-link {{ list_selection_action.css_class|default_if_none:'' }}">{{ list_selection_action.title }}</a>
                             </li>
