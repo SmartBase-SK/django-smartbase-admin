@@ -171,12 +171,11 @@
                                             </td>
                                         </tr>
                                     {% endif %}
-                                    {% block table_inline_after_rows %}
-                                    {% endblock %}
                                     </tbody>
                                 {% endfor %}
                             {% endwith %}
-
+                            {% block table_inline_after_rows %}
+                            {% endblock %}
                         </table>
 
                     </fieldset>
