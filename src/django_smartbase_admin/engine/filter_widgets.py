@@ -55,7 +55,6 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     default_value = None
     default_label = None
     filter_query_lambda = None
-    supporting_annotates_lambda = None
 
     def __init__(
         self,
@@ -63,7 +62,6 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         default_value=None,
         default_label=None,
         filter_query_lambda=None,
-        supporting_annotates_lambda=None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -71,9 +69,6 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         self.default_value = self.default_value or default_value
         self.default_label = self.default_label or default_label
         self.filter_query_lambda = filter_query_lambda or self.filter_query_lambda
-        self.supporting_annotates_lambda = (
-            supporting_annotates_lambda or self.supporting_annotates_lambda
-        )
 
     def init_filter_widget_static(self, field, view, configuration):
         self.field = field
@@ -103,11 +98,6 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         self, request, parsed_value, original_query, rule
     ):
         return original_query
-
-    def annotate_filtered_query(self, request, value):
-        if self.supporting_annotates_lambda:
-            return self.supporting_annotates_lambda(self, request, value)
-        return {}
 
     def to_json(self):
         return {"input_id": self.input_id}

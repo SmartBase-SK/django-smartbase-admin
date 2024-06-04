@@ -200,18 +200,14 @@ class QueryBuilderService:
         view_id: str,
         column_fields: dict,
         query: dict,
-    ) -> [Q, list]:
-        required_filter_annotates = {}
-
+    ) -> Q:
         # Recursively build the Q object
-        def build_q(rules, condition, required_filter_annotates):
+        def build_q(rules, condition):
             queries = []
             for rule in rules:
                 if "condition" in rule:
                     # Nested group of rules
-                    sub_q = build_q(
-                        rule["rules"], rule["condition"], required_filter_annotates
-                    )
+                    sub_q = build_q(rule["rules"], rule["condition"])
                     queries.append(sub_q)
                     continue
 
@@ -231,10 +227,6 @@ class QueryBuilderService:
                 )
                 if operator not in cls.LIST_OPERATORS and isinstance(value, list):
                     value = value[0]
-
-                required_filter_annotates |= (
-                    field.filter_widget.annotate_filtered_query(request, value)
-                )
 
                 if operator in cls.ZERO_INPUTS_OPERATORS:
                     filter_value = (
@@ -267,10 +259,7 @@ class QueryBuilderService:
             else:  # condition == "OR"
                 return Q(*queries, _connector=Q.OR)
 
-        return (
-            build_q(query["rules"], query["condition"], required_filter_annotates),
-            required_filter_annotates,
-        )
+        return build_q(query["rules"], query["condition"])
 
     @classmethod
     def get_filters_for_list_action(cls, list_action):
@@ -279,7 +268,7 @@ class QueryBuilderService:
             return Q()
         view_id = list_action.view.get_id()
         column_fields = {field.field: field for field in list_action.column_fields}
-        query, _ = cls.querybuilder_to_django_filter(
+        query = cls.querybuilder_to_django_filter(
             list_action.threadsafe_request,
             view_id,
             column_fields,
