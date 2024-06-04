@@ -2,7 +2,7 @@ import copy
 import json
 from dataclasses import dataclass, asdict
 from dataclasses import field as dataclass_field
-from typing import List, Optional, TYPE_CHECKING, Any, Union
+from typing import List, Optional, TYPE_CHECKING
 
 from django.db import models
 from django.db.models import Q

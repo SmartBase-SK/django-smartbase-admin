@@ -49,9 +49,8 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
         list_template_name=None,
         global_filter_data_map=None,
         sub_views=None,
-        **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         self.model = model or self.model
         self.label = label or self.label
         self.title = title or self.title or self.label
