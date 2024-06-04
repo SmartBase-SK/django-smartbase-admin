@@ -17,6 +17,11 @@ if TYPE_CHECKING:
 QB_JS_PREFIX = "SB_REPLACE_ME"
 
 
+class Conditions(models.TextChoices):
+    AND = "AND"
+    OR = "OR"
+
+
 class AllOperators(models.TextChoices):
     EQUAL = "equal", _("Equal")
     NOT_EQUAL = "not_equal", _("Not equal")
@@ -157,11 +162,45 @@ class QueryBuilderService:
     ]
 
     @classmethod
-    def querybuilder_to_django_filter(
-        cls, request, view_id: str, column_fields: dict, query: dict
-    ) -> [Q, list]:
+    def get_fields_from_querybuilder(
+        cls,
+        view_id: str,
+        column_fields: dict,
+        query: dict,
+    ) -> list:
         all_fields = []
 
+        # Recursively build the Q object
+        def build_q(rules, condition):
+            for rule in rules:
+                if "condition" in rule:
+                    # Nested group of rules
+                    build_q(rule["rules"], rule["condition"])
+                    continue
+
+                if rule["field"] is None or "value" not in rule:
+                    # rule is not valid skip
+                    continue
+
+                # Single rule
+                field_name = rule["field"].replace(f"{view_id}-", "")
+                field = column_fields.get(field_name)
+                if field is None:
+                    continue
+
+                all_fields.append(field)
+
+        build_q(query["rules"], query["condition"])
+        return all_fields
+
+    @classmethod
+    def querybuilder_to_django_filter(
+        cls,
+        request,
+        view_id: str,
+        column_fields: dict,
+        query: dict,
+    ) -> Q:
         # Recursively build the Q object
         def build_q(rules, condition):
             queries = []
@@ -189,8 +228,6 @@ class QueryBuilderService:
                 if operator not in cls.LIST_OPERATORS and isinstance(value, list):
                     value = value[0]
 
-                all_fields.append(field)
-
                 if operator in cls.ZERO_INPUTS_OPERATORS:
                     filter_value = (
                         True
@@ -217,12 +254,12 @@ class QueryBuilderService:
                 )
                 queries.append(q)
 
-            if condition == "AND":
+            if condition == Conditions.AND.value:
                 return Q(*queries)
             else:  # condition == "OR"
                 return Q(*queries, _connector=Q.OR)
 
-        return build_q(query["rules"], query["condition"]), all_fields
+        return build_q(query["rules"], query["condition"])
 
     @classmethod
     def get_filters_for_list_action(cls, list_action):
@@ -231,7 +268,7 @@ class QueryBuilderService:
             return Q()
         view_id = list_action.view.get_id()
         column_fields = {field.field: field for field in list_action.column_fields}
-        query, _ = cls.querybuilder_to_django_filter(
+        query = cls.querybuilder_to_django_filter(
             list_action.threadsafe_request,
             view_id,
             column_fields,
@@ -246,8 +283,7 @@ class QueryBuilderService:
             return []
         view_id = list_action.view.get_id()
         column_fields = {field.field: field for field in list_action.column_fields}
-        _, fields = cls.querybuilder_to_django_filter(
-            list_action.threadsafe_request,
+        fields = cls.get_fields_from_querybuilder(
             view_id,
             column_fields,
             querybuilder_filters,

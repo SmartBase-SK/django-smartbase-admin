@@ -156,10 +156,15 @@ class BooleanFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/boolean_field.html"
 
     def parse_value_from_input(self, request, filter_value):
-        value = super().parse_value_from_input(request, filter_value)
-        if value is None:
+        input_value = super().parse_value_from_input(request, filter_value)
+        try:
+            input_value = json.loads(input_value)
+        except:
+            pass
+
+        if input_value is None:
             return None
-        return json.loads(value)
+        return input_value
 
     @classmethod
     def is_used_for_model_field_type(cls, model_field):
