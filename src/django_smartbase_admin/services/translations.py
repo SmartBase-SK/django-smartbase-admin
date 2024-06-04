@@ -117,7 +117,7 @@ class SBAdminTranslationsService(object):
     @classmethod
     def get_translated_fields_for_model(cls, model, visible_fields=None):
         translated_fields = {}
-        if model is None or not cls.is_translated_model(model):
+        if not cls.is_translated_model(model):
             return translated_fields
         for translation_model in model._parler_meta.get_all_models():
             translated_fields[translation_model] = [
