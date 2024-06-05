@@ -43,7 +43,6 @@
                         operators: {{ content_context.advanced_filters_data.all_operators|safe }},
                         templates: {
                             group: function({ group_id, level, conditions, icons, settings, translate, builder }) {
-                                console.log(group_id, level, conditions, icons, settings, translate, builder)
                                 return `
                             <div id="${group_id}" class="rules-group-container">
                               <div class="rules-group-header">

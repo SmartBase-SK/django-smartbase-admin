@@ -17,8 +17,8 @@ export class FilterModule extends SBAdminTableModule {
         const params = this.table.getParamsFromUrl()
         const filterData = params[this.table.constants.FILTER_DATA_NAME]
         document.querySelector(`#${this.table.filterFormId}`).reset()
-        document.querySelectorAll(`.filter-wrapper`).forEach((el)=>{
-            if(!el.hasAttribute('data-all-filters-visible')) {
+        document.querySelectorAll(`.filter-wrapper`).forEach((el) => {
+            if (!el.hasAttribute('data-all-filters-visible')) {
                 this.hideFilter(el.getAttribute('data-filter-input-name'))
             }
         })
@@ -41,7 +41,7 @@ export class FilterModule extends SBAdminTableModule {
 
     filterInputValueChanged(field) {
         const valueElem = filterInputValueChangedUtil(field)
-        if(!valueElem) {
+        if (!valueElem) {
             return
         }
         this.changeFilterButtonState(valueElem)
@@ -49,7 +49,7 @@ export class FilterModule extends SBAdminTableModule {
 
     changeFilterButtonState(valueElem) {
         const dropdownButton = valueElem.closest('button')
-        if(valueElem.innerHTML) {
+        if (valueElem.innerHTML) {
             dropdownButton.classList.remove('empty')
             return
         }
@@ -71,13 +71,13 @@ export class FilterModule extends SBAdminTableModule {
     }
 
     focusOnFilterInput(filterElem) {
-        setTimeout(()=>{
+        setTimeout(() => {
             filterElem.children[0].click()
             filterElem.querySelector('input:not([type="hidden"])')?.focus()
-        },100)
+        }, 100)
     }
 
-    showFilter(field, focus=true) {
+    showFilter(field, focus = true) {
         const fieldElem = this.getFormField(field)
         const filterElem = document.querySelector(`#${this.table.viewId}-${field}-wrapper`)
         if (!filterElem) {
@@ -90,7 +90,7 @@ export class FilterModule extends SBAdminTableModule {
         }
         fieldElem.disabled = false
         filterElem.classList.remove('hidden')
-        if(focus){
+        if (focus) {
             this.focusOnFilterInput(filterElem)
         }
         this.table.refreshTableDataIfNotUrlLoad()

@@ -9,7 +9,7 @@ import {AdvancedFilterModule} from "./table_modules/advanced_filter_module"
 import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
-import { FilterOptionsModule } from "./table_modules/filter_options_module"
+import { HeaderTabsModule } from "./table_modules/header_tabs_module"
 
 
 class SBAdminTable {
@@ -88,6 +88,7 @@ class SBAdminTable {
 
     refreshTableDataIfNotUrlLoad() {
         if (!this.loadingFromUrl) {
+            this.callModuleAction('beforeRefreshTableDataIfNotUrlLoad')
             // apply fixed height to prevent loosing scroll position
             this.tabulator.element.style.height = `${this.tabulator.element.offsetHeight}px`
             this.tabulator.setData().finally(() => {
@@ -285,5 +286,5 @@ window.SBAdminTableModulesClass = {
     'movableColumnsModule': MovableColumnsModule,
     'dataEditModule': DataEditModule,
     'fullTextSearchModule': FullTextSearchModule,
-    'filterOptionsModule': FilterOptionsModule,
+    'headerTabsModule': HeaderTabsModule,
 }

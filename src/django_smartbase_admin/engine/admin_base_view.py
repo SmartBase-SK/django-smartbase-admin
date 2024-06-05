@@ -393,7 +393,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 [
                     "advancedFilterModule",
                     "fullTextSearchModule",
-                    "filterOptionsModule",
+                    "headerTabsModule",
                 ]
             )
         return tabulator_definition

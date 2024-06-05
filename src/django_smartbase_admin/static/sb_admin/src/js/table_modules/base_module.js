@@ -27,6 +27,9 @@ export class SBAdminTableModule {
     getUrlParams() {
     }
 
+    beforeRefreshTableDataIfNotUrlLoad() {
+    }
+
     modifyTabulatorOptions(tabulatorOptions) {
         return tabulatorOptions
     }
