@@ -405,9 +405,9 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         for inline_view in inlines:
             if issubclass(inline_view, SBAdminInline):
                 inline_view_instance = inline_view(model, admin_site)
-                configuration.view_map[inline_view_instance.get_id()] = (
-                    inline_view_instance
-                )
+                configuration.view_map[
+                    inline_view_instance.get_id()
+                ] = inline_view_instance
                 inline_view_instance.init_view_static(
                     configuration, inline_view_instance.model, admin_site
                 )
@@ -747,6 +747,17 @@ class SBAdminInline(
     sbadmin_sortable_field_options = ["order_by"]
     sbadmin_inline_list_actions = None
     extra = 0
+    ordering = None
+
+    def get_ordering(self, request):
+        """
+        Hook for specifying field ordering.
+        """
+        return self.ordering or ("-id",)
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        return qs.order_by(*self.get_ordering(request))
 
     def get_sbadmin_inline_list_actions(self):
         return [*(self.sbadmin_inline_list_actions or [])]
