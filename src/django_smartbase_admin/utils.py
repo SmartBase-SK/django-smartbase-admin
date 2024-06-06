@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
 
@@ -49,3 +50,47 @@ class FormFieldsetMixin(forms.Form):
                 fields=data.get("fields", ()),
                 classes=data.get("classes", ""),
             )
+
+
+get_filter_query_prefix = __import__("book.utils", fromlist=["get_filter_query_prefix"])
+
+
+def _pluck_classes(modules, classnames):
+    """
+    Gets a list of class names and a list of modules to pick from.
+    For each class name, will return the class from the first module that has a
+    matching class.
+    """
+    klasses = []
+    for classname in classnames:
+        klass = None
+        for module in modules:
+            if hasattr(module, classname):
+                klass = getattr(module, classname)
+                break
+        if not klass:
+            packages = [m.__name__ for m in modules if m is not None]
+            raise Exception(
+                "No class '%s' found in %s" % (classname, ", ".join(packages))
+            )
+        klasses.append(klass)
+    return klasses
+
+
+def import_with_injection(from_import, import_name):
+    original_module = __import__(from_import, fromlist=[import_name])
+    full_path = f"{from_import}.{import_name}"
+    overridden_module = None
+
+    SB_ADMIN_DEPENDENCY_INJECTION = getattr(
+        settings, "SB_ADMIN_DEPENDENCY_INJECTION", {}
+    )
+    if full_path in SB_ADMIN_DEPENDENCY_INJECTION:
+        overridden_module = __import__(
+            SB_ADMIN_DEPENDENCY_INJECTION[full_path][0],
+            fromlist=[SB_ADMIN_DEPENDENCY_INJECTION[full_path][1]],
+        )
+    if overridden_module:
+        return _pluck_classes([overridden_module, original_module], [import_name])[0]
+    else:
+        return _pluck_classes([original_module], [import_name])[0]

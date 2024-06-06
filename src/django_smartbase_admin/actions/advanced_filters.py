@@ -152,6 +152,7 @@ class QueryBuilderService:
         AllOperators.NOT_ENDS_WITH.value,
         AllOperators.IS_NOT_EMPTY.value,
         AllOperators.IS_NOT_NULL.value,
+        AllOperators.NOT_BETWEEN.value,
     ]
 
     LIST_OPERATORS = [
@@ -239,6 +240,15 @@ class QueryBuilderService:
                             f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": filter_value,
                         }
                     )
+                elif operator in [
+                    AllOperators.BETWEEN.value,
+                    AllOperators.NOT_BETWEEN.value,
+                ]:
+                    q = Q()
+                    if value[0] is not None:
+                        q &= Q(**{f"{field.filter_field}__gte": value[0]})
+                    if value[1] is not None:
+                        q &= Q(**{f"{field.filter_field}__lte": value[1]})
                 else:
                     q = Q(
                         **{f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": value}

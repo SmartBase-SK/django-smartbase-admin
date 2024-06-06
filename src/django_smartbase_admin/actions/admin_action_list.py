@@ -6,7 +6,6 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import smart_split, unescape_string_literal
 
-from django_smartbase_admin.actions.advanced_filters import QueryBuilderService
 from django_smartbase_admin.engine.actions import SBAdminAction
 from django_smartbase_admin.engine.const import (
     XLSX_PAGE_CHUNK_SIZE,
@@ -37,6 +36,11 @@ from django_smartbase_admin.engine.const import (
     ADVANCED_FILTER_DATA_NAME,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
+from django_smartbase_admin.utils import import_with_injection
+
+QueryBuilderService = import_with_injection(
+    "django_smartbase_admin.actions.advanced_filters", "QueryBuilderService"
+)
 
 
 class SBAdminListAction(SBAdminAction):
