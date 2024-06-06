@@ -52,9 +52,6 @@ class FormFieldsetMixin(forms.Form):
             )
 
 
-get_filter_query_prefix = __import__("book.utils", fromlist=["get_filter_query_prefix"])
-
-
 def _pluck_classes(modules, classnames):
     """
     Gets a list of class names and a list of modules to pick from.
