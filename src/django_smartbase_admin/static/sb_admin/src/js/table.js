@@ -272,6 +272,57 @@ class SBAdminTable {
             self.refreshTableDataIfNotUrlLoad()
         })
     }
+
+    executeListAction(action_url, no_params) {
+        const params = this.getUrlParamsString()
+        if (this.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
+            const urlParams = new URLSearchParams(params)
+            let headers = {
+                "Content-Type": "application/json",
+                "X-TabulatorRequest": true
+            }
+            headers = {
+                ...headers,
+                ...JSON.parse(document.body.getAttribute('hx-headers')),
+            }
+            let filename = ''
+            fetch(action_url, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(JSON.parse(urlParams.get(this.constants.BASE_PARAMS_NAME)) || {})
+            })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error("Network response was not ok " + response.statusText)
+                    }
+                    if (response.redirected) {
+                        window.location.href = response.url
+                    }
+                    const header = response.headers.get('Content-Disposition')
+                    const parts = header.split(';')
+                    filename = parts[1].split('=')[1]
+                    return response.blob()
+                })
+                .then(function(blob) {
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement("a")
+                    a.style.display = "none"
+                    a.href = url
+                    a.download = filename
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                })
+                .catch(function(error) {
+                    console.error("There was a problem with the fetch operation:", error)
+                })
+        } else {
+            if (!no_params) {
+                action_url += params
+            }
+            window.location.href = action_url
+        }
+    }
 }
 
 window.SBAdminTableClass = SBAdminTable
