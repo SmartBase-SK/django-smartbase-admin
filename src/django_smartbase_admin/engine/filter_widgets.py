@@ -11,6 +11,7 @@ from django_smartbase_admin.actions.advanced_filters import (
     AllOperators,
     STRING_ATTRIBUTES,
     NUMBER_ATTRIBUTES,
+    DATE_ATTRIBUTES,
 )
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
@@ -298,7 +299,7 @@ class DateFilterWidget(SBAdminFilterWidget):
         )
 
     def get_advanced_filter_operators(self):
-        return NUMBER_ATTRIBUTES
+        return DATE_ATTRIBUTES
 
     def get_shortcuts(self):
         now = timezone.now()

@@ -43,7 +43,18 @@ class AllOperators(models.TextChoices):
     IS_NOT_EMPTY = "is_not_empty", _("Equal")
     IS_NULL = "is_null", _("Is null")
     IS_NOT_NULL = "is_not_null", _("Is not null")
+    BEFORE = "before", _("Before")
+    AFTER = "after", _("After")
 
+
+DATE_ATTRIBUTES = [
+    AllOperators.BETWEEN,
+    AllOperators.NOT_BETWEEN,
+    AllOperators.BEFORE,
+    AllOperators.AFTER,
+    AllOperators.IS_NULL,
+    AllOperators.IS_NOT_NULL,
+]
 
 NUMBER_ATTRIBUTES = [
     AllOperators.BETWEEN,
@@ -135,6 +146,8 @@ class QueryBuilderService:
         AllOperators.IS_NOT_EMPTY.value: "__exact",
         AllOperators.IS_NULL.value: "__isnull",
         AllOperators.IS_NOT_NULL.value: "__isnull",
+        AllOperators.BEFORE.value: "__lt",
+        AllOperators.AFTER.value: "__gte",
     }
 
     ZERO_INPUTS_OPERATORS = {
@@ -312,7 +325,9 @@ class QueryBuilderService:
                 number_of_inputs = 0
             else:
                 number_of_inputs = 1
-            operators.append({"type": key, "nb_inputs": number_of_inputs})
+            operators.append(
+                {"type": key, "nb_inputs": number_of_inputs, "apply_to": "string"}
+            )
         return json.dumps(operators), json.dumps(operators_translations)
 
     @classmethod
