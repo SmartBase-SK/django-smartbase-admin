@@ -16,11 +16,11 @@
                         <span>{{ view.name }}</span>
                         {% if view.detail_url %}
                             <svg hx-delete="{{ view.detail_url }}"
-                                 hx-trigger="confirmDeleteView from:body"
+                                 hx-trigger="confirmDeleteView{{ view.id }} from:body"
                                  hx-swap="none"
                                  class="ml-8 w-20 h-20"
                                  data-show-confirm
-                                 data-submit-event="confirmDeleteView"
+                                 data-submit-event="confirmDeleteView{{ view.id }}"
                                  data-confirm-body="<h3 class='mb-8 font-semibold w-full text-18 text-center'>{% trans 'Remove View' %}</h3><p class='w-full text-center'>{% trans 'Do you want to remove table view?' %}</p>"
                             >
                                 <use xlink:href="#Close-small"></use>
