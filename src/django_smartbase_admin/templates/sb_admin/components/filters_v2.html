@@ -23,18 +23,18 @@
                 const SBTable = event.detail.SBTable.table;
                 const filterData = event.detail.filterData;
                 const queryBuilderEl$ = $("#{{ view_id }}-advanced-filter");
-                queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function(event, rule) {
-                    setTimeout(() => {
-                        //next tick
-                        SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
-                    }, 0)
-                })
-                queryBuilderEl$.on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
-                    setTimeout(() => {
-                        SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
-                    }, 0)
-                })
                 if (!queryBuilderEl$[0].queryBuilder) {
+                    queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function(event, rule) {
+                        setTimeout(() => {
+                            //next tick
+                            SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule)
+                        }, 0)
+                    })
+                    queryBuilderEl$.on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
+                        setTimeout(() => {
+                            SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator)
+                        }, 0)
+                    })
                     let customOptions = document.getElementById('query-builder-custom-options')
                     if(customOptions) {
                         customOptions = JSON.parse(customOptions.textContent)

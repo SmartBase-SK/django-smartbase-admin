@@ -31,7 +31,7 @@ export class TableParamsModule extends SBAdminTableModule {
 
     getSortDataFromSorters(sorters) {
         let sortParams = []
-        sorters.forEach((param) => {
+        sorters?.forEach((param) => {
             sortParams.push({column: param['field'] || param['column']['field'], dir: param['dir']})
         })
         return sortParams

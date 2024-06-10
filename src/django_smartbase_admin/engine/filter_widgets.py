@@ -585,7 +585,9 @@ class AutocompleteFilterWidget(
         context = super().get_context(name, value, attrs)
         context["filter_widget"] = self
         context["widget"]["type"] = "hidden"
-        context["widget"]["attrs"]["id"] = self.input_id
+        context["widget"]["attrs"]["id"] = (
+            self.input_id or context["widget"]["attrs"]["id"]
+        )
         return context
 
     def get_advanced_filter_operators(self):

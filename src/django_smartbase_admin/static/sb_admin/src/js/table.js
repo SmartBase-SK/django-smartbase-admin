@@ -64,10 +64,17 @@ class SBAdminTable {
     }
 
     getAllParamsFromUrl() {
+        `Retrieve filter data from "storage" -> currently supported storage is URL or HTML button`
         const urlParamsString = window.location.search
         const urlParams = new URLSearchParams(urlParamsString)
-        this.paramsFromUrl = JSON.parse(urlParams.get(this.constants.BASE_PARAMS_NAME)) || {}
-        return this.paramsFromUrl
+        const viewButton = document.querySelector(`.js-view-button[data-view-id="${urlParams.get("selectedView")}"]`)
+        let paramsFromUrl
+        if(viewButton) {
+            paramsFromUrl = {[this.viewId]: JSON.parse(viewButton.dataset.params)}
+        } else {
+            paramsFromUrl = JSON.parse(urlParams.get(this.constants.BASE_PARAMS_NAME)) || {}
+        }
+        return paramsFromUrl
     }
 
     getParamsFromUrl() {

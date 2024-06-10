@@ -11,8 +11,10 @@
             {% for view in current_views %}
                 <li>
                     <button type="button" class="relative js-view-button"
-                            onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.viewsModule.openView(event, this.dataset.params)"
-                            data-params="{{ view.url_params }}">
+                            onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.viewsModule.openView(event, this.dataset.params, this.dataset.viewId)"
+                            data-params="{{ view.url_params }}"
+                            data-view-id="{{ view.id }}"
+                    >
                         <span>{{ view.name }}</span>
                         {% if view.detail_url %}
                             <svg hx-delete="{{ view.detail_url }}"

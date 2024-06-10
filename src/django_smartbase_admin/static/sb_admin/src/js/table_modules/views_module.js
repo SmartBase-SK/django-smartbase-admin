@@ -1,4 +1,4 @@
-import {SBAdminTableModule} from "./base_module"
+import { SBAdminTableModule } from "./base_module"
 
 export class ViewsModule extends SBAdminTableModule {
     requiresHeader() {
@@ -8,8 +8,10 @@ export class ViewsModule extends SBAdminTableModule {
     refreshViewButtons() {
         const urlParamsString = this.table.getUrlParamsStringForSave()
         const searchParams = decodeURI(urlParamsString)
-        const selectedParams = JSON.stringify(this.selectedViewParams)
-        const saveButton = document.getElementById('save-view-modal-button')
+        let saveButton = document.getElementById('save-view-modal-button')
+        this.selectedViewParams = this.table.getAllParamsFromUrl()[this.table.viewId]
+        let selectedParams = JSON.stringify(this.selectedViewParams)
+
         let selectedView = null
         if (saveButton) {
             saveButton.disabled = true
@@ -54,15 +56,25 @@ export class ViewsModule extends SBAdminTableModule {
         this.refreshViewButtons()
     }
 
-    openView(e, params) {
-        if(e.target.closest('svg')){
+    openView(e, params, view_id) {
+        if (e.target.closest("svg")) {
             return
         }
-        const savedParams = JSON.parse(params) || {}
-        const allParams = this.table.getAllUrlParams()
-        this.selectedViewParams = savedParams
-        allParams[this.table.viewId] = savedParams
-        history.pushState({}, '', window.location.pathname + this.table.paramsObjectToUrlString(allParams))
+        if (this.table.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
+            const selectedViewParams = {
+                "selectedView": view_id
+            }
+            let new_path = window.location.pathname
+            if (view_id) {
+                new_path += "?" + new URLSearchParams(selectedViewParams).toString()
+            }
+            history.pushState({}, "", new_path)
+        } else {
+            const savedParams = JSON.parse(params) || {}
+            const allParams = this.table.getAllUrlParams()
+            allParams[this.table.viewId] = savedParams
+            history.pushState({}, "", window.location.pathname + this.table.paramsObjectToUrlString(allParams))
+        }
         this.table.loadFromUrl()
     }
 }

@@ -239,7 +239,9 @@ class SBAdminAutocompleteWidget(
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
-        self.input_id = f'id_{context["widget"]["name"]}'
+        self.input_id = (
+            context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
+        )
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"

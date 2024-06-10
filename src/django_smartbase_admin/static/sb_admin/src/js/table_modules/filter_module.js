@@ -17,9 +17,14 @@ export class FilterModule extends SBAdminTableModule {
         const params = this.table.getParamsFromUrl()
         const filterData = params[this.table.constants.FILTER_DATA_NAME]
         document.querySelector(`#${this.table.filterFormId}`).reset()
-        document.querySelectorAll(`.filter-wrapper`).forEach((el) => {
-            if (!el.hasAttribute('data-all-filters-visible')) {
-                this.hideFilter(el.getAttribute('data-filter-input-name'))
+        document.querySelectorAll(`[form=${this.table.filterFormId}]`).forEach((el) => {
+            const wrapperEl = el.closest('.filter-wrapper')
+            if(wrapperEl) {
+                if (!wrapperEl.hasAttribute('data-all-filters-visible')) {
+                    this.hideFilter(wrapperEl.getAttribute('data-filter-input-name'), true)
+                }
+            } else {
+                this.hideFilter(el.getAttribute('name'))
             }
         })
         if (filterData) {
@@ -96,15 +101,17 @@ export class FilterModule extends SBAdminTableModule {
         this.table.refreshTableDataIfNotUrlLoad()
     }
 
-    hideFilter(field) {
+    hideFilter(field, hideWrapper=false) {
         const fieldElem = this.getFormField(field)
         const filterElem = document.querySelector(`#${this.table.viewId}-${field}-wrapper`)
-        if (!filterElem) {
+        if (!fieldElem) {
             return
         }
         fieldElem.value = ''
-        fieldElem.disabled = true
-        filterElem.classList.add('hidden')
+        if(filterElem && hideWrapper) {
+            filterElem.classList.add('hidden')
+            fieldElem.disabled = true
+        }
         fieldElem.dispatchEvent(new Event('change'))
         fieldElem.dispatchEvent(new CustomEvent('clear'))
         this.table.refreshTableDataIfNotUrlLoad()

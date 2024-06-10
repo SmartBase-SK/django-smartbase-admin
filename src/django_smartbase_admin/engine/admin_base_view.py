@@ -486,32 +486,47 @@ class SBAdminBaseListView(SBAdminBaseView):
         name = config_name or request.POST.get(CONFIG_NAME, None)
         if name:
             name = urllib.parse.unquote(name)
+        updated_configuration = None
         if request.request_data.request_method == "POST":
             if name:
-                SBAdminListViewConfiguration.objects.update_or_create(
-                    name=name,
-                    user_id=request.request_data.user.id,
-                    defaults={
-                        "url_params": request.request_data.request_post.get(
-                            URL_PARAMS_NAME
-                        ),
-                        "view": self.get_id(),
-                        "action": None,
-                        "modifier": None,
-                    },
+                updated_configuration, created = (
+                    SBAdminListViewConfiguration.objects.update_or_create(
+                        name=name,
+                        user_id=request.request_data.user.id,
+                        defaults={
+                            "url_params": request.request_data.request_post.get(
+                                URL_PARAMS_NAME
+                            ),
+                            "view": self.get_id(),
+                            "action": None,
+                            "modifier": None,
+                        },
+                    )
                 )
         if request.request_data.request_method == "DELETE":
             if name:
                 SBAdminListViewConfiguration.objects.by_user_id(
                     request.request_data.user.id
                 ).by_name(name).by_view_action_modifier(view=self.get_id()).delete()
-        response = redirect(request.request_data.request_meta.get("HTTP_REFERER", ""))
+
+        redirect_to = self.get_redirect_url_from_request(request, updated_configuration)
+
+        response = redirect(redirect_to)
         if is_htmx_request(request.request_data.request_meta):
             response = HttpResponse()
-            response["HX-Redirect"] = request.request_data.request_meta.get(
-                "HTTP_REFERER", ""
-            )
+            response["HX-Redirect"] = redirect_to
         return response
+
+    def get_redirect_url_from_request(self, request, updated_configuration):
+        referer = request.request_data.request_meta.get("HTTP_REFERER", "")
+        url = urllib.parse.urlparse(referer)
+        if updated_configuration:
+            query = dict(urllib.parse.parse_qsl(url.query))
+            query.update({"selectedView": updated_configuration.pk, "tabCreated": True})
+
+            url = url._replace(query=urllib.parse.urlencode(query))
+        redirect_to = urllib.parse.urlunparse(url)
+        return redirect_to
 
     def action_list(
         self,
