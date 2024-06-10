@@ -22,15 +22,22 @@ class TabulatorFieldOptions(JSONSerializableMixin):
     headerSort = False
     formatterParams = None
     frozen = False
+    title = None
 
     def __init__(
-        self, headerFilter=None, headerSort=None, formatterParams=None, frozen=None
+        self,
+        headerFilter=None,
+        headerSort=None,
+        formatterParams=None,
+        frozen=None,
+        title=None,
     ) -> None:
         super().__init__()
         self.headerFilter = headerFilter
         self.headerSort = headerSort
         self.formatterParams = formatterParams
         self.frozen = frozen
+        self.title = title
 
 
 class XLSXFieldOptions(JSONSerializableMixin):
