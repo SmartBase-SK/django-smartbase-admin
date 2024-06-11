@@ -1,3 +1,4 @@
+import datetime
 import io
 import re
 from copy import copy
@@ -16,8 +17,14 @@ class SBAdminXLSXExportService(object):
     @classmethod
     def write_workbook(cls, export_file, data, columns, options=None):
         options = options or {}
+        default_date_format = options.get("default_date_format", "dd/mm/yyyy")
         workbook = xlsxwriter.Workbook(
-            export_file, {"in_memory": True, "remove_timezone": True}
+            export_file,
+            {
+                "in_memory": True,
+                "remove_timezone": True,
+                "default_date_format": default_date_format,
+            },
         )
         worksheet = workbook.add_worksheet()
 
@@ -27,11 +34,20 @@ class SBAdminXLSXExportService(object):
         header_rows_height = options.get("header_rows_height", 25)
         header_rows_freeze = options.get("header_rows_freeze", True)
         default_cell_format_options = options.get("cell_format", {})
+        default_cell_datetime_format_options = options.get("cell_datetime_format", None)
+        if not default_cell_datetime_format_options:
+            default_cell_datetime_format_options = {
+                **default_cell_format_options,
+                "num_format": default_date_format,
+            }
         header_cell_format_options = options.get("header_cell_format", {})
         cell_format_options = options.get("cell_formats", {})
         conditional_format_options = options.get("conditional_formats", {})
         default_cell_format = workbook.add_format(default_cell_format_options)
         header_cell_format = workbook.add_format(header_cell_format_options)
+        default_cell_datetime_format = workbook.add_format(
+            default_cell_datetime_format_options
+        )
 
         cell_formats_dict = {}
         for cell_format_key, cell_format in cell_format_options.items():
@@ -84,16 +100,26 @@ class SBAdminXLSXExportService(object):
                     data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
                     data_col = strip_tags(data_col).strip()
                 if not image_write:
-                    worksheet.write(
-                        row,
-                        col,
-                        data_col,
-                        (
-                            default_cell_format
-                            if row >= header_rows_count
-                            else header_cell_format
-                        ),
-                    )
+                    if (
+                        isinstance(data_col, datetime.datetime)
+                        or isinstance(data_col, datetime.date)
+                        or isinstance(data_col, datetime.time)
+                        or isinstance(data_col, datetime.timedelta)
+                    ):
+                        worksheet.write_datetime(
+                            row, col, data_col, default_cell_datetime_format
+                        )
+                    else:
+                        worksheet.write(
+                            row,
+                            col,
+                            data_col,
+                            (
+                                default_cell_format
+                                if row >= header_rows_count
+                                else header_cell_format
+                            ),
+                        )
                 col += 1
             row += 1
             col = 0
