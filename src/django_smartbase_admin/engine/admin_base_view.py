@@ -517,14 +517,14 @@ class SBAdminBaseListView(SBAdminBaseView):
             response["HX-Redirect"] = redirect_to
         return response
 
-    def get_redirect_url_from_request(self, request, updated_configuration):
+    def get_redirect_url_from_request(self, request, updated_configuration=None):
         referer = request.request_data.request_meta.get("HTTP_REFERER", "")
         url = urllib.parse.urlparse(referer)
+        query = dict(urllib.parse.parse_qsl(url.query))
+        query.update({"tabCreated": True})
         if updated_configuration:
-            query = dict(urllib.parse.parse_qsl(url.query))
-            query.update({"selectedView": updated_configuration.pk, "tabCreated": True})
-
-            url = url._replace(query=urllib.parse.urlencode(query))
+            query.update({"selectedView": updated_configuration.pk})
+        url = url._replace(query=urllib.parse.urlencode(query))
         redirect_to = urllib.parse.urlunparse(url)
         return redirect_to
 
