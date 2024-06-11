@@ -1,16 +1,26 @@
 import { SBAdminTableModule } from "./base_module"
+import { unset } from "lodash"
 
 export class ViewsModule extends SBAdminTableModule {
+    COMPARE_IGNORE_KEYS = ['filterData.sb_selected_filter_type']
+
     requiresHeader() {
         return true
     }
 
+    filterParamsForCompare(params) {
+        this.COMPARE_IGNORE_KEYS.forEach(key_to_remove => {
+            unset(params, key_to_remove)
+        })
+        return params
+    }
+
     refreshViewButtons() {
-        const urlParamsString = this.table.getUrlParamsStringForSave()
+        const urlParamsString = JSON.stringify(this.filterParamsForCompare(JSON.parse(this.table.getUrlParamsStringForSave())))
         const searchParams = decodeURI(urlParamsString)
         let saveButton = document.getElementById('save-view-modal-button')
         this.selectedViewParams = this.table.getAllParamsFromUrl()[this.table.viewId]
-        let selectedParams = JSON.stringify(this.selectedViewParams)
+        let selectedParams = JSON.stringify(this.filterParamsForCompare(this.selectedViewParams))
 
         let selectedView = null
         if (saveButton) {
@@ -18,7 +28,7 @@ export class ViewsModule extends SBAdminTableModule {
         }
 
         document.querySelectorAll('.js-view-button').forEach((item) => {
-            const itemParams = JSON.stringify(JSON.parse(item.dataset.params))
+            const itemParams = JSON.stringify(this.filterParamsForCompare(JSON.parse(item.dataset.params)))
             const sameAsUrlParams = (itemParams === searchParams)
             const sameAsSelectedParams = selectedParams === itemParams
             item.classList.remove("active")
