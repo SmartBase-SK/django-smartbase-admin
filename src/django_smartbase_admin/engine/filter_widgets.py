@@ -397,6 +397,7 @@ class AutocompleteFilterWidget(
     value_lambda = None
     allow_add = False
     hide_clear_button = False
+    search_query_lambda = None
 
     def get_field_name(self):
         return self.field.name
@@ -418,6 +419,7 @@ class AutocompleteFilterWidget(
         forward=None,
         allow_add=None,
         hide_clear_button=None,
+        search_query_lambda=None,
         **kwargs,
     ) -> None:
         super().__init__(template_name, default_value, **kwargs)
@@ -425,6 +427,7 @@ class AutocompleteFilterWidget(
         self.value_field = value_field or self.value_field
         self.filter_query_lambda = filter_query_lambda or self.filter_query_lambda
         self.filter_search_lambda = filter_search_lambda or self.filter_search_lambda
+        self.search_query_lambda = search_query_lambda or self.search_query_lambda
         self.label_lambda = label_lambda or self.label_lambda
         self.value_lambda = value_lambda or self.value_lambda
         self.multiselect = multiselect if multiselect is not None else self.multiselect
@@ -554,13 +557,24 @@ class AutocompleteFilterWidget(
         to_item = (page_num) * AUTOCOMPLETE_PAGE_SIZE
         qs = self.get_queryset(request)
         qs = self.filter_search_queryset(request, qs, search_term, forward_data)
-        qs = self.get_default_search_query(
-            request,
-            qs,
-            self.model,
-            search_term,
-            SBAdminTranslationsService.get_main_lang_code(),
-        )[from_item:to_item]
+        if self.search_query_lambda:
+            qs = self.search_query_lambda(
+                request,
+                qs,
+                self.model,
+                search_term,
+                SBAdminTranslationsService.get_main_lang_code(),
+            )
+        else:
+            qs = self.get_default_search_query(
+                request,
+                qs,
+                self.model,
+                search_term,
+                SBAdminTranslationsService.get_main_lang_code(),
+            )
+
+        qs = qs[from_item:to_item]
         result = []
         for item in qs:
             result.append(
