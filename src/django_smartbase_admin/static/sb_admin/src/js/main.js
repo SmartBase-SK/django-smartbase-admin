@@ -249,6 +249,14 @@ class Main {
         fieldElem.dispatchEvent(new Event('change'))
         fieldElem.dispatchEvent(new CustomEvent('clear', {detail: {refresh: true}}))
     }
+
+    executeListAction(table_id, action_url, no_params) {
+        if(window.SBAdminTable && window.SBAdminTable[table_id]){
+            window.SBAdminTable[table_id].executeListAction(action_url, no_params)
+        } else{
+            window.location.href = action_url
+        }
+    }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
