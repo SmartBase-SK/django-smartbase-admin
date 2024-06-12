@@ -373,6 +373,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tabulatorOptions": {
                 "renderVertical": "basic",
                 "persistence": False,
+                "layoutColumnsOnNewData": True,
                 "height": "100%",
                 "ajaxContentType": "json",
                 "ajaxConfig": {

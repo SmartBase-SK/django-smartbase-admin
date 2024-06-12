@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-smartbase-admin"
-version = "0.2.48"
+version = "0.2.49"
 description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
