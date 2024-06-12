@@ -56,6 +56,7 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     default_value = None
     default_label = None
     filter_query_lambda = None
+    exclude_null_operators = False
 
     def __init__(
         self,
@@ -63,6 +64,7 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         default_value=None,
         default_label=None,
         filter_query_lambda=None,
+        exclude_null_operators=None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -70,6 +72,9 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         self.default_value = self.default_value or default_value
         self.default_label = self.default_label or default_label
         self.filter_query_lambda = filter_query_lambda or self.filter_query_lambda
+        self.exclude_null_operators = (
+            exclude_null_operators or self.exclude_null_operators
+        )
 
     def init_filter_widget_static(self, field, view, configuration):
         self.field = field

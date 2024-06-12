@@ -33,7 +33,7 @@
                             <li>
                                 {{ list_selection_action.items }}
                                 <a {% if list_selection_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_selection_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}"
-                                                                                                                                                                                {% else %}onclick="window.SBAdminTable['{{ view_id }}'].executeListAction('{{ list_action.url }}', {{ list_action.no_params|yesno:'true,false' }})"{% endif %}
+                                                                                                                                                                                {% else %}onclick="window.SBAdminTable['{{ view_id }}'].executeListAction('{{ list_selection_action.url }}', {{ list_selection_action.no_params|yesno:'true,false' }})"{% endif %}
                                                                                                                                                                                 class="dropdown-menu-link {{ list_selection_action.css_class|default_if_none:'' }}">{{ list_selection_action.title }}</a>
                             </li>
                         {% endfor %}
@@ -42,7 +42,7 @@
             {% else %}
                 {# no group #}
                 {% for list_selection_action in list_selection_action_group %}
-                    <button {% if list_selection_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_selection_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.SBAdminTable['{{ view_id }}'].executeListAction('{{ list_action.url }}', {{ list_action.no_params|yesno:'true,false' }})"{% endif %}
+                    <button {% if list_selection_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_selection_action %} hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}" {% else %}onclick="window.SBAdminTable['{{ view_id }}'].executeListAction('{{ list_selection_action.url }}', {{ list_selection_action.no_params|yesno:'true,false' }})"{% endif %}
                                                                                                                                                                           class="btn btn-small {{ list_selection_action.css_class|default_if_none:'' }}">{{ list_selection_action.title }}
                     </button>
                 {% endfor %}

@@ -47,6 +47,11 @@ class AllOperators(models.TextChoices):
     AFTER = "after", _("After")
 
 
+NULL_ATTRIBUTES = [
+    AllOperators.IS_NULL,
+    AllOperators.IS_NOT_NULL,
+]
+
 DATE_ATTRIBUTES = [
     AllOperators.BETWEEN,
     AllOperators.NOT_BETWEEN,
@@ -96,12 +101,16 @@ class QueryBuilderFilter:
         filter_widget_for_context.input_id = QB_JS_PREFIX
         filter_widget_for_context.input_name = QB_JS_PREFIX
         operators = filter_widget.get_advanced_filter_operators()
-        operators = [operator.value for operator in operators]
+        operators_values = []
+        for operator in operators:
+            if filter_widget.exclude_null_operators and operator in NULL_ATTRIBUTES:
+                continue
+            operators_values.append(operator.value)
         return cls(
             id=filter_widget.input_id,
             field=filter_widget.field.field,
             label=filter_widget.field.title,
-            operators=operators,
+            operators=operators_values,
             input=render_to_string(
                 template_name=filter_widget.template_name.replace(
                     "filter_widgets/", "filter_widgets/advanced_filters/"
@@ -236,13 +245,8 @@ class QueryBuilderService:
                 if field is None:
                     continue
 
-                value = field.filter_widget.parse_value_from_input(
-                    request, rule["value"]
-                )
-                if operator not in cls.LIST_OPERATORS and isinstance(value, list):
-                    value = value[0]
-
                 if operator in cls.ZERO_INPUTS_OPERATORS:
+                    value = None
                     filter_value = (
                         True
                         if operator in [AllOperators.IS_NULL, AllOperators.IS_NOT_NULL]
@@ -253,19 +257,27 @@ class QueryBuilderService:
                             f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": filter_value,
                         }
                     )
-                elif operator in [
-                    AllOperators.BETWEEN.value,
-                    AllOperators.NOT_BETWEEN.value,
-                ]:
-                    q = Q()
-                    if value[0] is not None:
-                        q &= Q(**{f"{field.filter_field}__gte": value[0]})
-                    if value[1] is not None:
-                        q &= Q(**{f"{field.filter_field}__lte": value[1]})
                 else:
-                    q = Q(
-                        **{f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": value}
+                    value = field.filter_widget.parse_value_from_input(
+                        request, rule["value"]
                     )
+                    if operator not in cls.LIST_OPERATORS and isinstance(value, list):
+                        value = value[0]
+                    if operator in [
+                        AllOperators.BETWEEN.value,
+                        AllOperators.NOT_BETWEEN.value,
+                    ]:
+                        q = Q()
+                        if value[0] is not None:
+                            q &= Q(**{f"{field.filter_field}__gte": value[0]})
+                        if value[1] is not None:
+                            q &= Q(**{f"{field.filter_field}__lte": value[1]})
+                    else:
+                        q = Q(
+                            **{
+                                f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": value
+                            }
+                        )
 
                 if operator in cls.NEGATIVE_OPERATORS:
                     q = ~q
