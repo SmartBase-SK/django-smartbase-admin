@@ -1,3 +1,6 @@
+{% extends 'sb_admin/sb_admin_base_no_sidebar.html' %}
+{% load i18n %}
+{% block main_wrapper %}
 <div class="alert bg-notice-50 border border-notice-100 text-notice-900">
     <div class="flex">
         <svg class="w-20 h-20 mr-12 text-notice">
@@ -440,3 +443,4 @@
         <input type="text" id="date-picker" class="js-datepicker-range">
     </div>
 </div>
+{% endblock %}

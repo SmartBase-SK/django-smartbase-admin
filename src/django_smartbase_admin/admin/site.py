@@ -1,7 +1,9 @@
 from functools import update_wrapper
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, reverse_lazy
+from django.views.generic import TemplateView
 
 from django_smartbase_admin.engine.admin_entrypoint_view import SBAdminEntrypointView
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
@@ -129,6 +131,16 @@ class SBAdminSite(admin.AdminSite):
                 name="password_reset_complete",
             ),
         ]
+        if settings.DEBUG:
+            urls.append(
+                path(
+                    "components",
+                    TemplateView.as_view(
+                        template_name="sb_admin/includes/components.html"
+                    ),
+                    name="components",
+                )
+            )
         for model, model_admin in self._registry.items():
             action_view = getattr(model_admin, "action_view", None)
             if not action_view:
