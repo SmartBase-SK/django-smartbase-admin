@@ -159,7 +159,7 @@ class SBAdminViewService(object):
                     visible_fields.append(field.filter_field)
                 else:
                     visible_fields.append(field.field)
-                field_annotates = field.get_field_annotates(values)
+                field_annotates.update(field.get_field_annotates(values))
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         for (
             translation_model,
