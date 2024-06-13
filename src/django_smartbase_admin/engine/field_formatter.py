@@ -12,8 +12,17 @@ def datetime_formatter(object_id, value):
 
 def datetime_formatter_with_format(date_format=None, time_format=None):
     def inner_formatter(object_id, value):
+        if value is None:
+            return None
         value = timezone.localtime(value)
-        return f"{date(value, date_format)} {time(value, time_format)}"
+        return_value = ""
+        if date_format:
+            return_value += date(value, date_format)
+        if time_format:
+            if return_value:
+                return_value += " "
+            return_value += time(value, time_format)
+        return return_value
 
     return inner_formatter
 

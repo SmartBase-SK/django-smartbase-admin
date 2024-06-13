@@ -1,11 +1,11 @@
 {% load admin_urlname admin_urlquote from admin_urls %}
-{% load i18n nested_admin static widget_tweaks %}
+{% load i18n nested_admin static widget_tweaks sb_admin_tags %}
 
 {% with inline_admin_formset.formset.is_nested as is_nested %}
 
     {% with inline_admin_formset.opts as inline_opts %}
         <div
-            class="card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
+            class="{% if inline_admin_formset.opts.class_name %}{{ inline_admin_formset.opts.class_name }}{% else %}{{ inline_admin_formset.opts|to_class_name|slugify }}{% endif %}{% if inline_admin_formset.formset.can_delete %} can-delete{% endif %} card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
             id="{{ inline_admin_formset.formset.prefix }}-group"
             data-inline-type="stacked"
             data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
