@@ -5,17 +5,26 @@ from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.options import get_content_type_for_model
+from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
 from django.contrib.postgres.forms import SimpleArrayField
-from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+    PermissionDenied,
+)
 from django.db import models
 from django.forms import HiddenInput
 from django.forms.models import ModelFormMetaclass
 from django.template.loader import render_to_string
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import override as translation_override
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from filer.fields.image import AdminImageFormField
 from nested_admin.nested import (
@@ -57,7 +66,6 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminSplitDateTimeWidget,
     SBAdminTimeWidget,
     SBAdminDateTimeWidget,
-    SBAdminAutocompleteWidget,
     SBAdminFileWidget,
     SBAdminToggleWidget,
     SBAdminNullBooleanSelectWidget,
@@ -737,6 +745,191 @@ class SBAdmin(
 
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
+
+    def construct_change_message(self, request, form, formsets, add=False):
+        try:
+            change_message = []
+            if add:
+                change_message.append({"added": {}})
+            elif form.changed_data:
+                change_details = {}
+                for field in form.changed_data:
+                    initial_value = form.initial[field]
+                    new_value = form.cleaned_data[field]
+                    if isinstance(initial_value, int):  # Assuming the ID is an integer
+                        field_model = form._meta.model._meta.get_field(
+                            field
+                        ).related_model
+                        if field_model:
+                            initial_value_repr = (
+                                self._get_object_repr_by_id(field_model, initial_value)
+                                + f" ({initial_value})"
+                            )
+                            new_value_repr = str(new_value) + f" ({new_value.id})"
+                        else:
+                            initial_value_repr = str(initial_value)
+                            new_value_repr = str(new_value)
+                    else:
+                        initial_value_repr = str(initial_value)
+                        new_value_repr = str(new_value)
+                    if initial_value_repr != new_value_repr:
+                        change_details[field] = (initial_value_repr, new_value_repr)
+                change_message.append({"changed": change_details})
+
+            if formsets:
+                with translation_override(None):
+                    for formset in formsets:
+                        added_objects = set()
+                        for added_object in formset.new_objects:
+                            added_objects.add(added_object)
+                            object_details = ", ".join(
+                                f"{field}: '{getattr(added_object, field)}'"
+                                for field in formset.form._meta.fields
+                                if getattr(added_object, field, None) is not None
+                            )
+                            change_message.append(
+                                {
+                                    "added": (
+                                        added_object._meta.verbose_name,
+                                        object_details,
+                                    )
+                                }
+                            )
+
+                        for form in formset.forms:
+                            if form.has_changed():
+                                changed_object = form.instance
+                                if changed_object not in added_objects:
+                                    changed_details = {}
+                                    for field in form.changed_data:
+                                        if field != "DELETE":
+                                            initial_value = form.initial.get(field)
+                                            new_value = form.cleaned_data[field]
+                                            if isinstance(
+                                                initial_value, int
+                                            ):  # Assuming the ID is an integer
+                                                field_model = (
+                                                    formset.model._meta.get_field(
+                                                        field
+                                                    ).related_model
+                                                )
+                                                if field_model:
+                                                    initial_value_repr = (
+                                                        self._get_object_repr_by_id(
+                                                            field_model, initial_value
+                                                        )
+                                                    )
+                                                    new_value_repr = str(new_value)
+                                                else:
+                                                    initial_value_repr = str(
+                                                        initial_value
+                                                    )
+                                                    new_value_repr = str(new_value)
+                                            else:
+                                                initial_value_repr = str(initial_value)
+                                                new_value_repr = str(new_value)
+                                            if initial_value_repr != new_value_repr:
+                                                changed_details[field] = (
+                                                    initial_value_repr,
+                                                    new_value_repr,
+                                                )
+                                            change_message.append(
+                                                {"changed": changed_details}
+                                            )
+
+                        for deleted_object in formset.deleted_objects:
+                            change_message.append(
+                                {
+                                    "deleted": {
+                                        "name": str(deleted_object._meta.verbose_name),
+                                        "object": str(deleted_object),
+                                    }
+                                }
+                            )
+            return change_message
+        except:
+            return super().construct_change_message(request, form, formsets, add)
+
+    def _get_object_repr_by_id(self, model, object_id):
+        try:
+            obj = model.objects.get(id=object_id)
+            return str(obj)
+        except model.DoesNotExist:
+            return None
+
+    def _get_changed_field_labels_from_form(form, changed_data):
+        changed_field_labels = []
+        for field_name in changed_data:
+            try:
+                verbose_field_name = form.fields[field_name].label or field_name
+            except KeyError:
+                verbose_field_name = field_name
+            changed_field_labels.append(str(verbose_field_name))
+        return changed_field_labels
+
+    def history_view(self, request, object_id, extra_context=None):
+        try:
+            "The 'history' admin view for this model."
+            from django.contrib.admin.models import LogEntry
+            from django.contrib.admin.views.main import PAGE_VAR
+
+            # First check if the user can see this history.
+            model = self.model
+            obj = self.get_object(request, unquote(object_id))
+            if obj is None:
+                return self._get_obj_does_not_exist_redirect(
+                    request, model._meta, object_id
+                )
+
+            if not self.has_view_or_change_permission(request, obj):
+                raise PermissionDenied
+
+            # Then get the history for this object.
+            app_label = self.opts.app_label
+            action_list = (
+                LogEntry.objects.filter(
+                    object_id=unquote(object_id),
+                    content_type=get_content_type_for_model(model),
+                )
+                .select_related()
+                .order_by("-action_time")
+            )
+
+            paginator = self.get_paginator(request, action_list, 100)
+            page_number = request.GET.get(PAGE_VAR, 1)
+            page_obj = paginator.get_page(page_number)
+            page_range = paginator.get_elided_page_range(page_obj.number)
+
+            context = {
+                **self.admin_site.each_context(request),
+                "title": _("Change history: %s") % obj,
+                "subtitle": None,
+                "action_list": page_obj,
+                "page_range": page_range,
+                "page_var": PAGE_VAR,
+                "pagination_required": paginator.count > 100,
+                "module_name": str(capfirst(self.opts.verbose_name_plural)),
+                "object": obj,
+                "opts": self.opts,
+                "preserved_filters": self.get_preserved_filters(request),
+                **(extra_context or {}),
+            }
+
+            request.current_app = self.admin_site.name
+
+            return TemplateResponse(
+                request,
+                self.object_history_template
+                or [
+                    "admin/%s/%s/object_history.html"
+                    % (app_label, self.opts.model_name),
+                    "admin/%s/object_history.html" % app_label,
+                    "admin/object_history.html",
+                ],
+                context,
+            )
+        except Exception as e:
+            return super().history_view(request, object_id, extra_context)
 
 
 class SBAdminInline(
