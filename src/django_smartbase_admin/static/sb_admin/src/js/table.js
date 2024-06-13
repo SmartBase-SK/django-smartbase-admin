@@ -10,6 +10,7 @@ import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
 import { HeaderTabsModule } from "./table_modules/header_tabs_module"
+import { AjaxParamsTabulatorModifier } from "./params_module"
 
 
 class SBAdminTable {
@@ -209,8 +210,7 @@ class SBAdminTable {
         return this.paramsObjectToUrlString(params)
     }
 
-    ajaxUrlGenerator(url, config, params) {
-        this.lastTableParams = params
+    ajaxUrlGenerator() {
         this.updateUrlState()
         if (this.tabulatorOptions['ajaxConfig']['method'] === 'POST') {
             return this.tableAjaxUrl
@@ -255,12 +255,6 @@ class SBAdminTable {
             ajaxURLGenerator: (url, config, params) => {
                 return this.ajaxUrlGenerator(url, config, params)
             },
-            ajaxParams: () => {
-                if (this.tabulatorOptions['ajaxConfig']['method'] === 'POST') {
-                    return this.getAllUrlParams()
-                }
-                return {}
-            },
             dataSendParams: {
                 "size": this.constants.TABLE_PARAMS_SIZE_NAME,
                 "page": this.constants.TABLE_PARAMS_PAGE_NAME,
@@ -274,7 +268,9 @@ class SBAdminTable {
         tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
         tabulatorOptions['ajaxConfig']['headers']['X-TabulatorRequest'] = true
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
+        Tabulator.registerModule(AjaxParamsTabulatorModifier)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
+        this.tabulator.SBTable = this
         document.addEventListener("SBAdminReloadTableData", function () {
             self.refreshTableDataIfNotUrlLoad()
         })
