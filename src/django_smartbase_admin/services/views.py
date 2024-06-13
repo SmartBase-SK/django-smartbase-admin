@@ -152,7 +152,6 @@ class SBAdminViewService(object):
     def get_annotates(cls, model, values, fields):
         field_annotates = {}
         lang_annotates = {}
-        supporting_annotates = {}
         visible_fields = []
         for field in fields:
             if field.field in values:
@@ -160,18 +159,7 @@ class SBAdminViewService(object):
                     visible_fields.append(field.filter_field)
                 else:
                     visible_fields.append(field.field)
-                if field.annotate:
-                    field_annotates[field.field] = field.annotate
-                if field.annotate_function:
-                    function_result = field.annotate_function(field, values)
-                    if function_result:
-                        field_annotates[field.field] = function_result
-                    else:
-                        field_annotates[field.field] = Value(
-                            None, output_field=CharField()
-                        )
-                if field.supporting_annotates:
-                    supporting_annotates.update(field.supporting_annotates)
+                field_annotates = field.get_field_annotates(values)
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         for (
             translation_model,
@@ -188,4 +176,4 @@ class SBAdminViewService(object):
                 lang_annotates[model_field.name] = F(
                     f"{annotate_name}__{model_field.name}"
                 )
-        return {**lang_annotates, **supporting_annotates, **field_annotates}
+        return {**lang_annotates, **field_annotates}

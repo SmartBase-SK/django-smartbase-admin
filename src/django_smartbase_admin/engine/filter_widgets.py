@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Q, fields, FilteredRelation
+from django.db.models import Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -616,3 +616,44 @@ class AutocompleteFilterWidget(
             AllOperators.IS_NULL,
             AllOperators.IS_NOT_NULL,
         ]
+
+
+class FromValuesAutocompleteWidget(AutocompleteFilterWidget):
+    def init_filter_widget_static(self, field, view, configuration):
+        self.model = field.view.model
+        super().init_filter_widget_static(field, view, configuration)
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        qs = qs.annotate(**self.field.get_field_annotates(values=[]))
+        return qs
+
+    def search(self, request, post_data):
+        search_term = post_data.get(AUTOCOMPLETE_SEARCH_NAME)
+        forward_data = json.loads(post_data.get(AUTOCOMPLETE_FORWARD_NAME, "{}"))
+        page_num = int(post_data.get(AUTOCOMPLETE_PAGE_NUM, 1))
+        from_item = (page_num - 1) * AUTOCOMPLETE_PAGE_SIZE
+        to_item = (page_num) * AUTOCOMPLETE_PAGE_SIZE
+        qs = self.get_queryset(request)
+        qs = self.filter_search_queryset(request, qs, search_term, forward_data)
+        qs = (
+            qs.filter(**{f"{self.field.name}__icontains": search_term})
+            .values(self.field.name)
+            .annotate(remove_duplicates_count=Count(self.field.name))
+            .order_by(self.field.name)[from_item:to_item]
+        )
+        result = []
+        for item in qs:
+            result.append(
+                {
+                    "value": self.get_value(request, item),
+                    "label": self.get_label(request, item),
+                }
+            )
+        return result
+
+    def get_value(self, request, item):
+        return item.get(self.field.name)
+
+    def get_label(self, request, item):
+        return item.get(self.field.name)
