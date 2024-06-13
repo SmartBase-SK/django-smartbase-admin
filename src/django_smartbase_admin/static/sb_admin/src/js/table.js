@@ -10,7 +10,7 @@ import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
 import { HeaderTabsModule } from "./table_modules/header_tabs_module"
-import { AjaxParamsTabulatorModifier } from "./params_module"
+import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 
 
 class SBAdminTable {
@@ -268,7 +268,7 @@ class SBAdminTable {
         tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
         tabulatorOptions['ajaxConfig']['headers']['X-TabulatorRequest'] = true
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
-        Tabulator.registerModule(AjaxParamsTabulatorModifier)
+        Tabulator.registerModule(SBAjaxParamsTabulatorModifier)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         this.tabulator.SBTable = this
         document.addEventListener("SBAdminReloadTableData", function () {

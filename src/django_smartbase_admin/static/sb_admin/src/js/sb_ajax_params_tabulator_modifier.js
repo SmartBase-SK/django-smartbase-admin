@@ -1,6 +1,6 @@
 import { Module } from "tabulator-tables"
 
-export class AjaxParamsTabulatorModifier extends Module {
+export class SBAjaxParamsTabulatorModifier extends Module {
     static moduleName = "sb_ajax_params_tabulator_modifier"
 
     constructor(table) {
