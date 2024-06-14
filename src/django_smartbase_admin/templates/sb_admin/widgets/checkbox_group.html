@@ -1,0 +1,15 @@
+{% load i18n %}
+
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<ul class="relative">
+    {% for group, options, index in widget.optgroups %}
+        {% for option in options %}
+            <li>
+                <div class="relative py-8">
+                    {% include option.template_name with widget=option %}
+                </div>
+            </li>
+        {% endfor %}
+    {% endfor %}
+</ul>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

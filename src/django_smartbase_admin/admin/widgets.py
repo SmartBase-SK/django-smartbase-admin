@@ -128,6 +128,11 @@ class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultipl
         )
 
 
+class SBAdminMultipleChoiceInlineWidget(SBAdminMultipleChoiceWidget):
+    template_name = "sb_admin/widgets/checkbox_group.html"
+    option_template_name = "sb_admin/widgets/checkbox.html"
+
+
 class SBAdminNullBooleanSelectWidget(SBAdminBaseWidget, forms.NullBooleanSelect):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
