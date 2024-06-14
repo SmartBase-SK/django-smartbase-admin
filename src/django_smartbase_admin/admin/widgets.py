@@ -351,3 +351,7 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
             "sb_admin/js/codemirror/django.min.js",
             "sb_admin/src/js/code.js",
         ]
+
+
+class SBAdminHTMLWidget(SBAdminBaseWidget, forms.Widget):
+    template_name = "sb_admin/widgets/html_read_only.html"
