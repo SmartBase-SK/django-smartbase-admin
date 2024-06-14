@@ -12,6 +12,11 @@
         >header {
             @apply flex items-center text-18 mb-24 font-semibold;
         }
+        &.hide-header {
+            >header {
+                @apply hidden;
+            }
+        }
     }
     .column-widget-columns {
         & > li {
