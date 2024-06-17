@@ -31,12 +31,12 @@ class FakeQueryset(models.QuerySet):
 
 class SBAdminFakeInlineFormset(BaseInlineFormSet):
     original_model = None
-
-    def delete_existing(self, obj, commit=True):
-        raise NotImplementedError
+    inline_instance = None
 
     def save_new(self, form, commit=True):
-        raise NotImplementedError
+        return self.inline_instance.save_new_fake_inline_instance(
+            form, self.inline_instance.parent_instance, commit
+        )
 
 
 class SBAdminFakeInlineMixin:
@@ -44,6 +44,7 @@ class SBAdminFakeInlineMixin:
     model_name = "FakeRelationship"
     formset = SBAdminFakeInlineFormset
     original_model = None
+    path_to_parent_instance_id = None  # path to parent instance id in fake inline model
 
     def __init__(self, parent_model, admin_site):
         super().__init__(parent_model, admin_site)
@@ -70,7 +71,14 @@ class SBAdminFakeInlineMixin:
         formset = super().get_formset(request, obj, **kwargs)
         formset.queryset = self.get_queryset(request)
         formset.original_model = self.original_model
+        formset.inline_instance = self
         return formset
+
+    def has_add_permission(self, request, obj=None):
+        # don't allow adding new fake inline instances if parent instance is not saved yet
+        if not self.parent_instance.id:
+            return False
+        return super().has_add_permission(request, obj)
 
     def filter_fake_inline_identifier_by_parent_instance(
         self, inline_queryset, parent_instance
@@ -79,7 +87,24 @@ class SBAdminFakeInlineMixin:
         # example usage:
         # qs = inline_queryset.filter(path_to_parent_instance__id: parent_instance.id)
         # return qs
-        raise NotImplementedError
+        if not self.path_to_parent_instance_id:
+            raise NotImplementedError
+        qs = inline_queryset.filter(
+            **{self.path_to_parent_instance_id: parent_instance.id}
+        )
+        return qs
+
+    def save_new_fake_inline_instance(self, form, parent_instance, commit=True):
+        # save new instance of fake inline model
+        if not self.path_to_parent_instance_id:
+            raise NotImplementedError
+        fake_inline_object = form.save(commit=False)
+        if parent_instance.id:
+            setattr(
+                fake_inline_object, self.path_to_parent_instance_id, parent_instance.id
+            )
+            fake_inline_object.save()
+        return fake_inline_object
 
     def get_fake_inline_identifier_annotate(self):
         # this field is used as related 'id' of the inline and can later be used as reference for filtering, so the annotated value

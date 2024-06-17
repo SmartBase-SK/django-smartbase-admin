@@ -430,13 +430,14 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         inlines = []
         for inline_class in inline_classes:
             inline = inline_class(self.model, self.admin_site)
+            if hasattr(inline, "init_inline_dynamic"):
+                inline.init_inline_dynamic(request, obj)
             if request:
                 if not inline.has_view_or_change_permission(request, obj):
                     continue
                 if not inline.has_add_permission(request, obj):
                     inline.max_num = 0
-            if hasattr(inline, "init_inline_dynamic"):
-                inline.init_inline_dynamic(request, obj)
+            if hasattr(inline, "init_view_dynamic"):
                 inline.init_view_dynamic(request, request.request_data)
             inlines.append(inline)
         return inlines
@@ -754,27 +755,45 @@ class SBAdmin(
             elif form.changed_data:
                 change_details = {}
                 for field in form.changed_data:
-                    initial_value = form.initial[field]
-                    new_value = form.cleaned_data[field]
-                    if isinstance(initial_value, int):  # Assuming the ID is an integer
-                        field_model = form._meta.model._meta.get_field(
-                            field
-                        ).related_model
-                        if field_model:
-                            initial_value_repr = (
-                                self._get_object_repr_by_id(field_model, initial_value)
-                                + f" ({initial_value})"
-                            )
-                            new_value_repr = str(new_value) + f" ({new_value.id})"
+                    try:
+                        initial_value = form.initial[field]
+                        new_value = form.cleaned_data[field]
+                        if isinstance(initial_value, int):
+                            field_model = form._meta.model._meta.get_field(
+                                field
+                            ).related_model
+                            if field_model:
+                                initial_value_repr = self._get_object_repr_by_id(
+                                    field_model, initial_value
+                                )
+                                new_value_repr = str(new_value)
+                            else:
+                                initial_value_repr = str(initial_value)
+                                new_value_repr = str(new_value)
                         else:
                             initial_value_repr = str(initial_value)
                             new_value_repr = str(new_value)
-                    else:
+                    except KeyError:
+                        initial_value = form.fields[field].initial
+                        new_value = form.cleaned_data[field]
                         initial_value_repr = str(initial_value)
                         new_value_repr = str(new_value)
                     if initial_value_repr != new_value_repr:
-                        change_details[field] = (initial_value_repr, new_value_repr)
-                change_message.append({"changed": change_details})
+                        change_details[field] = {
+                            "initial": initial_value_repr,
+                            "new": new_value_repr,
+                            "object_id": (
+                                new_value.id if hasattr(new_value, "id") else ""
+                            ),
+                            "content_type_id": (
+                                get_content_type_for_model(new_value).pk
+                                if hasattr(new_value, "_meta")
+                                else ""
+                            ),
+                            "object_name": field,
+                        }
+                if change_details:
+                    change_message.append({"changed": change_details})
 
             if formsets:
                 with translation_override(None):
@@ -789,25 +808,30 @@ class SBAdmin(
                             )
                             change_message.append(
                                 {
-                                    "added": (
-                                        added_object._meta.verbose_name,
-                                        object_details,
-                                    )
+                                    "added": {
+                                        "initial": None,
+                                        "new": object_details,
+                                        "object_id": (
+                                            added_object.id if added_object.id else ""
+                                        ),
+                                        "content_type_id": get_content_type_for_model(
+                                            added_object
+                                        ).pk,
+                                        "object_name": added_object._meta.verbose_name,
+                                    }
                                 }
                             )
 
                         for form in formset.forms:
                             if form.has_changed():
-                                changed_object = form.instance
-                                if changed_object not in added_objects:
-                                    changed_details = {}
-                                    for field in form.changed_data:
-                                        if field != "DELETE":
+                                changed_details = {}
+                                for field in form.changed_data:
+                                    if field != "DELETE":
+                                        changed_object = form.instance
+                                        if changed_object not in added_objects:
                                             initial_value = form.initial.get(field)
                                             new_value = form.cleaned_data[field]
-                                            if isinstance(
-                                                initial_value, int
-                                            ):  # Assuming the ID is an integer
+                                            if isinstance(initial_value, int):
                                                 field_model = (
                                                     formset.model._meta.get_field(
                                                         field
@@ -829,10 +853,19 @@ class SBAdmin(
                                                 initial_value_repr = str(initial_value)
                                                 new_value_repr = str(new_value)
                                             if initial_value_repr != new_value_repr:
-                                                changed_details[field] = (
-                                                    initial_value_repr,
-                                                    new_value_repr,
-                                                )
+                                                changed_details[field] = {
+                                                    "initial": initial_value_repr,
+                                                    "new": new_value_repr,
+                                                    "object_id": (
+                                                        new_value.id
+                                                        if hasattr(new_value, "id")
+                                                        else ""
+                                                    ),
+                                                    "content_type_id": get_content_type_for_model(
+                                                        new_value
+                                                    ).pk,
+                                                    "object_name": new_value._meta.verbose_name,
+                                                }
                                             change_message.append(
                                                 {"changed": changed_details}
                                             )
@@ -841,13 +874,18 @@ class SBAdmin(
                             change_message.append(
                                 {
                                     "deleted": {
-                                        "name": str(deleted_object._meta.verbose_name),
-                                        "object": str(deleted_object),
+                                        "initial": str(deleted_object),
+                                        "new": None,
+                                        "object_id": None,
+                                        "content_type_id": get_content_type_for_model(
+                                            deleted_object
+                                        ).pk,
+                                        "object_name": deleted_object._meta.verbose_name,
                                     }
                                 }
                             )
             return change_message
-        except:
+        except Exception as e:
             return super().construct_change_message(request, form, formsets, add)
 
     def _get_object_repr_by_id(self, model, object_id):

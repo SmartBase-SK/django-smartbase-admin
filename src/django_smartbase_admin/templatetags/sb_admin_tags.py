@@ -146,58 +146,43 @@ def get_log_entry_message(log_entry):
         messages = []
         for sub_message in change_message:
             if "added" in sub_message:
-                if sub_message["added"]:
-                    obj_name, added_fields = sub_message["added"]
-                    messages.append(
-                        gettext("Added {obj_name} “{fields}”.\n").format(
-                            obj_name=obj_name,
-                            fields=added_fields,
+                try:
+                    if sub_message["added"]:
+                        added_data = sub_message["added"]
+                        messages.append(
+                            gettext("Added {object_name}: {new}”.\n").format(
+                                **added_data
+                            )
                         )
-                    )
-
-                else:
-                    messages.append(gettext("Added.\n"))
+                except Exception as e:
+                    messages.append(str(sub_message["added"]))
 
             elif "changed" in sub_message:
-                try:
-                    for fields in sub_message["changed"]:
-                        if fields == "fields":
-                            formatted_fields = (" and ").join(
-                                sub_message["changed"][fields]
-                            )
-                            messages.append(
-                                gettext("Changed {fields}.\n").format(
-                                    fields=formatted_fields
-                                )
-                            )
 
-                        else:
-                            old_value, new_value = sub_message["changed"][fields]
-                            old_value = fields + ": " + old_value
+                changed_data = sub_message["changed"]
+
+                for key, values in changed_data.items():
+                    try:
+                        if values["object_name"].upper() != key.upper():
                             messages.append(
                                 gettext(
-                                    "Changed {old_value} for {new_value}.\n"
-                                ).format(
-                                    old_value=(
-                                        old_value
-                                        if len(old_value) - len(fields) <= 50
-                                        else old_value[: 50 + len(fields)]
-                                    ),
-                                    new_value=(
-                                        new_value
-                                        if len(new_value) <= 50
-                                        else new_value[:50]
-                                    ),
-                                    **sub_message["changed"],
-                                )
+                                    "Changed {object_name} - {key}: from “{initial}” to “{new}”.\n"
+                                ).format(key=key, **values)
                             )
-                except Exception as e:
-                    messages.append(str(sub_message["changed"]))
+                        else:
+                            messages.append(
+                                gettext(
+                                    "Changed {key}: from “{initial}” to “{new}”.\n"
+                                ).format(**values, key=key)
+                            )
+                    except Exception as e:
+                        messages.append(str(sub_message["changed"]))
             elif "deleted" in sub_message:
-                sub_message["deleted"]["name"] = gettext(sub_message["deleted"]["name"])
+                deleted_data = sub_message["deleted"]
                 messages.append(
-                    gettext("Deleted {name} “{object}”.\n").format(
-                        **sub_message["deleted"]
+                    gettext('Deleted {object_name}: "{initial}."\n').format(
+                        initial=deleted_data.get("initial"),
+                        object_name=deleted_data.get("object_name"),
                     )
                 )
 
