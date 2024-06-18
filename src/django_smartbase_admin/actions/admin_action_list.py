@@ -58,19 +58,12 @@ class SBAdminListAction(SBAdminAction):
             self.all_params = json.loads(
                 request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
             )
-            if request.request_data.request_method == "GET":
-                source_data = request.request_data.request_get.get(
-                    BASE_PARAMS_NAME, "{}"
-                )
-            elif request.request_data.request_method == "POST":
-                if request.headers.get("X-TabulatorRequest", None) == "true":
-                    source_data = request.body
-                else:
-                    source_data = request.request_data.request_post.get(
-                        BASE_PARAMS_NAME, "{}"
-                    )
-            else:
-                source_data = "{}"
+            source_data = request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
+            if (
+                request.request_data.request_method == "POST"
+                and request.headers.get("X-TabulatorRequest", None) == "true"
+            ):
+                source_data = request.body
             try:
                 self.all_params = json.loads(source_data)
             except json.JSONDecodeError:

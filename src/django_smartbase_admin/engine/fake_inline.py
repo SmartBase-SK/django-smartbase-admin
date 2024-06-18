@@ -59,7 +59,15 @@ class SBAdminFakeInlineMixin:
                 (self.model,),
                 {
                     "__module__": self.__module__,
-                    "Meta": type("Meta", (), {"proxy": True}),
+                    "Meta": type(
+                        "Meta",
+                        (),
+                        {
+                            "proxy": True,
+                            "verbose_name": self.model._meta.verbose_name,
+                            "verbose_name_plural": self.model._meta.verbose_name_plural,
+                        },
+                    ),
                 },
             )
             fake_model_class.original_model = self.model
