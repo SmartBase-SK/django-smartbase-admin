@@ -4,9 +4,6 @@
 {% block view_class %}change-list{% endblock %}
 
 {% block content %}
-    {% block form_modal %}
-        {% include 'sb_admin/partials/modal/modal.html' %}
-    {% endblock %}
     {% block page_header %}
         <div class="list-view-header py-16 md:pb-32 flex items-center max-xs:px-20">
             <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">{{ list_title|capfirst }}</h1>

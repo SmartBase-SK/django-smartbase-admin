@@ -52,6 +52,14 @@
 
 {% endblock %}
 
+{% block confirmation_modal %}
+    {% include 'sb_admin/includes/confirmation.html' %}
+{% endblock %}
+
+{% block modal %}
+	{% include 'sb_admin/partials/modal/modal.html' %}
+{% endblock %}
+
 {% block js %}
     {% include 'sb_admin/sb_admin_js_trans.html' %}
     <script>

@@ -23,9 +23,6 @@
 {% endblock %}
 
 {% block content %}
-    {% block form_modal %}
-        {% include 'sb_admin/partials/modal/modal.html' %}
-    {% endblock %}
     {% get_tabular_context adminform inline_admin_formsets tabs_context as tabular_context %}
 
     {% block header %}
