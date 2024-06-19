@@ -84,8 +84,6 @@ class SBAdminFakeInlineMixin:
 
     def has_add_permission(self, request, obj=None):
         # don't allow adding new fake inline instances if parent instance is not saved yet
-        if not self.parent_instance.id:
-            return False
         return super().has_add_permission(request, obj)
 
     def filter_fake_inline_identifier_by_parent_instance(

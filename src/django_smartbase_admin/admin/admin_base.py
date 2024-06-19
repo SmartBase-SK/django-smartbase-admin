@@ -603,6 +603,12 @@ class SBAdmin(
     request_data = None
     menu_label = None
 
+    def save_formset(self, request, form, formset, change):
+        if not change and hasattr(formset, "inline_instance"):
+            # update inline_instance parent_instance on formset when creating new object
+            formset.inline_instance.parent_instance = form.instance
+        super().save_formset(request, form, formset, change)
+
     def get_sbadmin_list_filter(self, request):
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
