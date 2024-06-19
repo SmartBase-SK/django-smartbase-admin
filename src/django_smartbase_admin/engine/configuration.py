@@ -5,7 +5,11 @@ from django.db.models import Q
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
-from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY, FilterVersions
+from django_smartbase_admin.engine.const import (
+    GLOBAL_FILTER_DATA_KEY,
+    FilterVersions,
+    Action,
+)
 from django_smartbase_admin.utils import to_list
 
 
@@ -132,6 +136,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
 
     def has_action_permission(self, request, request_data, view, model, obj, action):
         if model:
+            if action.action_id == Action.BULK_DELETE.value:
+                return view.has_delete_permission(request, obj)
             return self.has_permission(
                 request, request_data, view, model, obj, "view"
             ) or self.has_permission(request, request_data, view, model, obj, "change")
