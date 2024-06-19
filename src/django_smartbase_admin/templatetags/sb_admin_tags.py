@@ -4,6 +4,8 @@ from django import template
 from django.contrib.admin.templatetags.admin_modify import submit_row
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.defaultfilters import json_script
+from django.utils.safestring import mark_safe
+from django.utils.text import get_text_list
 from django.utils.translation import gettext
 
 from django_smartbase_admin.templatetags.base import InclusionSBAdminNode
@@ -132,61 +134,71 @@ def to_class_name(value):
     return value.__class__.__name__
 
 
-@register.simple_tag
-def get_log_entry_message(log_entry):
-    """
-    If self.change_message is a JSON structure, interpret it as a change
-    string, properly translated.
-    """
-    if log_entry.change_message and log_entry.change_message[0] == "[":
+def get_change_message_legacy(log_entry):
+    change_message = log_entry.change_message
+    if change_message and change_message[0] == "[":
         try:
-            change_message = json.loads(log_entry.change_message)
+            change_message = json.loads(change_message)
         except json.JSONDecodeError:
-            return log_entry.change_message
+            return change_message
         messages = []
         for sub_message in change_message:
             if "added" in sub_message:
-                try:
-                    if sub_message["added"]:
-                        added_data = sub_message["added"]
-                        messages.append(
-                            gettext("Added {object_name}: {new}”.\n").format(
-                                **added_data
-                            )
+                if sub_message["added"]:
+                    sub_message["added"]["name"] = gettext(sub_message["added"]["name"])
+                    messages.append(
+                        gettext("Added {name} “{object}”.").format(
+                            **sub_message["added"]
                         )
-                except Exception as e:
-                    messages.append(str(sub_message["added"]))
+                    )
+                else:
+                    messages.append(gettext("Added."))
 
             elif "changed" in sub_message:
+                sub_message["changed"]["fields"] = get_text_list(
+                    [
+                        gettext(field_name)
+                        for field_name in sub_message["changed"]["fields"]
+                    ],
+                    gettext("and"),
+                )
+                if "name" in sub_message["changed"]:
+                    sub_message["changed"]["name"] = gettext(
+                        sub_message["changed"]["name"]
+                    )
+                    messages.append(
+                        gettext("Changed {fields} for {name} “{object}”.").format(
+                            **sub_message["changed"]
+                        )
+                    )
+                else:
+                    messages.append(
+                        gettext("Changed {fields}.").format(**sub_message["changed"])
+                    )
 
-                changed_data = sub_message["changed"]
-
-                for key, values in changed_data.items():
-                    try:
-                        if values["object_name"].upper() != key.upper():
-                            messages.append(
-                                gettext(
-                                    "Changed {object_name} - {key}: from “{initial}” to “{new}”.\n"
-                                ).format(key=key, **values)
-                            )
-                        else:
-                            messages.append(
-                                gettext(
-                                    "Changed {key}: from “{initial}” to “{new}”.\n"
-                                ).format(**values, key=key)
-                            )
-                    except Exception as e:
-                        messages.append(str(sub_message["changed"]))
             elif "deleted" in sub_message:
-                deleted_data = sub_message["deleted"]
+                sub_message["deleted"]["name"] = gettext(sub_message["deleted"]["name"])
                 messages.append(
-                    gettext('Deleted {object_name}: "{initial}."\n').format(
-                        initial=deleted_data.get("initial"),
-                        object_name=deleted_data.get("object_name"),
+                    gettext("Deleted {name} “{object}”.").format(
+                        **sub_message["deleted"]
                     )
                 )
 
-        change_message = " ".join(msg[0].upper() + msg[1:] for msg in messages)
+        change_message = mark_safe(
+            "<br/>".join(msg[0].upper() + msg[1:] for msg in messages)
+        )
         return change_message or gettext("No fields changed.")
     else:
-        return log_entry.change_message
+        return change_message
+
+
+@register.simple_tag
+def get_log_entry_message(log_entry):
+    """
+    If change_message is a JSON structure, interpret it as a change
+    string, properly translated.
+    """
+    try:
+        return get_change_message_legacy(log_entry)
+    except Exception as e:
+        return ""
