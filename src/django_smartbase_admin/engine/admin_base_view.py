@@ -2,6 +2,7 @@ import json
 import urllib.parse
 from collections import defaultdict
 
+from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
@@ -24,6 +25,7 @@ from django_smartbase_admin.engine.const import (
     GLOBAL_FILTER_ALIAS_WIDGET_ID,
     OVERRIDE_CONTENT_OF_NOTIFICATION,
     FilterVersions,
+    BASE_PARAMS_NAME,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
@@ -471,6 +473,21 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def action_bulk_delete(self, request, modifier):
         action = SBAdminListAction(self, request)
+        if (
+            request.request_data.request_method == "POST"
+            and request.headers.get("X-TabulatorRequest", None) == "true"
+        ):
+            return redirect(
+                self.get_action_url("action_bulk_delete")
+                + "?"
+                + urllib.parse.urlencode(
+                    {BASE_PARAMS_NAME: json.dumps(action.all_params)}
+                )
+            )
+        if not action.selection_data:
+            # don't run with no selection data as it will result in delete of all records
+            messages.error(request, _("No selection made."))
+            return redirect(self.get_menu_view_url(request))
         additional_filter = action.get_selection_queryset()
         response = delete_selected(
             self, request, self.get_queryset(request).filter(additional_filter)
