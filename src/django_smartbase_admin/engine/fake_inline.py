@@ -82,10 +82,6 @@ class SBAdminFakeInlineMixin:
         formset.inline_instance = self
         return formset
 
-    def has_add_permission(self, request, obj=None):
-        # don't allow adding new fake inline instances if parent instance is not saved yet
-        return super().has_add_permission(request, obj)
-
     def filter_fake_inline_identifier_by_parent_instance(
         self, inline_queryset, parent_instance
     ):
