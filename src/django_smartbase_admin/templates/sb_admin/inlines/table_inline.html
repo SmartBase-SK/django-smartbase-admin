@@ -9,7 +9,7 @@
             id="{{ inline_admin_formset.formset.prefix }}-group"
             data-inline-type="stacked"
             data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
-            data-inline-model="{{ inline_admin_formset.inline_model_id }}">
+            data-inline-model="{{ inline_admin_formset.inline_model_id }}"{% block additional_wrapper_attributes %}{% endblock %}>
 
             {% block card_content %}
                 <header class="mb-24 px-20 md:px-24 pt-20 md:pt-24 table-header">

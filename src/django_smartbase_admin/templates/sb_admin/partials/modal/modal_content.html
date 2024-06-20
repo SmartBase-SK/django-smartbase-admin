@@ -51,10 +51,6 @@
     </div>
     <script>
         (function(){
-            const choiceElements = document.getElementById('sb-admin-modal').querySelectorAll('.js-autocomplete');
-            choiceElements.forEach((choiceInput) => {
-                window.SBAdmin.autocomplete.initAutocomplete(choiceInput);
-            })
             document.body.dispatchEvent(new Event('SBModalShown'));
         })();
     </script>

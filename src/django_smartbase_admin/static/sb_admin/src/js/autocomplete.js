@@ -5,10 +5,6 @@ import debounce from "lodash/debounce"
 
 export default class Autocomplete {
     constructor() {
-        const choiceElements = document.querySelectorAll('.js-autocomplete')
-        choiceElements.forEach((choiceInput) => {
-            this.initAutocomplete(choiceInput)
-        })
         document.addEventListener('formset:added', (event) => {
             const totalFormsCount = document.querySelector(`#id_${event.detail.formsetName}-TOTAL_FORMS`).value - 1
             const formsetElements = document.querySelectorAll(`#${event.target.id} *`)
@@ -32,6 +28,10 @@ export default class Autocomplete {
     }
 
     handleDynamiclyAddedAutocomplete(el) {
+        const choiceElements = el.querySelectorAll('.js-autocomplete')
+        choiceElements.forEach((choiceInput) => {
+            this.initAutocomplete(choiceInput)
+        })
         el.querySelectorAll('.js-autocomplete-detail').forEach(item => {
             filterInputValueChangedUtil(item)
             item.addEventListener('SBAutocompleteChange', (e) => {
