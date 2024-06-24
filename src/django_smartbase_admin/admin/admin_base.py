@@ -74,6 +74,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminPasswordInputWidget,
     SBAdminReadOnlyPasswordHashWidget,
     SBAdminHiddenWidget,
+    SBAdminCKEditorUploadingWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -109,7 +110,7 @@ class SBAdminFormFieldWidgetsMixin:
         forms.BooleanField: SBAdminToggleWidget,
         forms.SlugField: SBAdminTextInputWidget,
         RichTextFormField: SBAdminCKEditorWidget,
-        RichTextUploadingFormField: SBAdminCKEditorWidget,
+        RichTextUploadingFormField: SBAdminCKEditorUploadingWidget,
         forms.ChoiceField: SBAdminSelectWidget,
         forms.TypedChoiceField: SBAdminSelectWidget,
         forms.NullBooleanField: SBAdminNullBooleanSelectWidget,

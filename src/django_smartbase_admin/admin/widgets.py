@@ -1,6 +1,7 @@
 import json
 
 from ckeditor.widgets import CKEditorWidget
+from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
 from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
@@ -106,6 +107,10 @@ class SBAdminCKEditorWidget(SBAdminBaseWidget, CKEditorWidget):
             extra_plugins=extra_plugins,
             external_plugin_resources=external_plugin_resources,
         )
+
+
+class SBAdminCKEditorUploadingWidget(CKEditorUploadingWidget, SBAdminCKEditorWidget):
+    pass
 
 
 class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
