@@ -87,12 +87,12 @@ class SBAdminFakeInlineMixin:
     ):
         # filter queryset by parent istance, in queryset there is annotated 'identifier' by get_fake_inline_identifier_annotate
         # example usage:
-        # qs = inline_queryset.filter(path_to_parent_instance__id: parent_instance.id)
+        # qs = inline_queryset.filter(path_to_parent_instance__id: parent_instance.pk)
         # return qs
         if not self.path_to_parent_instance_id:
             raise NotImplementedError
         qs = inline_queryset.filter(
-            **{self.path_to_parent_instance_id: parent_instance.id}
+            **{self.path_to_parent_instance_id: parent_instance.pk}
         )
         return qs
 
@@ -101,9 +101,9 @@ class SBAdminFakeInlineMixin:
         if not self.path_to_parent_instance_id:
             raise NotImplementedError
         fake_inline_object = form.save(commit=False)
-        if parent_instance.id:
+        if parent_instance.pk:
             setattr(
-                fake_inline_object, self.path_to_parent_instance_id, parent_instance.id
+                fake_inline_object, self.path_to_parent_instance_id, parent_instance.pk
             )
             fake_inline_object.save()
         return fake_inline_object
