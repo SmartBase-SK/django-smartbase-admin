@@ -114,7 +114,7 @@ class SBAdminFakeInlineMixin:
         # result of this method is used in fake_inline_queryset.annotate(SBAdminFakeInlineMixin.fk_name='result')
         # example usage:
         # return F('some_model__relationship_to_parent')
-        return F("id")
+        return F("pk")
 
     def get_queryset(self, request):
         model = self.original_model
