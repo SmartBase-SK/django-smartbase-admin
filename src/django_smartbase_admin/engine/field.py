@@ -23,6 +23,7 @@ class TabulatorFieldOptions(JSONSerializableMixin):
     formatterParams = None
     frozen = False
     title = None
+    editorParams = None
 
     def __init__(
         self,
@@ -31,6 +32,7 @@ class TabulatorFieldOptions(JSONSerializableMixin):
         formatterParams=None,
         frozen=None,
         title=None,
+        editorParams=None,
     ) -> None:
         super().__init__()
         self.headerFilter = headerFilter
@@ -38,6 +40,7 @@ class TabulatorFieldOptions(JSONSerializableMixin):
         self.formatterParams = formatterParams
         self.frozen = frozen
         self.title = title
+        self.editorParams = editorParams
 
 
 class XLSXFieldOptions(JSONSerializableMixin):
