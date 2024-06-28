@@ -1,5 +1,6 @@
 import json
 import pickle
+import urllib
 
 from django.db.models import Q, FilteredRelation, F, Value, CharField
 from django.shortcuts import redirect
@@ -7,6 +8,9 @@ from django.shortcuts import redirect
 from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
     FILTER_DATA_NAME,
+    FilterVersions,
+    ADVANCED_FILTER_DATA_NAME,
+    TABLE_PARAMS_SELECTED_FILTER_TYPE,
 )
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
@@ -27,7 +31,30 @@ class SBAdminViewService(object):
         return f"{BASE_PARAMS_NAME}={cls.json_dumps_for_url(params)}"
 
     @classmethod
-    def build_list_params_url(cls, view_id, filter_data=None):
+    def build_list_params_url(cls, view_id, filter_data=None, filter_version=None):
+        if filter_version == FilterVersions.FILTERS_VERSION_2:
+            filter_dict = {
+                ADVANCED_FILTER_DATA_NAME: {
+                    "condition": "AND",
+                    "rules": [],
+                    "valid": True,
+                },
+                FILTER_DATA_NAME: {
+                    TABLE_PARAMS_SELECTED_FILTER_TYPE: "tab_advanced_filters"
+                },
+            }
+            for key, value in filter_data.items():
+                filter_value = {
+                    "id": f"{view_id}-{key}",
+                    "field": key,
+                    "type": "string",
+                    "input": "text",
+                    "operator": "contains",
+                }
+                filter_value.update(value)
+                filter_dict[ADVANCED_FILTER_DATA_NAME]["rules"].append(filter_value)
+            params = {BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: filter_dict})}
+            return urllib.parse.urlencode(params)
         filter_data = filter_data or {}
         filter_data_processed = {}
         for filter_key, filter_value in filter_data.items():
