@@ -265,25 +265,27 @@ class DateFilterWidget(SBAdminFilterWidget):
     DATE_RANGE_SPLIT = " - "
     DATE_FORMAT = "%Y-%m-%d"
     template_name = "sb_admin/filter_widgets/date_field.html"
-    shortcuts = [
-        {"value": [0, 0], "label": _("Today")},
-        {
-            "value": [-7, 0],
-            "label": _("Last 7 days"),
-        },
-        {
-            "value": [-30, 0],
-            "label": _("Last 30 days"),
-        },
-        {
-            "value": [-90, 0],
-            "label": _("Last 90 days"),
-        },
-        {
-            "value": [-365, 0],
-            "label": _("Last 12 months"),
-        },
-    ]
+    shortcuts = {
+        AllOperators.IN_THE_LAST.value: [
+            {"value": [0, 0], "label": _("Today")},
+            {
+                "value": [-7, 0],
+                "label": _("Last 7 days"),
+            },
+            {
+                "value": [-30, 0],
+                "label": _("Last 30 days"),
+            },
+            {
+                "value": [-90, 0],
+                "label": _("Last 90 days"),
+            },
+            {
+                "value": [-365, 0],
+                "label": _("Last 12 months"),
+            },
+        ]
+    }
     default_value_shortcut_index = None
 
     def __init__(
@@ -308,22 +310,24 @@ class DateFilterWidget(SBAdminFilterWidget):
 
     def get_shortcuts(self):
         now = timezone.now()
-        shortcuts = []
-        for shortcut in self.shortcuts:
-            shortcuts.append(
-                {
-                    "label": shortcut["label"],
-                    "value": [
-                        now + timedelta(days=shortcut["value"][0]),
-                        now + timedelta(days=shortcut["value"][1]),
-                    ],
-                }
-            )
+        shortcuts = {}
+        for key, shortcuts_group in self.shortcuts.items():
+            shortcuts[key] = []
+            for shortcut in shortcuts_group:
+                shortcuts[key].append(
+                    {
+                        "label": shortcut["label"],
+                        "value": [
+                            now + timedelta(days=shortcut["value"][0]),
+                            now + timedelta(days=shortcut["value"][1]),
+                        ],
+                    }
+                )
         return shortcuts
 
     def get_default_value(self):
         if self.default_value_shortcut_index is not None:
-            selected_shortcut_value = self.get_shortcuts()[
+            selected_shortcut_value = next(iter(self.get_shortcuts()), [])[
                 self.default_value_shortcut_index
             ]["value"]
             return self.get_value_from_date_or_range(selected_shortcut_value)

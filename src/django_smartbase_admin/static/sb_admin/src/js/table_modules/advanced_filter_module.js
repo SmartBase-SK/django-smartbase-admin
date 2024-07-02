@@ -1,5 +1,6 @@
 import { SBAdminTableModule } from "./base_module"
 import { filterInputValueChangedUtil, filterInputValueChangeListener } from "../utils"
+import {customActionsPlugin, HIDE_CALENDAR_CLASS, monthYearViewsPlugin} from "../datepicker_plugins"
 
 export class AdvancedFilterModule extends SBAdminTableModule {
     constructor(table) {
@@ -16,13 +17,13 @@ export class AdvancedFilterModule extends SBAdminTableModule {
                 window.SBAdmin.range.initRange(widgetEl)
                 widgetEl.dispatchEvent(new CustomEvent("SBTableFilterFormLoad"))
             },
-            ".js-datepicker-not-inline": (rule, ruleEl, widgetEl) => {
+            ".js-datepicker-dynamic": (rule, ruleEl, widgetEl) => {
                 this.dateOperatorUpdate(rule, ruleEl, widgetEl)
             }
         }
         this.afterUpdateRuleOperatorFunctions = {
             ".js-range": this.rangeOperatorUpdate,
-            ".js-datepicker-not-inline": this.dateOperatorUpdate
+            ".js-datepicker-dynamic": this.dateOperatorUpdate.bind(this)
         }
     }
 
@@ -36,6 +37,9 @@ export class AdvancedFilterModule extends SBAdminTableModule {
         if(!filterData?.rules || filterData.rules.length === 0) {
             filterData = emptyRules
         }
+        document.querySelectorAll('.js-datepicker-dynamic').forEach(widgetEl => {
+            this.destroyDatePicker(widgetEl)
+        })
         window.dispatchEvent(new CustomEvent("SBinitOrUpdateQueryBuilder", { detail: { SBTable: this, filterData: filterData } }))
     }
 
@@ -95,26 +99,37 @@ export class AdvancedFilterModule extends SBAdminTableModule {
         }
     }
 
-    dateOperatorUpdate(rule, ruleEl, widgetEl) {
-        let newMode = "single"
-        if (["between", "not_between"].includes(rule.operator.type)) {
-            newMode = "range"
+    destroyDatePicker(widgetEl) {
+        if(widgetEl._flatpickr){
+            widgetEl._flatpickr.clear()
+            widgetEl._flatpickr.destroy()
         }
-        if (!widgetEl._flatpickr) {
-            // not yet initialized, init nad set right mode
-            const sbadminDatepickerData = JSON.parse(widgetEl.dataset.sbadminDatepicker)
-            sbadminDatepickerData.flatpickrOptions.mode = newMode
-            widgetEl.dataset.sbadminDatepicker = JSON.stringify(sbadminDatepickerData)
-            window.SBAdmin.datepicker.initWidgets(ruleEl)
-        } else {
-            // update mode
-            const flatPickr = widgetEl._flatpickr
-            const currentMode = flatPickr.config.mode
+    }
 
-            if (newMode !== currentMode) {
-                flatPickr.set("mode", newMode)
-                flatPickr.clear()
-            }
+    dateOperatorUpdate(rule, ruleEl, widgetEl) {
+        let optionsOverride = {
+            inline: false,
+            mode: "single",
+            allowInput: true,
+            plugins: [
+                monthYearViewsPlugin,
+                customActionsPlugin
+            ],
         }
+        if (["between", "not_between", "in_the_last", "in_the_next"].includes(rule.operator.type)) {
+            optionsOverride["mode"] = "range"
+        }
+        if (["in_the_last", "in_the_next"].includes(rule.operator.type)) {
+            // this option does work but there is a bug in certain cases
+            // optionsOverride["noCalendar"] = true
+            widgetEl.classList.add(HIDE_CALENDAR_CLASS)
+        }
+        else {
+            widgetEl.classList.remove(HIDE_CALENDAR_CLASS)
+        }
+        this.destroyDatePicker(widgetEl)
+        const sbadminDatepickerData = JSON.parse(widgetEl.dataset.sbadminDatepicker)
+        widgetEl.dataset.shortcuts = JSON.stringify(sbadminDatepickerData.shortcuts[rule.operator.type] || [])
+        window.SBAdmin.datepicker.initFlatPickr(widgetEl, {}, optionsOverride)
     }
 }

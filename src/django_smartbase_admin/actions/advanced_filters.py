@@ -45,6 +45,8 @@ class AllOperators(models.TextChoices):
     IS_NOT_NULL = "is_not_null", _("Is not null")
     BEFORE = "before", _("Before")
     AFTER = "after", _("After")
+    IN_THE_LAST = "in_the_last", _("In the last")
+    IN_THE_NEXT = "in_the_next", _("In the next")
 
 
 NULL_ATTRIBUTES = [
@@ -59,6 +61,8 @@ DATE_ATTRIBUTES = [
     AllOperators.AFTER,
     AllOperators.IS_NULL,
     AllOperators.IS_NOT_NULL,
+    AllOperators.IN_THE_LAST,
+    AllOperators.IN_THE_NEXT,
 ]
 
 NUMBER_ATTRIBUTES = [
@@ -157,6 +161,8 @@ class QueryBuilderService:
         AllOperators.IS_NOT_NULL.value: "__isnull",
         AllOperators.BEFORE.value: "__lt",
         AllOperators.AFTER.value: "__gte",
+        AllOperators.IN_THE_LAST.value: "__range",
+        AllOperators.IN_THE_NEXT.value: "__range",
     }
 
     ZERO_INPUTS_OPERATORS = {
