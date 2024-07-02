@@ -145,7 +145,8 @@ class Main {
         }
 
         const changeAliasName = () => {
-            const currentAlias = aliasGroup.querySelector('input[name="alias"]:checked')
+            const currentAlias = aliasGroup.querySelector('input.js-alias-domain-name-value:checked') ||
+                aliasGroup.querySelector('input[name="alias"]:checked')
             if (!currentAlias) {
                 return
             }
