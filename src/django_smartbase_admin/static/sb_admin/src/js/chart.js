@@ -48,7 +48,7 @@ class SBAdminChart {
             }
         })
         this.refreshData()
-        document.addEventListener("SBAdminReloadTableData", () => {
+        document.addEventListener(window.sb_admin_const.TABLE_RELOAD_DATA_EVENT_NAME, () => {
             this.refreshData()
         })
     }

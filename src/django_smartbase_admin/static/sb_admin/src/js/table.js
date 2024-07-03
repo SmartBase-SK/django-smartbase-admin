@@ -271,8 +271,13 @@ class SBAdminTable {
         Tabulator.registerModule(SBAjaxParamsTabulatorModifier)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         this.tabulator.SBTable = this
-        document.addEventListener("SBAdminReloadTableData", function () {
+        document.addEventListener(window.sb_admin_const.TABLE_RELOAD_DATA_EVENT_NAME, function () {
             self.refreshTableDataIfNotUrlLoad()
+        })
+        document.addEventListener(window.sb_admin_const.TABLE_UPDATE_ROW_DATA_EVENT_NAME, function (e) {
+            if (e.detail && e.detail.rowData) {
+                self.tabulator.updateData(e.detail.rowData)
+            }
         })
     }
 

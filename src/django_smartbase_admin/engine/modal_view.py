@@ -2,6 +2,7 @@ from django.http import HttpResponse
 from django.views.generic import FormView
 from django_htmx.http import trigger_client_event
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
+from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
 
 
 class ActionModalView(FormView):
@@ -19,7 +20,7 @@ class ActionModalView(FormView):
         trigger_client_event(response, "hideModal", {})
         trigger_client_event(
             response,
-            "SBAdminReloadTableData",
+            TABLE_RELOAD_DATA_EVENT_NAME,
             {},
         )
         return response

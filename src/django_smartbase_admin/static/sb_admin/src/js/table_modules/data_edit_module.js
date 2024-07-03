@@ -11,16 +11,14 @@ export class DataEditModule extends SBAdminTableModule {
             editRequestData.set('currentRowId', currentRowId)
             editRequestData.set('columnFieldName', cell.getColumn().getField())
             editRequestData.set('cellValue', cell.getValue())
-            fetch(this.table.tableDataEditUrl, {
-                method: 'POST',
-                headers: {
-                    "X-CSRFToken": window.csrf_token,
-                },
-                body: editRequestData
-            }).then(response => response.json())
-                .then(res => {
-                    console.log(res)
-                })
+            window.htmx.ajax('POST', this.table.tableDataEditUrl, {
+                'swap': 'none',
+                'values': {
+                    'currentRowId': currentRowId,
+                    'columnFieldName': cell.getColumn().getField(),
+                    'cellValue': cell.getValue()
+                }
+            })
         })
     }
 }

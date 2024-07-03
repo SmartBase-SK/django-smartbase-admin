@@ -26,6 +26,8 @@ from django_smartbase_admin.engine.const import (
     OVERRIDE_CONTENT_OF_NOTIFICATION,
     FilterVersions,
     BASE_PARAMS_NAME,
+    TABLE_RELOAD_DATA_EVENT_NAME,
+    TABLE_UPDATE_ROW_DATA_EVENT_NAME,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
@@ -33,7 +35,7 @@ from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXOptions,
     SBAdminXLSXFormat,
 )
-from django_smartbase_admin.utils import is_htmx_request
+from django_smartbase_admin.utils import is_htmx_request, render_notifications
 
 
 class SBAdminBaseView(object):
@@ -174,6 +176,8 @@ class SBAdminBaseView(object):
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
                     "AUTOCOMPLETE_PAGE_SIZE": AUTOCOMPLETE_PAGE_SIZE,
                     "GLOBAL_FILTER_ALIAS_WIDGET_ID": GLOBAL_FILTER_ALIAS_WIDGET_ID,
+                    "TABLE_RELOAD_DATA_EVENT_NAME": TABLE_RELOAD_DATA_EVENT_NAME,
+                    "TABLE_UPDATE_ROW_DATA_EVENT_NAME": TABLE_UPDATE_ROW_DATA_EVENT_NAME,
                 }
             ),
         }
@@ -289,7 +293,8 @@ class SBAdminBaseListView(SBAdminBaseView):
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
         cell_value = request.POST.get("cellValue", "")
-        return JsonResponse({"message": "Not Implemented"})
+        messages.add_message(request, messages.ERROR, "Not Implemented")
+        return HttpResponse(status=200, content=render_notifications(request))
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
