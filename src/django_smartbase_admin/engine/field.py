@@ -255,6 +255,7 @@ class SBAdminField(JSONSerializableMixin):
 
     def get_field_annotates(self, values):
         field_annotates = {}
+        supporting_annotates = {}
         if self.annotate:
             field_annotates[self.field] = self.annotate
         if self.annotate_function:
@@ -264,5 +265,5 @@ class SBAdminField(JSONSerializableMixin):
             else:
                 field_annotates[self.field] = Value(None, output_field=CharField())
         if self.supporting_annotates:
-            field_annotates.update(self.supporting_annotates)
-        return field_annotates
+            supporting_annotates.update(self.supporting_annotates)
+        return {**supporting_annotates, **field_annotates}
