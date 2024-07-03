@@ -334,7 +334,7 @@ class DateFilterWidget(SBAdminFilterWidget):
 
     def get_default_value(self):
         if self.default_value_shortcut_index is not None:
-            selected_shortcut_value = next(iter(self.get_shortcuts()), [])[
+            selected_shortcut_value = self.get_shortcuts()[
                 self.default_value_shortcut_index
             ]["value"]
             return self.get_value_from_date_or_range(selected_shortcut_value)
