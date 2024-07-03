@@ -172,6 +172,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             form_field, model=model, multiselect=multiselect
         )
 
+    def get_filter_widget(self, field, default_widget):
+        return default_widget
+
     def get_form_field_widget_class(
         self, view, request, form_field, db_field, default_widget_class
     ):

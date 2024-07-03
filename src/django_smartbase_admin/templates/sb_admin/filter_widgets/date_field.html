@@ -1,8 +1,12 @@
-<div class="dropdown-menu dropdown-menu-datepicker" style="max-width: none; width: auto; height: auto; max-height: none;">
+<div class="dropdown-menu dropdown-menu-datepicker"
+     style="max-width: none; width: auto; height: auto; max-height: none;">
     <div class="px-12 py-8">
         <input form="{{ filter_widget.view_id }}-filter-form" type="text" class="input pl-10 js-datepicker-range"
-           id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}" data-sbadmin-datepicker="{{ filter_widget.get_data }}"
-           {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %} value="{{ filter_widget.get_default_value }}"{% endif %}>
+               id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
+               data-sbadmin-datepicker="{{ filter_widget.get_data }}"
+               data-sbadmin-datepicker-shortcuts="{{ filter_widget.get_shortcuts_data }}"
+               {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %}
+               value="{{ filter_widget.get_default_value }}"{% endif %}>
     </div>
     {% include "sb_admin/filter_widgets/partials/clear.html" %}
 </div>

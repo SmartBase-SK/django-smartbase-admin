@@ -142,6 +142,7 @@ class SBAdminField(JSONSerializableMixin):
             )
         if not filter_widget:
             filter_widget = StringFilterWidget()
+        filter_widget = configuration.get_filter_widget(self, filter_widget)
         if filter_widget:
             filter_widget.init_filter_widget_static(self, self.view, configuration)
             self.filter_widget = filter_widget

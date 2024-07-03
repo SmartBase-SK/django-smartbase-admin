@@ -287,7 +287,7 @@ export const customActionsPlugin = (fp) => {
         const baseId = fp.element.id
         const baseValue = fp.element.value
         const el = document.createElement('div')
-        const shortcuts = JSON.parse(fp.element.dataset.shortcuts, dateTimeReviver)
+        const shortcuts = JSON.parse(fp.element.dataset.sbadminDatepickerShortcuts, dateTimeReviver)
         el.classList.add('flatpickr-shortcuts')
         el.addEventListener('change', (e) => {
             const value = e.target.value

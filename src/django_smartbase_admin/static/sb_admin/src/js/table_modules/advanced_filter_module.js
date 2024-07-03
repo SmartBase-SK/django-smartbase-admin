@@ -128,8 +128,8 @@ export class AdvancedFilterModule extends SBAdminTableModule {
             widgetEl.classList.remove(HIDE_CALENDAR_CLASS)
         }
         this.destroyDatePicker(widgetEl)
-        const sbadminDatepickerData = JSON.parse(widgetEl.dataset.sbadminDatepicker)
-        widgetEl.dataset.shortcuts = JSON.stringify(sbadminDatepickerData.shortcuts[rule.operator.type] || [])
+        const shortcuts = JSON.parse(widgetEl.dataset.sbadminDatepickerShortcutsDict)
+        widgetEl.dataset.sbadminDatepickerShortcuts = JSON.stringify(shortcuts[rule.operator.type] || [])
         window.SBAdmin.datepicker.initFlatPickr(widgetEl, {}, optionsOverride)
     }
 }

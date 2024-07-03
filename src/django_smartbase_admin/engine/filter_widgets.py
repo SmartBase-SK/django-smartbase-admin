@@ -265,27 +265,26 @@ class DateFilterWidget(SBAdminFilterWidget):
     DATE_RANGE_SPLIT = " - "
     DATE_FORMAT = "%Y-%m-%d"
     template_name = "sb_admin/filter_widgets/date_field.html"
-    shortcuts = {
-        AllOperators.IN_THE_LAST.value: [
-            {"value": [0, 0], "label": _("Today")},
-            {
-                "value": [-7, 0],
-                "label": _("Last 7 days"),
-            },
-            {
-                "value": [-30, 0],
-                "label": _("Last 30 days"),
-            },
-            {
-                "value": [-90, 0],
-                "label": _("Last 90 days"),
-            },
-            {
-                "value": [-365, 0],
-                "label": _("Last 12 months"),
-            },
-        ]
-    }
+    shortcuts = [
+        {"value": [0, 0], "label": _("Today")},
+        {
+            "value": [-7, 0],
+            "label": _("Last 7 days"),
+        },
+        {
+            "value": [-30, 0],
+            "label": _("Last 30 days"),
+        },
+        {
+            "value": [-90, 0],
+            "label": _("Last 90 days"),
+        },
+        {
+            "value": [-365, 0],
+            "label": _("Last 12 months"),
+        },
+    ]
+    shortcuts_dict = {AllOperators.IN_THE_LAST.value: shortcuts}
     default_value_shortcut_index = None
 
     def __init__(
@@ -308,21 +307,29 @@ class DateFilterWidget(SBAdminFilterWidget):
     def get_advanced_filter_operators(self):
         return DATE_ATTRIBUTES
 
+    def process_shortcut(self, shortcut, now):
+        return {
+            "label": shortcut["label"],
+            "value": [
+                now + timedelta(days=shortcut["value"][0]),
+                now + timedelta(days=shortcut["value"][1]),
+            ],
+        }
+
     def get_shortcuts(self):
         now = timezone.now()
+        shortcuts = []
+        for shortcut in self.shortcuts:
+            shortcuts.append(self.process_shortcut(shortcut, now))
+        return shortcuts
+
+    def get_shortcuts_dict(self):
+        now = timezone.now()
         shortcuts = {}
-        for key, shortcuts_group in self.shortcuts.items():
+        for key, shortcuts_group in self.shortcuts_dict.items():
             shortcuts[key] = []
             for shortcut in shortcuts_group:
-                shortcuts[key].append(
-                    {
-                        "label": shortcut["label"],
-                        "value": [
-                            now + timedelta(days=shortcut["value"][0]),
-                            now + timedelta(days=shortcut["value"][1]),
-                        ],
-                    }
-                )
+                shortcuts[key].append(self.process_shortcut(shortcut, now))
         return shortcuts
 
     def get_default_value(self):
@@ -336,13 +343,25 @@ class DateFilterWidget(SBAdminFilterWidget):
     def get_data(self):
         return json.dumps(
             {
-                "shortcuts": self.get_shortcuts(),
                 "flatpickrOptions": {
                     "locale": {
                         "rangeSeparator": self.DATE_RANGE_SPLIT,
                     }
                 },
             },
+            cls=SBAdminJSONEncoder,
+        )
+
+    def get_shortcuts_data(self):
+        return json.dumps(
+            self.get_shortcuts(),
+            cls=SBAdminJSONEncoder,
+        )
+
+    def get_shortcuts_dict_data(self):
+        # used for advanced filters with different calendar operators "in the last", "in the next", etc.
+        return json.dumps(
+            self.get_shortcuts_dict(),
             cls=SBAdminJSONEncoder,
         )
 
