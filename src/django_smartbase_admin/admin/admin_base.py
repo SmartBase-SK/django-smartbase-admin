@@ -9,7 +9,6 @@ from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
-from django.contrib.postgres.forms import SimpleArrayField
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
@@ -51,6 +50,14 @@ try:
     )
 
     parler_enabled = True
+except ImportError:
+    pass
+
+postrgres_enabled = None
+try:
+    from django.contrib.postgres.forms import SimpleArrayField
+
+    postrgres_enabled = True
 except ImportError:
     pass
 
@@ -114,11 +121,12 @@ class SBAdminFormFieldWidgetsMixin:
         forms.ChoiceField: SBAdminSelectWidget,
         forms.TypedChoiceField: SBAdminSelectWidget,
         forms.NullBooleanField: SBAdminNullBooleanSelectWidget,
-        SimpleArrayField: SBAdminArrayWidget,
         AdminImageFormField: SBAdminImageWidget,
         ReadOnlyPasswordHashWidget: SBAdminReadOnlyPasswordHashWidget,
         forms.HiddenInput: SBAdminHiddenWidget,
     }
+    if postrgres_enabled:
+        formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
 
     django_widget_to_widget = {
         forms.PasswordInput: SBAdminPasswordInputWidget,
