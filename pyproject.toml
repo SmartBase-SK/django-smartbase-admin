@@ -19,6 +19,8 @@ django-widget-tweaks = "^1.5.0"
 django-filer = "^3.1.1"
 easy-thumbnails = {extras = ["svg"], version = "^2.8.5"}
 django-htmx = "^1.17.3"
+# required for django-filer
+setuptools = "^67.0.0"
 
 
 [build-system]
