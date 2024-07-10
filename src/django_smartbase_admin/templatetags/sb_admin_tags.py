@@ -78,7 +78,7 @@ def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
 @register.simple_tag
 def get_tabular_context(fieldsets, inlines, tabs):
     default_tabs = False
-    has_error = False
+    any_error = False
     first_error_tab = True
     tabular_context = {}
     inlines_map = {inline.opts.__class__: inline for inline in inlines}
@@ -90,6 +90,7 @@ def get_tabular_context(fieldsets, inlines, tabs):
         default_tabs = True
     for key, values in tabs.items():
         for value in values:
+            has_error = False
             fieldset_value = fieldsets_map.get(value)
             inline_value = inlines_map.get(value)
             tabular_context[key] = tabular_context.get(
@@ -99,7 +100,15 @@ def get_tabular_context(fieldsets, inlines, tabs):
                 tabular_context[key]["content"].append(
                     {"type": "fieldset", "value": fieldset_value}
                 )
-                error_present = bool(fieldset_value.form.errors)
+                fieldset_fields = set()
+                for field in fieldset_value.fields:
+                    if isinstance(field, (list, tuple)):
+                        fieldset_fields.update(set(field))
+                    else:
+                        fieldset_fields.add(field)
+                error_present = bool(
+                    set(fieldset_value.form.errors.keys()).intersection(fieldset_fields)
+                )
                 has_error = has_error or error_present
                 tabular_context[key]["error"] = (
                     tabular_context[key]["error"] or error_present
@@ -114,18 +123,19 @@ def get_tabular_context(fieldsets, inlines, tabs):
                     tabular_context[key]["error"] or error_present
                 )
             if has_error:
+                any_error = True
                 tabular_context[key]["classes"].add("error")
                 if first_error_tab:
                     tabular_context[key]["classes"].update(["active", "show"])
                     first_error_tab = False
-    if not has_error:
+    if not any_error:
         tabular_context[list(tabular_context.keys())[0]]["classes"].update(
             ["active", "show"]
         )
     return {
         "context": tabular_context,
         "default_tabs": default_tabs,
-        "has_error": has_error,
+        "has_error": any_error,
     }
 
 
