@@ -645,6 +645,7 @@ class SBAdmin(
         )
 
     def register_autocomplete_views(self, request):
+        super().register_autocomplete_views(request)
         self.get_form(request)()
 
     def get_fieldsets(self, request, obj):
