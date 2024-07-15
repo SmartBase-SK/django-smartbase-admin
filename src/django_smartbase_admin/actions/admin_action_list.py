@@ -220,6 +220,18 @@ class SBAdminListAction(SBAdminAction):
             order_by = self.view.get_list_ordering() or [self.get_pk_field().name]
         return order_by
 
+    def get_order_by_fields_from_request(self):
+        order_by = self.get_order_by_from_request()
+        order_by_fields = []
+        order_by_fields_names = set()
+        for field in order_by:
+            field_name = field[1:] if field.startswith("-") else field
+            order_by_fields_names.add(field_name)
+        for field in self.column_fields:
+            if field.name in order_by_fields_names:
+                order_by_fields.append(field)
+        return order_by_fields
+
     def get_filter_from_request(self):
         base_filters = SBAdminViewService.get_filter_from_request(
             self.threadsafe_request, self.column_fields, self.filter_data
@@ -246,6 +258,7 @@ class SBAdminListAction(SBAdminAction):
         filter_fields.extend(
             QueryBuilderService.get_filters_fields_for_list_action(self)
         )
+        filter_fields.extend(self.get_order_by_fields_from_request())
         if self.is_search_query():
             search_fields = self.get_search_fields(self.threadsafe_request)
             filter_fields.extend(search_fields)
@@ -283,6 +296,9 @@ class SBAdminListAction(SBAdminAction):
         values.extend([field.field for field in visible_column_fields])
         if self.view.sbadmin_list_display_data:
             values.extend(self.view.sbadmin_list_display_data)
+        values.extend(
+            [field.field for field in self.get_order_by_fields_from_request()]
+        )
         return values
 
     def get_search_results(self, request, queryset, search_term):
