@@ -161,7 +161,7 @@
                                             {% include "sb_admin/includes/table_inline_delete_button.html" %}
                                         {% endblock %}
                                     </tr>
-
+                                    {% block table_inline_after_line %}{% endblock %}
                                     {% if inline_admin_form.form.inlines %}
                                         <tr class="djn-tr">
                                             <td class="djn-td" colspan="{{ inline_admin_form|cell_count }}">
