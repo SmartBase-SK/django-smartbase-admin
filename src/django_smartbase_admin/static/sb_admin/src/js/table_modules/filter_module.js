@@ -21,10 +21,10 @@ export class FilterModule extends SBAdminTableModule {
             const wrapperEl = el.closest('.filter-wrapper')
             if(wrapperEl) {
                 if (!wrapperEl.hasAttribute('data-all-filters-visible')) {
-                    this.hideFilter(wrapperEl.getAttribute('data-filter-input-name'), true)
+                    this.hideFilter(wrapperEl.getAttribute('data-filter-input-name'))
                 }
             } else {
-                this.hideFilter(el.getAttribute('name'))
+                this.hideFilter(el.getAttribute('name'), false)
             }
         })
         if (filterData) {
@@ -101,7 +101,7 @@ export class FilterModule extends SBAdminTableModule {
         this.table.refreshTableDataIfNotUrlLoad()
     }
 
-    hideFilter(field, hideWrapper=false) {
+    hideFilter(field, hideWrapper=true) {
         const fieldElem = this.getFormField(field)
         const filterElem = document.querySelector(`#${this.table.viewId}-${field}-wrapper`)
         if (!fieldElem) {
