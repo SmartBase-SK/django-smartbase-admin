@@ -1,172 +1,174 @@
 {% load static sb_admin_tags widget_tweaks i18n %}
 
 {% block content %}
-    <header class="flex items-center bg-light border-b border-dark-200 p-12 xl:hidden">
-        <div class="js-sidebar-toggle mr-12" data-sidebar-target="main-navigation">
-            <svg class="w-24 h-24">
-                <use xlink:href="#Hamburger-button"></use>
-            </svg>
-        </div>
-        <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
-             alt="SBAdmin" width="106" height="16">
-        <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300 ml-auto">
-            {{ username_data.initials }}
-        </div>
-    </header>
-    <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50 z-1"
-         id="main-navigation">
-        <header class="px-24 py-32 hidden xl:!block">
-            <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
-                 alt="SBAdmin" width="133" height="20">
-        </header>
-        <header class="px-16 py-8 flex items-center xl:hidden border-b border-dark-200 bg-light min-h-56">
-            <div class="js-sidebar-toggle w-24 h-24 flex-center ml-auto" data-sidebar-target="main-navigation">
-                <svg class="w-20 h-20 flex-shrink-0">
-                    <use xlink:href="#Close"></use>
+    {% if request.META.HTTP_SEC_FETCH_DEST == 'document' %}
+        <header class="flex items-center bg-light border-b border-dark-200 p-12 xl:hidden">
+            <div class="js-sidebar-toggle mr-12" data-sidebar-target="main-navigation">
+                <svg class="w-24 h-24">
+                    <use xlink:href="#Hamburger-button"></use>
                 </svg>
             </div>
+            <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
+                 alt="SBAdmin" width="106" height="16">
+            <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300 ml-auto">
+                {{ username_data.initials }}
+            </div>
         </header>
-        <div class="h-full overflow-auto custom-scrollbar max-lg:py-16">
-            <ul class="-my-2 px-16">
-                {% for menu_item in request_data.menu_items %}
-                    <li class="py-2">
-                        {% if menu_item.sub_items %}
-                            <div class="menu-item">
-                                <a href="{{ menu_item.get_url|default:menu_item.sub_items.0.get_url }}"
-                                   class="inline-flex w-full p-8 justify-start collapse-btn{% if not menu_item.is_active %} collapsed{% endif %}"
-                                   aria-expanded="{% if menu_item.is_active %}true{% else %}false{% endif %}"
-                                >
-                                    {% if menu_item.get_icon %}
-                                        <svg class="w-20 h-20 mr-8 flex-shrink-0">
-                                            <use xlink:href="#{{ menu_item.get_icon }}"></use>
-                                        </svg>
-                                    {% endif %}
-                                    <span>{{ menu_item.get_label }}</span>
-                                </a>
-                                <ul id="{{ menu_item.get_id }}" class="collapse -mb-2 mt-2{% if menu_item.is_active %} show{% endif %}">
-                                    {% for sub_menu_item in menu_item.sub_items %}
-                                        <li class="py-2">
-                                            <a href="{{ sub_menu_item.get_url }}"
-                                               class="menu-item text-dark-600 leading-20 pl-36 py-8 pr-8{% if sub_menu_item.is_active %} active{% endif %}">
-                                                <span>{{ sub_menu_item.get_label }}</span>
-                                            </a>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% else %}
-                            <div class="menu-item{% if menu_item.is_active %} active{% endif %}">
-                                <a href="{{ menu_item.get_url }}" class="inline-flex w-full p-8">
-                                    {% if menu_item.get_icon %}
-                                        <svg class="w-20 h-20 mr-8 flex-shrink-0">
-                                            <use xlink:href="#{{ menu_item.get_icon }}"></use>
-                                        </svg>
-                                    {% endif %}
-                                    <span>{{ menu_item.get_label }}</span>
-                                </a>
-                            </div>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-            {#            <hr class="my-32">#}
-            {#            <div class="text-14 mb-24 px-16">#}
-            {#                Pomoc a podpora#}
-            {#            </div>#}
-            {#            <ul class="-my-2 px-16">#}
-            {#                <li class="py-2">#}
-            {#                    <div class="menu-item">#}
-            {#                        <a href="#" class="inline-flex w-full p-8">#}
-            {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
-            {#                                <use xlink:href="#Accept-email"></use>#}
-            {#                            </svg>#}
-            {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
-            {#                        </a>#}
-            {#                    </div>#}
-            {#                </li>#}
-            {#                <li class="py-2">#}
-            {#                    <div class="menu-item">#}
-            {#                        <a href="#" class="inline-flex w-full p-8">#}
-            {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
-            {#                                <use xlink:href="#Accept-email"></use>#}
-            {#                            </svg>#}
-            {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
-            {#                        </a>#}
-            {#                    </div>#}
-            {#                </li>#}
-            {#            </ul>#}
-        </div>
-        <footer class="mt-auto border-t border-dark-200">
-            {#            Global Search #}
-            {#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
-            {#                <div class="flex gap-x-4">#}
-            {#                    <div class="key">#}
-            {#                        ⌘#}
-            {#                    </div>#}
-            {#                    <div class="key">#}
-            {#                        K#}
-            {#                    </div>#}
-            {#                </div>#}
-            {##}
-            {#                <div class="text-dark">#}
-            {#                    Rýchla navigácia#}
-            {#                </div>#}
-            {#            </div>#}
-            <div class="relative">
-                <div class="dropdown-btn flex items-center w-full p-16 cursor-pointer min-h-72"
-                     data-bs-toggle="dropdown"
-                     data-bs-offset="[16,8]"
-                     data-bs-popper-placement="top-start">
-                    <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300">
-                        {{ username_data.initials }}
-                    </div>
-                    <div class="ml-8">
-                        <div class="text-14 text-dark-900">{{ username_data.full_name }}</div>
-                        <div class="text-12 leading-16 js-alias-domain-name hidden"></div>
-                    </div>
-                    <svg class="w-16 h-16 ml-auto flex-shrink-0">
-                        <use xlink:href="#Sort Alt"></use>
+        <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50 z-1"
+             id="main-navigation">
+            <header class="px-24 py-32 hidden xl:!block">
+                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
+                     alt="SBAdmin" width="133" height="20">
+            </header>
+            <header class="px-16 py-8 flex items-center xl:hidden border-b border-dark-200 bg-light min-h-56">
+                <div class="js-sidebar-toggle w-24 h-24 flex-center ml-auto" data-sidebar-target="main-navigation">
+                    <svg class="w-20 h-20 flex-shrink-0">
+                        <use xlink:href="#Close"></use>
                     </svg>
                 </div>
-                <div class="dropdown-menu max-h-432">
-                    <form id="logout-form" method="post" action="{% url 'sb_admin:logout' %}" class="hidden">
-                        {% csrf_token %}
-                    </form>
-
-                    <ul>
-                        <li class="flex items-center p-12 text-dark-900 border-b border-dark-100 cursor-pointer hover:bg-dark-100"
-                            onclick="document.getElementById('logout-form').submit();">
-                            <svg class="w-16 h-16 flex-shrink-0 mr-8">
-                                <use xlink:href="#Logout"></use>
-                            </svg>
-                            {% trans 'Logout' %}
+            </header>
+            <div class="h-full overflow-auto custom-scrollbar max-lg:py-16">
+                <ul class="-my-2 px-16">
+                    {% for menu_item in request_data.menu_items %}
+                        <li class="py-2">
+                            {% if menu_item.sub_items %}
+                                <div class="menu-item">
+                                    <a href="{{ menu_item.get_url|default:menu_item.sub_items.0.get_url }}"
+                                       class="inline-flex w-full p-8 justify-start collapse-btn{% if not menu_item.is_active %} collapsed{% endif %}"
+                                       aria-expanded="{% if menu_item.is_active %}true{% else %}false{% endif %}"
+                                    >
+                                        {% if menu_item.get_icon %}
+                                            <svg class="w-20 h-20 mr-8 flex-shrink-0">
+                                                <use xlink:href="#{{ menu_item.get_icon }}"></use>
+                                            </svg>
+                                        {% endif %}
+                                        <span>{{ menu_item.get_label }}</span>
+                                    </a>
+                                    <ul id="{{ menu_item.get_id }}" class="collapse -mb-2 mt-2{% if menu_item.is_active %} show{% endif %}">
+                                        {% for sub_menu_item in menu_item.sub_items %}
+                                            <li class="py-2">
+                                                <a href="{{ sub_menu_item.get_url }}"
+                                                   class="menu-item text-dark-600 leading-20 pl-36 py-8 pr-8{% if sub_menu_item.is_active %} active{% endif %}">
+                                                    <span>{{ sub_menu_item.get_label }}</span>
+                                                </a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="menu-item{% if menu_item.is_active %} active{% endif %}">
+                                    <a href="{{ menu_item.get_url }}" class="inline-flex w-full p-8">
+                                        {% if menu_item.get_icon %}
+                                            <svg class="w-20 h-20 mr-8 flex-shrink-0">
+                                                <use xlink:href="#{{ menu_item.get_icon }}"></use>
+                                            </svg>
+                                        {% endif %}
+                                        <span>{{ menu_item.get_label }}</span>
+                                    </a>
+                                </div>
+                            {% endif %}
                         </li>
-                        <li class="flex items-center p-12 text-dark-900 cursor-pointer hover:bg-dark-100" onclick="window.location='{% url "sb_admin:password_change" %}'">
-                            <svg class="w-16 h-16 flex-shrink-0 mr-8">
-                                <use xlink:href="#Lock"></use>
-                            </svg>
-                            {% trans 'Change password' %}
-                        </li>
-                        {% if request_data.global_filter_instance %}
-                            <li class="p-12 text-dark-900">
-                                {% trans 'Choose domain' %}
-                            </li>
-                            <li>
-                                <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">
-                                    {% for field in request_data.global_filter_instance %}
-                                        <div class="relative">
-                                            {{ field }}
-                                        </div>
-                                        {{ field.errors }}
-                                    {% endfor %}
-                                </form>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </div>
+                    {% endfor %}
+                </ul>
+                {#            <hr class="my-32">#}
+                {#            <div class="text-14 mb-24 px-16">#}
+                {#                Pomoc a podpora#}
+                {#            </div>#}
+                {#            <ul class="-my-2 px-16">#}
+                {#                <li class="py-2">#}
+                {#                    <div class="menu-item">#}
+                {#                        <a href="#" class="inline-flex w-full p-8">#}
+                {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
+                {#                                <use xlink:href="#Accept-email"></use>#}
+                {#                            </svg>#}
+                {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
+                {#                        </a>#}
+                {#                    </div>#}
+                {#                </li>#}
+                {#                <li class="py-2">#}
+                {#                    <div class="menu-item">#}
+                {#                        <a href="#" class="inline-flex w-full p-8">#}
+                {#                            <svg class="w-20 h-20 mr-8 flex-shrink-0">#}
+                {#                                <use xlink:href="#Accept-email"></use>#}
+                {#                            </svg>#}
+                {#                            <span class="leading-20 line-clamp-1">Menu Item 8</span>#}
+                {#                        </a>#}
+                {#                    </div>#}
+                {#                </li>#}
+                {#            </ul>#}
             </div>
+            <footer class="mt-auto border-t border-dark-200">
+                {#            Global Search #}
+                {#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
+                {#                <div class="flex gap-x-4">#}
+                {#                    <div class="key">#}
+                {#                        ⌘#}
+                {#                    </div>#}
+                {#                    <div class="key">#}
+                {#                        K#}
+                {#                    </div>#}
+                {#                </div>#}
+                {##}
+                {#                <div class="text-dark">#}
+                {#                    Rýchla navigácia#}
+                {#                </div>#}
+                {#            </div>#}
+                <div class="relative">
+                    <div class="dropdown-btn flex items-center w-full p-16 cursor-pointer min-h-72"
+                         data-bs-toggle="dropdown"
+                         data-bs-offset="[16,8]"
+                         data-bs-popper-placement="top-start">
+                        <div class="w-32 h-32 rounded-full leading-none flex-center flex-shrink-0 bg-dark-300">
+                            {{ username_data.initials }}
+                        </div>
+                        <div class="ml-8">
+                            <div class="text-14 text-dark-900">{{ username_data.full_name }}</div>
+                            <div class="text-12 leading-16 js-alias-domain-name hidden"></div>
+                        </div>
+                        <svg class="w-16 h-16 ml-auto flex-shrink-0">
+                            <use xlink:href="#Sort Alt"></use>
+                        </svg>
+                    </div>
+                    <div class="dropdown-menu max-h-432">
+                        <form id="logout-form" method="post" action="{% url 'sb_admin:logout' %}" class="hidden">
+                            {% csrf_token %}
+                        </form>
 
-        </footer>
-    </nav>
-    <div class="bg-filter js-sidebar-toggle" data-sidebar-target="main-navigation"></div>
+                        <ul>
+                            <li class="flex items-center p-12 text-dark-900 border-b border-dark-100 cursor-pointer hover:bg-dark-100"
+                                onclick="document.getElementById('logout-form').submit();">
+                                <svg class="w-16 h-16 flex-shrink-0 mr-8">
+                                    <use xlink:href="#Logout"></use>
+                                </svg>
+                                {% trans 'Logout' %}
+                            </li>
+                            <li class="flex items-center p-12 text-dark-900 cursor-pointer hover:bg-dark-100" onclick="window.location='{% url "sb_admin:password_change" %}'">
+                                <svg class="w-16 h-16 flex-shrink-0 mr-8">
+                                    <use xlink:href="#Lock"></use>
+                                </svg>
+                                {% trans 'Change password' %}
+                            </li>
+                            {% if request_data.global_filter_instance %}
+                                <li class="p-12 text-dark-900">
+                                    {% trans 'Choose domain' %}
+                                </li>
+                                <li>
+                                    <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">
+                                        {% for field in request_data.global_filter_instance %}
+                                            <div class="relative">
+                                                {{ field }}
+                                            </div>
+                                            {{ field.errors }}
+                                        {% endfor %}
+                                    </form>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+
+            </footer>
+        </nav>
+        <div class="bg-filter js-sidebar-toggle" data-sidebar-target="main-navigation"></div>
+    {% endif %}
 {% endblock %}
