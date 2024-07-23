@@ -101,6 +101,7 @@ export class AdvancedFilterModule extends SBAdminTableModule {
 
     destroyDatePicker(widgetEl) {
         if(widgetEl._flatpickr){
+            widgetEl._flatpickr.calendarContainer?.remove()
             widgetEl._flatpickr.clear()
             widgetEl._flatpickr.destroy()
         }
