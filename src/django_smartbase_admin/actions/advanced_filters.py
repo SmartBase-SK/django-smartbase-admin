@@ -5,7 +5,7 @@ from dataclasses import field as dataclass_field
 from typing import List, Optional, TYPE_CHECKING
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
 
@@ -258,6 +258,8 @@ class QueryBuilderService:
                         if operator in [AllOperators.IS_NULL, AllOperators.IS_NOT_NULL]
                         else ""
                     )
+                    if field.annotate and isinstance(field.annotate, Count):
+                        filter_value = 0
                     q = Q(
                         **{
                             f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": filter_value,
