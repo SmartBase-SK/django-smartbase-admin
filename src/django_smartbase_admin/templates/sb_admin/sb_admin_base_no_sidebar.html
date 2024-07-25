@@ -40,6 +40,16 @@
     {% endif %}
     {% block extrahead %}{% endblock %}
     <style>@media (min-width: 1200px){.xl\:\!block {display: block !important;}}</style>
+    {% if request.META.HTTP_SEC_FETCH_DEST == "iframe" %}
+        <style>
+            .detail-view-action-bar {
+                display: none !important;
+            }
+            .change-form {
+                margin-top: 0 !important;
+            }
+        </style>
+    {% endif %}
 </head>
 <body hx-ext="remove-me" class="{{ view_id }} {% block bodyclass %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 <div class="hidden">
