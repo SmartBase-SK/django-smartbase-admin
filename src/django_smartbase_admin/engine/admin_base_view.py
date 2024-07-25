@@ -604,7 +604,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbamin_list_display(request) or []
-        self.init_fields_cache(list_fields, request.request_data.configuration)
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields
