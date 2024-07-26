@@ -32,9 +32,6 @@
                     init = true;
                     if (!queryBuilderEl$[0].queryBuilder) {
                         queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function(event, rule) {
-                            if(init) {
-                                return;
-                            };
                             setTimeout(() => {
                                 //next tick
                                 SBTable.moduleInstances.advancedFilterModule.initFilters(event, rule);
@@ -44,6 +41,9 @@
                             init = false;
                         });
                         queryBuilderEl$.on("afterUpdateRuleOperator.queryBuilder", function(event, rule, previousOperator) {
+                            if(init) {
+                                return;
+                            };
                             setTimeout(() => {
                                 SBTable.moduleInstances.advancedFilterModule.afterUpdateRuleOperator(event, rule, previousOperator);
                             }, 0);
