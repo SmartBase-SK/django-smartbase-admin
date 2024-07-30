@@ -213,3 +213,6 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             if global_filter_mapped_filter_key:
                 filter_query &= Q(**{f"{global_filter_mapped_filter_key}": field_value})
         return qs.filter(filter_query)
+
+    def process_global_filter_response(self, response, request):
+        return response

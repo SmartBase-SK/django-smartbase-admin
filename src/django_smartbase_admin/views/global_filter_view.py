@@ -22,4 +22,7 @@ class GlobalFilterView(View):
         request.request_data.configuration.init_global_filter_form_instance(request)
         if request.request_data.global_filter_instance.is_valid():
             request.session[GLOBAL_FILTER_DATA_KEY] = new_global_filter_data
+        response = request.request_data.process_global_filter_response(
+            response, request
+        )
         return response
