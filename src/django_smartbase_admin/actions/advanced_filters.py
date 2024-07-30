@@ -265,6 +265,21 @@ class QueryBuilderService:
                             f"{field.filter_field}{cls.OPERATOR_MAP[operator]}": filter_value,
                         }
                     )
+                    from django_smartbase_admin.engine.filter_widgets import (
+                        StringFilterWidget,
+                    )
+
+                    if isinstance(
+                        field.filter_widget, StringFilterWidget
+                    ) and operator in [
+                        AllOperators.IS_EMPTY,
+                        AllOperators.IS_NOT_EMPTY,
+                    ]:
+                        q = q | Q(
+                            **{
+                                f"{field.filter_field}{cls.OPERATOR_MAP[AllOperators.IS_NULL]}": True
+                            }
+                        )
                 else:
                     value = field.filter_widget.parse_value_from_input(
                         request, rule["value"]
