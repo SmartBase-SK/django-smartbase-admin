@@ -2,6 +2,7 @@ import datetime
 import io
 import re
 from copy import copy
+from html import unescape
 
 import xlsxwriter
 from django.http import HttpResponse
@@ -96,8 +97,13 @@ class SBAdminXLSXExportService(object):
                         except ValueError:
                             pass
                 if column_formatter == Formatter.HTML.value:
+                    # remove newlines
+                    data_col = re.sub(r"\n", "", str(data_col))
+                    data_col = re.sub(r"\r\n", "", str(data_col))
                     # replace all possible variants of <br> with new line
                     data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
+                    # unescape
+                    data_col = unescape(data_col)
                     data_col = strip_tags(data_col).strip()
                 if not image_write:
                     if (
