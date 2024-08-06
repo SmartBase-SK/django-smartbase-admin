@@ -211,6 +211,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_reorder_field = None
     search_field_placeholder = _("Search...")
     filters_version = None
+    sbadmin_list_action_class = SBAdminListAction
 
     def activate_reorder(self, request):
         request.reorder_active = True
@@ -472,12 +473,12 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.sbadmin_xlsx_options
 
     def action_xlsx_export(self, request, modifier):
-        action = SBAdminListAction(self, request)
+        action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data()
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
     def action_bulk_delete(self, request, modifier):
-        action = SBAdminListAction(self, request)
+        action = self.sbadmin_list_action_class(self, request)
         if (
             request.request_data.request_method == "POST"
             and request.headers.get("X-TabulatorRequest", None) == "true"
@@ -559,7 +560,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         extra_context=None,
         list_actions=None,
     ):
-        action = SBAdminListAction(
+        action = self.sbadmin_list_action_class(
             self,
             request,
             page_size=page_size,
@@ -591,7 +592,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
 
     def action_list_json(self, request, modifier, page_size=None):
-        action = SBAdminListAction(self, request, page_size=page_size)
+        action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()
         return JsonResponse(data=data, safe=False)
 

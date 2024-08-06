@@ -732,7 +732,9 @@ class SBAdmin(
             )
         except:
             all_params = {}
-        list_action = SBAdminListAction(self, request, all_params=all_params)
+        list_action = self.sbadmin_list_action_class(
+            self, request, all_params=all_params
+        )
         all_ids = list(
             list_action.build_final_data_count_queryset()
             .order_by(*list_action.get_order_by_from_request())
