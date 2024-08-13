@@ -7,8 +7,8 @@
         {% for choice in filter_widget.choices %}
             <li>
                 <div class="relative">
-                    <input onchange="document.getElementById('{{ filter_widget.input_id }}').value = event.target.value;document.getElementById('{{ filter_widget.input_id }}').dispatchEvent(new Event('change'))" type="radio" value="{{ choice.0 }}" name="{{ filter_widget.input_name }}_dummy" class="radio" id="{{ filter_widget.input_id }}_{{ forloop.counter0 }}" {% if filter_widget.get_default_value == choice.0 %} checked{% endif %} data-label="{{ choice.1 }}">
-                    <label for="{{ filter_widget.input_id }}_{{ forloop.counter0 }}">
+                    <input onchange="document.getElementById('{{ filter_widget.input_id }}').value = event.target.value;document.getElementById('{{ filter_widget.input_id }}').dispatchEvent(new Event('change'))" type="radio" value="{{ choice.0 }}" name="{{ filter_widget.input_name }}_dummy" class="radio" id="{{ filter_widget.input_id }}_{{ choice.0 }}" {% if filter_widget.get_default_value == choice.0 %} checked{% endif %} data-label="{{ choice.1 }}">
+                    <label for="{{ filter_widget.input_id }}_{{ choice.0 }}">
                         {{ choice.1|safe }}
                     </label>
                 </div>
