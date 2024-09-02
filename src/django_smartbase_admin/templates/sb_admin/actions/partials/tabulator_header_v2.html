@@ -7,7 +7,7 @@
                 <input form="{{ view_id }}-filter-form"
                        type="hidden"
                        value=""
-                       id="id_{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}"
+                       id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}"
                        name="{{ content_context.const.TABLE_PARAMS_SELECTED_FILTER_TYPE }}">
                 {% block table_header_before_tabs_header %}
                 {% endblock %}

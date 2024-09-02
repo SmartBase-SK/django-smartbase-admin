@@ -9,7 +9,7 @@ export class HeaderTabsModule extends SBAdminTableModule {
         if (!filterOptionsWrapper || !targetInput) {
             return
         }
-        filterOptionsWrapper.querySelectorAll('[data-bs-toggle]').forEach(el => {
+        filterOptionsWrapper.querySelectorAll('[data-bs-toggle="tab"]').forEach(el => {
             el.addEventListener("show.bs.tab", (event) => {
                 const targetId = event.target.id
                 if (targetId !== 'tab_saved_views') {
@@ -49,12 +49,16 @@ export class HeaderTabsModule extends SBAdminTableModule {
         if (!targetInput) {
             return
         }
-        if (targetInput.value === "") {
-            const filterOptionsWrapper = document.querySelector(".js-filters-options")
-            targetInput.value = filterOptionsWrapper.querySelector('[data-bs-toggle="tab"]').id
+        const filterOptionsWrapper = document.querySelector(".js-filters-options")
+        const activeTab = filterOptionsWrapper.querySelector('[data-bs-toggle="tab"].active')
+        if (activeTab.id !== 'tab_saved_views') {
+            if (targetInput.value === "") {
+                const filterOptionsWrapper = document.querySelector(".js-filters-options")
+                targetInput.value = filterOptionsWrapper.querySelector('[data-bs-toggle="tab"]').id
+            }
             document.getElementById(targetInput.value).click()
         }
-        if(window.location.search.includes('tabCreated')) {
+        if (window.location.search.includes('tabCreated')) {
             targetInput.value = 'tab_saved_views'
             document.getElementById(targetInput.value).click()
         }

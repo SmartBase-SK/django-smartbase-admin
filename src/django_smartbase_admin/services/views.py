@@ -11,6 +11,7 @@ from django_smartbase_admin.engine.const import (
     FilterVersions,
     ADVANCED_FILTER_DATA_NAME,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
+    TABLE_TAB_ADVANCED_FITLERS,
 )
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
@@ -40,7 +41,7 @@ class SBAdminViewService(object):
                     "valid": True,
                 },
                 FILTER_DATA_NAME: {
-                    TABLE_PARAMS_SELECTED_FILTER_TYPE: "tab_advanced_filters"
+                    TABLE_PARAMS_SELECTED_FILTER_TYPE: TABLE_TAB_ADVANCED_FITLERS
                 },
             }
             for key, value in filter_data.items():
