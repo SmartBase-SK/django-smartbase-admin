@@ -125,7 +125,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
         lang_codes.extend(selected_lang_codes)
         return lang_codes
 
-    def init_fields_cache(self, fields_source=None, configuration=None):
+    def init_fields_cache(self, fields_source=None, configuration=None, force=False):
         return
 
     def get_field_map(self, request):
