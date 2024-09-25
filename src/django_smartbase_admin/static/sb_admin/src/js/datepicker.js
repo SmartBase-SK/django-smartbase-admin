@@ -59,7 +59,7 @@ export default class Datepicker {
     initWidgets(parentEl=null) {
         const datePickerSelector = {
             '.js-datepicker': {
-                dateFormat: "d.m.Y",
+                defaultDateFormat: "d.m.Y",
                 allowInput: true,
                 plugins: [
                     monthYearViewsPlugin,
@@ -77,13 +77,13 @@ export default class Datepicker {
             '.js-timepicker': {
                 enableTime: true,
                 noCalendar: true,
-                dateFormat: "H:i",
+                defaultDateFormat: "H:i",
                 allowInput: true,
                 time_24hr: true,
             },
             '.js-datetimepicker': {
                 enableTime: true,
-                dateFormat: "d.m.Y H:i",
+                defaultDateFormat: "d.m.Y H:i",
                 allowInput: true,
                 time_24hr: true,
                 plugins: [
@@ -97,7 +97,9 @@ export default class Datepicker {
 
         Object.keys(datePickerSelector).forEach(selector => {
             parentEl.querySelectorAll(selector).forEach(datePickerEl => {
-                this.initFlatPickr(datePickerEl, datePickerSelector[selector])
+                const options = datePickerSelector[selector]
+                options.dateFormat = datePickerEl.getAttribute('data-js-datepicker-format') || options.defaultDateFormat
+                this.initFlatPickr(datePickerEl, options)
             })
         })
     }

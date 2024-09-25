@@ -160,28 +160,34 @@ class SBAdminNullBooleanSelectWidget(SBAdminBaseWidget, forms.NullBooleanSelect)
 
 class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
     template_name = "sb_admin/widgets/date.html"
+    # when overriding, make sure the format is included in settings.DATE_INPUT_FORMATS
+    js_datepicker_format = "Y-m-d"
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(
-            form_field, attrs={"class": "input js-datepicker", **(attrs or {})}
+            form_field, attrs={"class": "input js-datepicker", "data-js-datepicker-format": self.js_datepicker_format, **(attrs or {})}
         )
 
 
 class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
     template_name = "sb_admin/widgets/time.html"
+    # when overriding, make sure the format is included in settings.TIME_INPUT_FORMATS
+    js_datepicker_format = "H:i"
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(
-            form_field, attrs={"class": "input js-timepicker", **(attrs or {})}
+            form_field, attrs={"class": "input js-timepicker", "data-js-datepicker-format": self.js_datepicker_format, **(attrs or {})}
         )
 
 
 class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
     template_name = "sb_admin/widgets/datetime.html"
+    # when overriding, make sure the format is included in settings.DATETIME_INPUT_FORMATS
+    js_datepicker_format = "Y-m-d H:i"
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(
-            form_field, attrs={"class": "input js-datetimepicker", **(attrs or {})}
+            form_field, attrs={"class": "input js-datetimepicker", "data-js-datepicker-format": self.js_datepicker_format, **(attrs or {})}
         )
 
 
