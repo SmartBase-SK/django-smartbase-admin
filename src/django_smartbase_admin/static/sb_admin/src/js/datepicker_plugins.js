@@ -252,7 +252,6 @@ export const monthYearViewsPlugin = (fp) => {
 // eslint-disable-next-line no-unused-vars
 export const customActionsPlugin = (fp) => {
 
-    const dateFormat = 'd/m/Y'
     const createRadioInput = (id, name, value, label, checked) => {
         const inputWrapperEl = document.createElement('label')
         inputWrapperEl.classList.add('relative', 'block', 'px-12', 'py-8')
@@ -291,7 +290,7 @@ export const customActionsPlugin = (fp) => {
         el.classList.add('flatpickr-shortcuts')
         el.addEventListener('change', (e) => {
             const value = e.target.value
-            fp.setDate(shortcuts[value].value, true, dateFormat)
+            fp.setDate(shortcuts[value].value, true, fp.config.dateFormat)
         })
 
         shortcuts.forEach((shortcut, idx) => {

@@ -3,10 +3,12 @@ import json
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
+from django.conf import settings
 from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
+from django.utils.formats import get_format
 from django.utils.translation import gettext_lazy as _
 from django.views.generic.base import ContextMixin
 from filer.fields.image import AdminImageWidget
@@ -14,6 +16,7 @@ from filer.fields.image import AdminImageWidget
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
 )
+from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 
 class SBAdminBaseWidget(ContextMixin):
@@ -163,7 +166,27 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(
-            form_field, attrs={"class": "input js-datepicker", **(attrs or {})}
+            form_field,
+            format="%Y-%m-%d",
+            attrs={
+                "class": "input js-datepicker",
+                "data-sbadmin-datepicker": self.get_data(),
+                **(attrs or {}),
+            },
+        )
+
+    def get_data(self):
+        return json.dumps(
+            {
+                "flatpickrOptions": {
+                    "dateFormat": "Y-m-d",
+                    "altInput": True,
+                    "altFormat": get_format(
+                        "SHORT_DATE_FORMAT", use_l10n=settings.USE_L10N
+                    ),
+                },
+            },
+            cls=SBAdminJSONEncoder,
         )
 
 

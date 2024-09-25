@@ -59,7 +59,6 @@ export default class Datepicker {
     initWidgets(parentEl=null) {
         const datePickerSelector = {
             '.js-datepicker': {
-                dateFormat: "d.m.Y",
                 allowInput: true,
                 plugins: [
                     monthYearViewsPlugin,
