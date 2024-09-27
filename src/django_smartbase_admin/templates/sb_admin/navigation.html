@@ -1,7 +1,7 @@
 {% load static sb_admin_tags widget_tweaks i18n %}
 
 {% block content %}
-    {% if request.META.HTTP_SEC_FETCH_DEST == 'document' %}
+    {% if not sec_fetch_site or request.META.HTTP_SEC_FETCH_DEST == 'document' %}
         <header class="flex items-center bg-light border-b border-dark-200 p-12 xl:hidden">
             <div class="js-sidebar-toggle mr-12" data-sidebar-target="main-navigation">
                 <svg class="w-24 h-24">
