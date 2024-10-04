@@ -758,6 +758,13 @@ class SBAdmin(
             ),
         }
 
+    def add_view(self, request, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update(self.get_global_context(request, None))
+        extra_context.update(self.get_fieldsets_context(request, None))
+        extra_context.update(self.get_tabs_context(request, None))
+        return self.changeform_view(request, None, form_url, extra_context)
+
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request, object_id))
