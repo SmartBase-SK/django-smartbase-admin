@@ -45,6 +45,16 @@
             }
         }
 
+        &[readonly],
+        &:disabled {
+            & + label {
+                opacity: 0.5;
+            }
+            & ~ label {
+                cursor: default;
+            }
+        }
+
 
 
         &:checked {
