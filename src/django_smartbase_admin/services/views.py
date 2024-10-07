@@ -61,7 +61,7 @@ class SBAdminViewService(object):
         for filter_key, filter_value in filter_data.items():
             filter_data_processed[filter_key] = cls.json_dumps_and_replace(filter_value)
         view_params = {FILTER_DATA_NAME: filter_data_processed}
-        return cls.build_list_url(view_id, view_params)
+        return cls.build_list_url(view_id, view_params).replace("\\\\", "")
 
     @classmethod
     def get_pk_field_for_model(cls, model):
