@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 from django.contrib.auth import get_permission_codename
 from django.db.models import Q
 
@@ -88,6 +86,18 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
                 if hasattr(view, "get_id")
             }
         )
+        try:
+            from cms.plugin_pool import plugin_pool
+
+            for name, view in plugin_pool.plugins.items():
+                if hasattr(view, "get_id"):
+                    view_instance = view()
+                    self.view_map[view_instance.get_id()] = view_instance
+                    view_instance.init_view_static(
+                        self, view_instance.model, sb_admin_site
+                    )
+        except ImportError:
+            pass
 
     def init_model_admin_view_map(self):
         for model, admin_view in sb_admin_site._registry.items():
