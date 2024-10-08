@@ -757,7 +757,7 @@ class SBAdmin(
             ),
         }
 
-    def get_readonly_context(self, request, object_id=None):
+    def get_readonly_base_fields_context(self, request, object_id=None):
         obj = None
         if object_id:
             obj = self.get_object(request, object_id)
@@ -780,7 +780,7 @@ class SBAdmin(
         extra_context.update(self.get_global_context(request, None))
         extra_context.update(self.get_fieldsets_context(request, None))
         extra_context.update(self.get_tabs_context(request, None))
-        extra_context.update(self.get_readonly_context(request, None))
+        extra_context.update(self.get_readonly_base_fields_context(request, None))
         return self.changeform_view(request, None, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
@@ -789,7 +789,7 @@ class SBAdmin(
         extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
         extra_context.update(self.get_previous_next_context(request, object_id))
-        extra_context.update(self.get_readonly_context(request, object_id))
+        extra_context.update(self.get_readonly_base_fields_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
