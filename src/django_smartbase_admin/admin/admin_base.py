@@ -498,8 +498,12 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
 
     def get_action_url(self, action, modifier="template"):
         return reverse(
-            f"sb_admin:{self.get_id()}_action",
-            kwargs={"action": action, "modifier": modifier},
+            "sb_admin:sb_admin_base",
+            kwargs={
+                "view": self.get_id(),
+                "action": action,
+                "modifier": modifier,
+            },
         )
 
 
@@ -702,12 +706,11 @@ class SBAdmin(
         if not hasattr(self, action):
             raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
-            f"sb_admin:{self.get_id()}_action",
+            "sb_admin:sb_admin_base",
             kwargs={
+                "view": self.get_id(),
                 "action": action,
-                "modifier": (
-                    urllib.parse.quote(str(modifier), safe="") if modifier else None
-                ),
+                "modifier": modifier,
             },
         )
 

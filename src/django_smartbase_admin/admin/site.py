@@ -141,19 +141,6 @@ class SBAdminSite(admin.AdminSite):
                     name="components",
                 )
             )
-        for model, model_admin in self._registry.items():
-            action_view = getattr(model_admin, "action_view", None)
-            if not action_view:
-                continue
-            urls += [
-                path(
-                    "%s/%s/<str:action>/<str:modifier>"
-                    % (model._meta.app_label, model._meta.model_name),
-                    self.admin_view(action_view),
-                    name="%s_%s_action"
-                    % (model._meta.app_label, model._meta.model_name),
-                ),
-            ]
         urls.extend(
             [
                 path(
