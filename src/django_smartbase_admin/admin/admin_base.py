@@ -6,13 +6,14 @@ from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
 from django.contrib import admin
 from django.contrib.admin.options import get_content_type_for_model
-from django.contrib.admin.utils import unquote
+from django.contrib.admin.utils import unquote, lookup_field
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
     PermissionDenied,
+    ObjectDoesNotExist,
 )
 from django.db import models
 from django.forms import HiddenInput
@@ -274,9 +275,7 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
                 )
 
 
-class SBAdminBaseForm(
-    SBAdminBaseFormInit, forms.ModelForm, SBAdminFormFieldWidgetsMixin
-):
+class SBAdminBaseForm(SBAdminBaseFormInit, forms.ModelForm):
     pass
 
 
@@ -761,11 +760,30 @@ class SBAdmin(
             ),
         }
 
+    def get_readonly_base_fields_context(self, request, object_id=None):
+        obj = None
+        if object_id:
+            obj = self.get_object(request, object_id)
+        readonly_base_fields = {}
+        for field in self.readonly_fields:
+            base_field = self.form.base_fields.get(field)
+            if base_field:
+                try:
+                    f, attr, value = lookup_field(field, obj, self)
+                except (AttributeError, ValueError, ObjectDoesNotExist):
+                    value = base_field.initial
+                readonly_base_fields[field] = {
+                    "field": base_field,
+                    "value": value,
+                }
+        return {"readonly_base_fields": readonly_base_fields}
+
     def add_view(self, request, form_url="", extra_context=None):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request, None))
         extra_context.update(self.get_fieldsets_context(request, None))
         extra_context.update(self.get_tabs_context(request, None))
+        extra_context.update(self.get_readonly_base_fields_context(request, None))
         return self.changeform_view(request, None, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
@@ -774,20 +792,11 @@ class SBAdmin(
         extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
         extra_context.update(self.get_previous_next_context(request, object_id))
+        extra_context.update(self.get_readonly_base_fields_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
-
-    def _get_changed_field_labels_from_form(form, changed_data):
-        changed_field_labels = []
-        for field_name in changed_data:
-            try:
-                verbose_field_name = form.fields[field_name].label or field_name
-            except KeyError:
-                verbose_field_name = field_name
-            changed_field_labels.append(str(verbose_field_name))
-        return changed_field_labels
 
     def history_view(self, request, object_id, extra_context=None):
         try:
