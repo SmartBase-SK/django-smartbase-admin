@@ -1,0 +1,67 @@
+{% load i18n %}
+
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="hidden" id="{{ widget.attrs.id }}_wrapper">
+    {% include "sb_admin/widgets/input.html" %}
+</div>
+<div id="{{ widget.attrs.id }}_dict_wrapper">
+    {% for dict_item in dict_widgets %}
+        <div class="flex mb-8">
+            <div class="flex dict_line">
+                {% include "sb_admin/widgets/input.html" with widget=dict_item.key %}
+                {% include "sb_admin/widgets/input.html" with widget=dict_item.value %}
+            </div>
+            <button type="button" class="w-40 h-40 flex-center text-dark flex-shrink-0 ml-4" onclick="this.parentElement.remove();window.recalculateDictField('{{ widget.attrs.id }}')">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Delete"></use>
+                </svg>
+            </button>
+        </div>
+    {% endfor %}
+</div>
+<div class='hidden'
+     id="{{ widget.attrs.id }}_template">
+    <div class="flex mb-8">
+        <div class="flex dict_line">
+            {% include "sb_admin/widgets/input.html" with widget=template_widget %}
+            {% include "sb_admin/widgets/input.html" with widget=template_widget %}
+        </div>
+        <button type="button" class="w-40 h-40 flex-center text-dark flex-shrink-0 ml-4" onclick="this.parentElement.remove();window.recalculateDictField('{{ widget.attrs.id }}')">
+            <svg class="w-20 h-20">
+                <use xlink:href="#Delete"></use>
+            </svg>
+        </button>
+    </div>
+</div>
+<button class='btn btn-small btn-icon' type="button" onclick="addDictField('{{ widget.attrs.id }}')">
+    <svg class="w-20 h-20 text-dark mr-12"
+         aria-expanded="false">
+        <use xlink:href="#Plus"></use>
+    </svg>
+    <span>{% trans "Add" %}</span>
+</button>
+<script>
+    window.recalculateDictField = window.recalculateDictField || function (id) {
+        const input = document.getElementById(id + '_wrapper').querySelector('input');
+        const dictInputsWrapper = document.getElementById(id + '_dict_wrapper');
+        const dictInputLines = dictInputsWrapper.querySelectorAll('.dict_line');
+        const dictValue = {};
+        dictInputLines.forEach((dictInputLine) => {
+            dictValue[dictInputLine.children[0].value] = dictInputLine.children[1].value;
+        })
+        input.value = JSON.stringify(dictValue);
+    }
+    window.addDictField = window.addDictField || function (id) {
+        const template = document.getElementById(id + '_template').children[0];
+        const dictInputsWrapper = document.getElementById(id + '_dict_wrapper');
+        const newDictInputs = template.cloneNode(true);
+        dictInputsWrapper.appendChild(newDictInputs);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('{{ widget.attrs.id }}_dict_wrapper').addEventListener('change', function() {
+            window.recalculateDictField('{{ widget.attrs.id }}')
+        })
+    });
+</script>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

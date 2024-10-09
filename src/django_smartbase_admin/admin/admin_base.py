@@ -62,6 +62,16 @@ try:
 except ImportError:
     pass
 
+
+django_cms_attributes = None
+try:
+    from djangocms_attributes_field.fields import AttributesFormField
+
+    django_cms_attributes = True
+except ImportError:
+    pass
+
+
 from django_smartbase_admin.admin.widgets import (
     SBAdminTextInputWidget,
     SBAdminTextareaWidget,
@@ -83,6 +93,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminReadOnlyPasswordHashWidget,
     SBAdminHiddenWidget,
     SBAdminCKEditorUploadingWidget,
+    SBAdminAttributesWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -128,6 +139,8 @@ class SBAdminFormFieldWidgetsMixin:
     }
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
+    if django_cms_attributes:
+        formfield_widgets[AttributesFormField] = SBAdminAttributesWidget
 
     django_widget_to_widget = {
         forms.PasswordInput: SBAdminPasswordInputWidget,

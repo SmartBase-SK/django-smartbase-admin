@@ -46,7 +46,6 @@
         input.value = arrayValue.join(arrayInputsWrapper.dataset.delimeter)
     }
     window.addArrayField = window.addArrayField || function (id) {
-        console.log(id)
         const template = document.getElementById(id + '_template').children[0];
         const arrayInputsWrapper = document.getElementById(id + '_array_wrapper');
         const newArrayInput = template.cloneNode(true);

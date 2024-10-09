@@ -249,6 +249,27 @@ class SBAdminArrayWidget(SBAdminTextInputWidget):
         return context
 
 
+class SBAdminAttributesWidget(SBAdminTextInputWidget):
+    template_name = "sb_admin/widgets/attributes.html"
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        widget = context.get("widget", None)
+        dict_widgets = []
+        template_widget = {"attrs": {"class": "input"}}
+        if widget and value:
+            dict_widgets = [
+                {
+                    "key": {"value": key, **template_widget},
+                    "value": {"value": value, **template_widget},
+                }
+                for key, value in value.items()
+            ]
+        context["dict_widgets"] = dict_widgets
+        context["template_widget"] = template_widget
+        return context
+
+
 class SBAdminAutocompleteWidget(
     SBAdminBaseWidget, AutocompleteFilterWidget, forms.Widget
 ):
