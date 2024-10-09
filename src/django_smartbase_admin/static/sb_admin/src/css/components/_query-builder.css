@@ -261,6 +261,10 @@
         }
     }
 
+    input[type=number], input[type=text], select {
+        padding: 0.625rem !important;
+    }
+
     button[data-add] {
         @apply flex items-center gap-4 !px-12;
         @apply !text-14 font-semibold;
