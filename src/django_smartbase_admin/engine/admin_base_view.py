@@ -13,7 +13,10 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
-from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.engine.actions import (
+    SBAdminCustomAction,
+    SBAdminFormViewAction,
+)
 from django_smartbase_admin.engine.const import (
     Action,
     OBJECT_ID_PLACEHOLDER,
@@ -81,6 +84,27 @@ class SBAdminBaseView(object):
         return self.has_view_permission(request, obj) or self.has_change_permission(
             request, obj
         )
+
+    def delegate_to_action_view(self, processed_action):
+        def inner_view(request, modifier):
+            return processed_action.target_view.as_view(view=self)(request)
+
+        return inner_view
+
+    def process_actions(self, request, actions):
+        processed_actions = self.process_actions_permissions(request, actions)
+        for processed_action in processed_actions:
+            if isinstance(processed_action, SBAdminFormViewAction):
+                action_id = processed_action.target_view.__name__
+                setattr(
+                    self,
+                    action_id,
+                    self.delegate_to_action_view(processed_action),
+                )
+                processed_action.url = self.get_action_url(action_id)
+                processed_action.action_id = action_id
+
+        return processed_actions
 
     def process_actions_permissions(self, request, actions):
         result = []
@@ -211,6 +235,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_reorder_field = None
     search_field_placeholder = _("Search...")
     filters_version = None
+    sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
 
     def activate_reorder(self, request):
@@ -297,11 +322,18 @@ class SBAdminBaseListView(SBAdminBaseView):
         messages.add_message(request, messages.ERROR, "Not Implemented")
         return HttpResponse(status=200, content=render_notifications(request))
 
+    def init_actions(self, request):
+        if self.sbadmin_actions_initialized:
+            return
+        self.process_actions(request, self.get_sbadmin_list_selection_actions())
+        self.sbadmin_actions_initialized = True
+
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
             self.get_sbamin_list_display(request), request.request_data.configuration
         )
+        self.init_actions(request)
 
     def get_sbamin_list_display(self, request):
         return self.sbadmin_list_display or self.list_display
@@ -313,6 +345,11 @@ class SBAdminBaseListView(SBAdminBaseView):
             request.request_data.configuration,
             force=True,
         )
+        for list_action in self.get_sbadmin_list_selection_actions():
+            if isinstance(list_action, SBAdminFormViewAction):
+                form = list_action.target_view.form_class
+                form.view = self
+                form()
 
     def get_list_display(self, request):
         return [
@@ -453,7 +490,7 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_sbadmin_list_selection_actions_grouped(self, request):
         result = {}
-        list_selection_actions = self.process_actions_permissions(
+        list_selection_actions = self.process_actions(
             request, self.get_sbadmin_list_selection_actions()
         )
         for action in list_selection_actions:
