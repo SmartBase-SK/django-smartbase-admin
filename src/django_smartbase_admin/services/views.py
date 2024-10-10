@@ -21,9 +21,7 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 class SBAdminViewService(object):
     @classmethod
     def json_dumps_for_url(cls, data):
-        if isinstance(data, dict):
-            return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
-        return data
+        return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
 
     @classmethod
     def json_dumps_and_replace(cls, data):
