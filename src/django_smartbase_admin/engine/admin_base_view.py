@@ -28,6 +28,7 @@ from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
     TABLE_RELOAD_DATA_EVENT_NAME,
     TABLE_UPDATE_ROW_DATA_EVENT_NAME,
+    FILTER_DATA_NAME,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
@@ -607,6 +608,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbamin_list_display(request) or []
+        self.init_fields_cache(list_fields, request.request_data.configuration)
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields
@@ -632,12 +634,15 @@ class SBAdminBaseListView(SBAdminBaseView):
         list_view_config = [self.get_all_config(request), *sbadmin_list_config]
         views = []
         for defined_view in list_view_config:
+            url_params = SBAdminViewService.process_url_params(
+                view_id=self.get_id(),
+                url_params=defined_view["url_params"],
+                filter_version=self.get_filters_version(request),
+            )
             views.append(
                 {
                     "name": defined_view["name"],
-                    "url_params": SBAdminViewService.json_dumps_for_url(
-                        defined_view["url_params"]
-                    ),
+                    "url_params": SBAdminViewService.json_dumps_for_url(url_params),
                     "default": True,
                 }
             )

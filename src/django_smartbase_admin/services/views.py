@@ -4,6 +4,7 @@ import urllib
 
 from django.db.models import Q, FilteredRelation, F, Value, CharField
 from django.shortcuts import redirect
+from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
@@ -20,16 +21,53 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 class SBAdminViewService(object):
     @classmethod
     def json_dumps_for_url(cls, data):
-        return json.dumps(data, separators=(",", ":"))
+        if isinstance(data, dict):
+            return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
+        return data
 
     @classmethod
     def json_dumps_and_replace(cls, data):
-        return cls.json_dumps_for_url(data).replace('"', '\\"')
+        return cls.json_dumps_for_url(data)
 
     @classmethod
     def build_list_url(cls, view_id, url_params):
         params = {view_id: url_params}
         return f"{BASE_PARAMS_NAME}={cls.json_dumps_for_url(params)}"
+
+    @classmethod
+    def process_url_params(cls, view_id, url_params, filter_version):
+        filter_data = SBAdminViewService.process_filter_data_url(
+            view_id=view_id,
+            filter_data=url_params.get(FILTER_DATA_NAME, {}),
+            filter_version=filter_version,
+        )
+        url_params_processed = {**url_params}
+        if filter_data:
+            url_params_processed[FILTER_DATA_NAME] = filter_data
+        return url_params_processed
+
+    @classmethod
+    def process_filter_data_url(cls, view_id, filter_data, filter_version):
+        if filter_version == FilterVersions.FILTERS_VERSION_2:
+            filter_data_processed = []
+            for key, value in filter_data.items():
+                filter_value = {
+                    "id": f"{view_id}-{key}",
+                    "field": key,
+                    "type": "string",
+                    "input": "text",
+                    "operator": "contains",
+                }
+                filter_value.update(value)
+                filter_data_processed.append(filter_value)
+            return filter_data_processed
+        else:
+            filter_data_processed = {}
+            for filter_key, filter_value in filter_data.items():
+                filter_data_processed[filter_key] = cls.json_dumps_and_replace(
+                    filter_value
+                )
+        return filter_data_processed
 
     @classmethod
     def build_list_params_url(cls, view_id, filter_data=None, filter_version=None):
@@ -44,24 +82,18 @@ class SBAdminViewService(object):
                     TABLE_PARAMS_SELECTED_FILTER_TYPE: TABLE_TAB_ADVANCED_FITLERS
                 },
             }
-            for key, value in filter_data.items():
-                filter_value = {
-                    "id": f"{view_id}-{key}",
-                    "field": key,
-                    "type": "string",
-                    "input": "text",
-                    "operator": "contains",
-                }
-                filter_value.update(value)
-                filter_dict[ADVANCED_FILTER_DATA_NAME]["rules"].append(filter_value)
+            filter_dict[ADVANCED_FILTER_DATA_NAME]["rules"].extend(
+                cls.process_filter_data_url(view_id, filter_data, filter_version)
+            )
             params = {BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: filter_dict})}
             return urllib.parse.urlencode(params)
         filter_data = filter_data or {}
-        filter_data_processed = {}
-        for filter_key, filter_value in filter_data.items():
-            filter_data_processed[filter_key] = cls.json_dumps_and_replace(filter_value)
-        view_params = {FILTER_DATA_NAME: filter_data_processed}
-        return cls.build_list_url(view_id, view_params).replace("\\\\", "")
+        view_params = {
+            FILTER_DATA_NAME: cls.process_filter_data_url(
+                view_id, filter_data, filter_version
+            )
+        }
+        return cls.build_list_url(view_id, view_params)
 
     @classmethod
     def get_pk_field_for_model(cls, model):

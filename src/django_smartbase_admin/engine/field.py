@@ -83,6 +83,7 @@ class SBAdminField(JSONSerializableMixin):
     python_formatter = None
     tabulator_options = None
     xlsx_options = None
+    initialized = False
 
     def __init__(
         self,
@@ -121,6 +122,7 @@ class SBAdminField(JSONSerializableMixin):
             if (list_visible is not None)
             else (self.list_visible if self.list_visible is not None else True)
         )
+        self.list_visible_arg = list_visible
         self.list_collapsed = list_collapsed or self.list_collapsed or False
         self.auto_created = auto_created or self.auto_created or False
         self.formatter = formatter
@@ -203,7 +205,9 @@ class SBAdminField(JSONSerializableMixin):
         if self.model_field:
             self.editable = self.model_field.editable
             if self.model_field.is_relation:
-                self.list_visible = False
+                self.list_visible = (
+                    False if self.list_visible_arg is None else self.list_visible_arg
+                )
             if self.model_field.auto_created:
                 self.detail_visible = False
             self.title = self.title or getattr(
@@ -225,6 +229,7 @@ class SBAdminField(JSONSerializableMixin):
             self.formatter = "html"
         self.filter_field = self.filter_field or self.field
         self.init_filter_for_field(configuration)
+        self.initialized = True
 
     def serialize_tabulator(self):
         data = {

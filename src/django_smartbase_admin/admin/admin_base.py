@@ -708,7 +708,11 @@ class SBAdmin(
         all_config = self.get_all_config(request)
         url_suffix = ""
         if all_config and all_config.get("all_params_changed", False):
-            url_params_dict = all_config.get("url_params")
+            url_params_dict = SBAdminViewService.process_url_params(
+                view_id=self.get_id(),
+                url_params=all_config.get("url_params"),
+                filter_version=self.get_filters_version(request),
+            )
             if url_params_dict:
                 url_suffix = f"?{SBAdminViewService.build_list_url(self.get_id(), url_params_dict)}"
 
