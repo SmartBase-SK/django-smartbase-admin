@@ -24,12 +24,6 @@ class SBAdminCustomAction(object):
         group=None,
     ) -> None:
         super().__init__()
-
-        if not (url or (view and action_id)):
-            raise ImproperlyConfigured(
-                "You must provide either url or view and action_id"
-            )
-
         self.title = title
         self.url = url
         self.view = view
@@ -39,17 +33,27 @@ class SBAdminCustomAction(object):
         self.no_params = no_params
         self.open_in_modal = open_in_modal
         self.group = group
-        if not url and not action_modifier:
+        self.resolve_url()
+
+    def resolve_url(self):
+        if not (self.url or (self.view and self.action_id)):
+            raise ImproperlyConfigured(
+                "You must provide either url or view and action_id"
+            )
+
+        if not self.url and not self.action_modifier:
             self.url = self.view.get_action_url(self.action_id)
-        if not url and action_modifier is not None:
-            self.url = self.view.get_action_url(self.action_id, action_modifier)
+        if not self.url and self.action_modifier is not None:
+            self.url = self.view.get_action_url(self.action_id, self.action_modifier)
 
 
-class SBAdminAction(object):
-    view = None
-    threadsafe_request = None
+class SBAdminFormViewAction(SBAdminCustomAction):
+    def __init__(self, target_view, *args, **kwargs) -> None:
+        self.target_view = target_view
+        super().__init__(*args, **kwargs)
 
-    def __init__(self, view, request) -> None:
-        super().__init__()
-        self.view = view
-        self.threadsafe_request = request
+    def resolve_url(self):
+        """
+        self.url and self.action_id is resolved in side django_smartbase_admin.engine.admin_base_view.SBAdminBaseView.process_actions
+        """
+        pass

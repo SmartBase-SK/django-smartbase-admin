@@ -16,6 +16,7 @@ from filer.fields.image import AdminImageWidget
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
 )
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 
@@ -277,13 +278,18 @@ class SBAdminAutocompleteWidget(
     view = None
     form = None
     field_name = None
-    threadsafe_request = None
     initialised = None
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
+
+    def get_id(self):
+        base_id = super().get_id()
+        if self.form:
+            base_id += f"_{self.form.__class__.__name__}"
+        return base_id
 
     def init_widget_dynamic(self, form, form_field, field_name, view, request):
         super().init_widget_dynamic(form, form_field, field_name, view, request)
@@ -293,11 +299,10 @@ class SBAdminAutocompleteWidget(
         self.field_name = field_name
         self.view = view
         self.form = form
-        self.threadsafe_request = request
         self.init_autocomplete_widget_static(
             self.field_name,
             self.model,
-            self.threadsafe_request.request_data.configuration,
+            request.request_data.configuration,
         )
 
     def get_field_name(self):
@@ -315,20 +320,21 @@ class SBAdminAutocompleteWidget(
             getattr(self.form_field, "empty_label", "---------") or "---------"
         )
         query_suffix = "__in"
+        threadsafe_request = SBAdminThreadLocalService.get_request()
         if not self.is_multiselect():
             query_suffix = ""
             self.multiselect = False
         if value:
-            parsed_value = self.parse_value_from_input(self.threadsafe_request, value)
+            parsed_value = self.parse_value_from_input(threadsafe_request, value)
             if parsed_value:
                 selected_options = []
-                for item in self.get_queryset(self.threadsafe_request).filter(
+                for item in self.get_queryset(threadsafe_request).filter(
                     **{f"{self.get_value_field()}{query_suffix}": parsed_value}
                 ):
                     selected_options.append(
                         {
-                            "value": self.get_value(self.threadsafe_request, item),
-                            "label": self.get_label(self.threadsafe_request, item),
+                            "value": self.get_value(threadsafe_request, item),
+                            "label": self.get_label(threadsafe_request, item),
                         }
                     )
                 context["widget"]["value"] = json.dumps(selected_options)
@@ -343,7 +349,8 @@ class SBAdminAutocompleteWidget(
 
     def value_from_datadict(self, data, files, name):
         input_value = super().value_from_datadict(data, files, name)
-        parsed_value = self.parse_value_from_input(self.threadsafe_request, input_value)
+        threadsafe_request = SBAdminThreadLocalService.get_request()
+        parsed_value = self.parse_value_from_input(threadsafe_request, input_value)
         if parsed_value is None:
             return parsed_value
         return parsed_value if self.is_multiselect() else next(iter(parsed_value), None)

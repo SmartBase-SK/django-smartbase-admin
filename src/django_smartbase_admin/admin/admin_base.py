@@ -37,6 +37,7 @@ from nested_admin.nested import (
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import FormFieldsetMixin
 
 parler_enabled = None
@@ -94,7 +95,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminHiddenWidget,
     SBAdminCKEditorUploadingWidget,
     SBAdminAttributesWidget,
-    SBAdminMultipleChoiceWidget,
+    SBAdminMultipleChoiceInlineWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -133,8 +134,8 @@ class SBAdminFormFieldWidgetsMixin:
         RichTextUploadingFormField: SBAdminCKEditorUploadingWidget,
         forms.ChoiceField: SBAdminSelectWidget,
         forms.TypedChoiceField: SBAdminSelectWidget,
-        forms.MultipleChoiceField: SBAdminMultipleChoiceWidget,
-        forms.TypedMultipleChoiceField: SBAdminMultipleChoiceWidget,
+        forms.MultipleChoiceField: SBAdminMultipleChoiceInlineWidget,
+        forms.TypedMultipleChoiceField: SBAdminMultipleChoiceInlineWidget,
         forms.NullBooleanField: SBAdminNullBooleanSelectWidget,
         AdminImageFormField: SBAdminImageWidget,
         ReadOnlyPasswordHashWidget: SBAdminReadOnlyPasswordHashWidget,
@@ -266,12 +267,13 @@ class SBAdminFormFieldWidgetsMixin:
 
 
 class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
-    threadsafe_request = None
     view = None
 
     def __init__(self, *args, **kwargs):
         self.view = kwargs.pop("view", self.view)
-        self.threadsafe_request = kwargs.pop("request", self.threadsafe_request)
+        threadsafe_request = kwargs.pop(
+            "request", SBAdminThreadLocalService.get_request()
+        )
         super().__init__(*args, **kwargs)
         for field in self.fields:
             if not hasattr(self.fields[field].widget, "init_widget_dynamic"):
@@ -281,14 +283,12 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
                 self.fields[field],
                 field,
                 self.view,
-                self.threadsafe_request,
+                threadsafe_request,
             )
         for field in self.declared_fields:
             form_field = self.fields.get(field)
             if form_field:
-                self.assign_widget_to_form_field(
-                    form_field, request=self.threadsafe_request
-                )
+                self.assign_widget_to_form_field(form_field, request=threadsafe_request)
 
 
 class SBAdminBaseForm(SBAdminBaseFormInit, forms.ModelForm):
@@ -488,11 +488,6 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if form:
             form.view = self
 
-    def initialize_form_class_threadsafe(self, form, request):
-        self.initialize_form_class(form)
-        if form:
-            form.threadsafe_request = request
-
 
 class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
     def get_menu_view_url(self, request):
@@ -646,7 +641,7 @@ class SBAdmin(
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        self.initialize_form_class_threadsafe(form, request)
+        self.initialize_form_class(form)
         return form
 
     def get_id(self):
@@ -919,7 +914,7 @@ class SBAdminInline(
     def register_autocomplete_views(self, request):
         super().register_autocomplete_views(request)
         form_class = self.get_formset(request, self.model()).form
-        self.initialize_form_class_threadsafe(form_class, request)
+        self.initialize_form_class(form_class)
         form_class()
 
     @property
@@ -963,7 +958,7 @@ class SBAdminInline(
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         form_class = formset.form
-        self.initialize_form_class_threadsafe(form_class, request)
+        self.initialize_form_class(form_class)
         return formset
 
 
