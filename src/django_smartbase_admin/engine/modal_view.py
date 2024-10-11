@@ -33,7 +33,6 @@ class ActionModalView(FormView):
             (form_class,),
             {
                 "view": self.view,
-                "threadsafe_request": self.request,
             },
         )
 
