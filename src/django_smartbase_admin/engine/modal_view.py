@@ -28,11 +28,15 @@ class ActionModalView(FormView):
     def get_form_class(self):
         form_class = super().get_form_class()
 
-        class Form(form_class):
-            view = self.view
-            threadsafe_request = self.request
+        fake_form_class = type(
+            form_class.__name__,
+            (form_class,),
+            {
+                "view": self.view,
+            },
+        )
 
-        return Form
+        return fake_form_class
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
