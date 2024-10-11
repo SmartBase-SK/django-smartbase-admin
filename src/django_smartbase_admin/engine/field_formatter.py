@@ -1,6 +1,15 @@
+from enum import Enum
+
 from django.template.defaultfilters import date, time
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+
+
+class BadgeType(Enum):
+    SUCCESS = "positive"
+    NOTICE = "notice"
+    WARNING = "warning"
+    ERROR = "negative"
 
 
 def datetime_formatter(object_id, value):
@@ -33,14 +42,14 @@ def boolean_formatter(object_id, value):
     return f'<span class="badge badge-simple badge-neutral">{_("No")}</span>'
 
 
-def format_array(value_list, separator=""):
+def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOTICE):
     result = ""
     if not value_list:
         return result
     for value in value_list:
         if not value:
             continue
-        result += f'<span class="badge badge-simple badge-notice mr-4">{value}</span>{separator}'
+        result += f'<span class="badge badge-simple badge-{badge_type.value} mr-4">{value}</span>{separator}'
     return result
 
 
