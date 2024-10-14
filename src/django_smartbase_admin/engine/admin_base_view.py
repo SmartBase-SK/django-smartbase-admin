@@ -184,10 +184,10 @@ class SBAdminBaseView(object):
             "initials": request.request_data.user.username[0],
         }
 
-    def get_sbadmin_detail_actions(self, object_id):
+    def get_sbadmin_detail_actions(self, request, object_id: int | str | None = None):
         return self.sbadmin_detail_actions
 
-    def get_global_context(self, request, object_id=None):
+    def get_global_context(self, request, object_id: int | str | None = None):
         return {
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
@@ -195,7 +195,7 @@ class SBAdminBaseView(object):
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
-            "detail_actions": self.get_sbadmin_detail_actions(object_id),
+            "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
@@ -553,19 +553,20 @@ class SBAdminBaseListView(SBAdminBaseView):
         updated_configuration = None
         if request.request_data.request_method == "POST":
             if name:
-                updated_configuration, created = (
-                    SBAdminListViewConfiguration.objects.update_or_create(
-                        name=name,
-                        user_id=request.request_data.user.id,
-                        defaults={
-                            "url_params": request.request_data.request_post.get(
-                                URL_PARAMS_NAME
-                            ),
-                            "view": self.get_id(),
-                            "action": None,
-                            "modifier": None,
-                        },
-                    )
+                (
+                    updated_configuration,
+                    created,
+                ) = SBAdminListViewConfiguration.objects.update_or_create(
+                    name=name,
+                    user_id=request.request_data.user.id,
+                    defaults={
+                        "url_params": request.request_data.request_post.get(
+                            URL_PARAMS_NAME
+                        ),
+                        "view": self.get_id(),
+                        "action": None,
+                        "modifier": None,
+                    },
                 )
         if request.request_data.request_method == "DELETE":
             if name:
