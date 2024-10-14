@@ -326,7 +326,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def init_actions(self, request):
         if self.sbadmin_actions_initialized:
             return
-        self.process_actions(request, self.get_sbadmin_list_selection_actions())
+        self.process_actions(request, self.get_sbadmin_list_selection_actions(request))
         self.sbadmin_actions_initialized = True
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
@@ -346,7 +346,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             request.request_data.configuration,
             force=True,
         )
-        for list_action in self.get_sbadmin_list_selection_actions():
+        for list_action in self.get_sbadmin_list_selection_actions(request):
             if isinstance(list_action, SBAdminFormViewAction):
                 form = list_action.target_view.form_class
                 form.view = self
@@ -472,7 +472,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_actions
 
-    def get_sbadmin_list_selection_actions(self):
+    def get_sbadmin_list_selection_actions(self, request):
         if not self.sbadmin_list_selection_actions:
             self.sbadmin_list_selection_actions = [
                 SBAdminCustomAction(
@@ -492,7 +492,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_selection_actions_grouped(self, request):
         result = {}
         list_selection_actions = self.process_actions(
-            request, self.get_sbadmin_list_selection_actions()
+            request, self.get_sbadmin_list_selection_actions(request)
         )
         for action in list_selection_actions:
             if not result.get(action.group):
