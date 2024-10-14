@@ -34,6 +34,7 @@ class SBAdminViewService(object):
 
     @classmethod
     def process_url_params(cls, view_id, url_params, filter_version):
+        url_params = url_params or {}
         filter_data = SBAdminViewService.process_filter_data_url(
             view_id=view_id,
             filter_data=url_params.get(FILTER_DATA_NAME, {}),
