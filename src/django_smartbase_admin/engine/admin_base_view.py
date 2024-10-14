@@ -447,8 +447,8 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return tabulator_definition
 
-    def _get_sbadmin_list_actions(self):
-        list_actions = [*(self.get_sbadmin_list_actions() or [])]
+    def _get_sbadmin_list_actions(self, request):
+        list_actions = [*(self.get_sbadmin_list_actions(request) or [])]
         if self.is_reorder_available():
             list_actions = [
                 *list_actions,
@@ -461,7 +461,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return list_actions
 
-    def get_sbadmin_list_actions(self):
+    def get_sbadmin_list_actions(self, request):
         if not self.sbadmin_list_actions:
             self.sbadmin_list_actions = [
                 SBAdminCustomAction(
