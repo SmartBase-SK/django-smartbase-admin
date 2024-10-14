@@ -184,10 +184,10 @@ class SBAdminBaseView(object):
             "initials": request.request_data.user.username[0],
         }
 
-    def get_sbadmin_detail_actions(self, object_id):
+    def get_sbadmin_detail_actions(self, request, object_id: int | str | None = None):
         return self.sbadmin_detail_actions
 
-    def get_global_context(self, request, object_id=None):
+    def get_global_context(self, request, object_id: int | str | None = None):
         return {
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
@@ -195,7 +195,7 @@ class SBAdminBaseView(object):
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
-            "detail_actions": self.get_sbadmin_detail_actions(object_id),
+            "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
@@ -326,27 +326,27 @@ class SBAdminBaseListView(SBAdminBaseView):
     def init_actions(self, request):
         if self.sbadmin_actions_initialized:
             return
-        self.process_actions(request, self.get_sbadmin_list_selection_actions())
+        self.process_actions(request, self.get_sbadmin_list_selection_actions(request))
         self.sbadmin_actions_initialized = True
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
-            self.get_sbamin_list_display(request), request.request_data.configuration
+            self.get_sbadmin_list_display(request), request.request_data.configuration
         )
         self.init_actions(request)
 
-    def get_sbamin_list_display(self, request):
+    def get_sbadmin_list_display(self, request):
         return self.sbadmin_list_display or self.list_display
 
     def register_autocomplete_views(self, request):
         super().register_autocomplete_views(request)
         self.init_fields_cache(
-            self.get_sbamin_list_display(request),
+            self.get_sbadmin_list_display(request),
             request.request_data.configuration,
             force=True,
         )
-        for list_action in self.get_sbadmin_list_selection_actions():
+        for list_action in self.get_sbadmin_list_selection_actions(request):
             if isinstance(list_action, SBAdminFormViewAction):
                 form = list_action.target_view.form_class
                 form.view = self
@@ -355,7 +355,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_list_display(self, request):
         return [
             getattr(field, "name", field)
-            for field in self.get_sbamin_list_display(request)
+            for field in self.get_sbadmin_list_display(request)
         ]
 
     def get_search_fields(self, request):
@@ -447,8 +447,8 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return tabulator_definition
 
-    def _get_sbadmin_list_actions(self):
-        list_actions = [*(self.get_sbadmin_list_actions() or [])]
+    def _get_sbadmin_list_actions(self, request):
+        list_actions = [*(self.get_sbadmin_list_actions(request) or [])]
         if self.is_reorder_available():
             list_actions = [
                 *list_actions,
@@ -461,7 +461,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return list_actions
 
-    def get_sbadmin_list_actions(self):
+    def get_sbadmin_list_actions(self, request):
         if not self.sbadmin_list_actions:
             self.sbadmin_list_actions = [
                 SBAdminCustomAction(
@@ -472,7 +472,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_actions
 
-    def get_sbadmin_list_selection_actions(self):
+    def get_sbadmin_list_selection_actions(self, request):
         if not self.sbadmin_list_selection_actions:
             self.sbadmin_list_selection_actions = [
                 SBAdminCustomAction(
@@ -492,7 +492,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_selection_actions_grouped(self, request):
         result = {}
         list_selection_actions = self.process_actions(
-            request, self.get_sbadmin_list_selection_actions()
+            request, self.get_sbadmin_list_selection_actions(request)
         )
         for action in list_selection_actions:
             if not result.get(action.group):
@@ -553,19 +553,20 @@ class SBAdminBaseListView(SBAdminBaseView):
         updated_configuration = None
         if request.request_data.request_method == "POST":
             if name:
-                updated_configuration, created = (
-                    SBAdminListViewConfiguration.objects.update_or_create(
-                        name=name,
-                        user_id=request.request_data.user.id,
-                        defaults={
-                            "url_params": request.request_data.request_post.get(
-                                URL_PARAMS_NAME
-                            ),
-                            "view": self.get_id(),
-                            "action": None,
-                            "modifier": None,
-                        },
-                    )
+                (
+                    updated_configuration,
+                    created,
+                ) = SBAdminListViewConfiguration.objects.update_or_create(
+                    name=name,
+                    user_id=request.request_data.user.id,
+                    defaults={
+                        "url_params": request.request_data.request_post.get(
+                            URL_PARAMS_NAME
+                        ),
+                        "view": self.get_id(),
+                        "action": None,
+                        "modifier": None,
+                    },
                 )
         if request.request_data.request_method == "DELETE":
             if name:
@@ -644,7 +645,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         list_filter = self.get_sbadmin_list_filter(request) or []
         if not list_filter:
             return all_config
-        list_fields = self.get_sbamin_list_display(request) or []
+        list_fields = self.get_sbadmin_list_display(request) or []
         self.init_fields_cache(list_fields, request.request_data.configuration)
         base_filter = {
             getattr(field, "filter_field", field): ""

@@ -184,7 +184,9 @@ class SBAdminListAction(SBAdminAction):
         tabulator_definition["tableIdColumnName"] = id_column_name
         tabulator_definition["constants"] = constants
 
-        list_actions = self.list_actions or self.view._get_sbadmin_list_actions()
+        list_actions = self.list_actions or self.view._get_sbadmin_list_actions(
+            self.threadsafe_request
+        )
 
         context_data.update(
             {
