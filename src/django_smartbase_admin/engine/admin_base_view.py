@@ -332,17 +332,17 @@ class SBAdminBaseListView(SBAdminBaseView):
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
-            self.get_sbamin_list_display(request), request.request_data.configuration
+            self.get_sbadmin_list_display(request), request.request_data.configuration
         )
         self.init_actions(request)
 
-    def get_sbamin_list_display(self, request):
+    def get_sbadmin_list_display(self, request):
         return self.sbadmin_list_display or self.list_display
 
     def register_autocomplete_views(self, request):
         super().register_autocomplete_views(request)
         self.init_fields_cache(
-            self.get_sbamin_list_display(request),
+            self.get_sbadmin_list_display(request),
             request.request_data.configuration,
             force=True,
         )
@@ -355,7 +355,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_list_display(self, request):
         return [
             getattr(field, "name", field)
-            for field in self.get_sbamin_list_display(request)
+            for field in self.get_sbadmin_list_display(request)
         ]
 
     def get_search_fields(self, request):
@@ -645,7 +645,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         list_filter = self.get_sbadmin_list_filter(request) or []
         if not list_filter:
             return all_config
-        list_fields = self.get_sbamin_list_display(request) or []
+        list_fields = self.get_sbadmin_list_display(request) or []
         self.init_fields_cache(list_fields, request.request_data.configuration)
         base_filter = {
             getattr(field, "filter_field", field): ""
