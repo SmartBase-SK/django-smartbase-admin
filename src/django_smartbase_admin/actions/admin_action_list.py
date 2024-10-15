@@ -454,7 +454,7 @@ class SBAdminListAction(SBAdminAction):
             additional_filter = ~Q(id__in=self.deselected_rows)
         return additional_filter
 
-    def get_xlsx_data(self):
+    def get_xlsx_data(self, request):
         page_size = XLSX_PAGE_CHUNK_SIZE
         file_name = (
             f'{self.view.get_menu_label()}__{timezone.now().strftime("%Y-%m-%d")}.xlsx'
@@ -477,8 +477,8 @@ class SBAdminListAction(SBAdminAction):
                 )["data"]
             )
         options = (
-            self.view.get_sbadmin_xlsx_options().to_json()
-            if self.view.get_sbadmin_xlsx_options()
+            self.view.get_sbadmin_xlsx_options(request).to_json()
+            if self.view.get_sbadmin_xlsx_options(request)
             else {}
         )
         return [file_name, data_list, columns, options]
