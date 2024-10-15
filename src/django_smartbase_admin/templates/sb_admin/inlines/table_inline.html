@@ -1,6 +1,7 @@
 {% load admin_urlname admin_urlquote from admin_urls %}
 {% load i18n nested_admin static widget_tweaks sb_admin_tags %}
 
+{% call_method inline_admin_formset.opts "get_context_data" request as context_data %}
 {% with inline_admin_formset.formset.is_nested as is_nested %}
 
     {% with inline_admin_formset.opts as inline_opts %}
@@ -18,7 +19,7 @@
                             {{ inline_admin_formset.opts.verbose_name_plural|capfirst }}{% endif %}
                     </span>
                     <div class="ml-auto flex gap-8">
-                        {% for list_action in inline_admin_formset.opts.get_context_data.inline_list_actions %}
+                        {% for list_action in context_data.inline_list_actions %}
                             <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %}{% endif %} href="{{ list_action.url }}"
                                     class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
@@ -47,7 +48,9 @@
                             {% with inline_admin_formset.opts.sortable_field_name|default:"" as sortable_field_name %}
                                 <thead class="djn-module djn-thead">
                                     <tr>
-                                        <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
+                                        {% if context_data.is_sortable_active %}
+                                            <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
+                                        {% endif %}
                                         {% for field in inline_admin_formset.fields %}
                                             {% if not field.widget.is_hidden %}
                                                 <th class="djn-th
@@ -98,7 +101,7 @@
                                         </tr>
                                     {% endif %}
                                     <tr class="djn-tr form-row{% if inline_admin_form.original or inline_admin_form.show_url %} has_original{% endif %}">
-                                        <td class="original{% if inline_admin_formset.opts.sortable_field_name %} is-sortable{% endif %}">
+                                        <td class="original{% if inline_admin_formset.opts.sortable_field_name %} is-sortable{% endif %}" style="{% if not context_data.is_sortable_active %}display: none;{% endif %}">
                                             {% if inline_admin_formset.opts.sortable_field_name %}
                                                 <div class="djn-drag-handler">
                                                     <svg class="w-20 h-20 text-dark-400">
