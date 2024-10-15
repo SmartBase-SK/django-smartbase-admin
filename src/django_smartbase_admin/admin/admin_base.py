@@ -898,7 +898,7 @@ class SBAdminInline(
         qs = super().get_queryset(request)
         return qs.order_by(*self.get_ordering(request))
 
-    def get_sbadmin_inline_list_actions(self):
+    def get_sbadmin_inline_list_actions(self, request):
         return [*(self.sbadmin_inline_list_actions or [])]
 
     def get_action_url(self, action, modifier="template"):
@@ -917,9 +917,14 @@ class SBAdminInline(
         self.initialize_form_class(form_class)
         form_class()
 
-    @property
-    def get_context_data(self):
-        return {"inline_list_actions": self.get_sbadmin_inline_list_actions()}
+    def get_context_data(self, request):
+        is_sortable_active = self.sortable_field_name and (
+            self.has_add_permission(request) or self.has_change_permission(request)
+        )
+        return {
+            "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
+            "is_sortable_active": is_sortable_active,
+        }
 
     def init_sortable_field(self):
         if not self.sortable_field_name:
