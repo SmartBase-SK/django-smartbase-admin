@@ -1,5 +1,6 @@
 import json
 import urllib.parse
+from functools import partial
 
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
@@ -17,7 +18,7 @@ from django.core.exceptions import (
 )
 from django.db import models
 from django.forms import HiddenInput
-from django.forms.models import ModelFormMetaclass
+from django.forms.models import ModelFormMetaclass, modelform_factory
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -781,7 +782,15 @@ class SBAdmin(
             obj = self.get_object(request, object_id)
         readonly_base_fields = {}
         for field in self.readonly_fields:
-            base_field = self.form.base_fields.get(field)
+            params = {
+                "form": self.form,
+                "fields": "__all__",
+                "formfield_callback": partial(
+                    self.formfield_for_dbfield, request=request
+                ),
+            }
+            form = modelform_factory(self.model, **params)
+            base_field = form.base_fields.get(field)
             if base_field:
                 try:
                     f, attr, value = lookup_field(field, obj, self)
