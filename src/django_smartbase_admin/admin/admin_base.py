@@ -435,6 +435,7 @@ if parler_enabled:
 
 class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     sbadmin_fake_inlines = None
+    all_base_fields_form = None
 
     def init_view_static(self, configuration, model, admin_site):
         configuration.view_map[self.get_id()] = self
@@ -488,6 +489,14 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     def initialize_form_class(self, form):
         if form:
             form.view = self
+
+    def initialize_all_base_fields_form(self, request):
+        params = {
+            "form": self.form,
+            "fields": "__all__",
+            "formfield_callback": partial(self.formfield_for_dbfield, request=request),
+        }
+        self.all_base_fields_form = modelform_factory(self.model, **params)
 
 
 class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
@@ -630,7 +639,6 @@ class SBAdmin(
     sbadmin_tabs = None
     request_data = None
     menu_label = None
-    all_base_fields_form = None
 
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
@@ -642,12 +650,7 @@ class SBAdmin(
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
     def get_form(self, request, obj=None, **kwargs):
-        params = {
-            "form": self.form,
-            "fields": "__all__",
-            "formfield_callback": partial(self.formfield_for_dbfield, request=request),
-        }
-        self.all_base_fields_form = modelform_factory(self.model, **params)
+        self.initialize_all_base_fields_form(request)
         form = super().get_form(request, obj, **kwargs)
         self.initialize_form_class(form)
         return form
@@ -950,12 +953,7 @@ class SBAdminInline(
         return formfield
 
     def get_formset(self, request, obj=None, **kwargs):
-        params = {
-            "form": self.form,
-            "fields": "__all__",
-            "formfield_callback": partial(self.formfield_for_dbfield, request=request),
-        }
-        self.all_base_fields_form = modelform_factory(self.model, **params)
+        self.initialize_all_base_fields_form(request)
         formset = super().get_formset(request, obj, **kwargs)
         form_class = formset.form
         self.initialize_form_class(form_class)
