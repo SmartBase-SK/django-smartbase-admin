@@ -92,7 +92,7 @@ class SBAdminListAction(SBAdminAction):
         )
         self.deselected_rows = self.selection_data.get(DESELECTED_ROWS_KWARG_NAME, [])
         self.page_size = page_size or self.table_params.get(
-            TABLE_PARAMS_SIZE_NAME, self.view.get_list_per_page()
+            TABLE_PARAMS_SIZE_NAME, self.view.get_list_per_page(request)
         )
         self.init_column_fields()
         self.tabulator_definition = tabulator_definition
@@ -205,16 +205,18 @@ class SBAdminListAction(SBAdminAction):
                     self.threadsafe_request
                 ),
                 "search_fields": self.view.get_search_fields(self.threadsafe_request),
-                "search_field_placeholder": self.view.get_search_field_placeholder(),
+                "search_field_placeholder": self.view.get_search_field_placeholder(
+                    self.threadsafe_request
+                ),
                 "list_actions": self.view.process_actions_permissions(
                     self.threadsafe_request, list_actions
                 ),
                 "list_selection_actions": self.view.get_sbadmin_list_selection_actions_grouped(
                     self.threadsafe_request
                 ),
-                "config_url": self.view.get_config_url(),
+                "config_url": self.view.get_config_url(self.threadsafe_request),
                 "new_url": (
-                    self.view.get_new_url()
+                    self.view.get_new_url(self.threadsafe_request)
                     if self.view.has_add_permission(self.threadsafe_request)
                     else None
                 ),

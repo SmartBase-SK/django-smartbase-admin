@@ -1,6 +1,8 @@
 import json
 import urllib.parse
+from collections.abc import Iterable
 from functools import partial
+from typing import Any
 
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
@@ -16,6 +18,7 @@ from django.core.exceptions import (
     PermissionDenied,
 )
 from django.db import models
+from django.db.models import QuerySet
 from django.forms import HiddenInput
 from django.forms.models import (
     ModelFormMetaclass,
@@ -24,7 +27,7 @@ from django.forms.models import (
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.safestring import mark_safe
+from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
@@ -470,10 +473,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
                     configuration, inline_view_instance.model, admin_site
                 )
 
-    def get_sbadmin_fake_inlines(self, request, obj):
+    def get_sbadmin_fake_inlines(self, request, obj) -> Iterable:
         return self.sbadmin_fake_inlines or []
 
-    def get_inline_instances(self, request, obj=None):
+    def get_inline_instances(self, request, obj=None) -> list:
         inline_classes = self.get_inlines(request, obj)
         inline_classes = [*inline_classes] or []
         inline_classes.extend(self.get_sbadmin_fake_inlines(request, obj))
@@ -492,7 +495,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             inlines.append(inline)
         return inlines
 
-    def init_view_dynamic(self, request, request_data=None, **kwargs):
+    def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         if SBAdminTranslationsService.is_translated_model(self.model):
             has_default_form = (
                 self.form == TranslatableModelForm or self.form == forms.ModelForm
@@ -504,13 +507,13 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
                     f"Admin '{self}' form class '{self.form}' needs to extend SBTranslatableModelForm in case of translatable model."
                 )
         super().init_view_dynamic(request, request_data, **kwargs)
-        self.initialize_form_class(self.form)
+        self.initialize_form_class(self.form, request)
 
-    def initialize_form_class(self, form):
+    def initialize_form_class(self, form, request) -> None:
         if form:
             form.view = self
 
-    def initialize_all_base_fields_form(self, request):
+    def initialize_all_base_fields_form(self, request) -> None:
         params = {
             "form": self.form,
             "fields": "__all__",
@@ -520,10 +523,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
 
 
 class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
-    def get_menu_view_url(self, request):
+    def get_menu_view_url(self, request) -> str:
         return reverse(f"sb_admin:{self.get_id()}_changelist")
 
-    def get_id(self):
+    def get_id(self) -> str:
         return self.get_model_path()
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
@@ -536,7 +539,7 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
         extra_context.update(self.get_global_context(request))
         return super().changelist_view(request, extra_context)
 
-    def get_action_url(self, action, modifier="template"):
+    def get_action_url(self, action: str, modifier="template") -> str:
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs={
@@ -555,7 +558,7 @@ class SBAdminTranslationStatusMixin:
         main_language_code,
         current_lang_code,
         translations_edit_url,
-    ):
+    ) -> dict[str, Any]:
         language_code = language[0]
         language_title = language[1]
         this_lang_count = languages_count.get(language_code, 0)
@@ -591,11 +594,11 @@ class SBAdminTranslationStatusMixin:
         }
 
     @classmethod
-    def get_empty_state(cls):
+    def get_empty_state(cls) -> SafeString:
         return mark_safe("<div class='is-empty'></div>")
 
     @admin.display(description="")
-    def sbadmin_translation_status(self, obj):
+    def sbadmin_translation_status(self, obj) -> SafeString:
         if not SBAdminTranslationsService.is_i18n_enabled():
             return self.get_empty_state()
 
@@ -666,19 +669,21 @@ class SBAdmin(
             formset.inline_instance.parent_instance = form.instance
         super().save_formset(request, form, formset, change)
 
-    def get_sbadmin_list_filter(self, request):
+    def get_sbadmin_list_filter(self, request) -> Iterable:
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
     def get_form(self, request, obj=None, **kwargs):
         self.initialize_all_base_fields_form(request)
         form = super().get_form(request, obj, **kwargs)
-        self.initialize_form_class(form)
+        self.initialize_form_class(form, request)
         return form
 
-    def get_id(self):
+    def get_id(self) -> str:
         return self.get_model_path()
 
-    def get_sbadmin_fieldsets(self, request, object_id=None):
+    def get_sbadmin_fieldsets(
+        self, request, object_id=None
+    ) -> Iterable[tuple[str | None, dict[str, Any]]]:
         fieldsets = self.sbadmin_fieldsets or self.fieldsets
         if fieldsets:
             return fieldsets
@@ -690,7 +695,9 @@ class SBAdmin(
         super().register_autocomplete_views(request)
         self.get_form(request)()
 
-    def get_fieldsets(self, request, obj):
+    def get_fieldsets(
+        self, request, obj=None
+    ) -> list[tuple[str | None, dict[str, Any]]]:
         fieldsets = []
         object_id = obj.id if obj else None
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
@@ -705,7 +712,9 @@ class SBAdmin(
             fieldsets.append(fieldset_django)
         return fieldsets
 
-    def get_fieldsets_context(self, request, object_id):
+    def get_fieldsets_context(
+        self, request, object_id
+    ) -> dict[str, dict[str | None, dict[str, Any]]]:
         fielsets_context = {}
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
             actions = fieldset[1].get("actions", [])
@@ -719,18 +728,18 @@ class SBAdmin(
             fielsets_context[fieldset[0]] = fieldset[1]
         return {"fieldsets_context": fielsets_context}
 
-    def get_sbadmin_tabs(self, request, object_id):
+    def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
 
-    def get_tabs_context(self, request, object_id):
+    def get_tabs_context(self, request, object_id) -> dict[str, Iterable]:
         return {"tabs_context": self.get_sbadmin_tabs(request, object_id)}
 
-    def get_context_data(self, request):
+    def get_context_data(self, request) -> dict[str, Any]:
         return {
             "base_change_list_template": self.change_list_template,
         }
 
-    def get_menu_view_url(self, request):
+    def get_menu_view_url(self, request) -> str:
         all_config = self.get_all_config(request)
         url_suffix = ""
         if all_config and all_config.get("all_params_changed", False):
@@ -744,10 +753,10 @@ class SBAdmin(
 
         return f'{reverse(f"sb_admin:{self.get_id()}_changelist")}{url_suffix}'
 
-    def get_menu_label(self):
+    def get_menu_label(self) -> str:
         return self.menu_label or self.model._meta.verbose_name_plural
 
-    def get_action_url(self, action, modifier="template"):
+    def get_action_url(self, action, modifier="template") -> str:
         if not hasattr(self, action):
             raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
@@ -759,16 +768,16 @@ class SBAdmin(
             },
         )
 
-    def get_detail_url(self, object_id=None):
+    def get_detail_url(self, object_id=None) -> str:
         return reverse(
             f"sb_admin:{self.get_id()}_change",
             kwargs={"object_id": object_id or OBJECT_ID_PLACEHOLDER},
         )
 
-    def get_new_url(self):
+    def get_new_url(self) -> str:
         return reverse(f"sb_admin:{self.get_id()}_add")
 
-    def get_previous_next_context(self, request, object_id):
+    def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
         changelist_filters = request.GET.get("_changelist_filters", "")
@@ -900,20 +909,20 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
 
-    def get_ordering(self, request):
+    def get_ordering(self, request) -> tuple[str]:
         """
         Hook for specifying field ordering.
         """
         return self.ordering or ("-id",)
 
-    def get_queryset(self, request=None):
+    def get_queryset(self, request=None) -> QuerySet:
         qs = super().get_queryset(request)
         return qs.order_by(*self.get_ordering(request))
 
-    def get_sbadmin_inline_list_actions(self, request):
+    def get_sbadmin_inline_list_actions(self, request) -> list:
         return [*(self.sbadmin_inline_list_actions or [])]
 
-    def get_action_url(self, action, modifier="template"):
+    def get_action_url(self, action, modifier="template") -> str:
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs={
@@ -923,14 +932,14 @@ class SBAdminInline(
             },
         )
 
-    def register_autocomplete_views(self, request):
+    def register_autocomplete_views(self, request) -> None:
         super().register_autocomplete_views(request)
         form_class = self.get_formset(request, self.model()).form
-        self.initialize_form_class(form_class)
+        self.initialize_form_class(form_class, request)
         form_class()
 
-    def get_context_data(self, request):
-        is_sortable_active = self.sortable_field_name and (
+    def get_context_data(self, request) -> dict[str, Any]:
+        is_sortable_active: bool = self.sortable_field_name and (
             self.has_add_permission(request) or self.has_change_permission(request)
         )
         return {
@@ -938,7 +947,7 @@ class SBAdminInline(
             "is_sortable_active": is_sortable_active,
         }
 
-    def init_sortable_field(self):
+    def init_sortable_field(self) -> None:
         if not self.sortable_field_name:
             for field_name in self.sbadmin_sortable_field_options:
                 is_sortable_field_present = False
@@ -954,15 +963,15 @@ class SBAdminInline(
         self.init_sortable_field()
         super().__init__(parent_model, admin_site)
 
-    def init_view_dynamic(self, request, request_data=None, **kwargs):
+    def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         return super().init_view_dynamic(request, request_data, **kwargs)
 
-    def get_id(self):
+    def get_id(self) -> str:
         return (
             f"{self.__class__.__name__}_{SBAdminViewService.get_model_path(self.model)}"
         )
 
-    def init_inline_dynamic(self, request, obj=None):
+    def init_inline_dynamic(self, request, obj=None) -> None:
         self.threadsafe_request = request
         self.parent_instance = obj
 
@@ -976,7 +985,7 @@ class SBAdminInline(
         self.initialize_all_base_fields_form(request)
         formset = super().get_formset(request, obj, **kwargs)
         form_class = formset.form
-        self.initialize_form_class(form_class)
+        self.initialize_form_class(form_class, request)
         return formset
 
 

@@ -1,11 +1,13 @@
 import json
 import urllib.parse
 from collections import defaultdict
+from collections.abc import Iterable
+from typing import Any
 
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
-from django.db.models import F
+from django.db.models import F, QuerySet
 from django.http import HttpResponse, Http404, JsonResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -54,34 +56,34 @@ class SBAdminBaseView(object):
     def get_id(self):
         raise NotImplementedError
 
-    def get_menu_label(self):
+    def get_menu_label(self) -> str:
         return self.menu_label or self.model._meta.verbose_name_plural
 
-    def has_permission(self, request, obj=None, permission=None):
+    def has_permission(self, request, obj=None, permission=None) -> bool:
         return SBAdminViewService.has_permission(
             request=request, view=self, model=self.model, obj=obj, permission=permission
         )
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request, obj=None) -> bool:
         return self.has_permission(request, obj, "add")
 
-    def has_view_permission(self, request, obj=None):
+    def has_view_permission(self, request, obj=None) -> bool:
         return self.has_permission(request, obj, "view")
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request, obj=None) -> bool:
         return self.has_permission(request, obj, "change")
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None) -> bool:
         return self.has_permission(request, obj, "delete")
 
-    def has_permission_for_action(self, request, action):
+    def has_permission_for_action(self, request, action: SBAdminCustomAction) -> bool:
         return self.has_permission(
             request=request,
             obj=None,
             permission=action,
         )
 
-    def has_view_or_change_permission(self, request, obj=None):
+    def has_view_or_change_permission(self, request, obj=None) -> bool:
         return self.has_view_permission(request, obj) or self.has_change_permission(
             request, obj
         )
@@ -92,7 +94,9 @@ class SBAdminBaseView(object):
 
         return inner_view
 
-    def process_actions(self, request, actions):
+    def process_actions(
+        self, request, actions: list[SBAdminCustomAction]
+    ) -> list[SBAdminCustomAction]:
         processed_actions = self.process_actions_permissions(request, actions)
         for processed_action in processed_actions:
             if isinstance(processed_action, SBAdminFormViewAction):
@@ -107,7 +111,9 @@ class SBAdminBaseView(object):
 
         return processed_actions
 
-    def process_actions_permissions(self, request, actions):
+    def process_actions_permissions(
+        self, request, actions: list[SBAdminCustomAction]
+    ) -> list[SBAdminCustomAction]:
         result = []
         for action in actions:
             if self.has_permission_for_action(request, action):
@@ -173,7 +179,7 @@ class SBAdminBaseView(object):
         field.model_field = model_field
         return field
 
-    def get_username_data(self, request):
+    def get_username_data(self, request) -> dict[str, Any]:
         if request.request_data.user.first_name and request.request_data.user.last_name:
             return {
                 "full_name": f"{request.request_data.user.first_name} {request.request_data.user.last_name}",
@@ -184,10 +190,14 @@ class SBAdminBaseView(object):
             "initials": request.request_data.user.username[0],
         }
 
-    def get_sbadmin_detail_actions(self, request, object_id: int | str | None = None):
+    def get_sbadmin_detail_actions(
+        self, request, object_id: int | str | None = None
+    ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
 
-    def get_global_context(self, request, object_id: int | str | None = None):
+    def get_global_context(
+        self, request, object_id: int | str | None = None
+    ) -> dict[str, Any]:
         return {
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
@@ -207,12 +217,12 @@ class SBAdminBaseView(object):
             ),
         }
 
-    def get_model_path(self):
+    def get_model_path(self) -> str:
         return SBAdminViewService.get_model_path(self.model)
 
 
 class SBAdminBaseQuerysetMixin(object):
-    def get_queryset(self, request=None):
+    def get_queryset(self, request=None) -> QuerySet:
         request_data = getattr(request, "request_data", None)
         qs = SBAdminViewService.get_restricted_queryset(
             self.model,
@@ -239,10 +249,10 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
 
-    def activate_reorder(self, request):
+    def activate_reorder(self, request) -> None:
         request.reorder_active = True
 
-    def action_list_json_reorder(self, request, modifier):
+    def action_list_json_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         return self.action_list_json(request, modifier, page_size=100)
 
@@ -273,16 +283,16 @@ class SBAdminBaseListView(SBAdminBaseView):
             ],
         )
 
-    def is_reorder_active(self, request):
+    def is_reorder_active(self, request) -> bool:
         return (
-            self.is_reorder_available()
+            self.is_reorder_available(request)
             and getattr(request, "reorder_active", False) == True
         )
 
-    def is_reorder_available(self):
+    def is_reorder_available(self, request) -> str | None:
         return self.sbadmin_list_reorder_field
 
-    def action_table_reorder(self, request, modifier):
+    def action_table_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         qs = self.get_queryset(request)
         pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
@@ -316,30 +326,30 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
-    def action_table_data_edit(self, request, modifier):
+    def action_table_data_edit(self, request, modifier) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
         cell_value = request.POST.get("cellValue", "")
         messages.add_message(request, messages.ERROR, "Not Implemented")
         return HttpResponse(status=200, content=render_notifications(request))
 
-    def init_actions(self, request):
+    def init_actions(self, request) -> None:
         if self.sbadmin_actions_initialized:
             return
         self.process_actions(request, self.get_sbadmin_list_selection_actions(request))
         self.sbadmin_actions_initialized = True
 
-    def init_view_dynamic(self, request, request_data=None, **kwargs):
+    def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
             self.get_sbadmin_list_display(request), request.request_data.configuration
         )
         self.init_actions(request)
 
-    def get_sbadmin_list_display(self, request):
-        return self.sbadmin_list_display or self.list_display
+    def get_sbadmin_list_display(self, request) -> list[str] | list:
+        return self.sbadmin_list_display or self.list_display or []
 
-    def register_autocomplete_views(self, request):
+    def register_autocomplete_views(self, request) -> None:
         super().register_autocomplete_views(request)
         self.init_fields_cache(
             self.get_sbadmin_list_display(request),
@@ -352,7 +362,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 form.view = self
                 form()
 
-    def get_list_display(self, request):
+    def get_list_display(self, request) -> list[str] | list:
         return [
             getattr(field, "name", field)
             for field in self.get_sbadmin_list_display(request)
@@ -364,10 +374,10 @@ class SBAdminBaseListView(SBAdminBaseView):
         else:
             return []
 
-    def get_list_ordering(self):
+    def get_list_ordering(self) -> Iterable[str] | list:
         return self.ordering or []
 
-    def get_list_initial_order(self):
+    def get_list_initial_order(self, request) -> list[dict[str, Any]]:
         order = []
         for order_field in self.get_list_ordering():
             direction = "desc" if order_field.startswith("-") else "asc"
@@ -379,15 +389,15 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return order
 
-    def get_list_per_page(self):
+    def get_list_per_page(self, request) -> int | None:
         return self.list_per_page
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request, obj=None) -> bool:
         if self.is_reorder_active(request):
             return False
         return super().has_add_permission(request)
 
-    def get_tabulator_definition(self, request):
+    def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
         tabulator_definition = {
             "viewId": view_id,
@@ -404,8 +414,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 Action.TABLE_REORDER_ACTION.value
             ),
             "tableDetailUrl": self.get_detail_url(),
-            "tableInitialSort": self.get_list_initial_order(),
-            "tableInitialPageSize": self.get_list_per_page(),
+            "tableInitialSort": self.get_list_initial_order(request),
+            "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             # used to initialize all columns with these values
             "defaultColumnData": {},
@@ -447,9 +457,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return tabulator_definition
 
-    def _get_sbadmin_list_actions(self, request):
+    def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
         list_actions = [*(self.get_sbadmin_list_actions(request) or [])]
-        if self.is_reorder_available():
+        if self.is_reorder_available(request):
             list_actions = [
                 *list_actions,
                 SBAdminCustomAction(
@@ -461,7 +471,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return list_actions
 
-    def get_sbadmin_list_actions(self, request):
+    def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:
         if not self.sbadmin_list_actions:
             self.sbadmin_list_actions = [
                 SBAdminCustomAction(
@@ -472,7 +482,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_actions
 
-    def get_sbadmin_list_selection_actions(self, request):
+    def get_sbadmin_list_selection_actions(self, request) -> list[SBAdminCustomAction]:
         if not self.sbadmin_list_selection_actions:
             self.sbadmin_list_selection_actions = [
                 SBAdminCustomAction(
@@ -489,7 +499,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_selection_actions
 
-    def get_sbadmin_list_selection_actions_grouped(self, request):
+    def get_sbadmin_list_selection_actions_grouped(
+        self, request
+    ) -> dict[str, list[SBAdminCustomAction]]:
         result = {}
         list_selection_actions = self.process_actions(
             request, self.get_sbadmin_list_selection_actions(request)
@@ -500,7 +512,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             result[action.group].append(action)
         return result
 
-    def get_sbadmin_xlsx_options(self, request):
+    def get_sbadmin_xlsx_options(self, request) -> SBAdminXLSXOptions:
         self.sbadmin_xlsx_options = self.sbadmin_xlsx_options or SBAdminXLSXOptions(
             header_cell_format=SBAdminXLSXFormat(
                 bg_color="#00aaa7", font_color="#ffffff", bold=True
@@ -512,7 +524,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         return self.sbadmin_xlsx_options
 
-    def action_xlsx_export(self, request, modifier):
+    def action_xlsx_export(self, request, modifier) -> HttpResponse:
         action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
@@ -637,15 +649,15 @@ class SBAdminBaseListView(SBAdminBaseView):
             extra_context,
         )
 
-    def action_list_json(self, request, modifier, page_size=None):
+    def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()
         return JsonResponse(data=data, safe=False)
 
-    def get_sbadmin_list_filter(self, request):
+    def get_sbadmin_list_filter(self, request) -> Iterable | None:
         return self.sbadmin_list_filter
 
-    def get_all_config(self, request):
+    def get_all_config(self, request) -> dict[str, Any]:
         all_config = {"name": _("All"), "url_params": {}, "default": True}
         list_filter = self.get_sbadmin_list_filter(request) or []
         if not list_filter:
@@ -669,10 +681,10 @@ class SBAdminBaseListView(SBAdminBaseView):
         }
         return all_config
 
-    def get_sbadmin_list_view_config(self, request):
+    def get_sbadmin_list_view_config(self, request) -> list:
         return self.sbadmin_list_view_config or []
 
-    def get_base_config(self, request):
+    def get_base_config(self, request) -> list[dict[str, Any]]:
         sbadmin_list_config = self.get_sbadmin_list_view_config(request)
         list_view_config = [self.get_all_config(request), *sbadmin_list_config]
         views = []
@@ -691,7 +703,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return views
 
-    def get_config_data(self, request):
+    def get_config_data(self, request) -> dict[str, list[dict[str, Any]]]:
         from django_smartbase_admin.models import SBAdminListViewConfiguration
 
         current_views = list(
@@ -702,15 +714,15 @@ class SBAdminBaseListView(SBAdminBaseView):
             .values()
         )
         for view in current_views:
-            view["detail_url"] = self.get_config_url(view["id"])
+            view["detail_url"] = self.get_config_url(request, view["id"])
         config_views = self.get_base_config(request)
         config_views.extend(current_views)
         return {"current_views": config_views}
 
-    def get_ajax_url(self):
+    def get_ajax_url(self) -> str:
         return self.get_action_url(Action.LIST_JSON.value)
 
-    def get_detail_url(self):
+    def get_detail_url(self) -> str:
         url = reverse(
             "sb_admin:sb_admin_base",
             kwargs={
@@ -721,21 +733,21 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         return f"{url}/{OBJECT_ID_PLACEHOLDER}"
 
-    def get_config_url(self, config_name=None):
+    def get_config_url(self, request, config_name=None) -> str:
         return self.get_action_url(Action.CONFIG.value, config_name)
 
-    def get_new_url(self):
+    def get_new_url(self, request) -> None:
         return None
 
-    def get_context_data(self, request):
+    def get_context_data(self, request) -> dict:
         return {}
 
-    def get_filters_version(self, request):
+    def get_filters_version(self, request) -> FilterVersions:
         return (
             self.filters_version or request.request_data.configuration.filters_version
         )
 
-    def get_filters_template_name(self, request):
+    def get_filters_template_name(self, request) -> str:
         filters_version = self.get_filters_version(request)
         if filters_version is FilterVersions.FILTERS_VERSION_2:
             return "sb_admin/components/filters_v2.html"
@@ -743,7 +755,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             # default
             return "sb_admin/components/filters.html"
 
-    def get_tabulator_header_template_name(self, request):
+    def get_tabulator_header_template_name(self, request) -> str:
         filters_version = self.get_filters_version(request)
         if filters_version is FilterVersions.FILTERS_VERSION_2:
             return "sb_admin/actions/partials/tabulator_header_v2.html"
@@ -751,5 +763,5 @@ class SBAdminBaseListView(SBAdminBaseView):
             # default
             return "sb_admin/actions/partials/tabulator_header_v1.html"
 
-    def get_search_field_placeholder(self):
+    def get_search_field_placeholder(self, request) -> str:
         return self.search_field_placeholder
