@@ -500,7 +500,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             result[action.group].append(action)
         return result
 
-    def get_sbadmin_xlsx_options(self):
+    def get_sbadmin_xlsx_options(self, request):
         self.sbadmin_xlsx_options = self.sbadmin_xlsx_options or SBAdminXLSXOptions(
             header_cell_format=SBAdminXLSXFormat(
                 bg_color="#00aaa7", font_color="#ffffff", bold=True
@@ -514,7 +514,7 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def action_xlsx_export(self, request, modifier):
         action = self.sbadmin_list_action_class(self, request)
-        data = action.get_xlsx_data()
+        data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
     def action_bulk_delete(self, request, modifier):

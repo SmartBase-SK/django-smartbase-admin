@@ -1,30 +1,32 @@
 import json
 import urllib.parse
+from functools import partial
 
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
 from django.contrib import admin
 from django.contrib.admin.options import get_content_type_for_model
-from django.contrib.admin.utils import unquote, lookup_field
+from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
     PermissionDenied,
-    ObjectDoesNotExist,
 )
 from django.db import models
 from django.forms import HiddenInput
-from django.forms.models import ModelFormMetaclass
+from django.forms.models import (
+    ModelFormMetaclass,
+    modelform_factory,
+)
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import override as translation_override
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from filer.fields.image import AdminImageFormField
 from nested_admin.nested import (
@@ -35,7 +37,6 @@ from nested_admin.nested import (
     NestedGenericStackedInline,
 )
 
-from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import FormFieldsetMixin
@@ -434,6 +435,7 @@ if parler_enabled:
 
 class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     sbadmin_fake_inlines = None
+    all_base_fields_form = None
 
     def init_view_static(self, configuration, model, admin_site):
         configuration.view_map[self.get_id()] = self
@@ -487,6 +489,14 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     def initialize_form_class(self, form):
         if form:
             form.view = self
+
+    def initialize_all_base_fields_form(self, request):
+        params = {
+            "form": self.form,
+            "fields": "__all__",
+            "formfield_callback": partial(self.formfield_for_dbfield, request=request),
+        }
+        self.all_base_fields_form = modelform_factory(self.model, **params)
 
 
 class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
@@ -640,6 +650,7 @@ class SBAdmin(
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
     def get_form(self, request, obj=None, **kwargs):
+        self.initialize_all_base_fields_form(request)
         form = super().get_form(request, obj, **kwargs)
         self.initialize_form_class(form)
         return form
@@ -775,30 +786,11 @@ class SBAdmin(
             ),
         }
 
-    def get_readonly_base_fields_context(self, request, object_id=None):
-        obj = None
-        if object_id:
-            obj = self.get_object(request, object_id)
-        readonly_base_fields = {}
-        for field in self.readonly_fields:
-            base_field = self.form.base_fields.get(field)
-            if base_field:
-                try:
-                    f, attr, value = lookup_field(field, obj, self)
-                except (AttributeError, ValueError, ObjectDoesNotExist):
-                    value = base_field.initial
-                readonly_base_fields[field] = {
-                    "field": base_field,
-                    "value": value,
-                }
-        return {"readonly_base_fields": readonly_base_fields}
-
     def add_view(self, request, form_url="", extra_context=None):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request, None))
         extra_context.update(self.get_fieldsets_context(request, None))
         extra_context.update(self.get_tabs_context(request, None))
-        extra_context.update(self.get_readonly_base_fields_context(request, None))
         return self.changeform_view(request, None, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
@@ -807,7 +799,6 @@ class SBAdmin(
         extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
         extra_context.update(self.get_previous_next_context(request, object_id))
-        extra_context.update(self.get_readonly_base_fields_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
@@ -887,6 +878,7 @@ class SBAdminInline(
     sbadmin_inline_list_actions = None
     extra = 0
     ordering = None
+    all_base_fields_form = None
 
     def get_ordering(self, request):
         """
@@ -898,7 +890,7 @@ class SBAdminInline(
         qs = super().get_queryset(request)
         return qs.order_by(*self.get_ordering(request))
 
-    def get_sbadmin_inline_list_actions(self):
+    def get_sbadmin_inline_list_actions(self, request):
         return [*(self.sbadmin_inline_list_actions or [])]
 
     def get_action_url(self, action, modifier="template"):
@@ -917,9 +909,14 @@ class SBAdminInline(
         self.initialize_form_class(form_class)
         form_class()
 
-    @property
-    def get_context_data(self):
-        return {"inline_list_actions": self.get_sbadmin_inline_list_actions()}
+    def get_context_data(self, request):
+        is_sortable_active = self.sortable_field_name and (
+            self.has_add_permission(request) or self.has_change_permission(request)
+        )
+        return {
+            "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
+            "is_sortable_active": is_sortable_active,
+        }
 
     def init_sortable_field(self):
         if not self.sortable_field_name:
@@ -956,6 +953,7 @@ class SBAdminInline(
         return formfield
 
     def get_formset(self, request, obj=None, **kwargs):
+        self.initialize_all_base_fields_form(request)
         formset = super().get_formset(request, obj, **kwargs)
         form_class = formset.form
         self.initialize_form_class(form_class)

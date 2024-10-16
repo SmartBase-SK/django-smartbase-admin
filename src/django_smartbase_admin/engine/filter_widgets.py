@@ -621,6 +621,8 @@ class AutocompleteFilterWidget(
     def get_label(self, request, item):
         if self.label_lambda:
             return self.label_lambda(request, item)
+        if isinstance(item, list):
+            return ", ".join(map(str, item))
         return str(item)
 
     def get_context(self, name, value, attrs):

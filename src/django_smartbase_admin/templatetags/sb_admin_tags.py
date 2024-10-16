@@ -212,3 +212,11 @@ def get_log_entry_message(log_entry):
         return get_change_message_legacy(log_entry)
     except Exception as e:
         return ""
+
+
+@register.simple_tag
+def call_method(obj, method_name, *args):
+    method = getattr(obj, method_name, None)
+    if method:
+        return method(*args)
+    return False
