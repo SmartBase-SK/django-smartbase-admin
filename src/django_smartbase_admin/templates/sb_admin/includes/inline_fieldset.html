@@ -1,3 +1,5 @@
+{% load sb_admin_tags %}
+
 {% if fieldset.name %}
     <header class="mb-24">
         <span class="text-dark-900">{{ fieldset.name }}</span>
@@ -23,7 +25,7 @@
         {% for field in line %}
             <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden %} hidden{% endif %}">
                 {% if field.is_readonly %}
-                    {% include 'sb_admin/includes/readonly_field.html' %}
+                    {% call_method field "contents" request %}
                 {% else %}
                     {{ field.field }}
                     {% if not line.fields|length == 1 %}{{ field.errors }}{% endif %}

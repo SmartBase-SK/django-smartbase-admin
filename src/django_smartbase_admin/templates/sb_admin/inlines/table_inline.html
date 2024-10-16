@@ -148,7 +148,9 @@
                                                     {% if not field.field.is_hidden %}
                                                         <td class="djn-td field-{{ field.field.name }}">
                                                             {% if field.is_readonly %}
-                                                                <div class="px-10 py-8">{{ field.contents }}</div>
+                                                                <div class="px-10 py-8">
+                                                                    {% call_method field "contents" request %}
+                                                                </div>
                                                             {% else %}
                                                                 {{ field.field }}
                                                                 {% if field.field.errors %}

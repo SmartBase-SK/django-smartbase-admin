@@ -216,6 +216,7 @@ def get_log_entry_message(log_entry):
 
 @register.simple_tag
 def call_method(obj, method_name, *args):
-    method = getattr(obj, method_name)
-    return method(*args)
-
+    method = getattr(obj, method_name, None)
+    if method:
+        return method(*args)
+    return False
