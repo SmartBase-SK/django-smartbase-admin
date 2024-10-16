@@ -8,6 +8,8 @@ from django.template.loader import render_to_string
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
+from django_smartbase_admin.admin.site import sb_admin_site
+
 
 class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
     readonly_template = "sb_admin/includes/readonly_field.html"
@@ -26,7 +28,7 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
         )
 
     def contents(self, request=None):
-        if self.model_admin.admin_site.name != "sb_admin":
+        if self.model_admin.admin_site.name != sb_admin_site.name:
             return super().contents()
 
         field, obj, model_admin = (
