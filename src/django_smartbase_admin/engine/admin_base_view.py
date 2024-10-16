@@ -709,7 +709,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             .values()
         )
         for view in current_views:
-            view["detail_url"] = self.get_config_url(request, ["name"])
+            view["detail_url"] = self.get_config_url(request, view["name"])
         config_views = self.get_base_config(request)
         config_views.extend(current_views)
         return {"current_views": config_views}
