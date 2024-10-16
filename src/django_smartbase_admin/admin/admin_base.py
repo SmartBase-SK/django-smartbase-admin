@@ -539,7 +539,7 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
         extra_context.update(self.get_global_context(request))
         return super().changelist_view(request, extra_context)
 
-    def get_action_url(self, action: str, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template") -> str:
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs={
@@ -774,7 +774,7 @@ class SBAdmin(
             kwargs={"object_id": object_id or OBJECT_ID_PLACEHOLDER},
         )
 
-    def get_new_url(self) -> str:
+    def get_new_url(self, request) -> str:
         return reverse(f"sb_admin:{self.get_id()}_add")
 
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
