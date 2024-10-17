@@ -423,3 +423,41 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
 
 class SBAdminHTMLWidget(SBAdminBaseWidget, forms.Widget):
     template_name = "sb_admin/widgets/html_read_only.html"
+
+
+class SBAdminColorWidget(SBAdminTextInputWidget):
+    template_name = "sb_admin/widgets/color_field.html"
+    color_swatches = getattr(
+        settings,
+        "SB_ADMIN_COLOR_SWATCHES",
+        [
+            "#ffbe76",
+            "#f9ca24",
+            "#f0932b",
+            "#ff7979",
+            "#eb4d4b",
+            "#badc58",
+            "#6ab04c",
+            "#c7ecee",
+            "#7ed6df",
+            "#22a6b3",
+            "#e056fd",
+            "#be2edd",
+            "#686de0",
+            "#4834d4",
+            "#30336b",
+            "#130f40",
+            "#95afc0",
+            "#535c68",
+        ],
+    )
+
+    class Media:
+        css = {
+            "all": [
+                "sb_admin/css/coloris/coloris.min.css",
+            ],
+        }
+        js = [
+            "sb_admin/js/coloris/coloris.min.js",
+        ]

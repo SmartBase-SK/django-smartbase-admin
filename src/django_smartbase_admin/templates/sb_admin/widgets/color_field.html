@@ -1,0 +1,30 @@
+{% load i18n sb_admin_tags %}
+{% include 'sb_admin/widgets/includes/field_label.html' %}
+<div class="w-full">{% include "sb_admin/widgets/input.html" %}</div>
+{% include 'sb_admin/widgets/includes/help_text.html' %}
+<script>
+    {# https://github.com/mdbassit/Coloris #}
+    Coloris({
+        el: '#{{ widget.attrs.id }}',
+        theme: 'pill',
+        margin: 2,
+        formatToggle: true,
+        clearButton: true,
+        closeButton: true,
+        clearLabel: "{% trans 'Clear' %}",
+        swatches: JSON.parse('{{ widget.form_field.widget.color_swatches|get_json|safe }}'),
+        closeLabel: "{% trans 'Close' %}",
+        a11y: {
+            open: "{% trans 'Open color picker' %}",
+            close: "{% trans 'Close color picker' %}",
+            clear: "{% trans 'Clear the selected color' %}",
+            marker: "{% trans 'Saturation: {s}. Brightness: {v}.' %}",
+            hueSlider: "{% trans 'Hue slider' %}",
+            alphaSlider: "{% trans 'Opacity slider' %}",
+            input: "{% trans 'Color value field' %}",
+            format: "{% trans 'Color format' %}",
+            swatch: "{% trans 'Color swatch' %}",
+            instruction: "{% trans 'Saturation and brightness selector. Use up, down, left and right arrow keys to select.' %}"
+        }
+    });
+</script>

@@ -74,6 +74,15 @@ except ImportError:
     pass
 
 
+color_field_enabled = None
+try:
+    from colorfield.fields import ColorField
+
+    color_field_enabled = True
+except ImportError:
+    pass
+
+
 from django_smartbase_admin.admin.widgets import (
     SBAdminTextInputWidget,
     SBAdminTextareaWidget,
@@ -97,6 +106,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminCKEditorUploadingWidget,
     SBAdminAttributesWidget,
     SBAdminMultipleChoiceInlineWidget,
+    SBAdminColorWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -142,10 +152,13 @@ class SBAdminFormFieldWidgetsMixin:
         ReadOnlyPasswordHashWidget: SBAdminReadOnlyPasswordHashWidget,
         forms.HiddenInput: SBAdminHiddenWidget,
     }
+    db_field_widgets = {}
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
     if django_cms_attributes:
         formfield_widgets[AttributesFormField] = SBAdminAttributesWidget
+    if color_field_enabled:
+        db_field_widgets[ColorField] = SBAdminColorWidget
 
     django_widget_to_widget = {
         forms.PasswordInput: SBAdminPasswordInputWidget,
@@ -153,7 +166,9 @@ class SBAdminFormFieldWidgetsMixin:
     }
 
     def get_form_field_widget_class(self, form_field, db_field, request):
-        default_widget_class = self.formfield_widgets.get(form_field.__class__)
+        default_widget_class = self.db_field_widgets.get(
+            db_field.__class__, self.formfield_widgets.get(form_field.__class__)
+        )
         if not hasattr(request, "request_data"):
             # in case of login the view is not wrapped and we have no request_data present
             return default_widget_class

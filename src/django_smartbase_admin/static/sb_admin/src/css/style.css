@@ -18,5 +18,21 @@
     }
 }
 
+.clr-field {
+    width: 100%;
 
+    > button {
+        z-index: 1 !important;
+        right: auto !important;
+        left: 4px !important;
+        top: 4px !important;
+        bottom: 4px !important;
+        height: auto !important;
+        transform: none !important;
+        @apply !rounded;
 
+        + input {
+            @apply !pl-40;
+        }
+    }
+}
