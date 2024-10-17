@@ -7,7 +7,7 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, QuerySet
+from django.db.models import F
 from django.http import HttpResponse, Http404, JsonResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -222,7 +222,7 @@ class SBAdminBaseView(object):
 
 
 class SBAdminBaseQuerysetMixin(object):
-    def get_queryset(self, request=None) -> QuerySet:
+    def get_queryset(self, request=None):
         request_data = getattr(request, "request_data", None)
         qs = SBAdminViewService.get_restricted_queryset(
             self.model,
