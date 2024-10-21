@@ -28,7 +28,8 @@ from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
-from filer.fields.image import AdminImageFormField
+from filer.fields.file import FilerFileField
+from filer.fields.image import AdminImageFormField, FilerImageField
 from nested_admin.nested import (
     NestedModelAdmin,
     NestedTabularInline,
@@ -107,6 +108,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminAttributesWidget,
     SBAdminMultipleChoiceInlineWidget,
     SBAdminColorWidget,
+    SBAdminFilerImageWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -152,7 +154,10 @@ class SBAdminFormFieldWidgetsMixin:
         ReadOnlyPasswordHashWidget: SBAdminReadOnlyPasswordHashWidget,
         forms.HiddenInput: SBAdminHiddenWidget,
     }
-    db_field_widgets = {}
+    db_field_widgets = {
+        FilerImageField: SBAdminFilerImageWidget,
+        FilerFileField: SBAdminFilerImageWidget,
+    }
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
     if django_cms_attributes:

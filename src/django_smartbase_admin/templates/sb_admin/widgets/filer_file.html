@@ -1,0 +1,89 @@
+{% load i18n filer_admin_tags static %}
+
+{% spaceless %}
+    <div class="clearfix"></div>
+
+    <div class="dz-preview dz-file-preview hidden js-filer-dropzone-template">
+        <span class="filerFile">
+            <div class="dz-thumbnail"><img class="quiet" data-dz-thumbnail></div>
+            <div>
+                <span data-dz-name class="dz-name"></span>
+                <span class="filerClearer filer-icon filer-icon-remove-selection" title="{% trans 'Clear' %}"
+                     data-dz-remove data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
+                    <button type="button" class="btn btn-tiny btn-destructive">{% trans 'Delete' %}</button>
+                </span>
+            </div>
+            <div class="dz-progress js-filer-dropzone-progress"><span class="dz-upload" data-dz-uploadprogress></span></div>
+        </span>
+    </div>
+
+    <div class="js-filer-dropzone filer-dropzone{% if object %} js-object-attached{% endif %}"
+         data-url="{% url 'admin:filer-ajax_upload' %}"
+         data-max-files="1"
+         {% if max_filesize %}}data-max-filesize="{{ max_filesize|safe }}"{% endif %}>
+        <div class="z-index-fix"></div>
+        <div class="dz-default dz-message js-filer-dropzone-message{% if object %} hidden{% endif %}">
+            <span class="w-64 h-64 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon">
+                <svg class="w-24 h-24">
+                    <use xlink:href="#Upload"></use>
+                </svg>
+            </span>
+            <span>{% trans "drop your file here or" %}</span>
+        </div>
+
+        <span class="filerFile js-file-selector">
+            {% if object %}
+                {% if object.file.exists %}
+                    <a href="{{ object.url }}" target="_blank">{% file_icon object size='64x64' %}</a>
+                {% else %}
+                    {% file_icon object %}
+                {% endif %}
+            {% else %}
+                <img class="thumbnail_img hidden quiet" alt="{% trans 'no file selected' %}">
+            {% endif %}
+
+            <div>
+                {% if object %}
+                    {% if object.file.exists %}
+                        <span class="description_text">{{ object.label }}</span>
+                    {% else %}
+                        {% file_icon object %}
+                        <span class="description_text">{% trans 'File is missing' %}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="description_text"></span>
+                {% endif %}
+
+                <div class="flex items-center gap-4">
+                    <a class="filerClearer {% if not object %}hidden{% endif %}" title="{% trans 'Clear' %}"
+                       data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
+                        <button type="button" class="btn btn-tiny btn-destructive">{% trans 'Delete' %}</button>
+                    </a>
+
+                    <a href="{{ change_url }}?_edit_from_widget=1" class="js-related-edit related-lookup {% if object %}related-lookup-change{% endif %} edit" id="{{ id }}_change"
+                       title="{% trans 'Edit' %}">
+                          <button type="button" class="btn btn-tiny input-file-edit-btn">{% trans 'Edit' %}</button>
+                    </a>
+
+                    <a href="{{ lookup_url }}" class="js-related-lookup related-lookup {% if object %}related-lookup-change{% endif %} lookup" id="{{ id }}_lookup"
+                       title="{% trans 'Lookup' %}">
+                        <button type="button" class="btn btn-primary-light btn-tiny add-file-button">{% trans 'Choose File' %}</button>
+                    </a>
+                </div>
+            </div>
+
+
+            <div class="hidden">{{ hidden_input }}</div>
+            <script type="text/javascript" id="{{id}}_javascript">
+                django.jQuery(document).ready(function(){
+                    var plus = django.jQuery('#add_{{ id }}');
+                    if (plus.length){
+                        plus.remove();
+                    }
+                    // Delete this javascript once loaded to avoid the "add new" link duplicates it
+                    django.jQuery('#{{id}}_javascript').remove();
+                });
+            </script>
+        </span>
+    </div>
+{% endspaceless %}

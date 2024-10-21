@@ -10,6 +10,7 @@
 @import "_utilities.css";
 
 @import "_choices.css";
+@import "_filer.css";
 
 .js-ready {
     .sidebar,
