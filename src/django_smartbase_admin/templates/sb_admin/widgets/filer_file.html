@@ -60,11 +60,6 @@
                         <button type="button" class="btn btn-tiny btn-destructive">{% trans 'Delete' %}</button>
                     </a>
 
-                    <a href="{{ change_url }}?_edit_from_widget=1" class="js-related-edit related-lookup {% if object %}related-lookup-change{% endif %} edit" id="{{ id }}_change"
-                       title="{% trans 'Edit' %}">
-                          <button type="button" class="btn btn-tiny input-file-edit-btn">{% trans 'Edit' %}</button>
-                    </a>
-
                     <a href="{{ lookup_url }}" class="js-related-lookup related-lookup {% if object %}related-lookup-change{% endif %} lookup" id="{{ id }}_lookup"
                        title="{% trans 'Lookup' %}">
                         <button type="button" class="btn btn-primary-light btn-tiny add-file-button">{% trans 'Choose File' %}</button>

@@ -389,7 +389,7 @@ class SBAdminImageWidget(SBAdminBaseWidget, AdminImageWidget):
         )
 
 
-class SBAdminFilerImageWidget(SBAdminBaseWidget, FilerAdminFileWidget):
+class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
     template_name = "sb_admin/widgets/filer_file.html"
 
     def __init__(self, form_field=None, *args, **kwargs):
@@ -406,10 +406,20 @@ class SBAdminFilerImageWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         if value:
             try:
                 file_obj = File.objects.get(pk=value)
-                related_url = (
-                    file_obj.logical_folder.get_admin_directory_listing_url_path()
+                if file_obj.logical_folder.is_root:
+                    related_url = reverse("sb_admin:filer-directory_listing-root")
+                else:
+                    related_url = reverse(
+                        "sb_admin:filer-directory_listing",
+                        args=(file_obj.logical_folder.id,),
+                    )
+                change_url = reverse(
+                    "sb_admin:{}_{}_change".format(
+                        file_obj._meta.app_label,
+                        file_obj._meta.model_name,
+                    ),
+                    args=(file_obj.pk,),
                 )
-                change_url = file_obj.get_admin_change_url()
             except Exception as e:
                 # catch exception and manage it. We can re-raise it for debugging
                 # purposes and/or just logging it, provided user configured
@@ -419,7 +429,7 @@ class SBAdminFilerImageWidget(SBAdminBaseWidget, FilerAdminFileWidget):
                 if settings.FILER_DEBUG:
                     raise
         if not related_url:
-            related_url = reverse("admin:filer-directory_listing-last")
+            related_url = reverse("sb_admin:filer-directory_listing-last")
         params = self.url_parameters()
         params["_pick"] = "file"
         if params:
@@ -442,7 +452,7 @@ class SBAdminFilerImageWidget(SBAdminBaseWidget, FilerAdminFileWidget):
             "object": obj,
             "lookup_name": name,
             "id": css_id,
-            "admin_icon_delete": ("admin/img/icon-deletelink.svg"),
+            "admin_icon_delete": "admin/img/icon-deletelink.svg",
         }
         html = render_to_string(self.template_name, context)
         return mark_safe(html)
