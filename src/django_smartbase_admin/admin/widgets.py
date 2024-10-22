@@ -390,12 +390,10 @@ class SBAdminImageWidget(SBAdminBaseWidget, AdminImageWidget):
 
 
 class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
-    template_name = "sb_admin/widgets/filer_file.html"
-
     def __init__(self, form_field=None, *args, **kwargs):
         self.form_field = form_field
         super(FilerAdminFileWidget, self).__init__(
-            form_field.rel, form_field.view.admin_site
+            form_field.rel, form_field.view.admin_site, *args, **kwargs
         )
 
     def render(self, name, value, attrs=None, renderer=None):
@@ -454,7 +452,9 @@ class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
             "id": css_id,
             "admin_icon_delete": "admin/img/icon-deletelink.svg",
         }
-        html = render_to_string(self.template_name, context)
+        # using template name directly to prevent override of template_name
+        # when calling render of ForeignKeyRawIdWidget
+        html = render_to_string("sb_admin/widgets/filer_file.html", context)
         return mark_safe(html)
 
 
