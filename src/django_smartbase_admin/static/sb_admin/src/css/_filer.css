@@ -1,0 +1,60 @@
+.filer-dropzone {
+    @apply text-14 p-10 !important;
+    @apply bg-light border border-dark-300 rounded transition-colors !important;
+    @apply flex items-center gap-4 relative;
+    &.dz-drag-hover {
+        @apply border-primary bg-primary-50 !important;
+        .input-file-upload-icon {
+            @apply bg-light text-primary;
+        }
+        .dz-message {
+            opacity: 1 !important;
+        }
+    }
+    &:not(.js-object-attached) {
+        border-style: dashed !important;
+        .js-related-edit {
+            @apply !hidden;
+        }
+    }
+    .dz-name {
+        word-break: break-all;
+        white-space: normal !important;
+        max-width: none !important;
+        @apply mb-8 block;
+    }
+    .dz-message {
+        @apply flex items-center;
+        @apply m-0 text-left !important;
+    }
+    .input-file-upload-icon {
+        @apply bg-dark-100;
+        @apply transition-colors;
+    }
+    .filerFile {
+        @apply flex items-center;
+    }
+    .thumbnail_img {
+        @apply w-64 h-64 border border-dark-300 rounded-xs mr-16;
+    }
+    .dz-thumbnail {
+        @apply w-64 h-64 border border-dark-300 mr-16 rounded-xs !important;
+        @apply bg-no-repeat bg-center !important;
+        background-size: 2.5rem !important;
+        img:not([src]) {
+            @apply !hidden;
+        }
+    }
+    .description_text {
+        &:not(:empty) {
+            @apply inline-flex mb-8;
+        }
+    }
+    .dz-progress {
+        @apply absolute left-0 bottom-0 right-0 w-full h-4 rounded-b overflow-hidden;
+    }
+    .dz-upload {
+        @apply block h-full bg-primary !important;
+        width: 0;
+    }
+}
