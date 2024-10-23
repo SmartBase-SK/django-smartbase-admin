@@ -108,7 +108,7 @@ class SBAdminViewService(object):
             response.content.decode()
             .replace(
                 f'href="{reverse("admin:index")}',
-                f'href="{reverse("sb_admin:index")}"',
+                f'href="{reverse("sb_admin:index")}',
             )
             .encode()
         )
