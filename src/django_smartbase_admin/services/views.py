@@ -2,10 +2,9 @@ import json
 import pickle
 import urllib
 
-from django.conf import settings
-from django.db.models import Q, FilteredRelation, F, Value, CharField
+from django.db.models import Q, FilteredRelation, F
 from django.shortcuts import redirect
-from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
+from django.urls import reverse
 
 from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
@@ -17,6 +16,7 @@ from django_smartbase_admin.engine.const import (
 )
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
+from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 
 class SBAdminViewService(object):
@@ -107,7 +107,8 @@ class SBAdminViewService(object):
         response.content = (
             response.content.decode()
             .replace(
-                f'href="/{settings.ADMIN_PATH}', f'href="/{settings.SB_ADMIN_PATH}'
+                f'href="{reverse("admin:index")}',
+                f'href="{reverse("sb_admin:index")}"',
             )
             .encode()
         )
