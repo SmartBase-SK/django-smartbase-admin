@@ -446,6 +446,9 @@ class SBAdminListAction(SBAdminAction):
         return final_data
 
     def get_selection_queryset(self):
+        if not self.selection_data:
+            # don't run with no selection data as it will result in querying all records
+            return Q(id__in=[])
         additional_filter = None
         if self.selected_rows and self.selected_rows != SELECT_ALL_KEYWORD:
             additional_filter = Q(id__in=self.selected_rows)

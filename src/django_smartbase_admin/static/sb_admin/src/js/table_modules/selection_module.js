@@ -22,11 +22,10 @@ export class SelectionModule extends SBAdminTableModule {
             return
         }
         tableSelectedRowsInfo.innerHTML = `${selectedRows.size} selected`
-        if(selectedRows.size > 0) {
+        if (selectedRows.size > 0) {
             tableSelectedRowsBar.classList.add('show')
             document.getElementById('table-selected-rows-bar-select-all').checked = true
-        }
-        else {
+        } else {
             document.getElementById('table-selected-rows-bar-select-all').checked = false
             tableSelectedRowsBar.classList.remove('show')
         }
@@ -70,8 +69,7 @@ export class SelectionModule extends SBAdminTableModule {
             checkbox.setAttribute("name", `row-select-${this.table.viewId}`)
             label.setAttribute("for", `row-select-${rowData[this.table.tableIdColumnName]}`)
             wrapper.setAttribute("for", `row-select-${rowData[this.table.tableIdColumnName]}`)
-        }
-        else {
+        } else {
             checkbox.setAttribute("id", `row-select-all`)
             label.setAttribute("for", `row-select-all`)
             wrapper.setAttribute("for", `row-select-all`)
@@ -152,6 +150,10 @@ export class SelectionModule extends SBAdminTableModule {
     }
 
     loadFromUrlAfterInit() {
+        this.selectNoData()
+    }
+
+    beforeRefreshTableDataIfNotUrlLoad() {
         this.selectNoData()
     }
 }
