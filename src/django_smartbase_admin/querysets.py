@@ -2,6 +2,9 @@ from django.db import models
 
 
 class SBAdminListViewConfigurationQueryset(models.QuerySet):
+    def by_id(self, config_id):
+        return self.filter(id=config_id)
+
     def by_user_id(self, user_id):
         return self.filter(user_id=user_id)
 

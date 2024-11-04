@@ -28,6 +28,9 @@ export class ViewsModule extends SBAdminTableModule {
         }
 
         document.querySelectorAll('.js-view-button').forEach((item) => {
+            if(!item.dataset.params) {
+                return
+            }
             const itemParams = JSON.stringify(this.filterParamsForCompare(JSON.parse(item.dataset.params)))
             const sameAsUrlParams = (itemParams === searchParams)
             const sameAsSelectedParams = selectedParams === itemParams
@@ -67,6 +70,9 @@ export class ViewsModule extends SBAdminTableModule {
     }
 
     openView(e, params, view_id) {
+        if (!params) {
+            return
+        }
         if (e.target.closest("svg")) {
             return
         }
