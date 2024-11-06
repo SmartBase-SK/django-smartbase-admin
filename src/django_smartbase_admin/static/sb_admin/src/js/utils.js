@@ -54,8 +54,11 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
         input.addEventListener('change', callbackFunction)
         input.addEventListener('keypress', (event) => {
             if (event.keyCode === 13) {
+                // fire change event
+                input.blur()
                 event.preventDefault()
-                callbackFunction(event)
+                // refocus
+                input.focus()
                 return true
             }
         })
