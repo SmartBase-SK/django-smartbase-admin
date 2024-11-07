@@ -298,7 +298,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
         old_order = dict(
             qs.values_list(pk_field, self.sbadmin_list_reorder_field).order_by(
-                *self.get_list_ordering()
+                *self.get_list_ordering(request)
             )
         )
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
@@ -374,12 +374,12 @@ class SBAdminBaseListView(SBAdminBaseView):
         else:
             return []
 
-    def get_list_ordering(self) -> Iterable[str] | list:
+    def get_list_ordering(self, request) -> Iterable[str] | list:
         return self.ordering or []
 
     def get_list_initial_order(self, request) -> list[dict[str, Any]]:
         order = []
-        for order_field in self.get_list_ordering():
+        for order_field in self.get_list_ordering(request):
             direction = "desc" if order_field.startswith("-") else "asc"
             order.append(
                 {

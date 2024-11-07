@@ -230,7 +230,9 @@ class SBAdminListAction(SBAdminAction):
         for sort in self.table_params.get("sort", []):
             order_by.append(f"{'-' if sort['dir'] == 'desc' else ''}{sort['field']}")
         if len(order_by) == 0:
-            order_by = self.view.get_list_ordering() or [self.get_pk_field().name]
+            order_by = self.view.get_list_ordering(self.threadsafe_request) or [
+                self.get_pk_field().name
+            ]
         return order_by
 
     def get_order_by_fields_from_request(self):
