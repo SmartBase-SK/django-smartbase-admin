@@ -148,10 +148,12 @@
     display: none;
 }
 
-fieldset.module > h2 {
-    @apply flex items-center text-18 mb-24 font-semibold text-dark-900;
-    &.stacked-inline-heading {
-        @apply text-24 max-sm:px-24;
+fieldset.module > header {
+    > h2 {
+        @apply text-18 font-semibold text-dark-900;
+        &.stacked-inline-heading {
+            @apply text-24 max-sm:px-24;
+        }
     }
 }
 
@@ -162,9 +164,11 @@ fieldset.module > h2 {
             border: 0;
         }
         > fieldset {
-            >.stacked-inline-heading,
-            >.djn-add-item {
-                @apply px-24;
+            > header {
+                >.stacked-inline-heading,
+                >.djn-add-item {
+                    @apply px-24;
+                }
             }
         }
     }
