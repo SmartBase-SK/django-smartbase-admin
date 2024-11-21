@@ -269,6 +269,8 @@ class SBAdminAttributesWidget(SBAdminTextInputWidget):
         dict_widgets = []
         template_widget = {"attrs": {"class": "input"}}
         if widget and value:
+            if isinstance(value, str):
+                value = json.loads(value)
             dict_widgets = [
                 {
                     "key": {"value": key, **template_widget},
