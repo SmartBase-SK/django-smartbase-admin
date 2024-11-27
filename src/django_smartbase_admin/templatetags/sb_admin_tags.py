@@ -2,12 +2,15 @@ import json
 
 from django import template
 from django.contrib.admin.templatetags.admin_modify import submit_row
+from django.contrib.admin.utils import lookup_field
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.defaultfilters import json_script
 from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
 from django.utils.translation import gettext
 
+from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.templatetags.base import InclusionSBAdminNode
 
 register = template.Library()
@@ -220,3 +223,19 @@ def call_method(obj, method_name, *args):
     if method:
         return method(*args)
     return False
+
+
+@register.simple_tag
+def get_row_class(inline_admin_form):
+    try:
+        f, attr, value = lookup_field(
+            ROW_CLASS_FIELD, inline_admin_form.original, inline_admin_form.model_admin
+        )
+    except (AttributeError, ValueError, ObjectDoesNotExist):
+        return ""
+    return value
+
+
+@register.filter
+def is_row_class_field(field):
+    return isinstance(field, dict) and field["name"] == ROW_CLASS_FIELD
