@@ -126,7 +126,7 @@ export class SelectionModule extends SBAdminTableModule {
     getUrlParams() {
         const params = {}
         const selectionData = {}
-        const selectedArray = Array.from(this.tableSelectedRows)
+        const selectedArray = this.table.constants.SELECT_ALL_KEYWORD === this.tableSelectedRows ? this.tableSelectedRows : Array.from(this.tableSelectedRows)
         const deselectedArray = Array.from(this.tableDeselectedRows)
         if (selectedArray.length > 0) {
             selectionData[this.table.constants.SELECTED_ROWS_KWARG_NAME] = selectedArray

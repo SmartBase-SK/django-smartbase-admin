@@ -121,6 +121,7 @@ from django_smartbase_admin.engine.admin_base_view import (
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     TRANSLATIONS_SELECTED_LANGUAGES,
+    ROW_CLASS_FIELD,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -908,6 +909,21 @@ class SBAdminInline(
     extra = 0
     ordering = None
     all_base_fields_form = None
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        if ROW_CLASS_FIELD not in readonly_fields:
+            readonly_fields += (ROW_CLASS_FIELD,)
+        return readonly_fields
+
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if ROW_CLASS_FIELD not in fields:
+            fields += (ROW_CLASS_FIELD,)
+        return fields
+
+    def get_sbadmin_row_class(self, obj):
+        return ""
 
     def get_ordering(self, request) -> tuple[str]:
         """

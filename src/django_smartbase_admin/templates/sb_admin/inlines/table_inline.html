@@ -52,7 +52,7 @@
                                             <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
                                         {% endif %}
                                         {% for field in inline_admin_formset.fields %}
-                                            {% if not field.widget.is_hidden %}
+                                            {% if not field.widget.is_hidden and not field|is_row_class_field %}
                                                 <th class="djn-th
                                                     {{ field.label|lower|slugify }}{% if field.required %} required{% endif %}">
                                                     <div class="flex items-center">
@@ -100,7 +100,7 @@
                                             </td>
                                         </tr>
                                     {% endif %}
-                                    <tr class="djn-tr form-row{% if inline_admin_form.original or inline_admin_form.show_url %} has_original{% endif %}">
+                                    <tr class="djn-tr form-row{% if inline_admin_form.original or inline_admin_form.show_url %} has_original{% endif %} {% get_row_class inline_admin_form %}">
                                         <td class="original{% if inline_admin_formset.opts.sortable_field_name %} is-sortable{% endif %}" style="{% if not context_data.is_sortable_active %}display: none;{% endif %}">
                                             {% if inline_admin_formset.opts.sortable_field_name %}
                                                 <div class="djn-drag-handler">
@@ -145,7 +145,7 @@
                                         {% for fieldset in inline_admin_form %}
                                             {% for line in fieldset %}
                                                 {% for field in line %}
-                                                    {% if not field.field.is_hidden %}
+                                                    {% if not field.field.is_hidden and not field.field|is_row_class_field %}
                                                         <td class="djn-td field-{{ field.field.name }}">
                                                             {% if field.is_readonly %}
                                                                 <div class="px-10 py-8">
