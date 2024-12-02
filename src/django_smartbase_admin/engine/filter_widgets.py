@@ -370,7 +370,7 @@ class DateFilterWidget(SBAdminFilterWidget):
         return isinstance(model_field, fields.DateField)
 
     @classmethod
-    def get_range_from_value(cls, filter_value):
+    def get_range_from_value(cls, filter_value, operator=None):
         """
         Get date-range from string filter value
 
@@ -378,6 +378,12 @@ class DateFilterWidget(SBAdminFilterWidget):
         """
         if filter_value is None:
             return [None, None]
+        if operator in {'in_the_last', 'in_the_next'}\
+                and filter_value in {'1 day', '1 week', '1 month', '3 months', '1 year'}:
+            now = timezone.now()
+            shortcut = next((item for item in cls.shortcuts_dict[operator] if item['label'] == filter_value), None)
+            return cls.process_shortcut(cls, shortcut, now)['value']
+        
         date_format = cls.DATE_FORMAT
         date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
         if len(date_range) == 2:
@@ -396,8 +402,8 @@ class DateFilterWidget(SBAdminFilterWidget):
         date_to = datetime.strftime(date_or_range[1], cls.DATE_FORMAT)
         return f"{date_from}{cls.DATE_RANGE_SPLIT}{date_to}"
 
-    def parse_value_from_input(self, request, filter_value):
-        return self.get_range_from_value(filter_value)
+    def parse_value_from_input(self, request, filter_value, operator=None):
+        return self.get_range_from_value(filter_value, operator)
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
         date_from = filter_value[0]
