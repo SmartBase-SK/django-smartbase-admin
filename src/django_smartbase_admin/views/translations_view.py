@@ -161,7 +161,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
                     annotate=Case(
                         When(
                             **{
-                                f"{annotate_name}_count": F(
+                                f"{annotate_name}_count__gte": F(
                                     f"{main_lang_annotate_name}_count"
                                 ),
                                 "then": Value(self.TRANSLATION_TRANSLATED),
