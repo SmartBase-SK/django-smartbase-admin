@@ -51,6 +51,8 @@
                                         {% if context_data.is_sortable_active %}
                                             <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
                                         {% endif %}
+                                        {% if inline_admin_formset.formset.can_delete %}
+                                            <th class="djn-th" style="min-width: 54px; width: 54px;"></th>{% endif %}
                                         {% for field in inline_admin_formset.fields %}
                                             {% if not field.widget.is_hidden and not field|is_row_class_field %}
                                                 <th class="djn-th
@@ -70,8 +72,6 @@
                                                 </th>
                                             {% endif %}
                                         {% endfor %}
-                                        {% if inline_admin_formset.formset.can_delete %}
-                                            <th class="djn-th" style="min-width: 54px; width: 54px;"></th>{% endif %}
                                     </tr>
                                 </thead>
 
