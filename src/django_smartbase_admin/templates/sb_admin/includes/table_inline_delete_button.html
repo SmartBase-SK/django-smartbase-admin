@@ -1,7 +1,7 @@
 {% load widget_tweaks %}
 {% if inline_admin_formset.formset.can_delete %}
     {% if inline_admin_form.original %}
-        <td class="w-40">
+        <td class="w-40{% if sticky %} sticky-table-col{% endif %}">
             <div class="relative min-h-40 flex items-center delete djn-delete-handler {{ inline_admin_formset.handler_classes|join:" " }}">
                 {% render_field inline_admin_form.deletion_field.field class="checkbox checkbox-delete" %}
                 <label for="{{ inline_admin_form.deletion_field.field.auto_id }}">
@@ -12,10 +12,9 @@
             </div>
         </td>
     {% else %}
-        <td class="delete w-40">
-            <a
-                    class="flex-center h-40 inline-deletelink djn-remove-handler {{ inline_admin_formset.handler_classes|join:" " }}"
-                    href="javascript:void(0)">
+        <td class="delete w-40{% if sticky %} sticky-table-col{% endif %}">
+            <a class="flex-center h-40 inline-deletelink djn-remove-handler {{ inline_admin_formset.handler_classes|join:" " }}"
+               href="javascript:void(0)">
                 <svg class="w-20 h-20 text-dark-300 hover:text-dark-400">
                     <use xlink:href="#Delete"></use>
                 </svg>
