@@ -51,8 +51,11 @@
                                         {% if context_data.is_sortable_active %}
                                             <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
                                         {% endif %}
-                                        {% if inline_admin_formset.formset.can_delete %}
-                                            <th class="djn-th" style="min-width: 54px; width: 54px;"></th>{% endif %}
+                                        {% block table_inline_delete_table_head %}
+                                            {% if inline_admin_formset.formset.can_delete %}
+                                                <th class="djn-th sticky-table-head" style="min-width: 54px; width: 54px;"></th>
+                                            {% endif %}
+                                        {% endblock %}
                                         {% for field in inline_admin_formset.fields %}
                                             {% if not field.widget.is_hidden and not field|is_row_class_field %}
                                                 <th class="djn-th
@@ -163,7 +166,7 @@
                                             {% endfor %}
                                         {% endfor %}
                                         {% block table_inline_delete_button %}
-                                            {% include "sb_admin/includes/table_inline_delete_button.html" %}
+                                            {% include "sb_admin/includes/table_inline_delete_button.html" with sticky=True %}
                                         {% endblock %}
                                     </tr>
                                     {% block table_inline_after_line %}{% endblock %}

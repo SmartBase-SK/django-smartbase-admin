@@ -467,4 +467,30 @@
     .dropdown-menu {
         @apply py-0;
     }
+
+    .sticky-table-head,
+    .sticky-table-col {
+        position: sticky !important;
+        right: 0;
+        z-index: 1;
+        @apply overflow-hidden !border-l-0 pl-8;
+        &:before {
+            content: '';
+            box-shadow: 0 0 8px 0 rgba(17, 24, 39, 0.16);
+            @apply absolute inset-0 transition-colors ml-8;
+        }
+    }
+
+    .sticky-table-head {
+        @apply bg-transparent !important;
+        &:before {
+            @apply bg-dark-50;
+        }
+    }
+
+    .sticky-table-col {
+        &:before {
+            @apply bg-light;
+        }
+    }
 }

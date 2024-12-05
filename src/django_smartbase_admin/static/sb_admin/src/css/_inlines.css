@@ -9,6 +9,7 @@
     min-width: 100%;
     @apply h-full;
     > .djn-thead {
+        @apply bg-dark-50;
         th {
             @apply p-8 h-48;
             @apply transition-colors;
