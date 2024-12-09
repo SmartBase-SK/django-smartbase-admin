@@ -186,6 +186,21 @@
                             {% endblock %}
                         </table>
 
+                        {% block table_script %}
+                            <script>
+                                {# move all non initial lines to the top of the table to maintain original order #}
+                                {# this should happen only during validation error #}
+                                (function(){
+                                    const group = document.getElementById('{{ inline_admin_formset.formset.prefix }}-group');
+                                    const table = group.querySelector('.djn-table');
+                                    const bodies_to_move = Array.from(group.querySelectorAll('.djn-tbody[data-is-initial="false"]'));
+                                    if(bodies_to_move) {
+                                        table.prepend(...bodies_to_move.reverse());
+                                    }
+                                }());
+                            </script>
+                        {% endblock %}
+
                     </fieldset>
                 </div>
 
