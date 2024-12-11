@@ -3,6 +3,7 @@ import urllib.parse
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
@@ -570,6 +571,18 @@ class SBAdminBaseListView(SBAdminBaseView):
             elif config_name:
                 config_params["name"] = config_name
             if config_params:
+                url_params = request.request_data.request_post.get(URL_PARAMS_NAME)
+                
+                url_params_dict = json.loads(url_params)
+                advanced_filter_data = url_params_dict.get("advancedFilterData", {})
+                rules = advanced_filter_data.get("rules", [])
+                for rule in rules:
+                    if rule.get("operator") in {"in_the_last", "in_the_next"}:
+                        rule["value"] = self.get_duration_from_date_range(rule["value"])
+                
+                url_params_dict["advancedFilterData"] = advanced_filter_data
+                updated_url_params = json.dumps(url_params_dict) 
+                
                 (
                     updated_configuration,
                     created,
@@ -577,9 +590,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     user_id=request.request_data.user.id,
                     **config_params,
                     defaults={
-                        "url_params": request.request_data.request_post.get(
-                            URL_PARAMS_NAME
-                        ),
+                        "url_params": updated_url_params,
                         "view": self.get_id(),
                         "action": None,
                         "modifier": None,
@@ -765,3 +776,24 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_search_field_placeholder(self, request) -> str:
         return self.search_field_placeholder
+    
+    def get_duration_from_date_range(operator, date_range_str):
+        date_range = date_range_str.split(' - ')
+        if len(date_range) == 1:
+            return "1 day"
+        start_date = datetime.strptime(date_range[0].strip(), "%Y-%m-%d")
+        end_date = datetime.strptime(date_range[1].strip(), "%Y-%m-%d")
+        
+        duration = (end_date - start_date).days
+
+        match duration:
+            case 1:
+                return "1 day"
+            case 7:
+                return "1 week"
+            case 30:
+                return "1 month"
+            case 90:
+                return "3 months"
+            case 365:
+                return "1 year"
