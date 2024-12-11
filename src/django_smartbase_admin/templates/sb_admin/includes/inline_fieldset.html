@@ -23,7 +23,7 @@
             <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
 
         {% for field in line %}
-            <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden %} hidden{% endif %}">
+            <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden or field.field|is_row_class_field %} hidden{% endif %}">
                 {% if field.is_readonly %}
                     {% call_method field "contents" request %}
                 {% else %}
