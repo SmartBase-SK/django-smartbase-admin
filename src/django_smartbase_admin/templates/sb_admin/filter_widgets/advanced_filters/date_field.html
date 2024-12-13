@@ -1,10 +1,17 @@
 <div class="relative">
     <input
+        type="hidden"
+        autocomplete="off"
+        id="{{ filter_widget.input_id }}"
+        name="{{ filter_widget.input_name }}"
+    >
+    <input
         type="text"
         autocomplete="off"
         class="input pl-10 js-datepicker-dynamic"
-        id="{{ filter_widget.input_id }}"
-        name="{{ filter_widget.input_name }}"
+        id="{{ filter_widget.input_id }}_picker"
+        name="{{ filter_widget.input_name }}_picker"
+        data-sbadmin-datepicker-real-input-id="{{ filter_widget.input_id }}"
         data-sbadmin-datepicker="{{ filter_widget.get_data }}"
         data-sbadmin-datepicker-shortcuts-dict="{{ filter_widget.get_shortcuts_dict_data }}"
     >

@@ -249,39 +249,38 @@ export const monthYearViewsPlugin = (fp) => {
     }
 }
 
+export const createRadioInput = (id, name, value, label, checked) => {
+    const inputWrapperEl = document.createElement('label')
+    inputWrapperEl.classList.add('relative', 'block', 'px-12', 'py-8')
+    inputWrapperEl.setAttribute('for', id)
+    const labelEl = document.createElement('label')
+    labelEl.innerText = label
+    labelEl.setAttribute('for', id)
+    const inputEl = document.createElement('input')
+    inputEl.id = id
+    inputEl.name = name
+    inputEl.value = value
+    inputEl.type = 'radio'
+    inputEl.classList.add('radio')
+    inputEl.checked = checked
+    inputWrapperEl.append(inputEl)
+    inputWrapperEl.append(labelEl)
+    return inputWrapperEl
+}
+
+export const dateTimeReviver = (key, value) => {
+    if (key === 'value') {
+        const newValue = []
+        value.forEach((val) => {
+            newValue.push(new Date(val))
+        })
+        return newValue
+    }
+    return value
+}
+
 // eslint-disable-next-line no-unused-vars
 export const customActionsPlugin = (fp) => {
-
-    const createRadioInput = (id, name, value, label, checked) => {
-        const inputWrapperEl = document.createElement('label')
-        inputWrapperEl.classList.add('relative', 'block', 'px-12', 'py-8')
-        inputWrapperEl.setAttribute('for', id)
-        const labelEl = document.createElement('label')
-        labelEl.innerText = label
-        labelEl.setAttribute('for', id)
-        const inputEl = document.createElement('input')
-        inputEl.id = id
-        inputEl.name = name
-        inputEl.value = value
-        inputEl.type = 'radio'
-        inputEl.classList.add('radio')
-        inputEl.checked = checked
-        inputWrapperEl.append(inputEl)
-        inputWrapperEl.append(labelEl)
-        return inputWrapperEl
-    }
-
-    const dateTimeReviver = (key, value) => {
-        if (key === 'value') {
-            const newValue = []
-            value.forEach((val) => {
-                newValue.push(new Date(val))
-            })
-            return newValue
-        }
-        return value
-    }
-
     const createShortcuts = () => {
         const baseId = fp.element.id
         const baseValue = fp.element.value
@@ -318,5 +317,3 @@ export const customActionsPlugin = (fp) => {
         onReady: createShortcuts,
     }
 }
-
-export const HIDE_CALENDAR_CLASS = 'hide-calendar' // used for hiding calendar and only use shortcuts

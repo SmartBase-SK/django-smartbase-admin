@@ -617,6 +617,9 @@ span.flatpickr-weekday {
 .flatpickr-shortcuts {
     @apply pt-4 mb-16;
 
+    input[type="radio"] {
+        @apply hidden;
+    }
     & > label {
         @apply p-0;
     }

@@ -1,5 +1,6 @@
 .query-builder {
-    select:not(.select2-hidden-accessible), input:not(.checkbox):not(.choices__input) {
+    select:not(.select2-hidden-accessible),
+    input:not(.checkbox):not(.radio):not(.choices__input) {
         @apply !w-full input;
     }
 
