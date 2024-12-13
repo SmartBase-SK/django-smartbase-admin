@@ -72,12 +72,16 @@ export default class Datepicker {
         })
 
         shortcuts.forEach((shortcut, idx) => {
+            const checked = JSON.stringify(shortcut.value) === baseValue
+            if(checked) {
+                datePickerEl.value = shortcut.label
+            }
             el.append(createRadioInput(
                 `${baseId}_range${idx}`,
                 `${baseId}_shortcut`,
                 JSON.stringify(shortcut.value),
                 shortcut.label,
-                shortcut.value === baseValue
+                checked
             ))
         })
         datePickerEl.parentElement.append(el)
