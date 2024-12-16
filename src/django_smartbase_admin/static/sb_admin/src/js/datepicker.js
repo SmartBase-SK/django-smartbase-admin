@@ -41,13 +41,11 @@ export default class Datepicker {
                 const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
                 if(isInTable && realInput) {
                     // set initial value from real input to flatpickr
-                    const realInputInitialLoadHandler = () => {
+                    realInput.addEventListener('SBTableFilterFormLoad', () => {
                         if(!datePickerEl.value) {
                             instance.setDate(realInput.value, false, instance.config.dateFormat)
                         }
-                        realInput.removeEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
-                    }
-                    realInput.addEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
+                    })
                 }
                 if(!isInTable){
                     this.createClear(instance)

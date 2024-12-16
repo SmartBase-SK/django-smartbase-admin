@@ -312,7 +312,7 @@ export const customActionsPlugin = (fp) => {
         })
         fp.calendarContainer.prepend(el)
 
-        const realInputInitialLoadHandler = () => {
+        realInput.addEventListener('SBTableFilterFormLoad', () => {
             try {
                 const shortcutValue = JSON.parse(realInput.value)
                 const from = new Date()
@@ -332,9 +332,7 @@ export const customActionsPlugin = (fp) => {
             catch {
                 fp.setDate(realInput.value, false, fp.config.dateFormat)
             }
-            realInput.removeEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
-        }
-        realInput.addEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
+        })
     }
 
 
