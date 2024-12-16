@@ -49,6 +49,7 @@ class SBAdminBaseView(object):
     global_filter_data_map = None
     field_cache = None
     sbadmin_detail_actions = None
+    delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
 
     def init_view_static(self, configuration, model, admin_site):
         pass
