@@ -373,6 +373,11 @@ class DateFilterWidget(SBAdminFilterWidget):
         if filter_value is None:
             return [None, None]
         date_format = cls.DATE_FORMAT
+        if type(filter_value) is list:
+            return [
+                timezone.now() + timedelta(days=filter_value[0]),
+                timezone.now() + timedelta(days=filter_value[1]),
+            ]
         date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
         if len(date_range) == 2:
             date_from = datetime.strptime(date_range[0], date_format)

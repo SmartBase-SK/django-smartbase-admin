@@ -249,7 +249,7 @@ export const monthYearViewsPlugin = (fp) => {
     }
 }
 
-export const createRadioInput = (id, name, value, label, checked) => {
+export const createRadioInput = (id, name, value, label, checked, index) => {
     const inputWrapperEl = document.createElement('label')
     inputWrapperEl.classList.add('relative', 'block', 'px-12', 'py-8')
     inputWrapperEl.setAttribute('for', id)
@@ -261,59 +261,90 @@ export const createRadioInput = (id, name, value, label, checked) => {
     inputEl.name = name
     inputEl.value = value
     inputEl.type = 'radio'
-    inputEl.classList.add('radio')
+    inputEl.classList.add('radio', 'flatpickr-shortcut')
     inputEl.checked = checked
+    inputEl.dataset["index"] = index
     inputWrapperEl.append(inputEl)
     inputWrapperEl.append(labelEl)
     return inputWrapperEl
 }
 
-export const dateTimeReviver = (key, value) => {
-    if (key === 'value') {
-        const newValue = []
-        value.forEach((val) => {
-            newValue.push(new Date(val))
-        })
-        return newValue
-    }
-    return value
-}
-
 // eslint-disable-next-line no-unused-vars
 export const customActionsPlugin = (fp) => {
     const createShortcuts = () => {
-        const baseId = fp.element.id
-        const baseValue = fp.element.value
+        const realInput = document.getElementById(fp.element.dataset.sbadminDatepickerRealInputId)
+        const baseId = realInput.id
+        const baseValue = realInput.value
         const el = document.createElement('div')
-        const shortcuts = JSON.parse(fp.element.dataset.sbadminDatepickerShortcuts, dateTimeReviver)
+        const shortcuts = JSON.parse(fp.element.dataset.sbadminDatepickerShortcuts)
         el.classList.add('flatpickr-shortcuts')
         el.addEventListener('change', (e) => {
+            // on shortcut click/change set new value and label to real input element
             const value = e.target.value
-            fp.setDate(shortcuts[value].value, true, fp.config.dateFormat)
+            realInput.value = value
+            realInput.dataset['label'] = e.target.nextElementSibling.innerText
+            realInput.dispatchEvent(new Event('change'))
+
+            // parse new value and set it to flatpicker
+            const shortcutValue = shortcuts[e.target.dataset.index].value
+            const from = new Date()
+            from.setDate(from.getDate() + shortcutValue[0])
+
+            const to = new Date()
+            to.setDate(to.getDate() + shortcutValue[1])
+
+            fp.setDate([from, to], false, fp.config.dateFormat)
         })
 
         shortcuts.forEach((shortcut, idx) => {
-            const fromDateFormatted = fp.formatDate(shortcut.value[0], fp.config.dateFormat)
-            const toDateFormatted = fp.formatDate(shortcut.value[1], fp.config.dateFormat)
-            let shortcutValueStr
-            if (fromDateFormatted === toDateFormatted) {
-                shortcutValueStr = fromDateFormatted
-            } else {
-                shortcutValueStr = fromDateFormatted + fp.config.locale.rangeSeparator + toDateFormatted
+            const checked = JSON.stringify(shortcut.value) === baseValue
+            if(checked) {
+                realInput.dataset['label'] = shortcut.label
             }
             el.append(createRadioInput(
                 `${baseId}_range${idx}`,
                 `${baseId}_shortcut`,
-                idx,
+                JSON.stringify(shortcut.value),
                 shortcut.label,
-                baseValue === shortcutValueStr
+                checked,
+                idx
             ))
         })
         fp.calendarContainer.prepend(el)
+
+        const realInputInitialLoadHandler = () => {
+            try {
+                const shortcutValue = JSON.parse(realInput.value)
+                const from = new Date()
+                from.setDate(from.getDate() + shortcutValue[0])
+
+                const to = new Date()
+                to.setDate(to.getDate() + shortcutValue[1])
+                fp.setDate([from, to], false, fp.config.dateFormat)
+
+                shortcuts.forEach((shortcut, idx) => {
+                    if(JSON.stringify(shortcut.value) === realInput.value) {
+                        document.getElementById(`${baseId}_range${idx}`).checked = true
+                        realInput.dataset['label'] = shortcut.label
+                    }
+                })
+            }
+            catch {
+                fp.setDate(realInput.value, false, fp.config.dateFormat)
+            }
+            realInput.removeEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
+        }
+        realInput.addEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
     }
 
 
     return {
         onReady: createShortcuts,
+        onChange: (selectedDates, dateStr, instance) => {
+            const checkedShortcut = instance.element.parentElement.querySelector('input.flatpickr-shortcut:checked')
+            if(checkedShortcut){
+                checkedShortcut.checked = false
+            }
+        }
     }
 }

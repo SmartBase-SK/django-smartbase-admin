@@ -32,15 +32,30 @@ export default class Datepicker {
         if(datePickerEl.dataset.sbadminDatepicker) {
             sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)
         }
+
         flatpickr(datePickerEl, {
             onReady: (selectedDates, dateStr, instance) => {
                 const isInTable = datePickerEl.closest('[data-filter-input-name]')
-                if(!isInTable) {
+
+                // real input element should be present only in filters
+                const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+                if(isInTable && realInput) {
+                    // set initial value from real input to flatpickr
+                    const realInputInitialLoadHandler = () => {
+                        if(!datePickerEl.value) {
+                            instance.setDate(realInput.value, false, instance.config.dateFormat)
+                        }
+                        realInput.removeEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
+                    }
+                    realInput.addEventListener('SBTableFilterFormLoad', realInputInitialLoadHandler)
+                }
+                if(!isInTable){
                     this.createClear(instance)
                 }
                 instance.nextMonthNav?.replaceChildren(createIcon('Right-small'))
                 instance.prevMonthNav?.replaceChildren(createIcon('Left-small'))
-                datePickerEl.addEventListener('clear', () => {
+                const mainInput = realInput || datePickerEl
+                mainInput.addEventListener('clear', () => {
                     instance.clear()
                 })
             },
@@ -51,7 +66,12 @@ export default class Datepicker {
                 }
             },
             onChange: function(selectedDates, dateStr) {
-                document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId).value = dateStr
+                const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+                if(realInput) {
+                    realInput.value = dateStr
+                    realInput.removeAttribute('data-label')
+                    realInput.dispatchEvent(new Event('change'))
+                }
             },
             ...options,
             ...sbadminDatepickerData.flatpickrOptions,
@@ -81,7 +101,8 @@ export default class Datepicker {
                 `${baseId}_shortcut`,
                 JSON.stringify(shortcut.value),
                 shortcut.label,
-                checked
+                checked,
+                idx
             ))
         })
         datePickerEl.parentElement.append(el)

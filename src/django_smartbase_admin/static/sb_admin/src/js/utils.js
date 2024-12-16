@@ -73,6 +73,11 @@ export const filterInputValueChangedUtil = (field) => {
     if(!valueElem) {
         return
     }
+    const label = field.dataset.label
+    if(label) {
+        valueElem.innerHTML = label
+        return valueElem
+    }
     const valueOrObject = getObjectOrValue(field.value)
     if ((field.value === "" || field.value === "[]")) {
         if(field.dataset.emptyLabel) {
