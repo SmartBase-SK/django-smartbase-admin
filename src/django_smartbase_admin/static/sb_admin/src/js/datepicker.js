@@ -35,10 +35,23 @@ export default class Datepicker {
 
         flatpickr(datePickerEl, {
             onReady: (selectedDates, dateStr, instance) => {
+                instance.nextMonthNav?.replaceChildren(createIcon('Right-small'))
+                instance.prevMonthNav?.replaceChildren(createIcon('Left-small'))
+
                 const isInTable = datePickerEl.closest('[data-filter-input-name]')
 
                 // real input element should be present only in filters
                 const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+                const mainInput = realInput || datePickerEl
+                mainInput.addEventListener('clear', () => {
+                    instance.clear()
+                })
+
+
+                if(!isInTable){
+                    this.createClear(instance)
+                }
+
                 if(isInTable && realInput) {
                     // set initial value from real input to flatpickr
                     realInput.addEventListener('SBTableFilterFormLoad', () => {
@@ -46,16 +59,12 @@ export default class Datepicker {
                             instance.setDate(realInput.value, false, instance.config.dateFormat)
                         }
                     })
+                    return
                 }
-                if(!isInTable){
-                    this.createClear(instance)
+                if(realInput) {
+                    // advanced filters
+                    instance.setDate(realInput.value, false, instance.config.dateFormat)
                 }
-                instance.nextMonthNav?.replaceChildren(createIcon('Right-small'))
-                instance.prevMonthNav?.replaceChildren(createIcon('Left-small'))
-                const mainInput = realInput || datePickerEl
-                mainInput.addEventListener('clear', () => {
-                    instance.clear()
-                })
             },
             onClose: function(selectedDates, dateStr, instance) {
                 // fix single day range
