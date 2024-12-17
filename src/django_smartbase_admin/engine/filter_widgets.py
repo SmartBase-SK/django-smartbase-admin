@@ -326,12 +326,19 @@ class DateFilterWidget(SBAdminFilterWidget):
                 shortcuts[key].append(self.process_shortcut(shortcut, now))
         return shortcuts
 
+    def get_default_label(self):
+        if self.default_value_shortcut_index is not None:
+            return self.get_shortcuts()[self.default_value_shortcut_index]["label"]
+        return super().get_default_value()
+
     def get_default_value(self):
         if self.default_value_shortcut_index is not None:
             selected_shortcut_value = self.get_shortcuts()[
                 self.default_value_shortcut_index
             ]["value"]
-            return self.get_value_from_date_or_range(selected_shortcut_value)
+            return SBAdminViewService.json_dumps_for_url(
+                self.get_value_from_date_or_range(selected_shortcut_value)
+            )
         return super().get_default_value()
 
     def get_data(self):
@@ -374,9 +381,14 @@ class DateFilterWidget(SBAdminFilterWidget):
             return [None, None]
         date_format = cls.DATE_FORMAT
         if type(filter_value) is list:
+            if type(filter_value[0]) is int:
+                return [
+                    timezone.now() + timedelta(days=filter_value[0]),
+                    timezone.now() + timedelta(days=filter_value[1]),
+                ]
             return [
-                timezone.now() + timedelta(days=filter_value[0]),
-                timezone.now() + timedelta(days=filter_value[1]),
+                datetime.strptime(filter_value[0], date_format),
+                datetime.strptime(filter_value[1], date_format),
             ]
         try:
             days_range = json.loads(filter_value)
@@ -397,9 +409,11 @@ class DateFilterWidget(SBAdminFilterWidget):
     def get_value_from_date_or_range(cls, date_or_range):
         if not isinstance(date_or_range, list):
             return datetime.strftime(date_or_range, cls.DATE_FORMAT)
+        if type(date_or_range[0]) is int:
+            return date_or_range
         date_from = datetime.strftime(date_or_range[0], cls.DATE_FORMAT)
         date_to = datetime.strftime(date_or_range[1], cls.DATE_FORMAT)
-        return f"{date_from}{cls.DATE_RANGE_SPLIT}{date_to}"
+        return [date_from, date_to]
 
     def parse_value_from_input(self, request, filter_value):
         return self.get_range_from_value(filter_value)

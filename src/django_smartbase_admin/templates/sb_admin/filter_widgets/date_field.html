@@ -7,7 +7,7 @@
             id="{{ filter_widget.input_id }}"
             name="{{ filter_widget.input_name }}"
             form="{{ filter_widget.view_id }}-filter-form"
-            {% if filter_widget.get_default_value %}value="{{ filter_widget.get_default_value }}"{% endif %}
+            {% if filter_widget.get_default_value %}value="{{ filter_widget.get_default_value }}" data-label="{{ filter_widget.get_default_label }}"{% endif %}
             {% if not all_filters_visible %}disabled{% endif %}
         >
         <input type="text"
