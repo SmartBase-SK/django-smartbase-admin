@@ -652,7 +652,6 @@ class SBAdmin(
 ):
     change_list_template = "sb_admin/actions/list.html"
     change_form_template = "sb_admin/actions/change_form.html"
-    delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
     delete_selected_confirmation_template = (
         "sb_admin/actions/delete_selected_confirmation.html"
     )
