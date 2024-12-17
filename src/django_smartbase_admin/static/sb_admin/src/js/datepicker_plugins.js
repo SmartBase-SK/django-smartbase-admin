@@ -271,6 +271,24 @@ export const createRadioInput = (id, name, value, label, checked, index) => {
 
 // eslint-disable-next-line no-unused-vars
 export const customActionsPlugin = (fp) => {
+    const setInitialValueAndLabel = (realInput, shortcuts, baseId) => {
+        const shortcutValue = JSON.parse(realInput.value)
+        const from = new Date()
+        from.setDate(from.getDate() + shortcutValue[0])
+
+        const to = new Date()
+        to.setDate(to.getDate() + shortcutValue[1])
+        fp.setDate([from, to], false, fp.config.dateFormat)
+
+        shortcuts.forEach((shortcut, idx) => {
+            if(JSON.stringify(shortcut.value) === realInput.value) {
+                document.getElementById(`${baseId}_range${idx}`).checked = true
+                realInput.dataset['label'] = shortcut.label
+            }
+        })
+    }
+
+
     const createShortcuts = () => {
         const realInput = document.getElementById(fp.element.dataset.sbadminDatepickerRealInputId)
         const baseId = realInput.id
@@ -312,22 +330,13 @@ export const customActionsPlugin = (fp) => {
         })
         fp.calendarContainer.prepend(el)
 
+        if(realInput.value){
+            setInitialValueAndLabel(realInput, shortcuts, baseId)
+        }
+
         realInput.addEventListener('SBTableFilterFormLoad', () => {
             try {
-                const shortcutValue = JSON.parse(realInput.value)
-                const from = new Date()
-                from.setDate(from.getDate() + shortcutValue[0])
-
-                const to = new Date()
-                to.setDate(to.getDate() + shortcutValue[1])
-                fp.setDate([from, to], false, fp.config.dateFormat)
-
-                shortcuts.forEach((shortcut, idx) => {
-                    if(JSON.stringify(shortcut.value) === realInput.value) {
-                        document.getElementById(`${baseId}_range${idx}`).checked = true
-                        realInput.dataset['label'] = shortcut.label
-                    }
-                })
+                setInitialValueAndLabel(realInput, shortcuts, baseId)
             }
             catch {
                 fp.setDate(realInput.value, false, fp.config.dateFormat)
