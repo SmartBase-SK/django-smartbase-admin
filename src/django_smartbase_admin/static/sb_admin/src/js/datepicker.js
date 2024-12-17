@@ -1,6 +1,10 @@
 import flatpickr from "flatpickr"
 import {createIcon} from "./utils"
-import {customActionsPlugin, HIDE_CALENDAR_CLASS, monthYearViewsPlugin} from "./datepicker_plugins"
+import {
+    createRadioInput,
+    customActionsPlugin,
+    monthYearViewsPlugin
+} from "./datepicker_plugins"
 
 
 export default class Datepicker {
@@ -28,20 +32,38 @@ export default class Datepicker {
         if(datePickerEl.dataset.sbadminDatepicker) {
             sbadminDatepickerData = JSON.parse(datePickerEl.dataset.sbadminDatepicker)
         }
+
         flatpickr(datePickerEl, {
             onReady: (selectedDates, dateStr, instance) => {
-                const isInTable = datePickerEl.closest('[data-filter-input-name]')
-                if(!isInTable) {
-                    this.createClear(instance)
-                }
                 instance.nextMonthNav?.replaceChildren(createIcon('Right-small'))
                 instance.prevMonthNav?.replaceChildren(createIcon('Left-small'))
-                datePickerEl.addEventListener('clear', () => {
+
+                const isInTable = datePickerEl.closest('[data-filter-input-name]')
+
+                // real input element should be present only in filters
+                const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+                const mainInput = realInput || datePickerEl
+                mainInput.addEventListener('clear', () => {
                     instance.clear()
                 })
-                if(datePickerEl.classList.contains(HIDE_CALENDAR_CLASS)) {
-                    instance.monthNav.classList.add('!hidden')
-                    instance.innerContainer.classList.add('!hidden')
+
+
+                if(!isInTable){
+                    this.createClear(instance)
+                }
+
+                if(isInTable && realInput) {
+                    // set initial value from real input to flatpickr
+                    realInput.addEventListener('SBTableFilterFormLoad', () => {
+                        if(!datePickerEl.value) {
+                            instance.setDate(realInput.value, false, instance.config.dateFormat)
+                        }
+                    })
+                    return
+                }
+                if(realInput) {
+                    // advanced filters
+                    instance.setDate(realInput.value, false, instance.config.dateFormat)
                 }
             },
             onClose: function(selectedDates, dateStr, instance) {
@@ -50,10 +72,50 @@ export default class Datepicker {
                     instance.setDate([selectedDates[0],selectedDates[0]], true)
                 }
             },
+            onChange: function(selectedDates, dateStr) {
+                const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+                if(realInput) {
+                    realInput.value = dateStr
+                    realInput.removeAttribute('data-label')
+                    realInput.dispatchEvent(new Event('change'))
+                }
+            },
             ...options,
             ...sbadminDatepickerData.flatpickrOptions,
             ...optionsOverride
         })
+    }
+
+    initShortcutsDropdown(datePickerEl) {
+        const realInput = document.getElementById(datePickerEl.dataset.sbadminDatepickerRealInputId)
+        const baseId = realInput.id
+        const baseValue = realInput.value
+        const el = document.createElement('div')
+        const shortcuts = JSON.parse(datePickerEl.dataset.sbadminDatepickerShortcuts)
+        el.classList.add('flatpickr-shortcuts', 'dropdown-menu')
+        el.addEventListener('change', (e) => {
+            realInput.value = e.target.value
+            datePickerEl.value = e.target.nextElementSibling.innerText
+        })
+
+        shortcuts.forEach((shortcut, idx) => {
+            const checked = JSON.stringify(shortcut.value) === baseValue
+            if(checked) {
+                datePickerEl.value = shortcut.label
+            }
+            el.append(createRadioInput(
+                `${baseId}_range${idx}`,
+                `${baseId}_shortcut`,
+                JSON.stringify(shortcut.value),
+                shortcut.label,
+                checked,
+                idx
+            ))
+        })
+        datePickerEl.parentElement.append(el)
+        datePickerEl.readOnly = true
+        datePickerEl.dataset['bsToggle'] = "dropdown"
+        new window.bootstrap5.Dropdown(datePickerEl)
     }
 
     initWidgets(parentEl=null) {

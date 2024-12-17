@@ -1,6 +1,6 @@
 import { SBAdminTableModule } from "./base_module"
 import { filterInputValueChangedUtil, filterInputValueChangeListener } from "../utils"
-import {customActionsPlugin, HIDE_CALENDAR_CLASS, monthYearViewsPlugin} from "../datepicker_plugins"
+import {customActionsPlugin, monthYearViewsPlugin} from "../datepicker_plugins"
 
 export class AdvancedFilterModule extends SBAdminTableModule {
     constructor(table) {
@@ -104,6 +104,16 @@ export class AdvancedFilterModule extends SBAdminTableModule {
             widgetEl._flatpickr.calendarContainer?.remove()
             widgetEl._flatpickr.clear()
             widgetEl._flatpickr.destroy()
+            widgetEl._flatpickr = undefined
+            return
+        }
+        const dropdownInstance = window.bootstrap5.Dropdown.getInstance(widgetEl)
+        if(dropdownInstance) {
+            dropdownInstance.dispose()
+            widgetEl.removeAttribute('data-bs-toggle')
+            widgetEl.nextElementSibling?.remove()
+            widgetEl.readOnly = false
+            widgetEl.value = ""
         }
     }
 
@@ -120,17 +130,14 @@ export class AdvancedFilterModule extends SBAdminTableModule {
         if (["between", "not_between", "in_the_last", "in_the_next"].includes(rule.operator.type)) {
             optionsOverride["mode"] = "range"
         }
-        if (["in_the_last", "in_the_next"].includes(rule.operator.type)) {
-            // this option does work but there is a bug in certain cases
-            // optionsOverride["noCalendar"] = true
-            widgetEl.classList.add(HIDE_CALENDAR_CLASS)
-        }
-        else {
-            widgetEl.classList.remove(HIDE_CALENDAR_CLASS)
-        }
         this.destroyDatePicker(widgetEl)
         const shortcuts = JSON.parse(widgetEl.dataset.sbadminDatepickerShortcutsDict)
         widgetEl.dataset.sbadminDatepickerShortcuts = JSON.stringify(shortcuts[rule.operator.type] || [])
-        window.SBAdmin.datepicker.initFlatPickr(widgetEl, {}, optionsOverride)
+        if (["in_the_last", "in_the_next"].includes(rule.operator.type)) {
+            window.SBAdmin.datepicker.initShortcutsDropdown(widgetEl, {}, optionsOverride)
+        }
+        else {
+            window.SBAdmin.datepicker.initFlatPickr(widgetEl, {}, optionsOverride)
+        }
     }
 }

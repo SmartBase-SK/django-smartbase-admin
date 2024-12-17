@@ -308,13 +308,7 @@ class DateFilterWidget(SBAdminFilterWidget):
         return DATE_ATTRIBUTES
 
     def process_shortcut(self, shortcut, now):
-        return {
-            "label": shortcut["label"],
-            "value": [
-                now + timedelta(days=shortcut["value"][0]),
-                now + timedelta(days=shortcut["value"][1]),
-            ],
-        }
+        return shortcut
 
     def get_shortcuts(self):
         now = timezone.now()
@@ -379,12 +373,23 @@ class DateFilterWidget(SBAdminFilterWidget):
         if filter_value is None:
             return [None, None]
         date_format = cls.DATE_FORMAT
-        date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
-        if len(date_range) == 2:
-            date_from = datetime.strptime(date_range[0], date_format)
-            date_to = datetime.strptime(date_range[1], date_format)
-            return [date_from, date_to]
-        else:
+        if type(filter_value) is list:
+            return [
+                timezone.now() + timedelta(days=filter_value[0]),
+                timezone.now() + timedelta(days=filter_value[1]),
+            ]
+        try:
+            days_range = json.loads(filter_value)
+            return [
+                timezone.now() + timedelta(days=days_range[0]),
+                timezone.now() + timedelta(days=days_range[1]),
+            ]
+        except json.decoder.JSONDecodeError:
+            date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
+            if len(date_range) == 2:
+                date_from = datetime.strptime(date_range[0], date_format)
+                date_to = datetime.strptime(date_range[1], date_format)
+                return [date_from, date_to]
             date_value = datetime.strptime(filter_value, date_format)
             return [date_value, date_value]
 
