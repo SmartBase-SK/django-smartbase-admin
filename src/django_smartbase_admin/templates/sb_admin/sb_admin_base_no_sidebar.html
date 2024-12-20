@@ -38,6 +38,10 @@
     {% if content_context.is_jquery_required %}
         <script src="{% static 'sb_admin/js/jquery-3.7.1.min.js' %}"></script>
     {% endif %}
+    {% block jquery %}
+    {% endblock %}
+    {% block tree_widget_static %}
+    {% endblock %}
     {% block extrahead %}{% endblock %}
     <style>@media (min-width: 1200px){.xl\:\!block {display: block !important;}}</style>
     {% if request.META.HTTP_SEC_FETCH_DEST == "iframe" %}
