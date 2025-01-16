@@ -38,7 +38,7 @@
             @apply border-b border-dark-200;
         }
         &:first-child,
-        &.fancytree-checkbox-column ~ td {
+        &.fancytree-checkbox-column + td {
             overflow: hidden;
             border: none;
         }
@@ -284,7 +284,16 @@ tr.fancytree-has-children span.fancytree-expander:before {
             @apply pl-0 isolate;
         }
     }
-    > tbody > tr:hover > .fancytree-checkbox-column {
-        @apply bg-primary-50;
+
+    > tbody > tr {
+        &.fancytree-selected,
+        &:hover,
+        &.fancytree-active,
+        &.fancytree-active:hover,
+        &.fancytree-selected:hover {
+            > .fancytree-checkbox-column {
+                @apply bg-primary-50;
+            }
+        }
     }
 }

@@ -67,7 +67,7 @@
             &.field-image {
                 @apply max-w-370;
             }
-            .input:not(.choices__input) {
+            .input:not(.choices__input):not([type="search"]){
                 @apply border-0 rounded-none shadow-none;
             }
             .btn:not(.input-file-edit-btn) {
@@ -104,8 +104,8 @@
             }
         }
     }
-    >*:nth-last-child(2) {
-        td,th {
+    thead:last-child {
+        th {
             &:first-child {
                 @apply rounded-bl;
             }
