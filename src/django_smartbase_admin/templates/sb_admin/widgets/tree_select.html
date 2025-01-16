@@ -1,0 +1,24 @@
+{% load bookelicious_tags %}
+
+<div class="relative">
+    {% include 'sb_admin/widgets/includes/field_label.html' %}
+    <div id="{{ widget.attrs.id }}-wrapper" class="tree-widget-wrapper">
+        <input type="hidden" id="{{ widget.attrs.id }}" name="{{ widget.name }}"{% if widget.raw_value %} value="{{ widget.raw_value|get_json }}"{% endif %}>
+        <button
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                data-bs-offset="[0, 8]"
+                class="btn px-10 font-normal w-full"
+        >
+            <span id="{{ widget.attrs.id }}_label">{% get_item widget.value_dict widget.raw_value widget.form_field.empty_label %}</span>
+            <svg class="ml-8">
+                <use xlink:href="#Down"></use>
+            </svg>
+        </button>
+        <div class="dropdown-menu max-h-none w-248">
+            <div class="py-8">
+                {% include "sb_admin/widgets/tree_base.html" with tree_additional_columns=widget.additional_columns tree_value=widget.raw_value tree_multiselect=filter_widget.multiselect tree_component_id=widget.attrs.id tree_data_url=filter_widget.to_json.autocomplete_url tree_show_checkbox=True table_wrapper_classes="max-h-432 overflow-auto custom-scrollbar" %}
+            </div>
+        </div>
+    </div>
+</div>

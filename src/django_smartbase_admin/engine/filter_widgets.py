@@ -701,3 +701,48 @@ class FromValuesAutocompleteWidget(AutocompleteFilterWidget):
 
     def get_label(self, request, item):
         return item.get(self.field.name)
+
+
+class SBAdminTreeWidgetMixin:
+    order_by = None
+    inline = False
+    RELATIONSHIP_PICK_MODE_NONE = None
+    RELATIONSHIP_PICK_MODE_PARENT = "parent"
+    relationship_pick_mode = RELATIONSHIP_PICK_MODE_NONE
+    additional_columns = None
+
+    def __init__(
+        self,
+        order_by=None,
+        relationship_pick_mode=None,
+        inline=None,
+        additional_columns=None,
+        *args,
+        **kwargs,
+    ):
+        self.inline = inline if inline is not None else self.inline
+        self.order_by = order_by if order_by is not None else self.order_by
+        self.relationship_pick_mode = relationship_pick_mode
+        self.additional_columns = (
+            additional_columns
+            if additional_columns is not None
+            else self.additional_columns
+        )
+        if self.inline:
+            self.template_name = "sb_admin/widgets/tree_select_inline.html"
+        super().__init__(*args, **kwargs)
+
+    def action_autocomplete(self, request, modifier):
+        result = self.format_tree_data(request, self.get_queryset(request))
+        return JsonResponse(data=result, safe=False)
+
+    def format_tree_data(self, request, queryset):
+        raise NotImplementedError
+
+
+class SBAdminTreeFilterWidget(SBAdminTreeWidgetMixin, AutocompleteFilterWidget):
+    template_name = "sb_admin/filter_widgets/tree_select_filter.html"
+
+    def get_base_filter_query_for_parsed_value(self, request, parsed_value):
+        filter_q = super().get_base_filter_query_for_parsed_value(request, parsed_value)
+        return filter_q

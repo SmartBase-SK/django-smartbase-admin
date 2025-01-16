@@ -1,0 +1,27 @@
+{% extends "sb_admin/actions/list.html" %}
+{% load static %}
+{% block tabulator_custom_header %}
+{% endblock %}
+{% block tabulator_body %}
+    {% with view_id|add:'_tree' as tree_id %}
+        <div>
+            {% include "sb_admin/widgets/tree_base.html" with tree_main_column_name=list_title tree_reorder_url=content_context.tabulator_definition.treeReorderUrl tree_additional_columns=additional_columns tree_component_id=tree_id tree_data_url=content_context.tabulator_definition.tableAjaxUrl tree_detail_url=content_context.tabulator_definition.tableDetailUrl search_wrapper_classes="py-16 md:p-16" %}
+        </div>
+    {% endwith %}
+{% endblock %}
+{% block tabulator_custom_footer %}
+{% endblock %}
+{% block actions %}
+    {% with view_id|add:'_tree' as tree_id %}
+        {% if request.request_data.action == 'action_enter_reorder' %}
+            <li class="max-sm:hidden">
+                <button onclick="$.ui.fancytree.getTree('#' + '{{ tree_id }}' + '_tree').saveTreeOrder()"
+                        class="btn btn-empty">Save Order
+                </button>
+            </li>
+        {% endif %}
+    {% endwith %}
+    {{ block.super }}
+{% endblock %}
+{% block additional_js %}
+{% endblock %}

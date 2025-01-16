@@ -282,6 +282,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     url=self.get_menu_view_url(request),
                 ),
             ],
+            template=self.reorder_list_template,
         )
 
     def is_reorder_active(self, request) -> bool:
@@ -618,6 +619,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         tabulator_definition=None,
         extra_context=None,
         list_actions=None,
+        template=None,
     ):
         action = self.sbadmin_list_action_class(
             self,
@@ -640,7 +642,8 @@ class SBAdminBaseListView(SBAdminBaseView):
 
         return TemplateResponse(
             request,
-            self.change_list_template
+            template
+            or self.change_list_template
             or [
                 "admin/%s/%s/change_list.html"
                 % (self.model._meta.app_label, self.model._meta.model_name),

@@ -10,6 +10,7 @@ from django.contrib.admin.widgets import (
     ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
+from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.formats import get_format
@@ -23,6 +24,7 @@ from filer.models import File
 
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
+    SBAdminTreeWidgetMixin,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
@@ -542,3 +544,69 @@ class SBAdminColorWidget(SBAdminTextInputWidget):
         js = [
             "sb_admin/js/coloris/coloris.min.js",
         ]
+
+
+class SBAdminTreeWidget(SBAdminTreeWidgetMixin, SBAdminAutocompleteWidget):
+    template_name = "sb_admin/widgets/tree_select.html"
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["raw_value"] = value
+        context["widget"]["relationship_pick_mode"] = self.relationship_pick_mode
+        context["widget"]["value_dict"] = {
+            item["value"]: item["label"]
+            for item in context["widget"].get("value_list", [])
+        }
+        context["widget"]["additional_columns"] = self.additional_columns
+        return context
+
+    @classmethod
+    def get_descendants_from_tree_data(cls, tree_data, parent_id):
+        parent_item = cls.find_parent_in_tree_data(tree_data, parent_id)
+        descendants = cls.get_descendats_from_item(parent_item)
+        return descendants
+
+    @classmethod
+    def get_descendats_from_item(cls, item):
+        descendants = []
+        if not item:
+            return descendants
+        for child in item.get("children", []):
+            descendants.append(child)
+            descendants.extend(cls.get_descendats_from_item(child))
+        return descendants
+
+    @classmethod
+    def find_parent_in_tree_data(cls, tree_data, parent_id):
+        str_parent_id = str(parent_id)
+        for item in tree_data:
+            if item["key"] == str_parent_id:
+                return item
+            parent = cls.find_parent_in_tree_data(
+                item.get("children", []), str_parent_id
+            )
+            if parent:
+                return parent
+        return None
+
+    def value_from_datadict(self, data, files, name):
+        input_value = data.get(name)
+        threadsafe_request = SBAdminThreadLocalService.get_request()
+        parsed_value = self.parse_value_from_input(threadsafe_request, input_value)
+        obj = self.form.instance
+        if (
+            obj
+            and parsed_value
+            and self.relationship_pick_mode == self.RELATIONSHIP_PICK_MODE_PARENT
+        ):
+            if obj.id == parsed_value:
+                raise ValidationError(_("Cannot set parent to itself"))
+            qs = self.get_queryset(threadsafe_request).order_by(*self.order_by)
+            tree_data = self.format_tree_data(threadsafe_request, qs)
+            children = self.get_descendants_from_tree_data(tree_data, obj.id)
+            children_ids = []
+            for child in children:
+                children_ids.append(child.get("key"))
+            if input_value in children_ids:
+                raise ValidationError(_("Cannot set parent to it's own child"))
+        return parsed_value
