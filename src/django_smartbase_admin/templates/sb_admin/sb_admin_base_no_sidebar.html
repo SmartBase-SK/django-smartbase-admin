@@ -25,6 +25,10 @@
     {% block style_init %}{% endblock %}
 
     <script>window.csrf_token = "{{ csrf_token }}"</script>
+
+    {% block jquery %}
+    	<script src="{% static 'sb_admin/js/jquery-3.7.1.min.js' %}"></script>
+    {% endblock %}
     {% block js_init %}
         <script>
             {% if const %}
@@ -34,9 +38,6 @@
                 return JSON.parse(document.getElementById(elementId).textContent)
             }
         </script>
-    {% endblock %}
-    {% block jquery %}
-    	<script src="{% static 'sb_admin/js/jquery-3.7.1.min.js' %}"></script>
     {% endblock %}
     {% block tree_widget_static %}
         <script src="{% static 'sb_admin/fancytree/jquery.fancytree-all-deps.min.js' %}"></script>

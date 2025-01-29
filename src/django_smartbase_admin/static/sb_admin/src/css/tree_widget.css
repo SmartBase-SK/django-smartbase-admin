@@ -28,6 +28,9 @@
         &:last-child {
             @apply pr-16;
         }
+        &:not(.text-right) {
+            @apply text-left;
+        }
     }
     td {
         @apply px-8 py-0 relative;
@@ -295,5 +298,15 @@ tr.fancytree-has-children span.fancytree-expander:before {
                 @apply bg-primary-50;
             }
         }
+        &.fancytree-hide {
+            @apply hidden;
+        }
+    }
+}
+
+/* inline style */
+.djn-tbody .fancytree-ext-table{
+    .fancytree-checkbox-column {
+        @apply w-32;
     }
 }

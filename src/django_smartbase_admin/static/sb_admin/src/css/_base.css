@@ -100,4 +100,8 @@
     *:focus-visible {
         outline: none;
     }
+
+    mark {
+        @apply text-dark-900 bg-notice-100;
+    }
 }
