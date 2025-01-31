@@ -45,6 +45,15 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             if ($treeEl.hasClass('fancytree-container')) {
                 return
             }
+            $treeEl.on('change', (e) => {
+                const changeTarget = e.target.dataset['changeTarget']
+                if(changeTarget) {
+                    const changeTargetEl = document.querySelector(changeTarget)
+                    if(changeTargetEl) {
+                        changeTargetEl.value = e.target.value
+                    }
+                }
+            })
             const $treeDataEl = $('#' + $treeEl.data('tree-data-id'))
             const $treeAdditionalColumnsDataEl = $('#' + $treeEl.data('tree-additional-columns-id'))
             let treeWidgetData = {}

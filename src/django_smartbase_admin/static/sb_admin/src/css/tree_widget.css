@@ -276,6 +276,14 @@ tr.fancytree-has-children span.fancytree-expander:before {
     }
 }
 
+.fancytree-hide {
+    @apply hidden;
+}
+
+.fancytree-submatch:not(.fancytree-match) > *{
+    opacity: 0.5;
+}
+
 .filter-wrapper .fancytree-ext-table {
     > thead {
         @apply hidden;
@@ -297,9 +305,6 @@ tr.fancytree-has-children span.fancytree-expander:before {
             > .fancytree-checkbox-column {
                 @apply bg-primary-50;
             }
-        }
-        &.fancytree-hide {
-            @apply hidden;
         }
     }
 }
