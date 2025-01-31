@@ -558,6 +558,8 @@ class SBAdminTreeWidget(SBAdminTreeWidgetMixin, SBAdminAutocompleteWidget):
             for item in context["widget"].get("value_list", [])
         }
         context["widget"]["additional_columns"] = self.additional_columns
+        context["widget"]["tree_strings"] = self.tree_strings
+
         return context
 
     @classmethod

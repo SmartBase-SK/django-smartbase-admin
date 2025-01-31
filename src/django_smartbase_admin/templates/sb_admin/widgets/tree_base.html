@@ -12,7 +12,7 @@
     </div>
 </div>
 <div class="{{ table_wrapper_classes }}">
-    <table style="width: 100%;" id="{{ tree_component_id }}_tree" class="js-tree-widget" data-tree-data-id="{{ tree_component_id }}_data" data-tree-additional-columns-id="{{ tree_component_id }}_additional_columns">
+    <table style="width: 100%;" id="{{ tree_component_id }}_tree" class="js-tree-widget" data-tree-data-id="{{ tree_component_id }}_data" data-tree-additional-columns-id="{{ tree_component_id }}_additional_columns" data-tree-strings-id="{{ tree_component_id }}_tree_strings">
         <thead>
         <tr>
             {% if tree_show_checkbox %}<th></th>{% endif %}
@@ -46,3 +46,6 @@
     }
 </script>
 <script id="{{ tree_component_id }}_additional_columns" type="application/json">{{ tree_additional_columns|get_json|safe }}</script>
+<script id="{{ tree_component_id }}_tree_strings" type="application/json">
+    {{ tree_strings|get_json|safe }}
+</script>

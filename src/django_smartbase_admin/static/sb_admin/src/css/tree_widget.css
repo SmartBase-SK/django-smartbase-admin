@@ -284,6 +284,15 @@ tr.fancytree-has-children span.fancytree-expander:before {
     opacity: 0.5;
 }
 
+.fancytree-status-merged {
+    @apply h-40;
+}
+
+.fancytree-statusnode-loading,
+.fancytree-statusnode-error {
+    pointer-events: none;
+}
+
 .filter-wrapper .fancytree-ext-table {
     > thead {
         @apply hidden;

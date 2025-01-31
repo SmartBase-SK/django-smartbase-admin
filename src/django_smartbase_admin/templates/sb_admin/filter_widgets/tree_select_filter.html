@@ -7,7 +7,7 @@
                 <input form="{{ filter_widget.view_id }}-filter-form" type="hidden"
                        id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
                        {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %} value="{{ filter_widget.get_default_value|get_json }}"{% endif %}>
-                {% include "sb_admin/widgets/tree_base.html" with tree_additional_columns=filter_widget.additional_columns tree_filter=True tree_value=filter_widget.get_default_value tree_multiselect=filter_widget.multiselect tree_component_id=filter_widget.input_id tree_data_url=filter_widget.to_json.autocomplete_url tree_show_checkbox=True search_wrapper_classes="pb-8 px-12" table_wrapper_classes="max-h-432 overflow-auto custom-scrollbar" %}
+                {% include "sb_admin/widgets/tree_base.html" with tree_additional_columns=filter_widget.additional_columns tree_strings=filter_widget.tree_strings tree_filter=True tree_value=filter_widget.get_default_value tree_multiselect=filter_widget.multiselect tree_component_id=filter_widget.input_id tree_data_url=filter_widget.to_json.autocomplete_url tree_show_checkbox=True search_wrapper_classes="pb-8 px-12" table_wrapper_classes="max-h-432 overflow-auto custom-scrollbar" %}
             </div>
         {% endwith %}
     </div>

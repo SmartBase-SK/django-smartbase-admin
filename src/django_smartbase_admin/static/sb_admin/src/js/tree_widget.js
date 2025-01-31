@@ -56,11 +56,14 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             })
             const $treeDataEl = $('#' + $treeEl.data('tree-data-id'))
             const $treeAdditionalColumnsDataEl = $('#' + $treeEl.data('tree-additional-columns-id'))
+            const $treeStringsDataEl = $('#' + $treeEl.data('tree-strings-id'))
             let treeWidgetData = {}
             let additionalColumns = []
+            let treeStrings = {loading: "Loading...", loadError: "Load error!", moreData: "More...", noData: "No data."}
             try {
                 treeWidgetData = JSON.parse($treeDataEl.text()) || {}
                 additionalColumns = JSON.parse($treeAdditionalColumnsDataEl.text()) || []
+                treeStrings = JSON.parse($treeStringsDataEl.text())
             } catch (e) {
                 console.error(e)
             }
@@ -118,6 +121,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     autofocusInput: false,
                     handleCursorKeys: true,
                 },
+                strings: treeStrings,
                 postProcess: function (event, data) {
                     setTimeout(function () {
                         loadValue($inputEl, treeWidgetData, data.tree)

@@ -5,7 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _, pgettext_lazy
 
 from django_smartbase_admin.actions.advanced_filters import (
     AllOperators,
@@ -710,6 +710,12 @@ class SBAdminTreeWidgetMixin:
     RELATIONSHIP_PICK_MODE_PARENT = "parent"
     relationship_pick_mode = RELATIONSHIP_PICK_MODE_NONE
     additional_columns = None
+    tree_strings = {
+        "loading": pgettext_lazy("Tree widget", "Loading..."),
+        "loadError": pgettext_lazy("Tree widget", "Load error!"),
+        "moreData": pgettext_lazy("Tree widget", "More..."),
+        "noData": pgettext_lazy("Tree widget", "No data."),
+    }
 
     def __init__(
         self,
@@ -717,6 +723,7 @@ class SBAdminTreeWidgetMixin:
         relationship_pick_mode=None,
         inline=None,
         additional_columns=None,
+        tree_strings=None,
         *args,
         **kwargs,
     ):
@@ -727,6 +734,9 @@ class SBAdminTreeWidgetMixin:
             additional_columns
             if additional_columns is not None
             else self.additional_columns
+        )
+        self.tree_strings = (
+            tree_strings if tree_strings is not None else self.tree_strings
         )
         if self.inline:
             self.template_name = "sb_admin/widgets/tree_select_inline.html"
