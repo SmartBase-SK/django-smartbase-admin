@@ -1,16 +1,18 @@
 {% load static sb_admin_tags i18n %}
 
-<div class="border-b border-dark-200 {{ search_wrapper_classes }}">
-    <div class="js-tree-widget-search relative">
-        {% trans 'Search' as search_string %}
-        <input id="{{ tree_component_id }}_search" name="search" placeholder="{{ tree_filter_placeholder|default:search_string }}" autocomplete="off" class="input pl-36" type="search">
-        <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
-            <svg class="w-20 h-20">
-                <use xlink:href="#Search"></use>
-            </svg>
+{% if not hide_tree_search %}
+    <div class="border-b border-dark-200 {{ search_wrapper_classes }}">
+        <div class="js-tree-widget-search relative">
+            {% trans 'Search' as search_string %}
+            <input id="{{ tree_component_id }}_search" name="search" placeholder="{{ tree_filter_placeholder|default:search_string }}" autocomplete="off" class="input pl-36" type="search">
+            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Search"></use>
+                </svg>
+            </div>
         </div>
     </div>
-</div>
+{% endif %}
 <div class="{{ table_wrapper_classes }}">
     <table style="width: 100%;" id="{{ tree_component_id }}_tree" class="js-tree-widget" data-tree-data-id="{{ tree_component_id }}_data" data-tree-additional-columns-id="{{ tree_component_id }}_additional_columns" data-tree-strings-id="{{ tree_component_id }}_tree_strings">
         <thead>
