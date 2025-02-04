@@ -117,6 +117,9 @@ export class TableParamsModule extends SBAdminTableModule {
     }
 
     createPagination(paginationWidget) {
+        if(!paginationWidget) {
+            return
+        }
         const maxPage = this.table.tabulator.getPageMax()
         const currentPage = this.table.tabulator.getPage()
         const currentPageSize = this.table.tabulator.getPageSize()
@@ -242,6 +245,9 @@ export class TableParamsModule extends SBAdminTableModule {
     }
 
     createPageSize(pageSizeWidget) {
+        if(!pageSizeWidget) {
+            return
+        }
         pageSizeWidget.innerHTML = ''
         const pageSizeWrapper = document.createElement('div')
         pageSizeWrapper.classList.add('relative')
