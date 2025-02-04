@@ -54,6 +54,26 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     }
                 }
             })
+            let filterData = {}
+            const filterByTableData = (treeInstance) => {
+                if(!filterData["isFiltered"]) {
+                    treeInstance.filterNodes((node) => {
+                        node.setExpanded(false)
+                        return true
+                    },  { autoExpand: false })
+                    return
+                }
+
+                const tableData = {}
+                filterData['data'].forEach(item => tableData[item.path] = item)
+
+                treeInstance.filterNodes((node) => {
+                    if(tableData[node.key]) {
+                        return true
+                    }
+                },  { autoExpand: true })
+            }
+
             const $treeDataEl = $('#' + $treeEl.data('tree-data-id'))
             const $treeAdditionalColumnsDataEl = $('#' + $treeEl.data('tree-additional-columns-id'))
             const $treeStringsDataEl = $('#' + $treeEl.data('tree-strings-id'))
@@ -152,7 +172,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     $inputEl[0].dispatchEvent(new CustomEvent('SBAutocompleteChange'))
                     $inputEl[0].dispatchEvent(new Event('change', {bubbles: true}))
                 },
-                renderNode: function (event, data) {
+                enhanceTitle: function(event, data) {
                     const reorderActive = treeWidgetData.reorder_url
                     const nodeRendered = data.node.rendered
                     const filteringActive = data.node.tree.enableFilter
@@ -161,23 +181,22 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     if (detailUrlPresent && (!nodeRendered || filteringActive) && !reorderActive && validVisibleNode) {
                         const title = data.node.span.querySelector('.fancytree-title')
                         const titleLink = document.createElement('a')
+                        const url = treeWidgetData.detail_url.replace(-1, data.node.data.id)
                         titleLink.innerHTML = title.innerHTML
                         titleLink.classList.add('link')
+                        titleLink.href = url
                         title.innerHTML = ''
                         title.append(titleLink)
                         title.addEventListener('mousedown', function (e) {
                             e.preventDefault()
                             e.stopPropagation()
-                            const url = treeWidgetData.detail_url.replace(-1, data.node.key)
-                            if(e.button === 0) {
-                                window.location = url
-                                return
-                            }
-                            if(e.button === 1) {
-                                window.open(url)
-                            }
                         }, true)
                     }
+                },
+                renderNode: function (event, data) {
+                    const reorderActive = treeWidgetData.reorder_url
+                    const nodeRendered = data.node.rendered
+                    const validVisibleNode = data.node.span && data.node.span.classList.contains("fancytree-node") && !data.node.tr.classList.contains("fancytree-hide")
                     if (nodeRendered && !reorderActive) {
                         return
                     }
@@ -232,6 +251,9 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                         $tdList.eq(1 + tableConfig.nodeColumnIdx + index).html(value)
                     })
                 },
+                init: function (event, data) {
+                    filterByTableData(data.tree)
+                }
             })
 
             const clearSearchInput = function () {
@@ -285,6 +307,14 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                         window.htmx.process(document.getElementById("notification-messages"))
                     })
             }
+
+            document.body.addEventListener('tableDataProcessed', (e)=>{
+                filterData = e.detail
+                if(treeInstance.getRootNode().getChildren()[0]["statusNodeType"] === "loading") {
+                    return
+                }
+                filterByTableData(treeInstance)
+            })
         }
 
         const initAllTrees = function () {
