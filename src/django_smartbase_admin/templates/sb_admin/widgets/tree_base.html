@@ -44,7 +44,8 @@
         "checkbox": {% if tree_show_checkbox %}true{% else %}false{% endif %},
         "multiselect": {% if tree_multiselect %}2{% else %}1{% endif %},
         "detail_url":"{{ tree_detail_url }}",
-        "reorder_url":"{{ tree_reorder_url }}"
+        "reorder_url":"{{ tree_reorder_url }}",
+        "filter_by_table_data": {% if filter_by_table_data %}true{% else %}false{% endif %}
     }
 </script>
 <script id="{{ tree_component_id }}_additional_columns" type="application/json">{{ tree_additional_columns|get_json|safe }}</script>

@@ -252,7 +252,9 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     })
                 },
                 init: function (event, data) {
-                    filterByTableData(data.tree)
+                    if(treeWidgetData.filter_by_table_data) {
+                        filterByTableData(data.tree)
+                    }
                 }
             })
 
@@ -308,13 +310,15 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     })
             }
 
-            document.body.addEventListener('tableDataProcessed', (e)=>{
-                filterData = e.detail
-                if(treeInstance.getRootNode().getChildren()[0]["statusNodeType"] === "loading") {
-                    return
-                }
-                filterByTableData(treeInstance)
-            })
+            if(treeWidgetData.filter_by_table_data) {
+                document.body.addEventListener('tableDataProcessed', (e) => {
+                    filterData = e.detail
+                    if(treeInstance.getRootNode().getChildren()[0]["statusNodeType"] === "loading") {
+                        return
+                    }
+                    filterByTableData(treeInstance)
+                })
+            }
         }
 
         const initAllTrees = function () {
