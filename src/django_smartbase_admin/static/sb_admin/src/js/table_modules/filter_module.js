@@ -67,7 +67,9 @@ export class FilterModule extends SBAdminTableModule {
         const filterData = new FormData(filterForm).entries()
         const filterDataNotEmpty = {}
         for (const [key, value] of filterData) {
-            filterDataNotEmpty[key] = value
+            if(value) {
+                filterDataNotEmpty[key] = value
+            }
         }
         if (Object.keys(filterDataNotEmpty).length > 0) {
             params[this.table.constants.FILTER_DATA_NAME] = filterDataNotEmpty

@@ -1,4 +1,4 @@
-import {TabulatorFull as Tabulator} from 'tabulator-tables'
+import {TabulatorFull as Tabulator, Renderer} from 'tabulator-tables'
 import {ViewsModule} from "./table_modules/views_module"
 import {SelectionModule} from "./table_modules/selection_module"
 import {ColumnDisplayModule} from "./table_modules/column_display_module"
@@ -106,12 +106,18 @@ class SBAdminTable {
         }
     }
 
+    isFiltered() {
+        return this.getUrlParams()[this.constants.FILTER_DATA_NAME] !== undefined
+    }
+
     loadFromUrlAfterInit() {
         window.htmx.process(this.tabulator.rowManager.tableElement)
-        this.tabulator.on("dataProcessed", () => {
+        this.tabulator.on("dataProcessed", (data) => {
             window.htmx.process(this.tabulator.rowManager.tableElement)
+            document.body.dispatchEvent(new CustomEvent('tableDataProcessed', {"detail": {"data": data, "isFiltered": this.isFiltered()}}))
         })
         this.callModuleAction('loadFromUrlAfterInit')
+        document.body.dispatchEvent(new CustomEvent('tableDataProcessed', {"detail": {"data": this.tabulator.getData(), "isFiltered": this.isFiltered()}}))
     }
 
     initModules(modules) {
@@ -244,6 +250,16 @@ class SBAdminTable {
         const tableHeaderVisible = this.callModuleAction('requiresHeader')
         if (!tableHeaderVisible) {
             document.getElementById(this.viewId + "-tabulator-header").style.display = "none"
+        }
+
+        class NoRender extends Renderer {
+            render() {}
+        }
+        if(this.tabulatorOptions['renderVertical'] === "no-render") {
+            this.tabulatorOptions['renderVertical'] = NoRender
+        }
+        if(this.tabulatorOptions['renderHorizontal'] === "no-render") {
+            this.tabulatorOptions['renderHorizontal'] =NoRender
         }
 
         let tabulatorOptions = {
