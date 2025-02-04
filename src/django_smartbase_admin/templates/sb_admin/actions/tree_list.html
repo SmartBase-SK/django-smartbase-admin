@@ -1,5 +1,15 @@
 {% extends "sb_admin/actions/list.html" %}
 {% load static sb_admin_tags %}
+
+{% block extrahead %}
+	{{ block.super }}
+    <style>
+        #table-columns-dropdown-wrapper {
+            display: none;
+        }
+    </style>
+{% endblock %}
+
 {% block tabulator_custom_header %}
     {% include content_context.tabulator_header_template_name %}
 {% endblock %}
