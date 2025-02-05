@@ -148,29 +148,39 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     }, 1)
                 },
                 select: function (event, data) {
-                    let value = null
-                    if (treeWidgetData.filter) {
-                        value = data.tree.getSelectedNodes().map(function (node) {
-                            return {'value': node.key, 'label': node.title}
-                        })
-                        $inputEl[0].value = JSON.stringify(value)
-                    } else {
-                        value = data.tree.getSelectedNodes().map(function (node) {
-                            return node.key
-                        }).join(", ")
-                        if (treeWidgetData.multiselect === 2) {
-                            value = JSON.stringify(data.tree.getSelectedNodes().map(function (node) {
+                    if($inputEl.length > 0) {
+                        let value = null
+                        if (treeWidgetData.filter) {
+                            value = data.tree.getSelectedNodes().map(function (node) {
+                                return {'value': node.key, 'label': node.title}
+                            })
+                            $inputEl.val(JSON.stringify(value))
+                        } else {
+                            value = data.tree.getSelectedNodes().map(function (node) {
                                 return node.key
-                            }))
+                            }).join(", ")
+                            if (treeWidgetData.multiselect === 2) {
+                                value = JSON.stringify(data.tree.getSelectedNodes().map(function (node) {
+                                    return node.key
+                                }))
+                            }
+                            let label = data.tree.getSelectedNodes().map(function (node) {
+                                return node.title
+                            }).join(", ")
+                            $label.text(label)
+                            $inputEl.val(value)
                         }
-                        let label = data.tree.getSelectedNodes().map(function (node) {
-                            return node.title
-                        }).join(", ")
-                        $label.text(label)
-                        $inputEl.val(value)
+                        $inputEl[0].dispatchEvent(new CustomEvent('SBAutocompleteChange'))
+                        $inputEl[0].dispatchEvent(new Event('change', {bubbles: true}))
+                        return
                     }
-                    $inputEl[0].dispatchEvent(new CustomEvent('SBAutocompleteChange'))
-                    $inputEl[0].dispatchEvent(new Event('change', {bubbles: true}))
+
+                    if(treeWidgetData.filter_by_table_data && data.originalEvent) {
+                        const selectedKeys = data.tree.getSelectedNodes().map(function (node) {
+                            return node.data.id
+                        })
+                        document.body.dispatchEvent(new CustomEvent("treeRowSelected", {detail: {data: selectedKeys}}))
+                    }
                 },
                 enhanceTitle: function(event, data) {
                     const reorderActive = treeWidgetData.reorder_url
@@ -317,6 +327,13 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                         return
                     }
                     filterByTableData(treeInstance)
+                })
+
+                document.body.addEventListener('treeDeselectAllRows', () => {
+                    treeInstance.selectAll(false)
+                })
+                document.body.addEventListener('treeSelectAllRows', () => {
+                    treeInstance.selectAll(true)
                 })
             }
         }

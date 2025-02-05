@@ -18,10 +18,11 @@ export class SelectionModule extends SBAdminTableModule {
         this.tableSelectedRows = selectedRows
         this.tableDeselectedRows = deselectedRows
         if (selectedRows === this.table.constants.SELECT_ALL_KEYWORD) {
-            tableSelectedRowsInfo.innerHTML = this.table.tabulator.modules.page.remoteRowCountEstimate - deselectedRows.size
+            const count = this.table.tabulator.modules.page.remoteRowCountEstimate - deselectedRows.size
+            tableSelectedRowsInfo.innerHTML = window.sb_admin_translation_strings["selected"].replace('${value}', count)
             return
         }
-        tableSelectedRowsInfo.innerHTML = `${selectedRows.size} selected`
+        tableSelectedRowsInfo.innerHTML = window.sb_admin_translation_strings["selected"].replace('${value}', selectedRows.size)
         if (selectedRows.size > 0) {
             tableSelectedRowsBar.classList.add('show')
             document.getElementById('table-selected-rows-bar-select-all').checked = true
@@ -34,11 +35,13 @@ export class SelectionModule extends SBAdminTableModule {
     selectAllData() {
         this.table.tabulator.selectRow('all')
         this.setSelectedRows(this.table.constants.SELECT_ALL_KEYWORD, new Set())
+        document.body.dispatchEvent(new CustomEvent('treeSelectAllRows'))
     }
 
     selectNoData() {
         this.table.tabulator.deselectRow()
         this.setSelectedRows(new Set(), new Set())
+        document.body.dispatchEvent(new CustomEvent('treeDeselectAllRows'))
     }
 
     rowSelectionFormatter(tabulatorFormatterHandle, cell, formatterParams, onRendered) {
@@ -147,6 +150,21 @@ export class SelectionModule extends SBAdminTableModule {
     afterInit() {
         this.table.tabulator.on("rowSelected", this.getSelectionHandler("rowSelected"))
         this.table.tabulator.on("rowDeselected", this.getSelectionHandler("rowDeselected"))
+        this.table.tabulator.on("rowSelectionChanged", (data)=> {
+            if(data.length === 0) {
+                document.body.dispatchEvent(new CustomEvent('treeDeselectAllRows'))
+            }
+        })
+        document.body.addEventListener("treeRowSelected", (e) => {
+            const selectedRowIds = this.table.tabulator.getSelectedData().map(rowData => rowData.id)
+            const newSelectedRowIds = e.detail.data
+            const newSelectedRowIdsSet = new Set(e.detail.data)
+
+            const rowIdsToDeselect = selectedRowIds.filter((e) => !newSelectedRowIdsSet.has(e))
+
+            this.table.tabulator.deselectRow(rowIdsToDeselect)
+            this.table.tabulator.selectRow(newSelectedRowIds)
+        })
     }
 
     loadFromUrlAfterInit() {
