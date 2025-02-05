@@ -30,8 +30,8 @@ class SBAdminViewService(object):
 
     @classmethod
     def build_list_url(cls, view_id, url_params):
-        params = {view_id: url_params}
-        return f"{BASE_PARAMS_NAME}={cls.json_dumps_for_url(params)}"
+        params = {BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: url_params})}
+        return urllib.parse.urlencode(params)
 
     @classmethod
     def process_url_params(cls, view_id, url_params, filter_version):
