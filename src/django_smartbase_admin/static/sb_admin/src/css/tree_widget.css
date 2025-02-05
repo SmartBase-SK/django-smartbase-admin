@@ -46,7 +46,7 @@
             border: none;
         }
         &.fancytree-checkbox-column {
-            @apply pr-0;
+            @apply pr-0 w-32;
         }
         &:last-child {
             @apply pr-16;
@@ -320,12 +320,5 @@ tr.fancytree-has-children span.fancytree-expander:before {
                 @apply bg-primary-50;
             }
         }
-    }
-}
-
-/* inline style */
-.djn-tbody .fancytree-ext-table{
-    .fancytree-checkbox-column {
-        @apply w-32;
     }
 }
