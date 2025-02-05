@@ -157,7 +157,7 @@
     @apply flex items-center justify-center;
     background-size: 16px;
     position: absolute;
-    --expander-border: 1px dashed var(--color-dark-300);
+    --expander-border: 2px solid var(--color-dark-400);
     >div {
         @apply w-20 h-20;
         background-position: center;
@@ -255,8 +255,13 @@ tr.fancytree-has-children span.fancytree-expander:before {
 }
 
 .fancytree-exp-n, .fancytree-exp-nl {
-    .fancytree-expander > div {
-        display: none;
+    .fancytree-expander {
+        > div {
+            display: none;
+        }
+        &:before {
+            @apply mr-8;
+        }
     }
 }
 
