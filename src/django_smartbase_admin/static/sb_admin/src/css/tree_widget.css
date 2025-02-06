@@ -44,6 +44,7 @@
         &.fancytree-checkbox-column + td {
             overflow: hidden;
             border: none;
+            width: 99%;
         }
         &.fancytree-checkbox-column {
             @apply pr-0 w-32;
