@@ -114,6 +114,9 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     preventVoidMoves: true,
                     preventRecursion: true,
                     autoExpandMS: 400,
+                    dropMarkerParent: '.tree-list-view',
+                    dropMarkerOffsetX: -8,
+                    dropMarkerInsertOffsetX: 0,
                     dragStart: function () {
                         return true
                     },
