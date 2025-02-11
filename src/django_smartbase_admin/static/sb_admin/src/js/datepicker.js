@@ -10,6 +10,7 @@ import {
 export default class Datepicker {
     constructor() {
         let documentLocale = document.documentElement.lang || 'default'
+        documentLocale = documentLocale.split('-')[0]
         if (documentLocale === 'en') {
             documentLocale = 'default'
         }
