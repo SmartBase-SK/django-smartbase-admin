@@ -752,7 +752,3 @@ class SBAdminTreeWidgetMixin:
 
 class SBAdminTreeFilterWidget(SBAdminTreeWidgetMixin, AutocompleteFilterWidget):
     template_name = "sb_admin/filter_widgets/tree_select_filter.html"
-
-    def get_base_filter_query_for_parsed_value(self, request, parsed_value):
-        filter_q = super().get_base_filter_query_for_parsed_value(request, parsed_value)
-        return filter_q
