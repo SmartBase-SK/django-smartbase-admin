@@ -834,6 +834,7 @@ class SBAdminTreeWidgetMixin:
             lnk[path] = newobj
         return tree_data
 
+    # tree_widget_data: [{"key":"path", "children": [{...}]}]
     @classmethod
     def process_treebeard_tree(
         cls,
