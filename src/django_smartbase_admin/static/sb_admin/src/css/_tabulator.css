@@ -800,3 +800,9 @@
         height: 1.5rem;
     }
 }
+
+.tree-list-view {
+    .fancytree-ext-table td.fancytree-checkbox-column {
+        @apply pl-16 pr-4 w-40;
+    }
+}

@@ -1,0 +1,12 @@
+{% load sb_admin_tags %}
+
+<div class="relative -mb-2">
+    <script>
+        document.currentScript.closest('.djn-table').querySelector('.djn-thead').classList.add('hidden');
+    </script>
+    <div id="{{ widget.attrs.id }}-wrapper" class="tree-widget-wrapper">
+        <input type="hidden" id="{{ widget.attrs.id }}" name="{{ widget.name }}"{% if widget.raw_value %}
+               value="{{ widget.raw_value|get_json }}"{% endif %}>
+        {% include "sb_admin/widgets/tree_base.html" with tree_main_column_name=filter_widget.form_field.label tree_strings=widget.tree_strings tree_additional_columns=widget.additional_columns tree_value=widget.raw_value tree_multiselect=filter_widget.multiselect tree_component_id=widget.attrs.id tree_data_url=filter_widget.to_json.autocomplete_url tree_show_checkbox=True table_wrapper_classes="max-h-432 overflow-auto custom-scrollbar" search_wrapper_classes="pb-16 px-16" %}
+    </div>
+</div>

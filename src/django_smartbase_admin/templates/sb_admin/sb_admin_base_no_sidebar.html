@@ -25,6 +25,10 @@
     {% block style_init %}{% endblock %}
 
     <script>window.csrf_token = "{{ csrf_token }}"</script>
+
+    {% block jquery %}
+    	<script src="{% static 'sb_admin/js/jquery-3.7.1.min.js' %}"></script>
+    {% endblock %}
     {% block js_init %}
         <script>
             {% if const %}
@@ -35,12 +39,10 @@
             }
         </script>
     {% endblock %}
-    {% if content_context.is_jquery_required %}
-        <script src="{% static 'sb_admin/js/jquery-3.7.1.min.js' %}"></script>
-    {% endif %}
-    {% block jquery %}
-    {% endblock %}
     {% block tree_widget_static %}
+        <script src="{% static 'sb_admin/fancytree/jquery.fancytree-all-deps.min.js' %}"></script>
+        <script src="{% static 'sb_admin/dist/tree_widget.js' %}"></script>
+        <link rel="stylesheet" href="{% static 'sb_admin/dist/tree_widget_style.css' %}">
     {% endblock %}
     {% block extrahead %}{% endblock %}
     <style>@media (min-width: 1200px){.xl\:\!block {display: block !important;}}</style>

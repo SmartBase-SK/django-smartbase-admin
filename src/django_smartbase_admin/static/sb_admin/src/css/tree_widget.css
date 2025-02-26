@@ -1,0 +1,405 @@
+
+.tree-widget-wrapper > .dropdown-menu {
+    min-width: 480px;
+    width: auto;
+}
+
+.fancytree-ext-table {
+    @apply text-14 h-full text-dark-900;
+    >thead {
+        @apply bg-dark-50 border-b border-dark-200;
+    }
+    > tbody {
+        > tr {
+            &.fancytree-selected,
+            &:hover,
+            &.fancytree-active,
+            &.fancytree-active:hover,
+            &.fancytree-selected:hover {
+                @apply bg-primary-50;
+            }
+        }
+    }
+    th {
+        @apply whitespace-nowrap p-8 bg-dark-50 text-dark-600 h-48 text-14 font-normal;
+        &:first-child {
+            @apply pl-16;
+        }
+        &:last-child {
+            @apply pr-16;
+        }
+        &:not(.text-right) {
+            @apply text-left;
+        }
+    }
+    td {
+        @apply px-8 py-0 relative;
+        &:not(.fancytree-checkbox-column):first-child {
+            width: 99%;
+        }
+        &:not(:first-child) {
+            @apply border-b border-dark-200;
+        }
+        &:first-child,
+        &.fancytree-checkbox-column + td {
+            overflow: hidden;
+            border: none;
+            width: 99%;
+        }
+        &.fancytree-checkbox-column {
+            @apply pr-0 w-32;
+        }
+        &:last-child {
+            @apply pr-16;
+        }
+        .fancytree-title {
+            @apply ml-40 whitespace-nowrap;
+            a {
+                @apply flex items-center px-8 py-4;
+            }
+            .inactive-title {
+                color: #8997AB;
+                transition: color 0.2s ease-in-out;
+            }
+            .inactive-badge {
+                border-radius: 4px;
+                background: #E2E3E7;
+                color: #4B5563 !important;
+                padding: 2px 8px;
+                font-size: 10px;
+                margin-left: 8px;
+            }
+        }
+    }
+    tr.fancytree-expanded td {
+        .fancytree-title a {
+            @apply font-semibold;
+        }
+    }
+}
+
+.fancytree-node {
+    @apply flex items-center h-40 relative;
+}
+
+.fancytree-icon {
+    display: none;
+}
+
+.fancytree-checkbox {
+    @apply block relative cursor-pointer;
+    @apply left-0 bg-light border border-dark-300 rounded transition-colors shadow-xs;
+    @apply outline outline-transparent outline-2 outline-offset-2;
+    @apply w-20 h-20 top-0;
+    @apply rounded;
+    &:after {
+        content: '';
+        @apply block;
+        @apply transition-opacity;
+        @apply w-18 h-18;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.7072 7.70712L10.7072 17.7071C10.3167 18.0976 9.68349 18.0976 9.29297 17.7071L4.29297 12.7071L5.70718 11.2929L10.0001 15.5858L19.293 6.29291L20.7072 7.70712Z' fill='%23E5E7EB' fill-rule='nonzero'/%3E%3C/svg%3E%0A");
+        width: 18px;
+        height: 18px;
+        top: 1px;
+        left: 1px;
+        opacity: 0;
+    }
+    &:hover {
+        @apply border-dark;
+        &:after {
+            opacity: 1;
+        }
+    }
+}
+
+.fancytree-selected {
+    opacity: 1;
+    .fancytree-checkbox {
+        @apply bg-primary border-primary;
+        &:after {
+            opacity: 1;
+        }
+        &:hover {
+            @apply bg-primary-600 border-primary-600;
+        }
+    }
+}
+
+.fancytree-partsel {
+    opacity: 1;
+    .fancytree-checkbox {
+        @apply bg-primary border-primary;
+        &:after {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M19.25 13h-14v-2h14v2Z' fill='%23E5E7EB'/%3E%3C/svg%3E");
+            opacity: 1;
+        }
+        &:hover {
+            @apply bg-primary-600 border-primary-600;
+        }
+    }
+}
+
+.fancytree-title {
+    @apply relative flex items-center h-24;
+}
+
+.expander-border {
+    @apply absolute left-0 bottom-0 right-0;
+    &:after {
+        content: '';
+        @apply block absolute bottom-0 left-full;
+        right: -100vw;
+        @apply border-b border-dark-200;
+    }
+}
+
+.fancytree-expander {
+    @apply w-32 h-full;
+    @apply flex items-center justify-center;
+    background-size: 16px;
+    position: absolute;
+    --expander-border: 2px solid var(--color-dark-400);
+    >div {
+        @apply w-20 h-20;
+        background-position: center;
+        position: relative;
+        z-index: 1;
+    }
+    &:before,
+    &:after {
+        content: '';
+        @apply block absolute;
+    }
+    &:before {
+        border-bottom: var(--expander-border);
+        top: 50%;
+        left: -50%;
+        right: 0;
+        @apply mr-16;
+    }
+    &:after {
+        border-left: var(--expander-border);
+        left: 50%;
+    }
+    &.level-1 {
+        &:before,
+        &:after {
+            content: none;
+        }
+    }
+    &.expanded-parent {
+        .expander-additional {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            &:before {
+                content: '';
+                display: block;
+                position: absolute;
+                border-left: var(--expander-border);
+                top: 0;
+                bottom: 0;
+            }
+        }
+    }
+    &:hover {
+        >div {
+            filter: brightness(0.5);
+        }
+    }
+}
+
+tr.fancytree-has-children span.fancytree-expander:before {
+    right: 50%;
+}
+
+.fancytree-ico-e {
+    .fancytree-expander {
+        &:before {
+            bottom: 50%;
+        }
+        &:after {
+            top: 50%;
+            bottom: 0;
+            @apply mt-16;
+        }
+    }
+}
+
+.fancytree-ico-c {
+    .fancytree-expander {
+        &:before {
+
+        }
+        &:after {
+            left: -50%;
+        }
+    }
+}
+
+.fancytree-lastsib span.fancytree-expander.expanded-parent .expander-additional-last:before {
+    bottom: 50% !important;
+}
+
+.fancytree-exp-c, .fancytree-exp-e {
+    &:first-child .fancytree-expander:after {
+        top: 50%;
+    }
+}
+
+.fancytree-exp-cl span.fancytree-expander:after {
+    bottom: 50%;
+}
+
+.fancytree-ext-filter-hide-expanders tr.fancytree-match span.fancytree-expander {
+    visibility: visible;
+}
+
+.fancytree-exp-n, .fancytree-exp-nl {
+    .fancytree-expander {
+        > div {
+            display: none;
+        }
+        &:before {
+            @apply mr-8;
+        }
+    }
+}
+
+.fancytree-exp-nl .fancytree-expander:after {
+    bottom: 50%;
+}
+
+.fancytree-exp-c, .fancytree-exp-cl {
+    .fancytree-expander > div {
+        background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 12C1 5.92487 5.92487 1 12 1C18.0751 1 23 5.92487 23 12C23 18.0751 18.0751 23 12 23C5.92487 23 1 18.0751 1 12ZM12 3C7.02943 3 3 7.02943 3 12C3 16.9706 7.02943 21 12 21C16.9706 21 21 16.9706 21 12C21 7.02943 16.9706 3 12 3ZM11 11V8H13V11H16V13H13V16H11V13H8V11H11Z' fill='%236B7280'/%3E%3C/svg%3E");
+    }
+}
+
+.fancytree-exp-e, .fancytree-exp-ed, .fancytree-exp-edl, .fancytree-exp-el {
+    .fancytree-expander > div {
+        background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1ZM3 12C3 7.02943 7.02943 3 12 3C16.9706 3 21 7.02943 21 12C21 16.9706 16.9706 21 12 21C7.02943 21 3 16.9706 3 12ZM8 13H16V11H8V13Z' fill='%236B7280'/%3E%3C/svg%3E");
+    }
+}
+
+.fancytree-hide {
+    @apply hidden;
+}
+
+.fancytree-submatch:not(.fancytree-match) > *{
+    opacity: 0.5;
+}
+
+.fancytree-status-merged {
+    @apply h-40;
+}
+
+.fancytree-statusnode-loading,
+.fancytree-statusnode-error {
+    pointer-events: none;
+}
+
+.filter-wrapper .fancytree-ext-table {
+    > thead {
+        @apply hidden;
+    }
+    .fancytree-checkbox-column {
+        @apply pl-12 pr-4;
+        @apply sticky left-0 bg-light z-1;
+        + td {
+            @apply pl-0 isolate;
+        }
+    }
+
+    > tbody > tr {
+        &.fancytree-selected,
+        &:hover,
+        &.fancytree-active,
+        &.fancytree-active:hover,
+        &.fancytree-selected:hover {
+            > .fancytree-checkbox-column {
+                @apply bg-primary-50;
+            }
+        }
+    }
+}
+
+#fancytree-drop-marker {
+    height: 42px;
+    width: 100%;
+    position: absolute;
+    margin: 0;
+
+    &:before {
+        content: '';
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+
+    }
+
+    &:after {
+        content: '';
+        display: block;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 100%;
+        width: 28px;
+        @apply bg-no-repeat;
+    }
+}
+
+#fancytree-drop-marker.fancytree-drop-before {
+    &:before {
+        @apply border-t-2 border-primary;
+        margin-top: 12px;
+    }
+
+    &:after {
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M17.5859 10L15.293 7.70711L16.7072 6.29289L20.7072 10.2929C21.0977 10.6834 21.0977 11.3166 20.7072 11.7071L16.7072 15.7071L15.293 14.2929L17.5859 12H5.5C5.22385 12 5 12.2238 5 12.5V19H3V12.5C3 11.1193 4.1193 10 5.5 10H17.5859Z" fill="%2300959D"/></svg>');
+        background-position: top right;
+        top: 2px;
+    }
+}
+
+#fancytree-drop-marker.fancytree-drop-after {
+    &:before {
+        @apply border-b-2 border-primary;
+        margin-top: -12px;
+    }
+
+    &:after {
+        bottom: 2px;
+        transform: rotateX(180deg);
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M17.5859 10L15.293 7.70711L16.7072 6.29289L20.7072 10.2929C21.0977 10.6834 21.0977 11.3166 20.7072 11.7071L16.7072 15.7071L15.293 14.2929L17.5859 12H5.5C5.22385 12 5 12.2238 5 12.5V19H3V12.5C3 11.1193 4.1193 10 5.5 10H17.5859Z" fill="%2300959D"/></svg>');
+        background-position: top right;
+
+    }
+}
+
+#fancytree-drop-marker.fancytree-drop-over {
+    &:before {
+        @apply border-y-2 border-primary;
+    }
+
+    &:after {
+        background-position: center right;
+        top: 2px;
+        background-color: white;
+        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M1 12C1 5.92487 5.92487 1 12 1C18.0751 1 23 5.92487 23 12C23 18.0751 18.0751 23 12 23C5.92487 23 1 18.0751 1 12ZM12 3C7.02943 3 3 7.02943 3 12C3 16.9706 7.02943 21 12 21C16.9706 21 21 16.9706 21 12C21 7.02943 16.9706 3 12 3ZM13.8315 13.25H7.24609V11.25H13.8315L11.0386 8.45711L12.4528 7.04289L16.9528 11.5429C17.3433 11.9334 17.3433 12.5666 16.9528 12.9571L12.4528 17.4571L11.0386 16.0429L13.8315 13.25Z" fill="%2300959D"/></svg>');
+    }
+}
+
+span.fancytree-drag-source.fancytree-drag-remove {
+    opacity: 0.5;
+}
+
+.fancytree-ext-table:active {
+    > tbody > tr.fancytree-active {
+        background-color: transparent;
+    }
+}

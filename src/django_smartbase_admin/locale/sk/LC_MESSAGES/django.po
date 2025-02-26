@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-03-20 13:23+0100\n"
+"POT-Creation-Date: 2025-02-11 13:28+0100\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -18,8 +18,81 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 "X-Generator: Poedit 3.4.1\n"
 
+msgid "Equal"
+msgstr ""
+
+msgid "Not equal"
+msgstr ""
+
+msgid "Less"
+msgstr ""
+
+msgid "Less or equal"
+msgstr ""
+
+msgid "Greater"
+msgstr ""
+
+msgid "Greater or equal"
+msgstr ""
+
+msgid "Between"
+msgstr ""
+
+msgid "Not between"
+msgstr ""
+
+msgid "In"
+msgstr ""
+
+msgid "Not in"
+msgstr ""
+
+msgid "Begins with"
+msgstr ""
+
+msgid "Not begins with"
+msgstr ""
+
+msgid "Contains"
+msgstr ""
+
+msgid "Not contains"
+msgstr ""
+
+msgid "End with"
+msgstr ""
+
+msgid "Not ends with"
+msgstr ""
+
+msgid "Is empty"
+msgstr ""
+
+msgid "Is null"
+msgstr ""
+
+msgid "Is not null"
+msgstr ""
+
+msgid "Before"
+msgstr ""
+
+msgid "After"
+msgstr ""
+
+msgid "In the last"
+msgstr ""
+
+msgid "In the next"
+msgstr ""
+
 msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
 msgstr "Pre vybratie viacerých súborov podržte “Control”, alebo “Command” na Mac-u."
+
+#, python-format
+msgid "Change history: %s"
+msgstr "História zmien: %s"
 
 msgid "Clear"
 msgstr "Vymazať"
@@ -29,6 +102,15 @@ msgstr "Aktuálne"
 
 msgid "Change file"
 msgstr "Zmeniť súbor"
+
+msgid "Cannot set parent to itself"
+msgstr ""
+
+msgid "Cannot set parent to it's own child"
+msgstr ""
+
+msgid "Search..."
+msgstr "Vyhľadať..."
 
 msgid "Exit Reorder"
 msgstr "Ukončiť preusporiadanie"
@@ -45,6 +127,9 @@ msgstr "Exportovať vybrané"
 
 msgid "Delete Selected"
 msgstr "Odstrániť vybrané"
+
+msgid "No selection made."
+msgstr "Výber je prázdny"
 
 msgid "All"
 msgstr "Všetky"
@@ -105,6 +190,22 @@ msgstr "Posledných 90 dní"
 msgid "Last 12 months"
 msgstr "Posledných 12 mesiacov"
 
+msgctxt "Tree widget"
+msgid "Loading..."
+msgstr "Načítavanie..."
+
+msgctxt "Tree widget"
+msgid "Load error!"
+msgstr "Chyba pri načítavaní!"
+
+msgctxt "Tree widget"
+msgid "More..."
+msgstr "Viac..."
+
+msgctxt "Tree widget"
+msgid "No data."
+msgstr "Žiadne dáta."
+
 msgid "Translations"
 msgstr "Preklady"
 
@@ -119,6 +220,16 @@ msgid_plural "Please correct the errors below."
 msgstr[0] "Opravte chybu nižšie."
 msgstr[1] "Opravte chyby nižšie."
 msgstr[2] "Opravte chyby nižšie."
+
+msgid "Prev"
+msgstr ""
+
+#, python-format
+msgid "<strong>%(current_index)s</strong> / %(all_objects_count)s"
+msgstr ""
+
+msgid "Next"
+msgstr ""
 
 msgid "Back"
 msgstr "Naspäť"
@@ -158,12 +269,6 @@ msgstr "Nie, ísť späť"
 msgid "Yes, I’m sure"
 msgstr "Áno, som si istý"
 
-msgid "Home"
-msgstr "Domov"
-
-msgid "Delete multiple objects"
-msgstr "Zmazať viacero objektov"
-
 #, python-format
 msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
 msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
@@ -178,18 +283,6 @@ msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky n
 
 msgid "Add"
 msgstr "Pridať"
-
-msgid "Save view"
-msgstr "Uložiť zobrazenie"
-
-msgid "Search and filter"
-msgstr "Hľadať a filtrovať"
-
-msgid "Select all"
-msgstr "Vybrať všetky"
-
-msgid "Select none"
-msgstr "Odstrániť výber"
 
 msgid "For page"
 msgstr "Veľkost strany"
@@ -206,6 +299,30 @@ msgstr "Akcia"
 msgid "This object doesn't have a change history. It probably wasn't added via this admin site."
 msgstr "Tento objekt nemá históriu zmien. Pravdepodobne nebolo pridané cez túto admin stránku."
 
+msgid "Select all"
+msgstr "Vybrať všetky"
+
+msgid "Select none"
+msgstr "Odstrániť výber"
+
+msgid "Save view"
+msgstr "Uložiť zobrazenie"
+
+msgid "Search and filter"
+msgstr "Hľadať a filtrovať"
+
+msgid "Quick Search"
+msgstr "Rýchle vyhľadávanie"
+
+msgid "Saved Views"
+msgstr "Uložené zobrazenia"
+
+msgid "Advanced Filters"
+msgstr "Rozšírené filtrovanie"
+
+msgid "Search"
+msgstr "Vyhľadať"
+
 msgid "Copy"
 msgstr "Kopírovať"
 
@@ -214,6 +331,9 @@ msgstr "Uložiť"
 
 msgid "Show translations"
 msgstr "Zobraziť preklady"
+
+msgid "Save Order"
+msgstr "Uložiť zoradenie"
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -308,6 +428,9 @@ msgstr "Vybrať všetky"
 msgid "Remove"
 msgstr "Odstrániť"
 
+msgid "View Results"
+msgstr "Zobraziť výsledky"
+
 msgid ""
 "\n"
 "                                <button class=\"btn btn-primary-light btn-tiny\">Add file</button>\n"
@@ -322,8 +445,11 @@ msgstr ""
 msgid "JPG, PNG, GIF or WEBP max 10MB"
 msgstr "JPG, PNG, GIF alebo WEBP max 10MB"
 
-msgid "Delete"
-msgstr "Zmazať"
+msgid "Remove View"
+msgstr "Odstrániť zobratenie"
+
+msgid "Do you want to remove table view?"
+msgstr "Naozaj chcete odstrániť toto zobrazenie?"
 
 msgid "Save view as"
 msgstr "Uložiť zobrazenie ako"
@@ -374,8 +500,18 @@ msgstr ""
 msgid "Awards"
 msgstr "Ocenenia"
 
+msgid "Are you sure?"
+msgstr "Ste si istý?"
+
+msgid "Confirm"
+msgstr "Potvrdiť"
+
 msgid "Loading..."
 msgstr "Načítavanie..."
+
+#, python-format
+msgid "Add another %(verbose_name)s"
+msgstr "Pridať ďalší %(verbose_name)s"
 
 msgid "Change"
 msgstr "Zmeniť"
@@ -383,9 +519,8 @@ msgstr "Zmeniť"
 msgid "View"
 msgstr "Zobraziť"
 
-#, python-format
-msgid "Add another %(verbose_name)s"
-msgstr "Pridať ďalší %(verbose_name)s"
+msgid "Delete"
+msgstr "Zmazať"
 
 msgid "results"
 msgstr "výsledky"
@@ -398,9 +533,6 @@ msgstr "Strom stránok"
 
 msgid "Reset filter"
 msgstr "Vymazať filtre"
-
-msgid "Search"
-msgstr "Vyhľadať"
 
 msgid "Sites"
 msgstr "Stránky"
@@ -480,6 +612,9 @@ msgstr "Duplikáty"
 
 msgid "Go back to admin homepage"
 msgstr "Naspäť na adminovú domovskú stránku"
+
+msgid "Home"
+msgstr "Domov"
 
 msgid "Go back to Filer app"
 msgstr "Naspäť do koreňového priečinka"
@@ -572,6 +707,9 @@ msgstr "Odhlásiť sa"
 msgid "Choose domain"
 msgstr "Zvoľte si doménu"
 
+msgid "Continue"
+msgstr "Pokračovať"
+
 msgid "Move to last"
 msgstr "Presunúť na posledné miesto"
 
@@ -590,6 +728,10 @@ msgstr "<strong>${from} - ${to}</strong> z <strong>${total}</strong><span class=
 
 msgid "<strong>0</strong> items"
 msgstr "<strong>0</strong> položiek"
+
+#, python-brace-format
+msgid "${value} selected"
+msgstr "${value} vybrané"
 
 msgid "Basic Settings"
 msgstr "Základné nastavenia"
@@ -615,6 +757,77 @@ msgstr "alebo pridajte potiahnutím"
 msgid "Edit"
 msgstr "Upraviť"
 
+msgid "Open color picker"
+msgstr "Otvoriť výber farieb"
+
+msgid "Close color picker"
+msgstr "Zatvoriť výber farieb"
+
+msgid "Clear the selected color"
+msgstr "Vymazať výber farby"
+
+#, python-brace-format
+msgid "Saturation: {s}. Brightness: {v}."
+msgstr ""
+
+msgid "Hue slider"
+msgstr ""
+
+msgid "Opacity slider"
+msgstr ""
+
+msgid "Color value field"
+msgstr ""
+
+msgid "Color format"
+msgstr ""
+
+msgid "Color swatch"
+msgstr ""
+
+msgid "Saturation and brightness selector. Use up, down, left and right arrow keys to select."
+msgstr ""
+
+msgid "drop your file here or"
+msgstr ""
+
+msgid "No file selected"
+msgstr "Nebol vybraný žiadny súbor"
+
+msgid "File is missing"
+msgstr "Súbor chýba"
+
+msgid "Lookup"
+msgstr "Vyhľadať"
+
+msgid "Choose File"
+msgstr "Zvoľte súbor"
+
+#, python-brace-format
+msgid "Added {name} “{object}”."
+msgstr "Pridané {name} “{object}”."
+
+msgid "Added."
+msgstr "Pridané."
+
+msgid "and"
+msgstr "a"
+
+#, python-brace-format
+msgid "Changed {fields} for {name} “{object}”."
+msgstr "Zmenené {fields} pre {name} “{object}”"
+
+#, python-brace-format
+msgid "Changed {fields}."
+msgstr "Zmenené {fields}."
+
+#, python-brace-format
+msgid "Deleted {name} “{object}”."
+msgstr "Odstránené {name} “{object}”."
+
+msgid "No fields changed."
+msgstr "Žiadne zmeny."
+
 msgid "Not Translated"
 msgstr "Nepreložené"
 
@@ -628,4 +841,4 @@ msgid "Status"
 msgstr "Stav"
 
 msgid " of "
-msgstr ""
+msgstr " z "

@@ -1,8 +1,7 @@
-const path = require('path');
-const webpack = require('webpack');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const BundleTracker = require('webpack-bundle-tracker');
-const ESLintPlugin = require('eslint-webpack-plugin');
+const path = require('path')
+const webpack = require('webpack')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
+const ESLintPlugin = require('eslint-webpack-plugin')
 
 const entries = {
     main: './src/django_smartbase_admin/static/sb_admin/src/js/main.js',
@@ -11,9 +10,11 @@ const entries = {
     main_style: './src/django_smartbase_admin/static/sb_admin/src/css/style.css',
     translations: './src/django_smartbase_admin/static/sb_admin/src/js/translations.js',
     confirmation_modal: './src/django_smartbase_admin/static/sb_admin/src/js/confirmation_modal.js',
-};
+    tree_widget: './src/django_smartbase_admin/static/sb_admin/src/js/tree_widget.js',
+    tree_widget_style: './src/django_smartbase_admin/static/sb_admin/src/css/tree_widget.css',
+}
 
-const projectRoot = process.env.PWD || process.cwd();
+const projectRoot = process.env.PWD || process.cwd()
 
 module.exports = {
     resolve: {
@@ -74,4 +75,4 @@ module.exports = {
             'process.env.BUILD': JSON.stringify('web'),
         }),
     ]
-};
+}

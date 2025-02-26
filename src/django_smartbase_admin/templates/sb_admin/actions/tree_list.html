@@ -1,0 +1,63 @@
+{% extends "sb_admin/actions/list.html" %}
+{% load static sb_admin_tags i18n %}
+
+{% block extrahead %}
+	{{ block.super }}
+    <style>
+        #table-columns-dropdown-wrapper {
+            display: none;
+        }
+    </style>
+{% endblock %}
+
+{% block tabulator_card %}
+    {% with enable_table_filter=request.reorder_active|yesno:',True' %}
+        {% if enable_table_filter %}
+            {{ block.super }}
+        {% else %}
+        <div class="overflow-hidden pb-8 relative tree-list-view">
+            {{ block.super }}
+        </div>
+        {% endif %}
+    {% endwith %}
+{% endblock %}
+
+{% block tabulator_custom_header %}
+    {% if not request.reorder_active %}
+        {% include content_context.tabulator_header_template_name %}
+    {% endif %}
+{% endblock %}
+{% block tabulator_body %}
+    {% with view_id|add:'_tree' as tree_id %}
+        <div class="overflow-auto w-full relative">
+            {% include "sb_admin/widgets/tree_base.html" with tree_main_column_name=list_title tree_reorder_url=content_context.tabulator_definition.treeReorderUrl tree_additional_columns=additional_columns tree_component_id=tree_id tree_data_url=tree_json_url tree_detail_url=content_context.tabulator_definition.tableDetailUrl hide_tree_search=True filter_by_table_data=enable_table_filter tree_show_checkbox=enable_table_filter tree_multiselect=enable_table_filter search_wrapper_classes="py-16 md:p-16" %}
+        </div>
+    {% endwith %}
+    {% if not request.reorder_active %}
+        <div class="hidden">
+            {{ block.super }}
+        </div>
+    {% endif %}
+{% endblock %}
+{% block tabulator_custom_footer %}
+{% endblock %}
+
+{% block actions %}
+    {% with view_id|add:'_tree' as tree_id %}
+        {% if request.request_data.action == 'action_enter_reorder' %}
+            <li class="max-sm:hidden">
+                <button onclick="$.ui.fancytree.getTree('#' + '{{ tree_id }}' + '_tree').saveTreeOrder()"
+                        class="btn btn-empty">
+                    {% trans 'Save Order' %}
+                </button>
+            </li>
+        {% endif %}
+    {% endwith %}
+    {{ block.super }}
+{% endblock %}
+
+{% block additional_js %}
+    {% if not request.reorder_active %}
+        {{ block.super }}
+    {% endif %}
+{% endblock %}

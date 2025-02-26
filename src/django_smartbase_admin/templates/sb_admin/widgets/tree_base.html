@@ -1,0 +1,54 @@
+{% load static sb_admin_tags i18n %}
+
+{% if not hide_tree_search %}
+    <div class="border-b border-dark-200 {{ search_wrapper_classes }}">
+        <div class="js-tree-widget-search relative">
+            {% trans 'Search' as search_string %}
+            <input id="{{ tree_component_id }}_search" name="search" placeholder="{{ tree_filter_placeholder|default:search_string }}" autocomplete="off" class="input pl-36" type="search">
+            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Search"></use>
+                </svg>
+            </div>
+        </div>
+    </div>
+{% endif %}
+<div class="{{ table_wrapper_classes }}">
+    <table style="width: 100%;" id="{{ tree_component_id }}_tree" class="js-tree-widget fancytree-ext-table" data-tree-data-id="{{ tree_component_id }}_data" data-tree-additional-columns-id="{{ tree_component_id }}_additional_columns" data-tree-strings-id="{{ tree_component_id }}_tree_strings">
+        <thead>
+        <tr>
+            {% if tree_show_checkbox %}<th></th>{% endif %}
+            <th class="text-left">{{ tree_main_column_name }}<span id="{{ tree_component_id }}_matches" class="ml-4"></span></th>
+            {% for column in tree_additional_columns %}
+                <th>{{ column.title }}</th>
+            {% endfor %}
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            {% if tree_show_checkbox %}<td class="alignCenter fancytree-checkbox-column"></td>{% endif %}
+            <td></td>
+            {% for column in tree_additional_columns %}
+                <td></td>
+            {% endfor %}
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<script id="{{ tree_component_id }}_data" type="application/json">
+    {
+        "filter": {% if tree_filter %}true{% else %}false{% endif %},
+        "input_id": "{{ tree_component_id }}",
+        "data_url": "{{ tree_data_url }}",
+        "checkbox": {% if tree_show_checkbox %}true{% else %}false{% endif %},
+        "multiselect": {% if tree_multiselect %}2{% else %}1{% endif %},
+        "detail_url":"{{ tree_detail_url }}",
+        "reorder_url":"{{ tree_reorder_url }}",
+        "filter_by_table_data": {% if filter_by_table_data %}true{% else %}false{% endif %}
+    }
+</script>
+<script id="{{ tree_component_id }}_additional_columns" type="application/json">{{ tree_additional_columns|get_json|safe }}</script>
+<script id="{{ tree_component_id }}_tree_strings" type="application/json">
+    {{ tree_strings|get_json|safe }}
+</script>

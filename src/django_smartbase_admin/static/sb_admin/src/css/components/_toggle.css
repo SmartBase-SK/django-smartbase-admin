@@ -1,5 +1,6 @@
 @layer components {
-    input[type="checkbox"].toggle {
+    input[type="checkbox"].toggle,
+    input[type="radio"].toggle {
         @apply absolute opacity-0 top-0;
         z-index: -1;
         & ~ label {
