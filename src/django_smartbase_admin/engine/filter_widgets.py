@@ -716,6 +716,8 @@ class SBAdminTreeWidgetMixin:
         "moreData": pgettext_lazy("Tree widget", "More..."),
         "noData": pgettext_lazy("Tree widget", "No data."),
     }
+    model = None
+    path_field = "path"
 
     def __init__(
         self,
@@ -747,7 +749,134 @@ class SBAdminTreeWidgetMixin:
         return JsonResponse(data=result, safe=False)
 
     def format_tree_data(self, request, queryset):
+        self_id = None
+        if self.relationship_pick_mode == self.RELATIONSHIP_PICK_MODE_PARENT:
+            # disable selecting self and children if selecting parent
+            self_id = self.form.instance.id if self.form.instance else None
+        return self.get_tree_data(request, queryset, self_id=self_id)
+
+    @classmethod
+    def get_tree_base_values(cls):
+        return ["id", cls.path_field]
+
+    @classmethod
+    def get_tree_key(cls, request, item):
+        return item.get(cls.path_field)
+
+    @classmethod
+    def get_tree_title(cls, request, item):
         raise NotImplementedError
+
+    @classmethod
+    def get_value(cls, request, item):
+        return getattr(item, cls.path_field)
+
+    @classmethod
+    def get_label(cls, request, item):
+        raise NotImplementedError
+
+    @classmethod
+    def tree_process_global_data(cls, request, queryset, **kwargs):
+        return {}
+
+    @classmethod
+    def get_additional_data(cls, request, item, tree_process_global_data):
+        return {}
+
+    @classmethod
+    def get_tree_data(cls, request, queryset, values=None, self_id=None, **kwargs):
+        tree_values = cls.get_tree_base_values()
+        tree_values.extend(values if values else [])
+
+        queryset = queryset.order_by(*cls.order_by)
+        queryset = queryset.annotate(
+            **SBAdminViewService.get_annotates(cls.model, tree_values, [])
+        )
+        flat_data = []
+        tree_data, lnk = [], {}
+        tree_process_global_data = cls.tree_process_global_data(
+            request, queryset, **kwargs
+        )
+
+        data = list(queryset.values(*tree_values))
+        for item in data:
+            path = item.get("path")
+            depth = int(len(path) / cls.model.steplen)
+            item_id = cls.get_tree_key(request, item)
+            item_label = cls.get_tree_title(request, item)
+            newobj = {
+                "title": item_label,
+                "key": str(item_id),
+                "data": {"id": item.get("id")},
+            }
+            if item_id == self_id:
+                # disable selecting self and children if selecting parent
+                newobj["checkbox"] = False
+
+            additional_data = cls.get_additional_data(
+                request, item, tree_process_global_data
+            )
+            newobj.update(additional_data)
+
+            if depth == 1:
+                tree_data.append(newobj)
+                flat_data.append(newobj)
+            else:
+                parentpath = cls.model._get_basepath(path, depth - 1)
+                parentobj = lnk[parentpath]
+                if "children" not in parentobj:
+                    parentobj["children"] = []
+                if parentobj.get("checkbox") is False:
+                    # disable selecting self and children if selecting parent
+                    newobj["checkbox"] = False
+                parentobj["children"].append(newobj)
+                flat_data.append(newobj)
+            lnk[path] = newobj
+        return tree_data
+
+    @classmethod
+    def process_treebeard_tree(
+        cls,
+        tree_widget_data,
+        treebeard_objs_by_path,
+        depth=1,
+        parent_path="",
+        path_base="",
+    ):
+        if not path_base:
+            path_base = ((cls.model.steplen - 1) * "0") + "1"
+        previous = None
+        objs_to_update = []
+        for tree_widget_node in tree_widget_data:
+            treebeard_obj = treebeard_objs_by_path.get(tree_widget_node["key"])
+            old_depth = treebeard_obj.depth
+            old_path = getattr(treebeard_obj, cls.path_field)
+            old_numchild = treebeard_obj.numchild
+            treebeard_obj.depth = depth
+            if not previous:
+                previous = treebeard_obj
+                setattr(treebeard_obj, cls.path_field, parent_path + path_base)
+            else:
+                setattr(treebeard_obj, cls.path_field, previous._inc_path())
+                previous = treebeard_obj
+            children = tree_widget_node.get("children", [])
+            treebeard_obj.numchild = len(children)
+            if (
+                treebeard_obj.depth != old_depth
+                or getattr(treebeard_obj, cls.path_field) != old_path
+                or treebeard_obj.numchild != old_numchild
+            ):
+                objs_to_update.append(treebeard_obj)
+            objs_to_update.extend(
+                cls.process_treebeard_tree(
+                    children,
+                    treebeard_objs_by_path,
+                    depth + 1,
+                    getattr(treebeard_obj, cls.path_field),
+                    path_base,
+                )
+            )
+        return objs_to_update
 
 
 class SBAdminTreeFilterWidget(SBAdminTreeWidgetMixin, AutocompleteFilterWidget):
