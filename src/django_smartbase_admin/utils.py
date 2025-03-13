@@ -1,7 +1,12 @@
+import logging
+from collections.abc import Iterable
+
 from django import forms
 from django.conf import settings
 from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
+
+logger = logging.getLogger(__name__)
 
 
 class JSONSerializableMixin(object):
@@ -36,14 +41,20 @@ def render_notifications(request):
 
 
 class FormFieldsetMixin(forms.Form):
-    def fieldsets(self):
+    def get_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)
+        return getattr(meta, "fieldsets", tuple())
 
-        if not meta or not meta.fieldsets:
+    def fieldsets(self) -> Iterable[Fieldset]:
+        if not (fieldsets := self.get_fieldsets()):
+            logger.warning(
+                "No fieldsets defined for form %s. Using form fields as fallback.",
+                self.__class__.__name__,
+            )
             yield Fieldset(form=self, fields=self.fields)
             return
 
-        for name, data in meta.fieldsets:
+        for name, data in fieldsets:
             yield Fieldset(
                 form=self,
                 name=name,
