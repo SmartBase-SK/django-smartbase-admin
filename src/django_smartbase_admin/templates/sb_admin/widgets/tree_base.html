@@ -14,10 +14,13 @@
     </div>
 {% endif %}
 <div class="{{ table_wrapper_classes }}">
+
     <table style="width: 100%;" id="{{ tree_component_id }}_tree" class="js-tree-widget fancytree-ext-table" data-tree-data-id="{{ tree_component_id }}_data" data-tree-additional-columns-id="{{ tree_component_id }}_additional_columns" data-tree-strings-id="{{ tree_component_id }}_tree_strings">
         <thead>
         <tr>
-            {% if tree_show_checkbox %}<th></th>{% endif %}
+            {% if tree_show_checkbox %}
+                <th class="select-all-checkbox-wrapper"></th>
+            {% endif %}
             <th class="text-left">{{ tree_main_column_name }}<span id="{{ tree_component_id }}_matches" class="ml-4"></span></th>
             {% for column in tree_additional_columns %}
                 <th>{{ column.title }}</th>
@@ -26,7 +29,8 @@
         </thead>
         <tbody>
         <tr>
-            {% if tree_show_checkbox %}<td class="alignCenter fancytree-checkbox-column"></td>{% endif %}
+            {% if tree_show_checkbox %}
+                <td class="alignCenter fancytree-checkbox-column"></td>{% endif %}
             <td></td>
             {% for column in tree_additional_columns %}
                 <td></td>
@@ -45,7 +49,8 @@
         "multiselect": {% if tree_multiselect %}2{% else %}1{% endif %},
         "detail_url":"{{ tree_detail_url }}",
         "reorder_url":"{{ tree_reorder_url }}",
-        "filter_by_table_data": {% if filter_by_table_data %}true{% else %}false{% endif %}
+        "filter_by_table_data": {% if filter_by_table_data %}true{% else %}false{% endif %},
+        "allow_select_all": {% if allow_select_all %}true{% else %}false{% endif %}
     }
 </script>
 <script id="{{ tree_component_id }}_additional_columns" type="application/json">{{ tree_additional_columns|get_json|safe }}</script>
