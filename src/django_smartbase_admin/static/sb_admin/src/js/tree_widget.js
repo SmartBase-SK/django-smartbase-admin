@@ -265,7 +265,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     })
                 },
                 init: function (event, data) {
-                    if (treeWidgetData.filter_by_table_data) {
+                    if(treeWidgetData.filter_by_table_data) {
                         filterByTableData(data.tree)
                     }
                     if (treeWidgetData.allow_select_all) {
