@@ -76,6 +76,9 @@
             @apply font-semibold;
         }
     }
+    th.select-all-checkbox-wrapper{
+        padding-left: 8px;
+    }
 }
 
 .fancytree-node {
