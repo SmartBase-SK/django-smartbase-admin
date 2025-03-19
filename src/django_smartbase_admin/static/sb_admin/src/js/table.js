@@ -107,7 +107,11 @@ class SBAdminTable {
     }
 
     isFiltered() {
-        return this.getUrlParams()[this.constants.FILTER_DATA_NAME] !== undefined
+        const filterParams = this.getUrlParams()[this.constants.FILTER_DATA_NAME]
+        if(filterParams === undefined) {
+            return false
+        }
+        return Object.values(filterParams).some(val=>val)
     }
 
     loadFromUrlAfterInit() {
