@@ -559,7 +559,7 @@ class SBAdminTreeWidget(SBAdminTreeWidgetMixin, SBAdminAutocompleteWidget):
         }
         context["widget"]["additional_columns"] = self.additional_columns
         context["widget"]["tree_strings"] = self.tree_strings
-
+        context["fancytree_filter_settings"] = {"fuzzy": False}
         return context
 
     @classmethod
