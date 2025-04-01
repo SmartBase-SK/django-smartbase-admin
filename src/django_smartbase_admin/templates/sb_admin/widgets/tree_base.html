@@ -49,9 +49,6 @@
     }
 </script>
 {{ fancytree_filter_settings|get_json_script:'fancytree_filter_settings' }}
-<script>
-    const fancytreeFilterSettings = window.loadJSONScriptData("fancytree_filter_settings")
-</script>
 <script id="{{ tree_component_id }}_additional_columns" type="application/json">{{ tree_additional_columns|get_json|safe }}</script>
 <script id="{{ tree_component_id }}_tree_strings" type="application/json">
     {{ tree_strings|get_json|safe }}

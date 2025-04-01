@@ -95,6 +95,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                 indentation: 32,
                 nodeColumnIdx: 0,
             }
+            const fancytreeFilterSettings = window.loadJSONScriptData("fancytree_filter_settings")
             if (treeWidgetData.checkbox) {
                 tableConfig.checkboxColumnIdx = 0
                 tableConfig.nodeColumnIdx = 1
