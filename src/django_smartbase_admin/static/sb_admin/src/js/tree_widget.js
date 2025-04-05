@@ -270,6 +270,9 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     if(treeWidgetData.filter_by_table_data) {
                         filterByTableData(data.tree)
                     }
+                    if (treeWidgetData.allow_select_all) {
+                        appendSelectAllCheckbox($treeEl, data.tree)
+                    }
                 }
             })
 
@@ -341,6 +344,28 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     treeInstance.selectAll(true)
                 })
             }
+        }
+
+        const appendSelectAllCheckbox = function ($treeEl, treeInstance) {
+            const $selectAllWrapper = $treeEl.find(".select-all-checkbox-wrapper")
+
+            $selectAllWrapper.append(`
+            <span role="checkbox" aria-label="Select All" class="fancytree-checkbox" id="fancytree-row-select-all"></span>
+        `)
+
+            $("#fancytree-row-select-all").on("click", function () {
+                const selectedClassName = "fancytree-selected"
+                const isChecked = $(this).parent().hasClass(selectedClassName)
+
+                const visibleNodes = treeInstance.getRootNode().findAll(node => node.match)
+                visibleNodes.forEach(node => node.setSelected(!isChecked))
+
+                if (!isChecked) {
+                    $(this).parent().addClass(selectedClassName)
+                } else {
+                    $(this).parent().removeClass(selectedClassName)
+                }
+            })
         }
 
         const initAllTrees = function () {
