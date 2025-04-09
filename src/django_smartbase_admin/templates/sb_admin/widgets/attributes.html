@@ -59,8 +59,9 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        window.recalculateDictField('{{ widget.attrs.id }}');
         document.getElementById('{{ widget.attrs.id }}_dict_wrapper').addEventListener('change', function() {
-            window.recalculateDictField('{{ widget.attrs.id }}')
+            window.recalculateDictField('{{ widget.attrs.id }}');
         })
     });
 </script>
