@@ -35,8 +35,10 @@ logger = logging.getLogger(__name__)
 def get_datetime_placeholder(lang=None):
     lang = lang or get_language()
     sb_admin_settings = getattr(settings, "SB_ADMIN_SETTINGS", {})
-    return sb_admin_settings.get("DATETIME_PLACEHOLDER", {}).get(
-        lang, {"date": "mm.dd.yyyy", "time": "hh:mm"}
+    placeholder_setting = sb_admin_settings.get("DATETIME_PLACEHOLDER", {})
+    return placeholder_setting.get(
+        lang,
+        placeholder_setting.get("default", {"date": "mm.dd.yyyy", "time": "hh:mm"}),
     )
 
 
