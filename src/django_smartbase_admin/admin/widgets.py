@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _, get_language
 from django.views.generic.base import ContextMixin
 from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
 from filer.fields.image import AdminImageWidget
@@ -30,6 +30,14 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 logger = logging.getLogger(__name__)
+
+
+def get_datetime_placeholder(lang=None):
+    lang = lang or get_language()
+    sb_admin_settings = getattr(settings, "SB_ADMIN_SETTINGS", {})
+    return sb_admin_settings.get("DATETIME_PLACEHOLDER", {}).get(
+        lang, {"date": "mm.dd.yyyy", "time": "hh:mm"}
+    )
 
 
 class SBAdminBaseWidget(ContextMixin):
@@ -184,6 +192,7 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
             attrs={
                 "class": "input js-datepicker",
                 "data-sbadmin-datepicker": self.get_data(),
+                "placeholder": get_datetime_placeholder()["date"],
                 **(attrs or {}),
             },
         )
@@ -208,7 +217,13 @@ class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(
-            form_field, attrs={"class": "input js-timepicker", **(attrs or {})}
+            form_field,
+            attrs={
+                "class": "input js-timepicker",
+                "placeholder": get_datetime_placeholder()["time"],
+                "autocomplete": "do-not-autofill",
+                **(attrs or {}),
+            },
         )
 
 

@@ -1,3 +1,10 @@
 {% include 'sb_admin/widgets/includes/field_label.html' %}
-{% include "sb_admin/widgets/input.html" %}
+<div class="relative inline-flex h-full time-wrapper">
+    {% include "sb_admin/widgets/input.html" %}
+    <label class="absolute right-10 top-0 bottom-0 h-full flex items-center pointer-events-none" for="{{ widget.attrs.id }}">
+        <svg class="w-20 h-20">
+            <use xlink:href="#Time"></use>
+        </svg>
+    </label>
+</div>
 {% include 'sb_admin/widgets/includes/help_text.html' %}

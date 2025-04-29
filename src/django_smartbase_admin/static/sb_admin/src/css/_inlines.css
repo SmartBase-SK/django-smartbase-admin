@@ -79,6 +79,26 @@
             .input-file-wrapper > .input-file {
                 @apply border-0;
             }
+            >.flex.gap-16 {
+                @apply h-full;
+                gap: 1px;
+            }
+            .time-wrapper {
+                @apply w-full;
+                &:before {
+                    content: '';
+                    @apply block absolute left-0 top-1/2 -translate-y-1/2;
+                    width: 1px;
+                    @apply h-40 bg-dark-200;
+                    z-index: 1;
+                }
+            }
+            .js-datepicker,
+            .js-timepicker,
+            .js-datepicker-range,
+            .js-datetimepicker {
+                @apply h-full;
+            }
         }
         &:last-child {
             >tr:last-child {
