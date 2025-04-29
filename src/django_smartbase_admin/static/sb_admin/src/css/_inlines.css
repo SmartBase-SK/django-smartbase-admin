@@ -195,3 +195,8 @@ fieldset.module > header {
     }
 }
 
+.djn-remove-handler {
+    position: relative;
+    z-index: 1;
+}
+
