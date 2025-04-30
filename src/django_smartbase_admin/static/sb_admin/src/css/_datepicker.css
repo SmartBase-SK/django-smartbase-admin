@@ -651,6 +651,10 @@ span.flatpickr-weekday {
     @apply cursor-pointer;
 }
 
+.js-datepicker {
+    @apply min-w-136;
+}
+
 .js-timepicker {
-    @apply max-w-64;
+    @apply min-w-96 w-96;
 }

@@ -17,8 +17,8 @@ export default class Datepicker {
         flatpickr.localize(this.getLocale(documentLocale))
         this.initWidgets()
 
-        document.addEventListener('formset:added', () => {
-            this.initWidgets()
+        document.addEventListener('formset:added', (e) => {
+            this.initWidgets(e.target)
         })
     }
 
@@ -158,7 +158,10 @@ export default class Datepicker {
         }
 
         Object.keys(datePickerSelector).forEach(selector => {
-            parentEl.querySelectorAll(selector).forEach(datePickerEl => {
+            parentEl.querySelectorAll(`${selector}:not([type="hidden"])`).forEach(datePickerEl => {
+                if(datePickerEl.closest('.djn-empty-form')){
+                    return
+                }
                 this.initFlatPickr(datePickerEl, datePickerSelector[selector])
             })
         })
