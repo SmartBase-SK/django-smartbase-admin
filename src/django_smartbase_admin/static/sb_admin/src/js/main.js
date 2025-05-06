@@ -271,8 +271,6 @@ class Main {
             window.location.href = action_url
         }
     }
-
-
 }
 
 window.addEventListener('DOMContentLoaded', () => {
