@@ -59,6 +59,7 @@ class Main {
                     return
                 }
                 this.initFileInputs(detail.target)
+                this.initDropdowns(detail.target)
             })
         }
 
