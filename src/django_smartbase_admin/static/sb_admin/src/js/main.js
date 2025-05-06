@@ -49,6 +49,19 @@ class Main {
             window.open(e.detail.url, e.detail?.target || '_blank')
         })
 
+        if(window.htmx){
+            window.htmx.on("htmx:afterSwap", (detail) => {
+                const requestEl = detail.detail.requestConfig.elt.closest('[hx-swap]')
+                if(requestEl && requestEl.getAttribute('hx-swap') === "none") {
+                    // do not process afterSwap if none swap is performed
+                    // this should prevent double processing of afterSwap for first oob-swapped element
+                    // which in case of hx-swap=none is returned here in the detail.target
+                    return
+                }
+                this.initFileInputs(detail.target)
+            })
+        }
+
         new Sidebar()
         this.datepicker = new Datepicker()
         this.range = new Range()
@@ -258,6 +271,8 @@ class Main {
             window.location.href = action_url
         }
     }
+
+
 }
 
 window.addEventListener('DOMContentLoaded', () => {
