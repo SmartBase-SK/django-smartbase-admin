@@ -12,10 +12,7 @@ Built to **speed up development** of internal tools and admin panels — beautif
 
 - Modular components ready to extend
 
-- Auth and permission support
-
 - Responsive & mobile-friendly
-
 
 
 ## 📚 Full Documentation
