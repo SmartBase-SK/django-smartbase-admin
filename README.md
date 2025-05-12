@@ -7,13 +7,15 @@ Built to **speed up development** of internal tools and admin panels — beautif
 
 ## ✨ Features
 - Fast integration with any Django project
-
+- Improved performance of Django List Admin using `SBAdminField`, database `annotate()` and `values()` to avoid direct object access  
+- Simple configuration of menu structure, dashboard components, and permissions per user role  
+- Enhanced Django List Admin filters: autocomplete support for related fields and filtering across all model fields  
+- Ability for users to save and reuse custom filters in Django List Admin  
+- Improved Django Detail Admin with autocomplete for relational fields  
+- Support for "FakeInlines" – define inline-like blocks without requiring a direct model relationship  
+- Easy extension of list and detail views with custom actions and corresponding views
 - Beautiful modern UI (Tailwind CSS)
-
-- Modular components ready to extend
-
 - Responsive & mobile-friendly
-
 
 ## 📚 Full Documentation
 
@@ -34,15 +36,9 @@ Ensure that django-smartbase-admin and its dependencies are included in your Dja
 INSTALLED_APPS = [
     # other apps
     "django_smartbase_admin",
-    "psycopg2",
     "easy_thumbnails",
     "widget_tweaks",
 ]
-```
-
-Additionally, install setuptools if not already available:
-```bash
-pip install setuptools
 ```
 
 ### 2. Add Admin URL Configuration
