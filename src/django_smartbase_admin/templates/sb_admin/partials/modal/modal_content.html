@@ -16,7 +16,7 @@
                 </div>
                 <div class="modal-body">
                     {% block modal_body %}
-                        <form id="sb-admin-modal-form" hx-indicator=".sb-admin-modal-loading" hx-target="#sb-admin-modal" hx-post="{{ request.get_full_path }}" action="{{ request.get_full_path }}" method="post">
+                        <form id="sb-admin-modal-form" enctype="multipart/form-data" hx-indicator=".sb-admin-modal-loading" hx-target="#sb-admin-modal" hx-post="{{ request.get_full_path }}" action="{{ request.get_full_path }}" method="post">
                             {% if form.errors %}
                                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
                                     <div class="flex">
