@@ -17,7 +17,11 @@ Built to **speed up development** of internal tools and admin panels — beautif
 - Beautiful modern UI (Tailwind CSS)
 - Responsive & mobile-friendly
 
-## 📚 Full Documentation
+![image](https://github.com/user-attachments/assets/b99a35b0-05fd-45e3-a165-950b0d4750cd)
+![image](https://github.com/user-attachments/assets/f7719377-eb88-42c4-8fe0-5d4ca0ff29bf)
+
+
+## 📚 Full Documentation (in progress)
 
 🗂 [View Full Docs](https://smartbase-sk.github.io/django-smartbase-admin-docs/docs/installation)
 
