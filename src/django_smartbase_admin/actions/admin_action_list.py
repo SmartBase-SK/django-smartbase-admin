@@ -4,6 +4,8 @@ import math
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django.utils.text import smart_split, unescape_string_literal
 
 from django_smartbase_admin.engine.const import (
@@ -430,6 +432,11 @@ class SBAdminListAction(SBAdminAction):
                 if field.python_formatter:
                     formatted_value = field.python_formatter(object_id, processed_value)
                 row[field.field] = formatted_value
+            for field_key, field_value in row.items():
+                if isinstance(field_value, str) and not isinstance(
+                    field_value, SafeString
+                ):
+                    row[field_key] = escape(field_value)
 
     def get_json_data(self):
         return self.get_data()
