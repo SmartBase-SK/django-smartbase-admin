@@ -408,11 +408,11 @@ class SBAdminListAction(SBAdminAction):
 
     def process_final_data(self, final_data):
         visible_columns = self.get_visible_column_fields()
-        fields_with_methods_to_call = [
-            field
+        fields_with_methods_to_call_by_field_key = {
+            field.field: field
             for field in visible_columns
             if field.view_method or field.python_formatter
-        ]
+        }
         for row in final_data:
             additional_data = {}
             if self.view.sbadmin_list_display_data:
@@ -420,23 +420,23 @@ class SBAdminListAction(SBAdminAction):
                     data: row.get(data, None)
                     for data in self.view.sbadmin_list_display_data
                 }
-            for field in fields_with_methods_to_call:
-                object_id = row.get(self.get_pk_field().name, None)
-                value = row.get(field.field, None)
-                processed_value = value
-                if field.view_method:
-                    processed_value = field.view_method(
-                        object_id, value, **additional_data
-                    )
-                formatted_value = processed_value
-                if field.python_formatter:
-                    formatted_value = field.python_formatter(object_id, processed_value)
-                row[field.field] = formatted_value
-            for field_key, field_value in row.items():
-                if isinstance(field_value, str) and not isinstance(
-                    field_value, SafeString
-                ):
-                    row[field_key] = escape(field_value)
+            for field_key, value in row.items():
+                if field_key in fields_with_methods_to_call_by_field_key:
+                    field = fields_with_methods_to_call_by_field_key[field_key]
+                    object_id = row.get(self.get_pk_field().name, None)
+                    processed_value = value
+                    if field.view_method:
+                        processed_value = field.view_method(
+                            object_id, value, **additional_data
+                        )
+                    formatted_value = processed_value
+                    if field.python_formatter:
+                        formatted_value = field.python_formatter(
+                            object_id, processed_value
+                        )
+                    row[field.field] = formatted_value
+                if isinstance(value, str) and not isinstance(value, SafeString):
+                    row[field_key] = escape(value)
 
     def get_json_data(self):
         return self.get_data()
