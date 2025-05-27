@@ -434,7 +434,7 @@ class SBAdminListAction(SBAdminAction):
                         formatted_value = field.python_formatter(
                             object_id, processed_value
                         )
-                    row[field.field] = formatted_value
+                    row[field_key] = formatted_value
                 if isinstance(value, str) and not isinstance(value, SafeString):
                     row[field_key] = escape(value)
 
