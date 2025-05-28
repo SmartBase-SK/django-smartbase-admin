@@ -100,7 +100,7 @@ class SBAdminField(JSONSerializableMixin):
         list_visible=None,
         list_collapsed=None,
         auto_created=None,
-        formatter: Formatter = None,
+        formatter: Formatter = Formatter.HTML.value,
         tabulator_editor=None,
         python_formatter=None,
         tabulator_options: "TabulatorFieldOptions" = None,
@@ -185,7 +185,6 @@ class SBAdminField(JSONSerializableMixin):
             if self.model_field and not self.annotate:
                 self.annotate = F(field_name)
             self.filter_field = self.filter_field or field_name
-            self.formatter = "html"
         if self.view.model and not self.model_field:
             self.model_field = self.get_model_field_from_model(self.name)
         if (
@@ -225,8 +224,6 @@ class SBAdminField(JSONSerializableMixin):
                 self.python_formatter = datetime_formatter
             if isinstance(self.model_field, BooleanField):
                 self.python_formatter = boolean_formatter
-        if self.python_formatter and not self.formatter:
-            self.formatter = "html"
         self.filter_field = self.filter_field or self.field
         self.init_filter_for_field(configuration)
         self.initialized = True

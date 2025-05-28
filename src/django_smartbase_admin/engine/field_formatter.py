@@ -1,6 +1,7 @@
 from enum import Enum
 
 from django.template.defaultfilters import date, time
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
@@ -38,8 +39,10 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
 
 def boolean_formatter(object_id, value):
     if value:
-        return f'<span class="badge badge-simple badge-positive">{_("Yes")}</span>'
-    return f'<span class="badge badge-simple badge-neutral">{_("No")}</span>'
+        return mark_safe(
+            f'<span class="badge badge-simple badge-positive">{_("Yes")}</span>'
+        )
+    return mark_safe(f'<span class="badge badge-simple badge-neutral">{_("No")}</span>')
 
 
 def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOTICE):
@@ -50,7 +53,7 @@ def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOT
         if not value:
             continue
         result += f'<span class="badge badge-simple badge-{badge_type.value} mr-4">{value}</span>{separator}'
-    return result
+    return mark_safe(result)
 
 
 def array_badge_formatter(object_id, value_list):
@@ -62,8 +65,10 @@ def newline_separated_array_badge_formatter(object_id, value_list):
 
 
 def rich_text_formatter(object_id, value):
-    return f'<div style="max-width: 500px; white-space: normal;">{value}</div>'
+    return mark_safe(
+        f'<div style="max-width: 500px; white-space: normal;">{value}</div>'
+    )
 
 
 def link_formatter(object_id, value):
-    return f'<a href="{value}">{value}</a>'
+    return mark_safe(f'<a href="{value}">{value}</a>')
