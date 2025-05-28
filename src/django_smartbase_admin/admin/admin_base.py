@@ -215,11 +215,16 @@ class SBAdminFormFieldWidgetsMixin:
         )  # remove origin classes to prevent override our custom widget class
         kwargs = {}
         if isinstance(form_field, RichTextFormField):
-            kwargs["config_name"] = getattr(db_field, "config_name", "default")
+            kwargs["config_name"] = getattr(
+                form_field.widget, "config_name", None
+            ) or getattr(db_field, "config_name", "default")
+
             kwargs["external_plugin_resources"] = getattr(
-                db_field, "external_plugin_resources", []
-            )
-            kwargs["extra_plugins"] = getattr(db_field, "extra_plugins", [])
+                form_field.widget, "external_plugin_resources", None
+            ) or getattr(db_field, "external_plugin_resources", [])
+            kwargs["extra_plugins"] = getattr(
+                form_field.widget, "extra_plugins", None
+            ) or getattr(db_field, "extra_plugins", [])
         form_field.widget = widget(form_field=form_field, attrs=widget_attrs, **kwargs)
         return form_field
 
