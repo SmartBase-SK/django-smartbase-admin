@@ -424,19 +424,13 @@ class SBAdminListAction(SBAdminAction):
                 if field_key in fields_with_methods_to_call_by_field_key:
                     field = fields_with_methods_to_call_by_field_key[field_key]
                     object_id = row.get(self.get_pk_field().name, None)
-                    processed_value = value
                     if field.view_method:
-                        processed_value = field.view_method(
-                            object_id, value, **additional_data
-                        )
-                    formatted_value = processed_value
+                        value = field.view_method(object_id, value, **additional_data)
                     if field.python_formatter:
-                        formatted_value = field.python_formatter(
-                            object_id, processed_value
-                        )
-                    row[field_key] = formatted_value
+                        value = field.python_formatter(object_id, value)
                 if isinstance(value, str) and not isinstance(value, SafeString):
-                    row[field_key] = escape(value)
+                    value = escape(value)
+                row[field_key] = value
 
     def get_json_data(self):
         return self.get_data()
