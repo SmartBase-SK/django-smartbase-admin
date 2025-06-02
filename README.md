@@ -25,6 +25,18 @@ Built to **speed up development** of internal tools and admin panels — beautif
 
 🗂 [View Full Docs](https://smartbase-sk.github.io/django-smartbase-admin-docs/docs/installation)
 
+
+## 🌐 Live Demo
+
+Want to see it in action?  
+👉 [Check out the live demo](https://sbadmin.sbdev.sk/)  
+
+**Login credentials:**
+- **Admin role**: `admin / admin`  
+- **Editor role**: `editor / editor`  
+
+
+
 ## ⚡ Quick Start
 
 ### 1. Install Smartbase Admin
