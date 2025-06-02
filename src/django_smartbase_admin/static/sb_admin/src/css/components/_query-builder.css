@@ -1,11 +1,27 @@
 .query-builder {
     select:not(.select2-hidden-accessible),
-    input:not(.checkbox):not(.radio):not(.choices__input) {
+    input:not(.checkbox):not(.radio):not([type="checkbox"]):not([type="radio"]):not(.choices__input) {
         @apply !w-full input;
     }
 
     .select2 {
         @apply !input;
+    }
+
+    .radio.radio-default {
+        @apply bg-light border border-dark-200 transition-colors;
+        &:first-child {
+            @apply rounded-t;
+        }
+        &:last-child {
+            @apply rounded-b;
+        }
+        &:hover {
+            @apply border-dark-400;
+        }
+        >label {
+            @apply !bg-transparent;
+        }
     }
 
     .rules-group-container {
@@ -106,7 +122,7 @@
         /*@apply flex items-center gap-8;*/
         @apply grid gap-8;
         grid-template-columns: repeat(18, 1fr);
-        grid-template-rows: repeat(2, 1fr);
+        /*grid-template-rows: repeat(2, 1fr);*/
         @apply !py-8 md:!py-16 !m-0;
         @apply !bg-dark-100 !border-dark-200 !rounded;
 
@@ -144,6 +160,10 @@
 
             &:empty {
                 @apply input cursor-not-allowed border-none;
+            }
+
+            >span {
+                @apply flex w-full bg-light h-44 p-10 rounded;
             }
         }
 

@@ -111,8 +111,10 @@
         }
     }
 
-    .checkbox,
-    .radio {
+    input.checkbox,
+    input.radio,
+    div.checkbox > input[type="checkbox"],
+    div.radio > input[type="radio"]{
         @apply absolute opacity-0 top-0;
         z-index: -1;
         & ~ label {
@@ -185,7 +187,8 @@
         }
     }
 
-    .checkbox {
+    input.checkbox,
+    div.checkbox > input[type="checkbox"] {
         & ~ label {
             &::before {
                 @apply rounded;
@@ -252,7 +255,8 @@
         }
     }
 
-    .radio {
+    input.radio,
+    div.radio > input[type="radio"] {
         & + label {
             @apply px-16 py-12 flex items-center justify-between text-dark-900;
 
@@ -290,7 +294,7 @@
         margin: 0;
     }
 
-    .checkbox.checkbox-icon {
+    input.checkbox.checkbox-icon {
         + label {
             @apply pl-0 text-dark-300 transition-colors;
             &:before,
