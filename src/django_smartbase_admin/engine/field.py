@@ -277,12 +277,8 @@ class SBAdminField(JSONSerializableMixin):
                 field_annotates[self.field] = Value(None, output_field=CharField())
         if self.supporting_annotates:
             for key, value in self.supporting_annotates.items():
-                # when FilteredRelation is reused more than once, condition inside filter is wrong
-                # e.g. instead of
-                # delivery_service = FilteredRelation("delivery__service__translations",condition=Q(delivery__service__translations__language_code='sk'))
-                # there was
-                # delivery_service = FilteredRelation("delivery__service__translations",condition=Q(delivery_service__language_code='sk'))
-                # causing error: FieldError: Cannot resolve keyword 'delivery_service' into field.
+                # workaround for a django bug
+                # https://code.djangoproject.com/ticket/36442#ticket
                 if isinstance(value, FilteredRelation):
                     supporting_annotates[key] = value.clone()
                 else:
