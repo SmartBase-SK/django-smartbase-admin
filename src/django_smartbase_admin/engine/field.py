@@ -1,5 +1,13 @@
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
-from django.db.models import Count, Value, CharField, F, DateTimeField, BooleanField
+from django.db.models import (
+    Count,
+    Value,
+    CharField,
+    F,
+    DateTimeField,
+    BooleanField,
+    FilteredRelation,
+)
 from django.db.models.functions import Concat
 
 from django_smartbase_admin.engine.const import ANNOTATE_KEY, Formatter
@@ -268,5 +276,15 @@ class SBAdminField(JSONSerializableMixin):
             else:
                 field_annotates[self.field] = Value(None, output_field=CharField())
         if self.supporting_annotates:
-            supporting_annotates.update(self.supporting_annotates)
+            for key, value in self.supporting_annotates.items():
+                # when FilteredRelation is reused more than once, condition inside filter is wrong
+                # e.g. instead of
+                # delivery_service = FilteredRelation("delivery__service__translations",condition=Q(delivery__service__translations__language_code='sk'))
+                # there was
+                # delivery_service = FilteredRelation("delivery__service__translations",condition=Q(delivery_service__language_code='sk'))
+                # causing error: FieldError: Cannot resolve keyword 'delivery_service' into field.
+                if isinstance(value, FilteredRelation):
+                    supporting_annotates[key] = value.clone()
+                else:
+                    supporting_annotates[key] = value
         return {**supporting_annotates, **field_annotates}
