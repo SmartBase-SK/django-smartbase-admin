@@ -77,9 +77,6 @@ class SBAdminFakeInlineMixin:
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
-        fake_fk = models.ForeignKey(self.original_model, on_delete=models.SET_NULL)
-        fake_fk.set_attributes_from_name("inline_fake_relationship")
-        formset.fk = fake_fk
         formset.queryset = self.get_queryset(request)
         formset.original_model = self.original_model
         formset.inline_instance = self

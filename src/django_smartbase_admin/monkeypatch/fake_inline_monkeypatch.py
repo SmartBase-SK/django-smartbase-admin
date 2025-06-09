@@ -14,7 +14,7 @@ def monkeypatch_get_foreign_key(fnc):
             result = models.ForeignKey(
                 model.original_model, on_delete=models.DO_NOTHING
             )
-            result.name = SBAdminFakeInlineMixin.fk_name
+            result.set_attributes_from_name(SBAdminFakeInlineMixin.fk_name)
 
         return result
 
