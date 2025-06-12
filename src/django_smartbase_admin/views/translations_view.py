@@ -9,6 +9,7 @@ from django.forms import modelform_factory
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
@@ -207,11 +208,11 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
 
     def format_translation_status(self, object_id, value):
         if value == self.TRANSLATION_NOT_TRANSLATED:
-            return f'<span class="badge badge-simple badge-neutral"><svg class="w-16 h-16 mr-4 text-invisible"><use xlink:href="#Add-one"></use></svg>{_("Not Translated")}</span>'
+            return mark_safe(f'<span class="badge badge-simple badge-neutral"><svg class="w-16 h-16 mr-4 text-invisible"><use xlink:href="#Add-one"></use></svg>{_("Not Translated")}</span>')
         if value == self.TRANSLATION_INCOMPLETE:
-            return f'<span class="badge badge-simple badge-warning"><svg class="w-16 h-16 mr-4 text-warning"><use xlink:href="#Attention"></use></svg>{_("Incomplete")}</span>'
+            return mark_safe(f'<span class="badge badge-simple badge-warning"><svg class="w-16 h-16 mr-4 text-warning"><use xlink:href="#Attention"></use></svg>{_("Incomplete")}</span>')
         if value == self.TRANSLATION_TRANSLATED:
-            return f'<span class="badge badge-simple badge-positive"><svg class="w-16 h-16 mr-4 text-success"><use xlink:href="#Check"></use></svg>{_("Translated")}</span>'
+            return mark_safe(f'<span class="badge badge-simple badge-positive"><svg class="w-16 h-16 mr-4 text-success"><use xlink:href="#Check"></use></svg>{_("Translated")}</span>')
 
     def get_translated_fields(self):
         return SBAdminTranslationsService.get_translated_fields_for_model(self.model)
