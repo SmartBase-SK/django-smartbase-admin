@@ -16,7 +16,7 @@ Built to **speed up development** of internal tools and admin panels — beautif
 - Easy extension of list and detail views with custom actions and corresponding views
 - Beautiful modern UI (Tailwind CSS)
 - Responsive & mobile-friendly
-- 
+- End-user ready for building SaaS or similar projects with global queryset configuration
 ![image](https://github.com/user-attachments/assets/4bacb8c2-fd3d-4137-9b5a-fa849d9aeff6)
 ![image](https://github.com/user-attachments/assets/f7719377-eb88-42c4-8fe0-5d4ca0ff29bf)
 
