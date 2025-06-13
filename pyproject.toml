@@ -11,17 +11,17 @@ include = [
     "**/static/sb_admin/dist/**/*"
 ]
 classifiers = [
-    "Development Status" = "Development Status :: 5 - Production/Stable",
-    "Environment" = "Environment :: Web Environment",
-    "Framework" = "Framework :: Django",
-    "Intended Audience" = "Intended Audience :: Developers",
-    "License" = "License :: OSI Approved :: MIT License",
-    "Operating System" = "Operating System :: OS Independent",
-    "Programming Language" = "Programming Language :: Python :: 3",
-    "Programming Language" = "Programming Language :: Python :: 3.10",
-    "Programming Language" = "Programming Language :: Python :: 3.11",
-    "Programming Language" = "Programming Language :: Python :: 3.12",
-    "Programming Language" = "Programming Language :: Python :: 3.13"
+    "Development Status :: Development Status :: 5 - Production/Stable",
+    "Environment :: Environment :: Web Environment",
+    "Framework :: Framework :: Django",
+    "Intended Audience :: Intended Audience :: Developers",
+    "License :: License :: OSI Approved :: MIT License",
+    "Operating System :: Operating System :: OS Independent",
+    "Programming Language :: Programming Language :: Python :: 3",
+    "Programming Language :: Programming Language :: Python :: 3.10",
+    "Programming Language :: Programming Language :: Python :: 3.11",
+    "Programming Language :: Programming Language :: Python :: 3.12",
+    "Programming Language :: Programming Language :: Python :: 3.13"
 ]
 
 [tool.poetry.dependencies]
