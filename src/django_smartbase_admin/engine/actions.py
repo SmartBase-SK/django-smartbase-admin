@@ -22,6 +22,8 @@ class SBAdminCustomAction(object):
         no_params=False,
         open_in_modal=False,
         group=None,
+        sub_actions=None,
+        icon=None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -33,9 +35,15 @@ class SBAdminCustomAction(object):
         self.no_params = no_params
         self.open_in_modal = open_in_modal
         self.group = group
+        self.sub_actions = sub_actions
+        self.icon = icon
         self.resolve_url()
 
     def resolve_url(self):
+        if self.sub_actions:
+            for sub_action in self.sub_actions:
+                sub_action.resolve_url()
+            return
         if not (self.url or (self.view and self.action_id)):
             raise ImproperlyConfigured(
                 "You must provide either url or view and action_id"
