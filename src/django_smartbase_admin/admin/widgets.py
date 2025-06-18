@@ -205,9 +205,7 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
                 "flatpickrOptions": {
                     "dateFormat": "Y-m-d",
                     "altInput": True,
-                    "altFormat": get_format(
-                        "SHORT_DATE_FORMAT", use_l10n=settings.USE_L10N
-                    ),
+                    "altFormat": get_format("SHORT_DATE_FORMAT"),
                 },
             },
             cls=SBAdminJSONEncoder,

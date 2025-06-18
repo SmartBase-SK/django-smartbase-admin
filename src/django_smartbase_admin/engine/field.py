@@ -1,5 +1,13 @@
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
-from django.db.models import Count, Value, CharField, F, DateTimeField, BooleanField
+from django.db.models import (
+    Count,
+    Value,
+    CharField,
+    F,
+    DateTimeField,
+    BooleanField,
+    FilteredRelation,
+)
 from django.db.models.functions import Concat
 
 from django_smartbase_admin.engine.const import ANNOTATE_KEY, Formatter
@@ -268,5 +276,11 @@ class SBAdminField(JSONSerializableMixin):
             else:
                 field_annotates[self.field] = Value(None, output_field=CharField())
         if self.supporting_annotates:
-            supporting_annotates.update(self.supporting_annotates)
+            for key, value in self.supporting_annotates.items():
+                # workaround for a django bug
+                # https://code.djangoproject.com/ticket/36442#ticket
+                if isinstance(value, FilteredRelation):
+                    supporting_annotates[key] = value.clone()
+                else:
+                    supporting_annotates[key] = value
         return {**supporting_annotates, **field_annotates}
