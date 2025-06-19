@@ -366,6 +366,25 @@ class SBAdminAutocompleteWidget(
                             "label": self.get_label(threadsafe_request, item),
                         }
                     )
+
+                related_model = self.model
+                app_label = related_model._meta.app_label
+                model_name = related_model._meta.model_name
+
+                try:
+                    change_url = reverse(
+                        "sb_admin:{}_{}_change".format(
+                            app_label, model_name
+                        ), args=(parsed_value,)
+                    )
+                    add_url = reverse(
+                        "sb_admin:{}_{}_add".format(app_label, model_name)
+                    )
+
+                    context["widget"]["attrs"]["related_edit_url"] = change_url
+                    context["widget"]["attrs"]["related_add_url"] = add_url
+                except:
+                    pass
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
         return context

@@ -14,9 +14,9 @@
     <script type="text/javascript"
             id="django-admin-form-add-constants"
             src="{% static 'admin/js/change_form.js' %}"
-        {% if adminform and add %}
+            {% if adminform and add %}
             data-model-name="{{ opts.model_name }}"
-        {% endif %}>
+            {% endif %}>
     </script>
     {# JavaScript for prepopulated fields #}
     {% prepopulated_fields_js %}
@@ -42,10 +42,10 @@
                 <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
                     <li class="relative md:hidden">
                         <button
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                            data-bs-popper-placement="bottom-end"
-                            class="btn btn-empty btn-icon">
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-bs-popper-placement="bottom-end"
+                                class="btn btn-empty btn-icon">
                             <svg class="w-16 h-16">
                                 <use xlink:href="#More"></use>
                             </svg>
@@ -108,7 +108,8 @@
     {% endblock %}
 
     {% block form %}
-        <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
+
+        <form {% if has_file_field %}enctype="multipart/form-data" {% endif %} action="{{ form_url }}" method="post"
               id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
             {% csrf_token %}
             {% if errors %}
@@ -186,46 +187,62 @@
                 <script type="text/javascript"
                         id="django-admin-form-add-constants"
                         src="{% static 'admin/js/change_form.js' %}"
-                    {% if adminform and add %}
+                        {% if adminform and add %}
                         data-model-name="{{ opts.model_name }}"
-                    {% endif %}>
+                        {% endif %}>
                 </script>
             {% endblock %}
             {% if is_popup %}
                 {# TODO: check sticky bar in popups #}
-             {% endif %}
-            {% block action_bar %}
-                <div class="detail-view-action-bar">
-                    <div>
-                        <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
-                            {% include 'sb_admin/includes/change_form_title.html' %}
-                        </h2>
-                        {% if previous_url or next_url %}
-                            <div class="flex items-center gap-8 mr-8">
-                                <{% if previous_url %}a href="{{ previous_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Prev' %}">
-                                    <svg class="w-20 h-20">
-                                        <use xlink:href="#Left"></use>
-                                    </svg>
-                                </{% if previous_url %}a{% else %}button{% endif %}>
-                                <div class="text-12">{% blocktrans %}<strong>{{ current_index }}</strong> / {{ all_objects_count }}{% endblocktrans %}</div>
-                                <{% if next_url %}a href="{{ next_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Next' %}">
-                                    <svg class="w-20 h-20">
-                                        <use xlink:href="#Right"></use>
-                                    </svg>
-                                </{% if next_url %}a{% else %}button{% endif %}>
-                            </div>
-                        {% endif %}
-                        <div class="flex ml-auto gap-8">
-                            {% if not is_popup and has_view_permission %}
-                                {% url opts|admin_urlname:'changelist' as changelist_url %}
-                                <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
-                            {% endif %}
+            {% endif %}
+            {% if not is_popup %}
 
-                            {% submit_row %}
+                {% block action_bar %}
+                    <div class="detail-view-action-bar">
+                        <div>
+                            <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                                {% include 'sb_admin/includes/change_form_title.html' %}
+                            </h2>
+                            {% if previous_url or next_url %}
+                                <div class="flex items-center gap-8 mr-8">
+                                    <{% if previous_url %}a href="{{ previous_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Prev' %}">
+                                        <svg class="w-20 h-20">
+                                            <use xlink:href="#Left"></use>
+                                        </svg>
+                                        </{% if previous_url %}a{% else %}button{% endif %}>
+                                        <div class="text-12">{% blocktrans %}<strong>{{ current_index }}</strong> / {{ all_objects_count }}{% endblocktrans %}</div>
+                                        <{% if next_url %}a href="{{ next_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Next' %}">
+                                            <svg class="w-20 h-20">
+                                                <use xlink:href="#Right"></use>
+                                            </svg>
+                                            </{% if next_url %}a{% else %}button{% endif %}>
+                                </div>
+                            {% endif %}
+                            <div class="flex ml-auto gap-8">
+                                {% if not is_popup and has_view_permission %}
+                                    {% url opts|admin_urlname:'changelist' as changelist_url %}
+                                    <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+                                {% endif %}
+
+                                {% submit_row %}
+                            </div>
                         </div>
                     </div>
+                {% endblock %}
+            {% else %}
+                <div class="modal-footer flex justify-end gap-8 px-24 py-16 border-t border-dark-200">
+
+                    <button type="submit"
+                            form="{{ opts.model_name }}_form"
+                            {% url opts|admin_urlname:'change' original.pk|admin_urlquote as change_url %}
+                            hx-post="{{ change_url }}"
+                            hx-target="#sb-admin-modal .modal-content"
+                            hx-swap="innerHTML"
+                            class="btn btn-primary">
+                        {% trans 'Save' %}
+                    </button>
                 </div>
-            {% endblock %}
+            {% endif %}
         </form>
     {% endblock %}
 {% endblock %}

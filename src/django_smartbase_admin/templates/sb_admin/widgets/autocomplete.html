@@ -2,7 +2,8 @@
 {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
-        <div id="{{ widget.attrs.id }}-wrapper">
+        <div id="{{ widget.attrs.id }}-wrapper" class="relative">
+
             <button
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
@@ -17,6 +18,40 @@
                     </svg>
                 {% endblock %}
             </button>
+
+            <div class="flex items-center gap-4">
+
+                {% if widget.attrs.related_edit_url %}
+                    <a href="{{ widget.attrs.related_edit_url }}"
+                       class="btn btn-icon"
+                       title="{% trans 'Edit' %}"
+                       data-bs-toggle="modal"
+                       data-bs-target="#sb-admin-modal"
+                       hx-get="{{ widget.attrs.related_edit_url }}?_popup=1"
+                       hx-target="#sb-admin-modal .modal-content"
+                       hx-swap="innerHTML">
+                        <svg class="w-20 h-20">
+                            <use xlink:href="#Preview-open"></use>
+                        </svg>
+                    </a>
+                {% endif %}
+
+                {% if widget.attrs.related_add_url %}
+                    <a href="{{ widget.attrs.related_add_url }}"
+                       class="btn btn-icon"
+                       title="{% trans 'Add' %}"
+                       data-bs-toggle="modal"
+                       data-bs-target="#sb-admin-modal"
+                       hx-get="{{ widget.attrs.related_add_url }}?_popup=1"
+                       hx-target="#sb-admin-modal .modal-content"
+                       hx-swap="innerHTML">
+                        <svg class="w-20 h-20">
+                            <use xlink:href="#Add-one"></use>
+                        </svg>
+                    </a>
+                {% endif %}
+
+            </div>
             <div class="dropdown-menu max-h-none w-248">
                 <div class="px-12 pt-8">
                     {% include 'sb_admin/widgets/input.html' %}
