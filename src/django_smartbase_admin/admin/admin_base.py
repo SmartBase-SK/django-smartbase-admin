@@ -24,6 +24,7 @@ from django.forms.models import (
     ModelFormMetaclass,
     modelform_factory,
 )
+from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -31,6 +32,7 @@ from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
+from django_htmx.http import trigger_client_event
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
 from nested_admin.nested import (
@@ -902,6 +904,15 @@ class SBAdmin(
             )
         except Exception as e:
             return super().history_view(request, object_id, extra_context)
+
+    def response_change(self, request, obj):
+        if "_modal_save" in request.POST:
+            response = HttpResponse()
+
+            trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
+            return response
+        else:
+            return super().response_change(request, obj)
 
 
 class SBAdminInline(

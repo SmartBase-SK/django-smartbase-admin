@@ -230,16 +230,29 @@
                     </div>
                 {% endblock %}
             {% else %}
-                <div class="modal-footer flex justify-end gap-8 px-24 py-16 border-t border-dark-200">
+                <div class="modal-footer flex space-between flex-nowrap gap-8 px-24 py-16 border-t border-dark-200 w-full">
+                    {% if original %}
+                        {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
+                    {% else %}
+                        {% url opts|admin_urlname:'add' as post_url %}
+                    {% endif %}
 
                     <button type="submit"
                             form="{{ opts.model_name }}_form"
-                            {% url opts|admin_urlname:'change' original.pk|admin_urlquote as change_url %}
-                            hx-post="{{ change_url }}"
+                            hx-post="{{ post_url }}"
                             hx-target="#sb-admin-modal .modal-content"
                             hx-swap="innerHTML"
-                            class="btn btn-primary">
+                            hx-vals='{"_modal_save": "1"}'
+                            class="btn btn-primary w-1/2">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Save"></use>
+                        </svg>
                         {% trans 'Save' %}
+                    </button>
+                    <button type="button"
+                            class="btn w-1/2"
+                            data-bs-dismiss="modal" aria-label="Close">
+                        {% trans 'Close' %}
                     </button>
                 </div>
             {% endif %}

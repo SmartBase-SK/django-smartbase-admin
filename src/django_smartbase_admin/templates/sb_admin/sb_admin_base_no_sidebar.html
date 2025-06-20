@@ -73,7 +73,9 @@
 {% endblock %}
 
 {% block modal %}
-	{% include 'sb_admin/partials/modal/modal.html' %}
+    {% if not is_popup %}
+	    {% include 'sb_admin/partials/modal/modal.html' %}
+    {% endif %}
 {% endblock %}
 
 {% block js %}

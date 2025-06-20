@@ -12,7 +12,7 @@ from django.contrib.admin.widgets import (
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
@@ -55,6 +55,12 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
+        opts = self.form_field.view.opts
+
+        context["widget"]["attrs"][
+            "id"
+        ] = f"{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
+
         return context
 
 
@@ -373,9 +379,8 @@ class SBAdminAutocompleteWidget(
 
                 try:
                     change_url = reverse(
-                        "sb_admin:{}_{}_change".format(
-                            app_label, model_name
-                        ), args=(parsed_value,)
+                        "sb_admin:{}_{}_change".format(app_label, model_name),
+                        args=(parsed_value,),
                     )
                     add_url = reverse(
                         "sb_admin:{}_{}_add".format(app_label, model_name)
@@ -383,7 +388,7 @@ class SBAdminAutocompleteWidget(
 
                     context["widget"]["attrs"]["related_edit_url"] = change_url
                     context["widget"]["attrs"]["related_add_url"] = add_url
-                except:
+                except NoReverseMatch:
                     pass
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
