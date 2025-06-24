@@ -1,5 +1,14 @@
 {% load sb_admin_tags i18n %}
 {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
+    <script>
+        document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
+            const {field, id, label} = event.detail;
+            const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
+            document.getElementById(`${field}-value`).textContent = label;
+            selectEl._choicesInstance.setValue([{value: id, label: label}]);
+        });
+    </script>
+
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
         <div id="{{ widget.attrs.id }}-wrapper" class="relative">
@@ -18,40 +27,7 @@
                     </svg>
                 {% endblock %}
             </button>
-
-            <div class="flex items-center gap-4">
-
-                {% if widget.attrs.related_edit_url %}
-                    <a href="{{ widget.attrs.related_edit_url }}"
-                       class="btn btn-icon"
-                       title="{% trans 'Edit' %}"
-                       data-bs-toggle="modal"
-                       data-bs-target="#sb-admin-modal"
-                       hx-get="{{ widget.attrs.related_edit_url }}?_popup=1"
-                       hx-target="#sb-admin-modal .modal-content"
-                       hx-swap="innerHTML">
-                        <svg class="w-20 h-20">
-                            <use xlink:href="#Preview-open"></use>
-                        </svg>
-                    </a>
-                {% endif %}
-
-                {% if widget.attrs.related_add_url %}
-                    <a href="{{ widget.attrs.related_add_url }}"
-                       class="btn btn-icon"
-                       title="{% trans 'Add' %}"
-                       data-bs-toggle="modal"
-                       data-bs-target="#sb-admin-modal"
-                       hx-get="{{ widget.attrs.related_add_url }}?_popup=1"
-                       hx-target="#sb-admin-modal .modal-content"
-                       hx-swap="innerHTML">
-                        <svg class="w-20 h-20">
-                            <use xlink:href="#Add-one"></use>
-                        </svg>
-                    </a>
-                {% endif %}
-
-            </div>
+            {% include 'sb_admin/widgets/includes/related_item_buttons.html' %}
             <div class="dropdown-menu max-h-none w-248">
                 <div class="px-12 pt-8">
                     {% include 'sb_admin/widgets/input.html' %}

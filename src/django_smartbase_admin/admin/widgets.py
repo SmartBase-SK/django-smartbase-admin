@@ -55,11 +55,11 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
-        opts = self.form_field.view.opts
-
-        context["widget"]["attrs"][
-            "id"
-        ] = f"{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
+        opts = self.form_field.view.opts if hasattr(self.form_field.view, "opts") else None
+        if opts:
+            context["widget"]["attrs"][
+                "id"
+            ] = f"{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
 
         return context
 

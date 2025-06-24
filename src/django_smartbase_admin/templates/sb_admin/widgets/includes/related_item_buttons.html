@@ -1,30 +1,35 @@
+{% load i18n %}
+
 <div class="flex items-center gap-4">
 
-                {% if widget.attrs.related_edit_url %}
-                    <a href="{{ widget.attrs.related_edit_url }}"
-                       class="btn btn-icon" title="{% trans 'Edit' %}" target="_blank">
-                        <svg class="w-20 h-20">
-                            <use xlink:href="#Edit"></use>
-                        </svg>
-                    </a>
-                {% endif %}
+    {% if widget.attrs.related_edit_url %}
+        <a href="{{ widget.attrs.related_edit_url }}"
+           class="btn btn-icon"
+           title="{% trans 'Edit' %}"
+           data-bs-toggle="modal"
+           data-bs-target="#sb-admin-modal"
+           hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&source_field={{ widget.attrs.id }}"
+           hx-target="#sb-admin-modal .modal-content"
+           hx-swap="innerHTML">
+            <svg class="w-20 h-20">
+                <use xlink:href="#Preview-open"></use>
+            </svg>
+        </a>
+    {% endif %}
 
-                {% if widget.attrs.related_add_url %}
-                    <a href="{{ widget.attrs.related_add_url }}"
-                       class="btn btn-icon" title="{% trans 'Add' %}" target="_blank">
-                        <svg class="w-20 h-20">
-                            <use xlink:href="#Add-one"></use>
-                        </svg>
-                    </a>
-                {% endif %}
+    {% if widget.attrs.related_add_url %}
+        <a href="{{ widget.attrs.related_add_url }}"
+           class="btn btn-icon"
+           title="{% trans 'Add' %}"
+           data-bs-toggle="modal"
+           data-bs-target="#sb-admin-modal"
+           hx-get="{{ widget.attrs.related_add_url }}?_popup=1&source_field={{ widget.attrs.id }}"
+           hx-target="#sb-admin-modal .modal-content"
+           hx-swap="innerHTML">
+            <svg class="w-20 h-20">
+                <use xlink:href="#Add-one"></use>
+            </svg>
+        </a>
+    {% endif %}
 
-                {% if widget.attrs.related_delete_url %}
-                    <a href="{{ widget.attrs.related_delete_url }}"
-                       class="btn btn-icon btn-destructive" title="{% trans 'Delete' %}" target="_blank">
-                        <svg class="w-20 h-20">
-                            <use xlink:href="#Delete"></use>
-                        </svg>
-                    </a>
-                {% endif %}
-
-            </div>
+</div>

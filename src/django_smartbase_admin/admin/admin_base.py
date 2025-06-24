@@ -905,12 +905,33 @@ class SBAdmin(
         except Exception as e:
             return super().history_view(request, object_id, extra_context)
 
+    @classmethod
+    def get_modal_save_response(cls, request, obj):
+        response = HttpResponse(
+            headers={
+                "HX-Trigger": json.dumps(
+                    {
+                        "sbadmin:modal-change-form-response": {
+                            "field": request.POST.get("source_field"),
+                            "id": obj.pk,
+                            "label": str(obj),
+                        }
+                    }
+                )
+            }
+        )
+        trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
+        return response
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if "_modal_save" in request.POST:
+            return self.get_modal_save_response(request, obj)
+        else:
+            return super().response_add(request, obj, post_url_continue)
+
     def response_change(self, request, obj):
         if "_modal_save" in request.POST:
-            response = HttpResponse()
-
-            trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
-            return response
+            return self.get_modal_save_response(request, obj)
         else:
             return super().response_change(request, obj)
 

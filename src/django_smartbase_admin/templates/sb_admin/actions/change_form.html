@@ -242,7 +242,7 @@
                             hx-post="{{ post_url }}"
                             hx-target="#sb-admin-modal .modal-content"
                             hx-swap="innerHTML"
-                            hx-vals='{"_modal_save": "1"}'
+                            hx-vals='{"_modal_save": "1", "source_field":"{{ request.GET.source_field }}"}'
                             class="btn btn-primary w-1/2">
                         <svg class="w-20 h-20 mr-8">
                             <use xlink:href="#Save"></use>
