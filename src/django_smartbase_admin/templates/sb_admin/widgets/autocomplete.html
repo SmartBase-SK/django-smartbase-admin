@@ -1,14 +1,5 @@
 {% load sb_admin_tags i18n %}
 {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
-    <script>
-        document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
-            const {field, id, label} = event.detail;
-            const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
-            document.getElementById(`${field}-value`).textContent = label;
-            selectEl._choicesInstance.setValue([{value: id, label: label}]);
-        });
-    </script>
-
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
         <div id="{{ widget.attrs.id }}-wrapper" class="relative">
@@ -65,4 +56,13 @@
         {{ filter_widget|get_json_script:autocomplete_data_id }}
     </div>
     {% include 'sb_admin/widgets/includes/help_text.html' %}
+
+    <script>
+        document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
+            const {field, id, label} = event.detail;
+            const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
+            selectEl._choicesInstance.setValue([{value: id, label: label}]);
+            document.getElementById(`${field}-value`).textContent = label;
+        });
+    </script>
 {% endwith %}

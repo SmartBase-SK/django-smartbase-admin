@@ -10,7 +10,9 @@
 {% block view_class %}change-form{% endblock %}
 
 {% block js %}
-    {{ block.super }}
+    {% if not is_popup %}
+        {{ block.super }}
+    {% endif %}
     <script type="text/javascript"
             id="django-admin-form-add-constants"
             src="{% static 'admin/js/change_form.js' %}"
@@ -196,7 +198,6 @@
                 {# TODO: check sticky bar in popups #}
             {% endif %}
             {% if not is_popup %}
-
                 {% block action_bar %}
                     <div class="detail-view-action-bar">
                         <div>

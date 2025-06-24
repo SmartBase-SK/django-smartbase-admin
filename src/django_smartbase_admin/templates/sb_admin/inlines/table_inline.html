@@ -6,11 +6,11 @@
 
     {% with inline_admin_formset.opts as inline_opts %}
         <div
-            class="{% if inline_admin_formset.opts.class_name %}{{ inline_admin_formset.opts.class_name }}{% else %}{{ inline_admin_formset.opts|to_class_name|slugify }}{% endif %}{% if inline_admin_formset.formset.can_delete %} can-delete{% endif %} card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
-            id="{{ inline_admin_formset.formset.prefix }}-group"
-            data-inline-type="stacked"
-            data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
-            data-inline-model="{{ inline_admin_formset.inline_model_id }}"{% block additional_wrapper_attributes %}{% endblock %}>
+                class="{% if inline_admin_formset.opts.class_name %}{{ inline_admin_formset.opts.class_name }}{% else %}{{ inline_admin_formset.opts|to_class_name|slugify }}{% endif %}{% if inline_admin_formset.formset.can_delete %} can-delete{% endif %} card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
+                id="{{ inline_admin_formset.formset.prefix }}-group"
+                data-inline-type="stacked"
+                data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
+                data-inline-model="{{ inline_admin_formset.inline_model_id }}"{% block additional_wrapper_attributes %}{% endblock %}>
 
             {% block card_content %}
                 <header class="mb-24 px-20 md:px-24 pt-20 md:pt-24 table-header">
@@ -21,7 +21,7 @@
                     <div class="ml-auto flex gap-8">
                         {% for list_action in context_data.inline_list_actions %}
                             <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %}{% endif %} href="{{ list_action.url }}"
-                                    class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
+                                                                                                                                                                    class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
                         {% if inline_admin_formset.has_add_permission %}
                             <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
@@ -34,7 +34,7 @@
                     </div>
                 </header>
                 <div
-                    class="tabular inline-related {% if forloop.last and inline_admin_formset.has_add_permission %}last-related{% endif %}">
+                        class="tabular inline-related {% if forloop.last and inline_admin_formset.has_add_permission %}last-related{% endif %}">
                     <fieldset class="module djn-fieldset {{ inline_admin_formset.classes }}">
 
                         {{ inline_admin_formset.formset.management_form }}
@@ -47,52 +47,52 @@
                         <table class="djn-items inline-related djn-table">
                             {% with inline_admin_formset.opts.sortable_field_name|default:"" as sortable_field_name %}
                                 <thead class="djn-module djn-thead">
-                                    <tr>
-                                        {% if context_data.is_sortable_active %}
-                                            <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
-                                        {% endif %}
-                                        {% for field in inline_admin_formset.fields %}
-                                            {% if not field.widget.is_hidden and not field|is_row_class_field %}
-                                                <th class="djn-th
+                                <tr>
+                                    {% if context_data.is_sortable_active %}
+                                        <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
+                                    {% endif %}
+                                    {% for field in inline_admin_formset.fields %}
+                                        {% if not field.widget.is_hidden and not field|is_row_class_field %}
+                                            <th class="djn-th
                                                     {{ field.label|lower|slugify }}{% if field.required %} required{% endif %}">
-                                                    <div class="flex items-center">
-                                                        <span class="mr-auto">{{ field.label|capfirst }}{% if field.required %}<span class="ml-4 text-negative">*</span>{% endif %}</span>
-                                                        {% if field.help_text %}&nbsp;
-                                                            <div class="ml-4">
-                                                                <div class="js-tooltip flex" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ field.help_text|striptags }}">
-                                                                    <svg class="w-12 h-12">
-                                                                        <use xlink:href="#Help"></use>
-                                                                    </svg>
-                                                                </div>
+                                                <div class="flex items-center">
+                                                    <span class="mr-auto">{{ field.label|capfirst }}{% if field.required %}<span class="ml-4 text-negative">*</span>{% endif %}</span>
+                                                    {% if field.help_text %}&nbsp;
+                                                        <div class="ml-4">
+                                                            <div class="js-tooltip flex" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ field.help_text|striptags }}">
+                                                                <svg class="w-12 h-12">
+                                                                    <use xlink:href="#Help"></use>
+                                                                </svg>
                                                             </div>
-                                                        {% endif %}
-                                                    </div>
-                                                </th>
-                                            {% endif %}
-                                        {% endfor %}
-                                        {% block table_inline_delete_table_head %}
-                                            {% if inline_admin_formset.formset.can_delete %}
-                                                <th class="djn-th sticky-table-head" style="min-width: 54px; width: 54px;"></th>
-                                            {% endif %}
-                                        {% endblock %}
-                                    </tr>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </th>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% block table_inline_delete_table_head %}
+                                        {% if inline_admin_formset.formset.can_delete %}
+                                            <th class="djn-th sticky-table-head" style="min-width: 54px; width: 54px;"></th>
+                                        {% endif %}
+                                    {% endblock %}
+                                </tr>
                                 </thead>
 
 
                                 {% for inline_admin_form in inline_admin_formset|formsetsort:sortable_field_name %}
                                     <tbody
-                                        class="djn-tbody djn-inline-form
+                                            class="djn-tbody djn-inline-form
                                         {% if not forloop.last or not inline_admin_formset.has_add_permission %} djn-item{% endif %}
                                         {% if inline_admin_formset.opts.classes %} {{ inline_admin_formset.opts.classes|join:" " }}{% endif %}
                                         {% if inline_admin_form.original or inline_admin_form.show_url %} has_original{% endif %}
                                         {% if forloop.last and inline_admin_formset.has_add_permission %} djn-empty-form empty-form{% endif %}
                                         {% if inline_admin_form.form.inlines %} djn-has-inlines{% endif %}
                                         {% if inline_admin_form.errors %} has-errors{% endif %}"
-                                        data-inline-model="{{ inline_admin_form.model_admin.opts.app_label }}-{{ inline_admin_form.model_admin.opts.model_name }}"
-                                        {% if inline_admin_form.pk_field.field %}
-                                        data-is-initial="{% if inline_admin_form.pk_field.field.value %}true{% else %}false{% endif %}"
-                                        {% endif %}
-                                        id="{{ inline_admin_formset.formset.prefix }}-{% if forloop.last and inline_admin_formset.has_add_permission %}empty{% else %}{% if is_nested %}{% endif %}{{ inline_admin_form.form|form_index }}{% endif %}">
+                                            data-inline-model="{{ inline_admin_form.model_admin.opts.app_label }}-{{ inline_admin_form.model_admin.opts.model_name }}"
+                                            {% if inline_admin_form.pk_field.field %}
+                                            data-is-initial="{% if inline_admin_form.pk_field.field.value %}true{% else %}false{% endif %}"
+                                            {% endif %}
+                                            id="{{ inline_admin_formset.formset.prefix }}-{% if forloop.last and inline_admin_formset.has_add_permission %}empty{% else %}{% if is_nested %}{% endif %}{{ inline_admin_form.form|form_index }}{% endif %}">
 
                                     {% if inline_admin_form.form.non_field_errors %}
                                         <tr>
@@ -190,11 +190,11 @@
                             <script>
                                 {# move all non initial lines to the top of the table to maintain original order #}
                                 {# this should happen only during validation error #}
-                                (function(){
+                                (function () {
                                     const group = document.getElementById('{{ inline_admin_formset.formset.prefix }}-group');
                                     const table = group.querySelector('.djn-table');
                                     const bodies_to_move = Array.from(group.querySelectorAll('.djn-tbody[data-is-initial="false"]'));
-                                    if(bodies_to_move) {
+                                    if (bodies_to_move) {
                                         table.prepend(...bodies_to_move.reverse());
                                     }
                                 }());
