@@ -24,7 +24,7 @@ export const choicesJSOptions = (choiceInput) => ({
             },
             choice: (templateOptions, choice, selectText) => {
                 const originalItem = Choices.defaults.templates.choice.call(this, templateOptions, choice, selectText)
-                if(!choiceInput.hasAttribute('multiple')) {
+                if (!choiceInput.hasAttribute('multiple')) {
                     return originalItem
                 }
                 const input = document.createElement('input')
@@ -50,6 +50,14 @@ export const choicesJSOptions = (choiceInput) => ({
 
 
 export const choicesJSListeners = {
+    'selectItem': (item, inputEl) => {
+        if (!item) return
+        const choiceValue = {
+            value: item.value,
+            label: item.label
+        }
+        inputEl.value = JSON.stringify(choiceValue)
+    },
     'addItem': (choicesJS, inputEl) => {
         const choiceValue = []
         let choicesJSValue = choicesJS.getValue()

@@ -88,7 +88,10 @@ export default class Autocomplete {
             choicesJS.SBhasNextPage = true
             this.search(choicesJS.SBcurrentSearchTerm, choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage)
         }, 200))
-        choiceInput.choicesInstance = choicesJS
+
+        choiceInput.addEventListener('selectItem', (event) => {
+            choicesJSListeners.selectItem(event.detail, inputEl)
+        })
         choiceInput.addEventListener('addItem', () => {
             choicesJSListeners.addItem(choicesJS, inputEl)
         })
