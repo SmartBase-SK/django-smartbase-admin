@@ -287,6 +287,6 @@ export default class Autocomplete {
     }
 
     isInitialized(choiceInput) {
-        return choiceInput.classList.contains('choices__input') || choiceInput.closest('.choices')
+        return choiceInput.closest('.choices')
     }
 }
