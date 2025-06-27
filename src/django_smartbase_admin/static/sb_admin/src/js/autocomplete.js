@@ -44,6 +44,9 @@ export default class Autocomplete {
         const dataEl = document.getElementById(choiceInput.dataset.autocompleteDataId)
         const autocompleteData = JSON.parse(dataEl.textContent)
         let inputElId = autocompleteData.input_id
+        if (this.isInitialized(choiceInput)) {
+            return
+        }
         if (totalFormsCount !== null) {
             inputElId = inputElId.replace('__prefix__', totalFormsCount)
         }
@@ -60,6 +63,7 @@ export default class Autocomplete {
         const addNewButton = wrapperEl.querySelector(`.js-add-new-button`)
         const deleteButton = wrapperEl.querySelector(`.js-clear-autocomplete`)
         const options = JSON.parse(choiceInput.dataset.autocompleteOptions || "{}")
+
         const choicesJS = new Choices(choiceInput, {
             ...choicesJSOptions(choiceInput),
             placeholderValue: 'Search',
@@ -99,7 +103,7 @@ export default class Autocomplete {
             choicesJSListeners.removeItem(choicesJS, inputEl)
         })
         choiceInput.addEventListener('change', (e) => {
-            if(!e.target.hasAttribute('multiple')) {
+            if (!e.target.hasAttribute('multiple')) {
                 choicesJS.SBwrapperElButton.click()
             }
             inputEl.dispatchEvent(new CustomEvent('SBAutocompleteChange'))
@@ -111,7 +115,7 @@ export default class Autocomplete {
             this.search('', choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage, !choicesJS.SBinitialised)
         }
 
-        if(wrapperElButton){
+        if (wrapperElButton) {
             // filter in dropdown
             wrapperElButton.addEventListener('show.bs.dropdown', initLoad)
         } else {
@@ -189,14 +193,14 @@ export default class Autocomplete {
         }
     }
 
-    toggleAddNew(choicesJS, label, show=false) {
-        if(!choicesJS.SBaddNewButton) {
+    toggleAddNew(choicesJS, label, show = false) {
+        if (!choicesJS.SBaddNewButton) {
             return
         }
         const buttonText = choicesJS.SBaddNewButton.querySelector('.js-add-item-label')
         buttonText.innerText = label
         choicesJS.SBaddNewButton.dataset.value = label
-        if(show) {
+        if (show) {
             choicesJS.SBaddNewButton.parentElement.classList.remove('hidden')
         } else {
             choicesJS.SBaddNewButton.parentElement.classList.add('hidden')
@@ -259,7 +263,7 @@ export default class Autocomplete {
                 }
 
                 choicesJSChoices.forEach((choice) => {
-                    if(choice.label === searchTerm) {
+                    if (choice.label === searchTerm) {
                         exactSearchTermMatched = true
                     }
                 })
@@ -280,5 +284,9 @@ export default class Autocomplete {
                 }
                 choicesJS.SBcurrentPage = requestedPage
             })
+    }
+
+    isInitialized(choiceInput) {
+        return choiceInput.classList.contains('choices__input') || choiceInput.closest('.choices')
     }
 }

@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib.parse
 from collections.abc import Iterable
 from functools import partial
@@ -128,6 +129,7 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
 
+logger = logging.getLogger(__name__)
 
 class SBAdminFormFieldWidgetsMixin:
     formfield_widgets = {
@@ -946,6 +948,7 @@ class SBAdminInline(
     extra = 0
     ordering = None
     all_base_fields_form = None
+    add_modal = False
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
@@ -995,12 +998,16 @@ class SBAdminInline(
         is_sortable_active: bool = self.sortable_field_name and (
             self.has_add_permission(request) or self.has_change_permission(request)
         )
+        add_url = None
         try:
-            add_url = reverse(
-                "sb_admin:{}_{}_add".format(self.opts.app_label, self.opts.model_name)
-            )
+            if self.add_modal:
+                add_url = reverse(
+                    "sb_admin:{}_{}_add".format(
+                        self.opts.app_label, self.opts.model_name
+                    )
+                )
         except NoReverseMatch:
-            add_url = None
+            logger.warning("To use Add in modal, You have to specify SBAdmin view for %s model", self.opts.model_name)
         return {
             "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
             "is_sortable_active": is_sortable_active,

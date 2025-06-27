@@ -5,7 +5,13 @@ import Modal from 'bootstrap/js/dist/modal'
 import Tooltip from 'bootstrap/js/dist/tooltip'
 
 // remove Modal focus trap to fix interaction with fields in modals inside another modal
-Modal.prototype._initializeFocusTrap = function () { return { activate: function () { }, deactivate: function () { } } }
+Modal.prototype._initializeFocusTrap = function () {
+    return {
+        activate: function () {
+        }, deactivate: function () {
+        }
+    }
+}
 
 window.bootstrap5 = {
     Modal: Modal,
@@ -31,7 +37,7 @@ class Main {
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         tooltipTriggerList.map((tooltipTriggerEl) => {
             const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
-            if(tooltipEl) {
+            if (tooltipEl) {
                 return new Tooltip(tooltipTriggerEl, {container: tooltipEl})
             }
             return null
@@ -49,10 +55,10 @@ class Main {
             window.open(e.detail.url, e.detail?.target || '_blank')
         })
 
-        if(window.htmx){
+        if (window.htmx) {
             window.htmx.on("htmx:afterSwap", (detail) => {
                 const requestEl = detail.detail.requestConfig.elt.closest('[hx-swap]')
-                if(requestEl && requestEl.getAttribute('hx-swap') === "none") {
+                if (requestEl && requestEl.getAttribute('hx-swap') === "none") {
                     // do not process afterSwap if none swap is performed
                     // this should prevent double processing of afterSwap for first oob-swapped element
                     // which in case of hx-swap=none is returned here in the detail.target
@@ -60,16 +66,17 @@ class Main {
                 }
                 this.initFileInputs(detail.target)
                 this.initDropdowns(detail.target)
+                this.initInputs()
+                this.autocomplete = new Autocomplete()
+
             })
         }
 
         new Sidebar()
-        this.datepicker = new Datepicker()
-        this.range = new Range()
+        this.initInputs()
         new Sorting()
         this.autocomplete = new Autocomplete()
         new ChoicesJS()
-        this.multiselect = new Multiselect()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)
@@ -82,8 +89,13 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
+    initInputs(){
+        this.datepicker = new Datepicker()
+        this.range = new Range()
+        this.multiselect = new Multiselect()
+    }
     handleLocationHashFromTabs() {
-        if(window.location.hash) {
+        if (window.location.hash) {
             document.querySelector(`#tab_${window.location.hash.slice(1)}`)?.click()
         }
         const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]:not([data-bs-disable-history])')
@@ -116,7 +128,7 @@ class Main {
 
     fileDownload(event) {
         const button = event.target.closest('.js-file-button')
-        if(button) {
+        if (button) {
             event.preventDefault()
             event.stopPropagation()
             const download_window = window.open(button.getAttribute("href"))
@@ -132,21 +144,20 @@ class Main {
         const dropdowns = [].slice.call(target.querySelectorAll('[data-bs-toggle="dropdown"]'))
         dropdowns.map((dropdownToggleEl) => {
             let offset = dropdownToggleEl.dataset['bsOffset']
-            if(offset) {
+            if (offset) {
                 offset = JSON.parse(dropdownToggleEl.dataset['bsOffset'])
-            }
-            else {
-                offset = [0,8]
+            } else {
+                offset = [0, 8]
             }
             return new Dropdown(dropdownToggleEl, {
                 autoClose: 'outside',
                 offset: offset,
                 popperConfig(defaultBsPopperConfig) {
                     const elementConf = {}
-                    if(dropdownToggleEl.dataset['bsPopperPlacement']) {
+                    if (dropdownToggleEl.dataset['bsPopperPlacement']) {
                         elementConf['placement'] = dropdownToggleEl.dataset['bsPopperPlacement']
                     }
-                    return { ...defaultBsPopperConfig, ...elementConf, strategy: 'fixed' }
+                    return {...defaultBsPopperConfig, ...elementConf, strategy: 'fixed'}
                 }
             })
         })
@@ -154,7 +165,7 @@ class Main {
 
     initAliasName() {
         const aliasGroup = document.getElementById(window.sb_admin_const.GLOBAL_FILTER_ALIAS_WIDGET_ID)
-        if(!aliasGroup) {
+        if (!aliasGroup) {
             return
         }
 
@@ -180,9 +191,9 @@ class Main {
         const saveStateEl = event.target.closest('.js-save-state')
         if (saveStateEl) {
             const isBsToggle = saveStateEl.dataset['bsToggle']
-            if(isBsToggle === 'collapse') {
+            if (isBsToggle === 'collapse') {
                 const expanded = saveStateEl.getAttribute('aria-expanded') === 'true'
-                setCookie(saveStateEl.id, expanded, expanded?1:0)
+                setCookie(saveStateEl.id, expanded, expanded ? 1 : 0)
             }
         }
     }
@@ -196,7 +207,7 @@ class Main {
     selectAll(event) {
         const wrapper = event.target.closest('.js-select-all-wrapper')
 
-        if(wrapper) {
+        if (wrapper) {
             const selectAll = event.target.closest('.js-select-all')
             const clearAll = event.target.closest('.js-clear-all')
             if (selectAll) {
@@ -231,17 +242,16 @@ class Main {
             const input = fileInput.querySelector('input[type="file"]')
             const delete_checkbox = fileInput.querySelector('input[type="checkbox"]')
             input?.addEventListener('change', e => {
-                if(delete_checkbox) {
+                if (delete_checkbox) {
                     delete_checkbox.checked = false
                 }
-                if(e.target.files[0]) {
+                if (e.target.files[0]) {
                     fileInput.classList.add('filled')
                     fileInput.querySelectorAll('.js-input-file-image').forEach(el => {
                         el.src = URL.createObjectURL(e.target.files[0])
                     })
                     fileInput.querySelector('.js-input-file-filename').innerHTML = e.target.files[0].name
-                }
-                else {
+                } else {
                     fileInput.classList.remove('filled')
                     fileInput.querySelector('.js-input-file-filename').innerHTML = ""
                 }
@@ -251,7 +261,7 @@ class Main {
             deleteButton?.addEventListener('click', () => {
                 input.value = ""
                 input.dispatchEvent(new Event('change'))
-                if(delete_checkbox) {
+                if (delete_checkbox) {
                     delete_checkbox.checked = true
                 }
             })
@@ -266,9 +276,9 @@ class Main {
     }
 
     executeListAction(table_id, action_url, no_params) {
-        if(window.SBAdminTable && window.SBAdminTable[table_id]){
+        if (window.SBAdminTable && window.SBAdminTable[table_id]) {
             window.SBAdminTable[table_id].executeListAction(action_url, no_params)
-        } else{
+        } else {
             window.location.href = action_url
         }
     }
