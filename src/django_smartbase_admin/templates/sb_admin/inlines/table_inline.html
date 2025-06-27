@@ -24,12 +24,28 @@
                                                                                                                                                                     class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
                         {% if inline_admin_formset.has_add_permission %}
-                            <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
-                                <svg class="w-20 h-20 md:mr-8">
-                                    <use xlink:href="#Plus"></use>
-                                </svg>
-                                <span>{% trans 'Add' %}</span>
-                            </a>
+                            {% if context_data.add_url %}
+                                <a
+                                   class="btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}"
+                                   data-bs-toggle="modal"
+                                   data-bs-target="#sb-admin-modal"
+                                   hx-get="{{ context_data.add_url }}?_popup=1&is_modal=1"
+                                   hx-target="#sb-admin-modal .modal-content"
+                                   hx-swap="innerHTML"
+                                >
+                                    <svg class="w-20 h-20 md:mr-8">
+                                        <use xlink:href="#Plus"></use>
+                                    </svg>
+                                    <span>{% trans 'Add' %}</span>
+                                </a>
+                            {% else %}
+                                <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
+                                    <svg class="w-20 h-20 md:mr-8">
+                                        <use xlink:href="#Plus"></use>
+                                    </svg>
+                                    <span>{% trans 'Add' %}</span>
+                                </a>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </header>

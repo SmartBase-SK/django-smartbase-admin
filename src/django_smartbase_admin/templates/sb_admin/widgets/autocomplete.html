@@ -61,7 +61,7 @@
         document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
             const {field, id, label} = event.detail;
             const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
-            selectEl._choicesInstance.setValue([{value: id, label: label}]);
+            selectEl.choicesInstance.setValue([{value: id, label: label}]);
             document.getElementById(`${field}-value`).textContent = label;
         });
     </script>

@@ -27,7 +27,7 @@ from django.forms.models import (
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
@@ -995,9 +995,16 @@ class SBAdminInline(
         is_sortable_active: bool = self.sortable_field_name and (
             self.has_add_permission(request) or self.has_change_permission(request)
         )
+        try:
+            add_url = reverse(
+                "sb_admin:{}_{}_add".format(self.opts.app_label, self.opts.model_name)
+            )
+        except NoReverseMatch:
+            add_url = None
         return {
             "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
             "is_sortable_active": is_sortable_active,
+            "add_url": add_url,
         }
 
     def init_sortable_field(self) -> None:
