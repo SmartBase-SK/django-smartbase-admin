@@ -1000,18 +1000,31 @@ class SBAdminInline(
         )
         add_url = None
         try:
-            if self.add_modal:
+            if self.add_modal and self.has_add_permission(request):
                 add_url = reverse(
                     "sb_admin:{}_{}_add".format(
                         self.opts.app_label, self.opts.model_name
                     )
                 )
         except NoReverseMatch:
-            logger.warning("To use Add in modal, You have to specify SBAdmin view for %s model", self.opts.model_name)
+            logger.warning(
+                "To use Add in modal, You have to specify SBAdmin view for %s model",
+                self.opts.model_name,
+            )
+        parent_data = {
+            "parent_instance_pk": self.parent_instance.pk,
+            "parent_instance_label": str(self.parent_instance),
+            "parent_instance_field": "{}_{}_id_{}".format(
+                self.model._meta.app_label,
+                self.model._meta.model_name,
+                self.parent_model._meta.model_name,
+            ),
+        }
         return {
             "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
             "is_sortable_active": is_sortable_active,
             "add_url": add_url,
+            "parent_data": parent_data,
         }
 
     def init_sortable_field(self) -> None:

@@ -55,7 +55,9 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
-        opts = self.form_field.view.opts if hasattr(self.form_field.view, "opts") else None
+        opts = (
+            self.form_field.view.opts if hasattr(self.form_field.view, "opts") else None
+        )
         if opts:
             context["widget"]["attrs"][
                 "id"
@@ -359,6 +361,16 @@ class SBAdminAutocompleteWidget(
         if not self.is_multiselect():
             query_suffix = ""
             self.multiselect = False
+        context["widget"]["attrs"]["preselect_field"] = threadsafe_request.GET.get(
+            "parent_instance_field"
+        )
+        context["widget"]["attrs"]["preselect_field_label"] = (
+            threadsafe_request.GET.get("parent_instance_label")
+        )
+        context["widget"]["attrs"]["preselect_field_value"] = (
+            threadsafe_request.GET.get("parent_instance_pk")
+        )
+
         if value:
             parsed_value = self.parse_value_from_input(threadsafe_request, value)
             if parsed_value:

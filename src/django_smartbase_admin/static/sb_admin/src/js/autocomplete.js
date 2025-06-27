@@ -44,9 +44,7 @@ export default class Autocomplete {
         const dataEl = document.getElementById(choiceInput.dataset.autocompleteDataId)
         const autocompleteData = JSON.parse(dataEl.textContent)
         let inputElId = autocompleteData.input_id
-        if (this.isInitialized(choiceInput)) {
-            return
-        }
+
         if (totalFormsCount !== null) {
             inputElId = inputElId.replace('__prefix__', totalFormsCount)
         }
@@ -286,7 +284,4 @@ export default class Autocomplete {
             })
     }
 
-    isInitialized(choiceInput) {
-        return choiceInput.closest('.choices')
-    }
 }

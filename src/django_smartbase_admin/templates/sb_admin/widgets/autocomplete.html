@@ -66,5 +66,27 @@
             }));
             document.getElementById(`${field}-value`).textContent = label;
         });
+
+    document.body.addEventListener("htmx:afterSwap", function (e) {
+              const field = "{{ widget.attrs.preselect_field }}";
+                const value = "{{ widget.attrs.preselect_field_value }}";
+                const label = "{{ widget.attrs.preselect_field_label|default:'' }}";
+
+                console.log(field)
+
+
+                const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
+                if (selectEl) {
+                    selectEl.dispatchEvent(new CustomEvent("selectItem", {
+                        detail: {value: value, label: label}
+                    }));
+
+                    const labelEl = document.getElementById(`${field}-value`);
+                    if (labelEl) {
+                        labelEl.textContent = label;
+                    }
+                }
+
+    });
     </script>
 {% endwith %}

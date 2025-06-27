@@ -61,7 +61,7 @@ class Main {
                 this.initFileInputs(detail.target)
                 this.initDropdowns(detail.target)
                 this.initInputs()
-                this.autocomplete = new Autocomplete()
+                this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
 
             })
         }
