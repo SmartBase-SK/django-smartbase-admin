@@ -235,22 +235,26 @@
                 }
             }
         }
-        &-delete {
-            + label {
-                @apply text-dark-300 transition-colors;
-                @apply p-8 h-full w-full flex-center;
-                &:before,
-                &:after {
-                    @apply hidden;
-                }
-                &:hover {
-                    @apply text-dark-400;
-                }
+    }
+
+    input.checkbox-delete {
+        + label {
+            @apply text-dark-300 transition-colors;
+            @apply p-8 h-full w-full flex-center;
+
+            &:before,
+            &:after {
+                @apply hidden;
             }
-            &:checked {
-                + label {
-                    @apply text-negative;
-                }
+
+            &:hover {
+                @apply text-dark-400;
+            }
+        }
+
+        &:checked {
+            + label {
+                @apply text-negative;
             }
         }
     }
