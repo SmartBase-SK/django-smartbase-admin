@@ -58,31 +58,25 @@
     {% include 'sb_admin/widgets/includes/help_text.html' %}
 
     <script>
-        document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
-            const {field, id, label} = event.detail;
+        function selectItem(field, id, label) {
             const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
             selectEl.dispatchEvent(new CustomEvent('selectItem', {
                 detail: {value: id, label: label},
             }));
             document.getElementById(`${field}-value`).textContent = label;
+        }
+
+        document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
+            const {field, id, label} = event.detail;
+            selectItem(field, id, label);
         });
 
         setTimeout(function () {
             const field = "{{ widget.attrs.preselect_field }}"
-            const value = "{{ widget.attrs.preselect_field_value }}"
+            const id = "{{ widget.attrs.preselect_field_value }}"
             const label = "{{ widget.attrs.preselect_field_label|default:'' }}"
             if (field && field !== "None") {
-                const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
-                if (selectEl) {
-                    selectEl.dispatchEvent(new CustomEvent("selectItem", {
-                        detail: {value: value, label: label}
-                    }));
-
-                    const labelEl = document.getElementById(`${field}-value`);
-                    if (labelEl) {
-                        labelEl.textContent = label;
-                    }
-                }
+                selectItem(field, id, label);
             }
         }, 100)
 
