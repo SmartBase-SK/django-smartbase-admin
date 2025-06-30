@@ -910,19 +910,16 @@ class SBAdmin(
 
     @classmethod
     def get_modal_save_response(cls, request, obj):
-        response = HttpResponse(
-            headers={
-                "HX-Trigger": json.dumps(
-                    {
-                        "sbadmin:modal-change-form-response": {
-                            "field": request.POST.get("sb_admin_source_field"),
-                            "id": obj.pk,
-                            "label": str(obj),
-                            "reload": request.POST.get("sb_admin_reload_on_save") == '1',
-                        }
-                    }
-                )
-            }
+        response = HttpResponse()
+        trigger_client_event(
+            response,
+            "sbadmin:modal-change-form-response",
+            {
+                "field": request.POST.get("sb_admin_source_field"),
+                "id": obj.pk,
+                "label": str(obj),
+                "reload": request.POST.get("sb_admin_reload_on_save") == "1",
+            },
         )
         trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
         return response
