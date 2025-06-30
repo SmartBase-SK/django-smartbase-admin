@@ -915,9 +915,10 @@ class SBAdmin(
                 "HX-Trigger": json.dumps(
                     {
                         "sbadmin:modal-change-form-response": {
-                            "field": request.POST.get("source_field"),
+                            "field": request.POST.get("sb_admin_source_field"),
                             "id": obj.pk,
                             "label": str(obj),
+                            "reload": request.POST.get("sb_admin_reload_on_save") == '1',
                         }
                     }
                 )
@@ -927,13 +928,13 @@ class SBAdmin(
         return response
 
     def response_add(self, request, obj, post_url_continue=None):
-        if "_modal_save" in request.POST:
+        if "sb_admin_modal_save" in request.POST:
             return self.get_modal_save_response(request, obj)
         else:
             return super().response_add(request, obj, post_url_continue)
 
     def response_change(self, request, obj):
-        if "_modal_save" in request.POST:
+        if "sb_admin_modal_save" in request.POST:
             return self.get_modal_save_response(request, obj)
         else:
             return super().response_change(request, obj)
@@ -1019,9 +1020,9 @@ class SBAdminInline(
         }
         if self.parent_instance:
             context_data["parent_data"] = {
-                "parent_instance_pk": self.parent_instance.pk,
-                "parent_instance_label": str(self.parent_instance),
-                "parent_instance_field": "{}_{}_id_{}".format(
+                "sb_admin_parent_instance_pk": self.parent_instance.pk,
+                "sb_admin_parent_instance_label": str(self.parent_instance),
+                "sb_admin_parent_instance_field": "{}_{}_id_{}".format(
                     self.model._meta.app_label,
                     self.model._meta.model_name,
                     self.parent_model._meta.model_name,

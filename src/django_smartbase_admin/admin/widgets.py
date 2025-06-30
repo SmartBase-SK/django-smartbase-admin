@@ -362,13 +362,13 @@ class SBAdminAutocompleteWidget(
             query_suffix = ""
             self.multiselect = False
         context["widget"]["attrs"]["preselect_field"] = threadsafe_request.GET.get(
-            "parent_instance_field"
+            "sb_admin_parent_instance_field"
         )
         context["widget"]["attrs"]["preselect_field_label"] = (
-            threadsafe_request.GET.get("parent_instance_label")
+            threadsafe_request.GET.get("sb_admin_parent_instance_label")
         )
         context["widget"]["attrs"]["preselect_field_value"] = (
-            threadsafe_request.GET.get("parent_instance_pk")
+            threadsafe_request.GET.get("sb_admin_parent_instance_pk")
         )
 
         if value:

@@ -60,20 +60,22 @@
     <script>
         function selectItem(field, id, label) {
             const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
-            selectEl.dispatchEvent(new CustomEvent('selectItem', {
-                detail: {value: id, label: label},
-            }));
-            document.getElementById(`${field}-value`).textContent = label;
+            if(selectEl) {
+                selectEl.dispatchEvent(new CustomEvent('selectItem', {
+                    detail: {value: id, label: label},
+                }));
+                document.getElementById(`${field}-value`).textContent = label;
+            }
         }
 
         document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
-            const {field, id, label} = event.detail;
+            const {field, id, label, reload} = event.detail;
             selectItem(field, id, label);
         });
 
         setTimeout(function () {
             const field = "{{ widget.attrs.preselect_field }}"
-            const id = "{{ widget.attrs.preselect_field_value }}"
+            const id = {{ widget.attrs.preselect_field_value |default:-1}}
             const label = "{{ widget.attrs.preselect_field_label|default:'' }}"
             if (field && field !== "None") {
                 selectItem(field, id, label);

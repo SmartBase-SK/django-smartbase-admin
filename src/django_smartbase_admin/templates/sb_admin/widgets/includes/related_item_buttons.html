@@ -8,7 +8,7 @@
                title="{% trans 'Edit' %}"
                data-bs-toggle="modal"
                data-bs-target="#sb-admin-modal"
-               hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&is_modal=1&source_field={{ widget.attrs.id }}"
+               hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sb_admin_source_field={{ widget.attrs.id }}"
                hx-target="#sb-admin-modal .modal-content"
                hx-swap="innerHTML">
                 <svg class="w-20 h-20">
@@ -23,7 +23,7 @@
                title="{% trans 'Add' %}"
                data-bs-toggle="modal"
                data-bs-target="#sb-admin-modal"
-               hx-get="{{ widget.attrs.related_add_url }}?_popup=1&is_modal=1&source_field={{ widget.attrs.id }}"
+               hx-get="{{ widget.attrs.related_add_url }}?_popup=1&sb_admin_source_field={{ widget.attrs.id }}"
                hx-target="#sb-admin-modal .modal-content"
                hx-swap="innerHTML">
                 <svg class="w-20 h-20">
