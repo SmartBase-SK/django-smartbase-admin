@@ -67,14 +67,11 @@
             document.getElementById(`${field}-value`).textContent = label;
         });
 
-    document.body.addEventListener("htmx:afterSwap", function (e) {
-              const field = "{{ widget.attrs.preselect_field }}";
-                const value = "{{ widget.attrs.preselect_field_value }}";
-                const label = "{{ widget.attrs.preselect_field_label|default:'' }}";
-
-                console.log(field)
-
-
+        setTimeout(function () {
+            const field = "{{ widget.attrs.preselect_field }}"
+            const value = "{{ widget.attrs.preselect_field_value }}"
+            const label = "{{ widget.attrs.preselect_field_label|default:'' }}"
+            if (field && field !== "None") {
                 const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
                 if (selectEl) {
                     selectEl.dispatchEvent(new CustomEvent("selectItem", {
@@ -86,7 +83,8 @@
                         labelEl.textContent = label;
                     }
                 }
+            }
+        }, 100)
 
-    });
     </script>
 {% endwith %}
