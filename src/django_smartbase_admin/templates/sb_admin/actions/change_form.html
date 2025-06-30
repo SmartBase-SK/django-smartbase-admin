@@ -1,6 +1,5 @@
 {% extends "sb_admin/sb_admin_base.html" %}
 {% load i18n admin_urls static admin_modify sb_admin_tags %}
-
 {% block js_init %}
     {{ block.super }}
     <script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
@@ -10,15 +9,15 @@
 {% block view_class %}change-form{% endblock %}
 
 {% block js %}
-    {% if not is_popup %}
+    {% if not sb_admin_is_modal %}
         {{ block.super }}
     {% endif %}
     <script type="text/javascript"
             id="django-admin-form-add-constants"
             src="{% static 'admin/js/change_form.js' %}"
-        {% if adminform and add %}
+            {% if adminform and add %}
             data-model-name="{{ opts.model_name }}"
-        {% endif %}>
+            {% endif %}>
     </script>
     {# JavaScript for prepopulated fields #}
     {% prepopulated_fields_js %}
@@ -44,10 +43,10 @@
                 <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
                     <li class="relative md:hidden">
                         <button
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                            data-bs-popper-placement="bottom-end"
-                            class="btn btn-empty btn-icon">
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-bs-popper-placement="bottom-end"
+                                class="btn btn-empty btn-icon">
                             <svg class="w-16 h-16">
                                 <use xlink:href="#More"></use>
                             </svg>
@@ -191,15 +190,40 @@
                 <script type="text/javascript"
                         id="django-admin-form-add-constants"
                         src="{% static 'admin/js/change_form.js' %}"
-                    {% if adminform and add %}
+                        {% if adminform and add %}
                         data-model-name="{{ opts.model_name }}"
-                    {% endif %}>
+                        {% endif %}>
                 </script>
             {% endblock %}
             {% if is_popup %}
                 {# TODO: check sticky bar in popups #}
             {% endif %}
-            {% if not is_popup %}
+            {% if sb_admin_is_modal %}
+                <div class="modal-footer flex space-between flex-nowrap gap-8 px-24 py-16 border-t border-dark-200 w-full">
+                    {% if original %}
+                        {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
+                    {% else %}
+                        {% url opts|admin_urlname:'add' as post_url %}
+                    {% endif %}
+                    <button type="submit"
+                            form="{{ opts.model_name }}_form"
+                            hx-post="{{ post_url }}"
+                            hx-target="#sb-admin-modal .modal-content"
+                            hx-swap="innerHTML"
+                            hx-vals='{"sb_admin_modal_save": 1,"sb_admin_source_field":"{{ request.GET.sb_admin_source_field }}", "sb_admin_reload_on_save": {{ request.GET.sb_admin_reload_on_save|default:"0" }}}'
+                            class="btn btn-primary w-1/2">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Save"></use>
+                        </svg>
+                        {% trans 'Save' %}
+                    </button>
+                    <button type="button"
+                            class="btn w-1/2"
+                            data-bs-dismiss="modal" aria-label="Close">
+                        {% trans 'Close' %}
+                    </button>
+                </div>
+            {% else %}
                 {% block action_bar %}
                     <div class="detail-view-action-bar">
                         <div>
@@ -232,32 +256,6 @@
                         </div>
                     </div>
                 {% endblock %}
-            {% else %}
-                <div class="modal-footer flex space-between flex-nowrap gap-8 px-24 py-16 border-t border-dark-200 w-full">
-                    {% if original %}
-                        {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
-                    {% else %}
-                        {% url opts|admin_urlname:'add' as post_url %}
-                    {% endif %}
-
-                    <button type="submit"
-                            form="{{ opts.model_name }}_form"
-                            hx-post="{{ post_url }}"
-                            hx-target="#sb-admin-modal .modal-content"
-                            hx-swap="innerHTML"
-                            hx-vals='{"sb_admin_modal_save": "1","sb_admin_source_field":"{{ request.GET.sb_admin_source_field }}", "sb_admin_reload_on_save": {{ request.GET.sb_admin_reload_on_save|default:"0" }}}'
-                            class="btn btn-primary w-1/2">
-                        <svg class="w-20 h-20 mr-8">
-                            <use xlink:href="#Save"></use>
-                        </svg>
-                        {% trans 'Save' %}
-                    </button>
-                    <button type="button"
-                            class="btn w-1/2"
-                            data-bs-dismiss="modal" aria-label="Close">
-                        {% trans 'Close' %}
-                    </button>
-                </div>
             {% endif %}
         </form>
     {% endblock %}

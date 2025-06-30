@@ -207,6 +207,7 @@ class SBAdminBaseView(object):
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
             "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
+            "sb_admin_is_modal": request.GET.get("sb_admin_is_modal", '0') == '1',
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
