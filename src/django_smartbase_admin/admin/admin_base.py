@@ -950,7 +950,7 @@ class SBAdminInline(
     extra = 0
     ordering = None
     all_base_fields_form = None
-    add_modal = False
+    sb_admin_add_modal = False
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
@@ -1002,7 +1002,7 @@ class SBAdminInline(
         )
         add_url = None
         try:
-            if self.add_modal and self.has_add_permission(request):
+            if self.sb_admin_add_modal and self.has_add_permission(request):
                 add_url = reverse(
                     "sb_admin:{}_{}_add".format(
                         self.opts.app_label, self.opts.model_name
