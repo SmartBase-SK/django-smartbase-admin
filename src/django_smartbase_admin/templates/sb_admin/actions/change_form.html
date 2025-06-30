@@ -16,9 +16,9 @@
     <script type="text/javascript"
             id="django-admin-form-add-constants"
             src="{% static 'admin/js/change_form.js' %}"
-            {% if adminform and add %}
+        {% if adminform and add %}
             data-model-name="{{ opts.model_name }}"
-            {% endif %}>
+        {% endif %}>
     </script>
     {# JavaScript for prepopulated fields #}
     {% prepopulated_fields_js %}
@@ -44,10 +44,10 @@
                 <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
                     <li class="relative md:hidden">
                         <button
-                                data-bs-toggle="dropdown"
-                                aria-expanded="false"
-                                data-bs-popper-placement="bottom-end"
-                                class="btn btn-empty btn-icon">
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            data-bs-popper-placement="bottom-end"
+                            class="btn btn-empty btn-icon">
                             <svg class="w-16 h-16">
                                 <use xlink:href="#More"></use>
                             </svg>
@@ -191,9 +191,9 @@
                 <script type="text/javascript"
                         id="django-admin-form-add-constants"
                         src="{% static 'admin/js/change_form.js' %}"
-                        {% if adminform and add %}
+                    {% if adminform and add %}
                         data-model-name="{{ opts.model_name }}"
-                        {% endif %}>
+                    {% endif %}>
                 </script>
             {% endblock %}
             {% if is_popup %}

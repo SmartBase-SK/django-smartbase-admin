@@ -3,7 +3,6 @@
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
         <div id="{{ widget.attrs.id }}-wrapper" class="relative">
-
             <button
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
@@ -56,7 +55,6 @@
         {{ filter_widget|get_json_script:autocomplete_data_id }}
     </div>
     {% include 'sb_admin/widgets/includes/help_text.html' %}
-
     <script>
         function selectItem(field, id, label) {
             const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`);
@@ -81,6 +79,5 @@
                 selectItem(field, id, label);
             }
         }, 100)
-
     </script>
 {% endwith %}

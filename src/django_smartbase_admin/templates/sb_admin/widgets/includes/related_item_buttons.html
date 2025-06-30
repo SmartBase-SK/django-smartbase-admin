@@ -1,7 +1,6 @@
 {% load i18n %}
 {% if not is_popup %}
     <div class="flex items-center gap-4">
-
         {% if widget.attrs.related_edit_url %}
             <a href="{{ widget.attrs.related_edit_url }}"
                class="btn btn-icon"
@@ -16,7 +15,6 @@
                 </svg>
             </a>
         {% endif %}
-
         {% if widget.attrs.related_add_url %}
             <a href="{{ widget.attrs.related_add_url }}"
                class="btn btn-icon"
@@ -31,6 +29,5 @@
                 </svg>
             </a>
         {% endif %}
-
     </div>
 {% endif %}
