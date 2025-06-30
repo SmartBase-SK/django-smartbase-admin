@@ -131,6 +131,7 @@ from django_smartbase_admin.services.views import SBAdminViewService
 
 logger = logging.getLogger(__name__)
 
+
 class SBAdminFormFieldWidgetsMixin:
     formfield_widgets = {
         forms.DateTimeField: SBAdminDateTimeWidget,
@@ -1011,21 +1012,22 @@ class SBAdminInline(
                 "To use Add in modal, You have to specify SBAdmin view for %s model",
                 self.opts.model_name,
             )
-        parent_data = {
-            "parent_instance_pk": self.parent_instance.pk,
-            "parent_instance_label": str(self.parent_instance),
-            "parent_instance_field": "{}_{}_id_{}".format(
-                self.model._meta.app_label,
-                self.model._meta.model_name,
-                self.parent_model._meta.model_name,
-            ),
-        }
-        return {
+        context_data = {
             "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
             "is_sortable_active": is_sortable_active,
             "add_url": add_url,
-            "parent_data": parent_data,
         }
+        if self.parent_instance:
+            context_data["parent_data"] = {
+                "parent_instance_pk": self.parent_instance.pk,
+                "parent_instance_label": str(self.parent_instance),
+                "parent_instance_field": "{}_{}_id_{}".format(
+                    self.model._meta.app_label,
+                    self.model._meta.model_name,
+                    self.parent_model._meta.model_name,
+                ),
+            }
+        return context_data
 
     def init_sortable_field(self) -> None:
         if not self.sortable_field_name:
