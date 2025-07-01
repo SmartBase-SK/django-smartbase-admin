@@ -110,9 +110,8 @@
 
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %} action="{{ form_url }}" method="post"
-              id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto {% if sbadmin_is_modal %}
-              max-h-[75vh] overflow-y-auto
-              {% endif %}" novalidate>
+              id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+        <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto {% endif %}">
             {% csrf_token %}
             {% if errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
@@ -194,6 +193,7 @@
                         {% endif %}>
                 </script>
             {% endblock %}
+        </div>
             {% if is_popup %}
                 {# TODO: check sticky bar in popups #}
             {% endif %}
