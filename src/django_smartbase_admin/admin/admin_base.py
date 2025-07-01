@@ -924,7 +924,7 @@ class SBAdmin(
                 "field": request.POST.get("sb_admin_source_field"),
                 "id": obj.pk,
                 "label": str(obj),
-                "reload": request.POST.get("sb_admin_reload_on_save") == "1",
+                "reload": request.POST.get("sbadmin_reload_on_save") == "1",
             },
         )
         trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})

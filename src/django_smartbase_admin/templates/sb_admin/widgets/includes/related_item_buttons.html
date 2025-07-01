@@ -1,5 +1,5 @@
 {% load i18n %}
-{% if not is_popup %}
+{% if not sbadmin_is_modal %}
     <div class="flex items-center gap-4">
         {% if widget.attrs.related_edit_url %}
             <a href="{{ widget.attrs.related_edit_url }}"

@@ -47,6 +47,7 @@ SBADMIN_IS_MODAL_VAR = "sbadmin_is_modal"
 SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR = "sbadmin_parent_instance_field"
 SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
 SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
+SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 
 class SBAdminBaseView(object):
@@ -212,8 +213,10 @@ class SBAdminBaseView(object):
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
             "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
-            "sbadmin_is_modal": SBADMIN_IS_MODAL_VAR in request.GET
+            SBADMIN_IS_MODAL_VAR: SBADMIN_IS_MODAL_VAR in request.GET
             or SBADMIN_IS_MODAL_VAR in request.POST,
+            SBADMIN_RELOAD_ON_SAVE_VAR: SBADMIN_RELOAD_ON_SAVE_VAR in request.GET
+            or SBADMIN_RELOAD_ON_SAVE_VAR in request.POST,
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
