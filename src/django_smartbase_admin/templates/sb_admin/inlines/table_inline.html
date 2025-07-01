@@ -29,7 +29,7 @@
                                         class="btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}"
                                         data-bs-toggle="modal"
                                         data-bs-target="#sb-admin-modal"
-                                        hx-get="{{ context_data.add_url }}?_popup=1&sb_admin_is_modal=1&sb_admin_reload_on_save=1&sb_admin_parent_instance_field={{ context_data.parent_data.sb_admin_parent_instance_field }}&sb_admin_parent_instance_pk={{ context_data.parent_data.sb_admin_parent_instance_pk }}&sb_admin_parent_instance_label={{ context_data.parent_data.sb_admin_parent_instance_label }}"
+                                        hx-get="{{ context_data.add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_reload_on_save=1&sbadmin_parent_instance_field={{ context_data.parent_data.sbadmin_parent_instance_field }}&sbadmin_parent_instance_pk={{ context_data.parent_data.sbadmin_parent_instance_pk }}&sbadmin_parent_instance_label={{ context_data.parent_data.sbadmin_parent_instance_label }}"
                                         hx-target="#sb-admin-modal .modal-content"
                                         hx-swap="innerHTML"
                                 >

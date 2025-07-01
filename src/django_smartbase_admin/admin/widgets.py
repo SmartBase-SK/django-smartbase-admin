@@ -22,6 +22,10 @@ from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
 from filer.fields.image import AdminImageWidget
 from filer.models import File
 
+from django_smartbase_admin.engine.admin_base_view import (
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
+    SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+)
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     SBAdminTreeWidgetMixin,
@@ -362,13 +366,13 @@ class SBAdminAutocompleteWidget(
             query_suffix = ""
             self.multiselect = False
         context["widget"]["attrs"]["preselect_field"] = threadsafe_request.GET.get(
-            "sb_admin_parent_instance_field"
+            "sbadmin_parent_instance_field"
         )
         context["widget"]["attrs"]["preselect_field_label"] = (
-            threadsafe_request.GET.get("sb_admin_parent_instance_label")
+            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_LABEL_VAR)
         )
         context["widget"]["attrs"]["preselect_field_value"] = (
-            threadsafe_request.GET.get("sb_admin_parent_instance_pk")
+            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
         )
 
         if value:

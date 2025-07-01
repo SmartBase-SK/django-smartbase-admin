@@ -43,7 +43,11 @@ from django_smartbase_admin.services.xlsx_export import (
 )
 from django_smartbase_admin.utils import is_htmx_request, render_notifications
 
-SB_ADMIN_IS_MODAL_VAR = "sb_admin_is_modal"
+SBADMIN_IS_MODAL_VAR = "sbadmin_is_modal"
+SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR = "sbadmin_parent_instance_field"
+SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
+SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
+
 
 class SBAdminBaseView(object):
     menu_label = None
@@ -208,7 +212,8 @@ class SBAdminBaseView(object):
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
             "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
-            "sb_admin_is_modal": SB_ADMIN_IS_MODAL_VAR in request.GET or SB_ADMIN_IS_MODAL_VAR in request.POST,
+            "sbadmin_is_modal": SBADMIN_IS_MODAL_VAR in request.GET
+            or SBADMIN_IS_MODAL_VAR in request.POST,
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,

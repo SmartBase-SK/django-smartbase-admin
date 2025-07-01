@@ -13,6 +13,7 @@ from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
@@ -119,7 +120,8 @@ from django_smartbase_admin.admin.widgets import (
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
-    SBAdminBaseQuerysetMixin, SB_ADMIN_IS_MODAL_VAR,
+    SBAdminBaseQuerysetMixin,
+    SBADMIN_IS_MODAL_VAR, SBADMIN_PARENT_INSTANCE_PK_VAR, SBADMIN_PARENT_INSTANCE_LABEL_VAR, SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
 )
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
@@ -673,6 +675,10 @@ class SBAdmin(
     sbadmin_tabs = None
     request_data = None
     menu_label = None
+    sbadmin_is_generic_model = None
+
+    def __init__(self, model, admin_site):
+        super().__init__(model, admin_site)
 
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
@@ -925,14 +931,33 @@ class SBAdmin(
         return response
 
     def response_add(self, request, obj, post_url_continue=None):
-        if SB_ADMIN_IS_MODAL_VAR in request.POST:
+        if SBADMIN_IS_MODAL_VAR in request.POST:
             return self.get_modal_save_response(request, obj)
         return super().response_add(request, obj, post_url_continue)
 
     def response_change(self, request, obj):
-        if SB_ADMIN_IS_MODAL_VAR in request.POST:
+        if SBADMIN_IS_MODAL_VAR in request.POST:
             return self.get_modal_save_response(request, obj)
         return super().response_change(request, obj)
+
+    @classmethod
+    def set_generic_relation_from_parent(cls, request, obj):
+        parent_model_path = request.POST.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
+        parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+
+        if parent_model_path and parent_pk:
+            app_label, model_name, field, parent_model = parent_model_path.split("_", 4)
+            content_type = ContentType.objects.get(
+                app_label=app_label, model=parent_model
+            )
+            obj.content_type = content_type
+            obj.object_id = int(parent_pk)
+
+    def save_model(self, request, obj, form, change):
+        if self.sbadmin_is_generic_model and SBADMIN_IS_MODAL_VAR in request.POST:
+            self.set_generic_relation_from_parent(request, obj)
+        super().save_model(request, obj, form, change)
+
 
 
 class SBAdminInline(
@@ -1015,9 +1040,9 @@ class SBAdminInline(
         }
         if self.parent_instance:
             context_data["parent_data"] = {
-                "sb_admin_parent_instance_pk": self.parent_instance.pk,
-                "sb_admin_parent_instance_label": str(self.parent_instance),
-                "sb_admin_parent_instance_field": "{}_{}_id_{}".format(
+                SBADMIN_PARENT_INSTANCE_PK_VAR: self.parent_instance.pk,
+                SBADMIN_PARENT_INSTANCE_LABEL_VAR: str(self.parent_instance),
+                SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: "{}_{}_id_{}".format(
                     self.model._meta.app_label,
                     self.model._meta.model_name,
                     self.parent_model._meta.model_name,
