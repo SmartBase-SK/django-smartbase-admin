@@ -119,7 +119,7 @@ from django_smartbase_admin.admin.widgets import (
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
-    SBAdminBaseQuerysetMixin,
+    SBAdminBaseQuerysetMixin, SB_ADMIN_IS_MODAL_VAR,
 )
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
@@ -925,12 +925,12 @@ class SBAdmin(
         return response
 
     def response_add(self, request, obj, post_url_continue=None):
-        if "sb_admin_modal_save" in request.POST:
+        if SB_ADMIN_IS_MODAL_VAR in request.POST:
             return self.get_modal_save_response(request, obj)
         return super().response_add(request, obj, post_url_continue)
 
     def response_change(self, request, obj):
-        if "sb_admin_modal_save" in request.POST:
+        if SB_ADMIN_IS_MODAL_VAR in request.POST:
             return self.get_modal_save_response(request, obj)
         return super().response_change(request, obj)
 

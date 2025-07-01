@@ -210,7 +210,7 @@
                             hx-post="{{ post_url }}"
                             hx-target="#sb-admin-modal .modal-content"
                             hx-swap="innerHTML"
-                            hx-vals='{"sb_admin_modal_save": 1,"sb_admin_source_field":"{{ request.GET.sb_admin_source_field }}", "sb_admin_reload_on_save": {{ request.GET.sb_admin_reload_on_save|default:"0" }}}'
+                            hx-vals='{"sb_admin_is_modal":1,"sb_admin_source_field":"{{ request.GET.sb_admin_source_field }}", "sb_admin_reload_on_save": {{ request.GET.sb_admin_reload_on_save|default:"0" }}}'
                             class="btn btn-primary w-1/2">
                         <svg class="w-20 h-20 mr-8">
                             <use xlink:href="#Save"></use>
