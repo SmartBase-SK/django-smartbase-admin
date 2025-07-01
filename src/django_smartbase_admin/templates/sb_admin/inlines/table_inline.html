@@ -214,13 +214,6 @@
                                         table.prepend(...bodies_to_move.reverse());
                                     }
                                 }());
-
-                                document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
-                                    const {field, id, label, reload} = event.detail;
-                                    if (reload) {
-                                        window.location.reload();
-                                    }
-                                });
                             </script>
                         {% endblock %}
 

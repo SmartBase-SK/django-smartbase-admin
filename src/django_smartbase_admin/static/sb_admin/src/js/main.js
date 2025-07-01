@@ -284,3 +284,9 @@ class Main {
 window.addEventListener('DOMContentLoaded', () => {
     window.SBAdmin = new Main()
 })
+
+document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {
+    if (event.detail.reload) {
+        window.location.reload()
+    }
+})

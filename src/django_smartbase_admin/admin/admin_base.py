@@ -927,14 +927,12 @@ class SBAdmin(
     def response_add(self, request, obj, post_url_continue=None):
         if "sb_admin_modal_save" in request.POST:
             return self.get_modal_save_response(request, obj)
-        else:
-            return super().response_add(request, obj, post_url_continue)
+        return super().response_add(request, obj, post_url_continue)
 
     def response_change(self, request, obj):
         if "sb_admin_modal_save" in request.POST:
             return self.get_modal_save_response(request, obj)
-        else:
-            return super().response_change(request, obj)
+        return super().response_change(request, obj)
 
 
 class SBAdminInline(

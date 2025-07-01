@@ -25,6 +25,10 @@ export default class Autocomplete {
             this.handleDynamiclyAddedAutocomplete(document.getElementById('sb-admin-modal'))
         })
         this.handleDynamiclyAddedAutocomplete(document)
+        document.body.addEventListener('sbadmin:modal-change-form-response', (event) => {
+            const {field, id, label} = event.detail
+            this.selectAutocompleteItem(field, id, label)
+        })
     }
 
     handleDynamiclyAddedAutocomplete(el) {
@@ -280,5 +284,15 @@ export default class Autocomplete {
                 }
                 choicesJS.SBcurrentPage = requestedPage
             })
+    }
+
+    selectAutocompleteItem(field, id, label) {
+        const selectEl = document.querySelector(`select.js-autocomplete[data-autocomplete-data-id="${field}_data"]`)
+        if (selectEl) {
+            selectEl.dispatchEvent(new CustomEvent('selectItem', {
+                detail: {value: id, label: label},
+            }))
+            document.getElementById(`${field}-value`).textContent = label
+        }
     }
 }
