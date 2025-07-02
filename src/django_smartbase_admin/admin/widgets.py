@@ -25,6 +25,7 @@ from filer.models import File
 from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_IS_MODAL_VAR,
 )
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -374,7 +375,7 @@ class SBAdminAutocompleteWidget(
         context["widget"]["attrs"]["preselect_field_value"] = (
             threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
         )
-
+        parsed_value = None
         if value:
             parsed_value = self.parse_value_from_input(threadsafe_request, value)
             if parsed_value:
@@ -389,26 +390,31 @@ class SBAdminAutocompleteWidget(
                         }
                     )
 
-                related_model = self.model
-                app_label = related_model._meta.app_label
-                model_name = related_model._meta.model_name
-
-                try:
-                    change_url = reverse(
-                        "sb_admin:{}_{}_change".format(app_label, model_name),
-                        args=(parsed_value,),
-                    )
-                    add_url = reverse(
-                        "sb_admin:{}_{}_add".format(app_label, model_name)
-                    )
-
-                    context["widget"]["attrs"]["related_edit_url"] = change_url
-                    context["widget"]["attrs"]["related_add_url"] = add_url
-                except NoReverseMatch:
-                    pass
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
+
+        if not SBADMIN_IS_MODAL_VAR in threadsafe_request.GET:
+            self.add_related_buttons_urls(parsed_value, context)
+
         return context
+
+    def add_related_buttons_urls(self, parsed_value, context):
+        related_model = self.model
+        app_label = related_model._meta.app_label
+        model_name = related_model._meta.model_name
+
+        try:
+            if parsed_value:
+                change_url = reverse(
+                    "sb_admin:{}_{}_change".format(app_label, model_name),
+                    args=(parsed_value,),
+                )
+                context["widget"]["attrs"]["related_edit_url"] = change_url
+
+            add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
+            context["widget"]["attrs"]["related_add_url"] = add_url
+        except NoReverseMatch:
+            pass
 
     def is_multiselect(self):
         if self.multiselect is not None:

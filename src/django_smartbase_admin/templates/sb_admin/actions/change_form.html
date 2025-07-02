@@ -136,8 +136,8 @@
                     {% for tab, tab_content_object in tabular_context.context.items %}
                         <li role="presentation">
                             <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ tab|slugify }}" data-bs-toggle="tab"
-                                    data-bs-target="#tabcontent_{{ tab|slugify }}" type="button" role="tab"
-                                    aria-controls="tabcontent_{{ tab|slugify }}" aria-selected="true">
+                                    data-bs-target="#{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" type="button" role="tab"
+                                    aria-controls="{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" aria-selected="true">
                                 {{ tab }}
                             </button>
                         </li>
@@ -145,7 +145,7 @@
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="tabcontent_{{ tab|slugify }}" role="tabpanel"
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
                      aria-labelledby="tab_{{ tab|slugify }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">
