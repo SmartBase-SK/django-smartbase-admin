@@ -6,11 +6,11 @@
 
     {% with inline_admin_formset.opts as inline_opts %}
         <div
-                class="{% if inline_admin_formset.opts.class_name %}{{ inline_admin_formset.opts.class_name }}{% else %}{{ inline_admin_formset.opts|to_class_name|slugify }}{% endif %}{% if inline_admin_formset.formset.can_delete %} can-delete{% endif %} card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
-                id="{{ inline_admin_formset.formset.prefix }}-group"
-                data-inline-type="stacked"
-                data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
-                data-inline-model="{{ inline_admin_formset.inline_model_id }}"{% block additional_wrapper_attributes %}{% endblock %}>
+            class="{% if inline_admin_formset.opts.class_name %}{{ inline_admin_formset.opts.class_name }}{% else %}{{ inline_admin_formset.opts|to_class_name|slugify }}{% endif %}{% if inline_admin_formset.formset.can_delete %} can-delete{% endif %} card p-0 sm:mb-24 inline-group group djn-group djn-tabular{% if is_nested %} djn-group-nested{% else %} djn-group-root{% endif %}"
+            id="{{ inline_admin_formset.formset.prefix }}-group"
+            data-inline-type="stacked"
+            data-inline-formset="{{ inline_admin_formset.inline_formset_data }}"
+            data-inline-model="{{ inline_admin_formset.inline_model_id }}"{% block additional_wrapper_attributes %}{% endblock %}>
 
             {% block card_content %}
                 <header class="mb-24 px-20 md:px-24 pt-20 md:pt-24 table-header">
@@ -21,7 +21,7 @@
                     <div class="ml-auto flex gap-8">
                         {% for list_action in context_data.inline_list_actions %}
                             <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %}{% endif %} href="{{ list_action.url }}"
-                                                                                                                                                                    class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
+                                    class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
                         {% if inline_admin_formset.has_add_permission %}
                             {% if context_data.add_url and not sbadmin_is_modal %}
@@ -50,7 +50,7 @@
                     </div>
                 </header>
                 <div
-                        class="tabular inline-related {% if forloop.last and inline_admin_formset.has_add_permission %}last-related{% endif %}">
+                    class="tabular inline-related {% if forloop.last and inline_admin_formset.has_add_permission %}last-related{% endif %}">
                     <fieldset class="module djn-fieldset {{ inline_admin_formset.classes }}">
 
                         {{ inline_admin_formset.formset.management_form }}
@@ -97,18 +97,18 @@
 
                                 {% for inline_admin_form in inline_admin_formset|formsetsort:sortable_field_name %}
                                     <tbody
-                                            class="djn-tbody djn-inline-form
+                                        class="djn-tbody djn-inline-form
                                         {% if not forloop.last or not inline_admin_formset.has_add_permission %} djn-item{% endif %}
                                         {% if inline_admin_formset.opts.classes %} {{ inline_admin_formset.opts.classes|join:" " }}{% endif %}
                                         {% if inline_admin_form.original or inline_admin_form.show_url %} has_original{% endif %}
                                         {% if forloop.last and inline_admin_formset.has_add_permission %} djn-empty-form empty-form{% endif %}
                                         {% if inline_admin_form.form.inlines %} djn-has-inlines{% endif %}
                                         {% if inline_admin_form.errors %} has-errors{% endif %}"
-                                            data-inline-model="{{ inline_admin_form.model_admin.opts.app_label }}-{{ inline_admin_form.model_admin.opts.model_name }}"
-                                            {% if inline_admin_form.pk_field.field %}
-                                            data-is-initial="{% if inline_admin_form.pk_field.field.value %}true{% else %}false{% endif %}"
-                                            {% endif %}
-                                            id="{{ inline_admin_formset.formset.prefix }}-{% if forloop.last and inline_admin_formset.has_add_permission %}empty{% else %}{% if is_nested %}{% endif %}{{ inline_admin_form.form|form_index }}{% endif %}">
+                                        data-inline-model="{{ inline_admin_form.model_admin.opts.app_label }}-{{ inline_admin_form.model_admin.opts.model_name }}"
+                                        {% if inline_admin_form.pk_field.field %}
+                                        data-is-initial="{% if inline_admin_form.pk_field.field.value %}true{% else %}false{% endif %}"
+                                        {% endif %}
+                                        id="{{ inline_admin_formset.formset.prefix }}-{% if forloop.last and inline_admin_formset.has_add_permission %}empty{% else %}{% if is_nested %}{% endif %}{{ inline_admin_form.form|form_index }}{% endif %}">
 
                                     {% if inline_admin_form.form.non_field_errors %}
                                         <tr>
@@ -206,11 +206,11 @@
                             <script>
                                 {# move all non initial lines to the top of the table to maintain original order #}
                                 {# this should happen only during validation error #}
-                                (function () {
+                                (function(){
                                     const group = document.getElementById('{{ inline_admin_formset.formset.prefix }}-group');
                                     const table = group.querySelector('.djn-table');
                                     const bodies_to_move = Array.from(group.querySelectorAll('.djn-tbody[data-is-initial="false"]'));
-                                    if (bodies_to_move) {
+                                    if(bodies_to_move) {
                                         table.prepend(...bodies_to_move.reverse());
                                     }
                                 }());

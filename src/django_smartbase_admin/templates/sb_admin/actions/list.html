@@ -12,10 +12,10 @@
             <ul class="ml-auto flex gap-8 md:gap-16">
                 <li class="relative md:hidden">
                     <button
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                            data-bs-popper-placement="bottom-end"
-                            class="btn btn-empty btn-icon">
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        data-bs-popper-placement="bottom-end"
+                        class="btn btn-empty btn-icon">
                         <svg class="w-16 h-16">
                             <use xlink:href="#More"></use>
                         </svg>
@@ -26,7 +26,7 @@
                             {% block dropdown_actions %}
                                 {% for list_action in content_context.list_actions %}
                                     <li>
-                                        {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="dropdown-menu-link" %}
+                                       {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="dropdown-menu-link" %}
                                     </li>
                                 {% endfor %}
                             {% endblock %}
@@ -56,7 +56,7 @@
                                 <ul>
                                     {% for list_sub_action in list_action.sub_actions %}
                                         <li>
-                                            {% include "sb_admin/actions/partials/action_link.html" with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
+                                          {% include "sb_admin/actions/partials/action_link.html" with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
                                         </li>
                                     {% endfor %}
                                 </ul>
