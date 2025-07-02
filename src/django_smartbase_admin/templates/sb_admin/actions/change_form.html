@@ -111,7 +111,7 @@
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %} action="{{ form_url }}" method="post"
               id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
-        <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto {% endif %}">
+        <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto sbadmin_is_modal{% endif %}">
             {% csrf_token %}
             {% if errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
@@ -152,7 +152,7 @@
                                 {% if tab_content.type == 'fieldset' %}
                                     {% block tab_content_fieldset %}
                                         {% with tab_content.value as fieldset %}
-                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes or sbadmin_is_modal %}
                                                 {% include "sb_admin/includes/fieldset.html" %}
                                             {% endif %}
                                         {% endwith %}
@@ -172,7 +172,7 @@
                                 {% for tab_content in tab_content_object.content %}
                                     {% if tab_content.type == 'fieldset' %}
                                         {% with tab_content.value as fieldset %}
-                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes and not sbadmin_is_modal %}
                                                 {% include "sb_admin/includes/fieldset.html" %}
                                             {% endif %}
                                         {% endwith %}
