@@ -195,4 +195,38 @@
             @apply max-sm:hidden;
         }
     }
+
+    .btn-group {
+        @apply flex;
+        > * {
+            &:first-child {
+                @apply rounded-r-none;
+                >.btn,
+                >.input {
+                    @apply rounded-r-none;
+                }
+            }
+            &:last-child {
+                @apply rounded-l-none;
+                >.btn,
+                .input {
+                    @apply rounded-l-none;
+                }
+            }
+            &:not(:first-child) {
+                margin-left: -1px;
+            }
+            &:not(:first-child):not(:last-child) {
+                @apply rounded-none;
+                >.btn,
+                >.input{
+                    @apply rounded-none;
+                }
+            }
+            &:hover,
+            &:focus {
+                z-index: 1;
+            }
+        }
+    }
 }

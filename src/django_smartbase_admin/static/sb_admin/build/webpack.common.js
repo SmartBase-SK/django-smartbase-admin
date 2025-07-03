@@ -7,11 +7,13 @@ const entries = {
     main: './src/django_smartbase_admin/static/sb_admin/src/js/main.js',
     table: './src/django_smartbase_admin/static/sb_admin/src/js/table.js',
     chart: './src/django_smartbase_admin/static/sb_admin/src/js/chart.js',
+    calendar: './src/django_smartbase_admin/static/sb_admin/src/js/calendar.js',
     main_style: './src/django_smartbase_admin/static/sb_admin/src/css/style.css',
     translations: './src/django_smartbase_admin/static/sb_admin/src/js/translations.js',
     confirmation_modal: './src/django_smartbase_admin/static/sb_admin/src/js/confirmation_modal.js',
     tree_widget: './src/django_smartbase_admin/static/sb_admin/src/js/tree_widget.js',
     tree_widget_style: './src/django_smartbase_admin/static/sb_admin/src/css/tree_widget.css',
+    calendar_style: './src/django_smartbase_admin/static/sb_admin/src/css/calendar.css',
 }
 
 const projectRoot = process.env.PWD || process.cwd()

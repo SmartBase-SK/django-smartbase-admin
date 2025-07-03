@@ -2,14 +2,28 @@ export default class Multiselect {
     constructor(selector_override, options_override) {
         const selector = selector_override || '.js-simple-multiselect'
         const selectorDetail = '.js-simple-multiselect-detail'
+        const selectAllClass = 'js-simple-multiselect-all'
         this.wrapperSelector = '.js-simple-multiselect-wrapper'
         document.addEventListener('change', e => {
             const wrapperEl = e.target.closest(this.wrapperSelector)
             const multiselectInput = wrapperEl?.querySelector(selector)
             const isCheckboxClicked = e.target.type === 'checkbox'
+            const selectAllEl = wrapperEl.querySelector(`.${selectAllClass}`)
             if (multiselectInput && isCheckboxClicked) {
+                const checkboxes = Array.from(this.getCheckboxes(multiselectInput))
+                if(e.target.classList.contains(selectAllClass)) {
+                    checkboxes.forEach(el => {
+                        el.checked = e.target.checked
+                    })
+                }
+                else {
+                    selectAllEl.checked = false
+                }
+                if(!checkboxes.some(el => el.checked)) {
+                    selectAllEl.checked = true
+                }
                 let checked = []
-                this.getCheckboxes(multiselectInput).forEach(el => {
+                checkboxes.forEach(el => {
                     if (el.checked) {
                         checked.push({
                             value: el.value,

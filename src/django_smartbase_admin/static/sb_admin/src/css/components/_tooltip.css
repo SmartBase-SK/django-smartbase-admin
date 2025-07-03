@@ -28,7 +28,8 @@
         }
     }
 
-    .tooltip.bs-tooltip-top {
+    .tooltip.bs-tooltip-top,
+    .tooltip.bs-tooltip-auto[data-popper-placement^="top"] {
 
         .tooltip-arrow {
             bottom: 0;
@@ -41,7 +42,8 @@
         }
     }
 
-    .tooltip.bs-tooltip-bottom {
+    .tooltip.bs-tooltip-bottom,
+    .tooltip.bs-tooltip-auto[data-popper-placement^="bottom"] {
 
         .tooltip-arrow {
             top: 0;
@@ -54,7 +56,8 @@
         }
     }
 
-    .tooltip.bs-tooltip-end {
+    .tooltip.bs-tooltip-end,
+    .tooltip.bs-tooltip-auto[data-popper-placement^="right"] {
         padding: 0 .5rem;
 
         .tooltip-arrow {
@@ -72,7 +75,8 @@
 
 
 
-    .tooltip.bs-tooltip-start {
+    .tooltip.bs-tooltip-start,
+    .tooltip.bs-tooltip-auto[data-popper-placement^="left"] {
         padding: 0 .5rem;
 
         .tooltip-arrow {
@@ -85,24 +89,6 @@
                 border-width: .5rem 0 .5rem .5rem;
                 border-left-color: theme('colors.dark.a / 90%');
             }
-        }
-    }
-
-    .tooltip.bs-tooltip-auto {
-        &[data-popper-placement^="top"] {
-            @extend .tooltip.bs-tooltip-top;
-        }
-
-        &[data-popper-placement^="right"] {
-            @extend .tooltip.bs-tooltip-end;
-        }
-
-        &[data-popper-placement^="bottom"] {
-            @extend .tooltip.bs-tooltip-bottom;
-        }
-
-        &[data-popper-placement^="left"] {
-            @extend .tooltip.bs-tooltip-start;
         }
     }
 

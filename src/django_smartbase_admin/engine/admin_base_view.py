@@ -33,7 +33,7 @@ from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
     TABLE_RELOAD_DATA_EVENT_NAME,
     TABLE_UPDATE_ROW_DATA_EVENT_NAME,
-    FILTER_DATA_NAME,
+    SELECT_ALL_KEYWORD,
     IGNORE_LIST_SELECTION,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -224,6 +224,7 @@ class SBAdminBaseView(object):
                     "GLOBAL_FILTER_ALIAS_WIDGET_ID": GLOBAL_FILTER_ALIAS_WIDGET_ID,
                     "TABLE_RELOAD_DATA_EVENT_NAME": TABLE_RELOAD_DATA_EVENT_NAME,
                     "TABLE_UPDATE_ROW_DATA_EVENT_NAME": TABLE_UPDATE_ROW_DATA_EVENT_NAME,
+                    "SELECT_ALL_KEYWORD": SELECT_ALL_KEYWORD,
                 }
             ),
         }

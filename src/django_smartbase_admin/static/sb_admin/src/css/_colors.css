@@ -15,7 +15,7 @@
         --color-dark-50: #F9FAFB;
         --color-dark-a: 17 24 39; /* rgb value from which the alpha values are generated */
 
-        --color-primary-900: #D3F6F8;
+        --color-primary-900: #002729;
         --color-primary-800: #003A3D;
         --color-primary-700: #006166;
         --color-primary-600: #008188;
@@ -46,7 +46,7 @@
         --color-success-300: #6EE7B7;
         --color-success-200: #A7F3D0;
         --color-success-100: #D1FAE5;
-        --color-success-50: #D1FAE5;
+        --color-success-50: #ECFDF5;
 
         --color-warning-900: #78350F;
         --color-warning-800: #78350F;
@@ -59,26 +59,26 @@
         --color-warning-100: #FEF3C7;
         --color-warning-50: #FFFBEB;
 
-        --color-negative-900: #7F1D1D;
-        --color-negative-800: #991B1B;
-        --color-negative-700: #B91C1C;
-        --color-negative-600: #DC2626;
-        --color-negative: #EF4444;
-        --color-negative-400: #F87171;
-        --color-negative-300: #FCA5A5;
-        --color-negative-200: #FECACA;
-        --color-negative-100: #FEE2E2;
-        --color-negative-50: #FEF2F2;
+        --color-negative-900: #330000;
+        --color-negative-800: #660000;
+        --color-negative-700: #990000;
+        --color-negative-600: #CC0000;
+        --color-negative: #FF0917;
+        --color-negative-400: #FF3A45;
+        --color-negative-300: #FF6B74;
+        --color-negative-200: #FF9DA2;
+        --color-negative-100: #FFCED1;
+        --color-negative-50: #FFE6E8;
 
         --color-notice-900: #0C4A6E;
         --color-notice-800: #075985;
         --color-notice-700: #0369A1;
-        --color-notice-600: #0369A1;
-        --color-notice: #0284C7;
-        --color-notice-400: #0EA5E9;
-        --color-notice-300: #38BDF8;
-        --color-notice-200: #7DD3FC;
-        --color-notice-100: #BAE6FD;
-        --color-notice-50: #E0F2FE;
+        --color-notice-600: #0284C7;
+        --color-notice: #0EA5E9;
+        --color-notice-400: #38BDF8;
+        --color-notice-300: #7DD3FC;
+        --color-notice-200: #BAE6FD;
+        --color-notice-100: #F0F9FF;
+        --color-notice-50: #F0F9FF;
     }
 }
