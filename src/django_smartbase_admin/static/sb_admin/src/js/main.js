@@ -83,11 +83,9 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
-    initInputs(/*target*/){
-        // TODO: fix missing target for all these components
-        // target = target || document
-        this.datepicker = new Datepicker()
-        this.range = new Range()
+    initInputs(target){
+        this.datepicker = new Datepicker(target)
+        this.range = new Range(null, null, target)
         this.multiselect = new Multiselect()
     }
     handleLocationHashFromTabs() {
