@@ -60,7 +60,7 @@ class Main {
                 }
                 this.initFileInputs(detail.target)
                 this.initDropdowns(detail.target)
-                this.initInputs()
+                this.initInputs(detail.target)
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
 
             })
@@ -71,7 +71,6 @@ class Main {
         new Sorting()
         this.autocomplete = new Autocomplete()
         new ChoicesJS()
-        this.multiselect = new Multiselect()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)
@@ -84,7 +83,9 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
-    initInputs(){
+    initInputs(/*target*/){
+        // TODO: fix missing target for all these components
+        // target = target || document
         this.datepicker = new Datepicker()
         this.range = new Range()
         this.multiselect = new Multiselect()
