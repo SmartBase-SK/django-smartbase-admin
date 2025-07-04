@@ -62,7 +62,7 @@ class Main {
                 this.initDropdowns(detail.target)
                 this.initInputs(detail.target)
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
-
+                this.initInlines(detail.target)
             })
         }
 
@@ -82,7 +82,13 @@ class Main {
         this.initAliasName()
         this.handleLocationHashFromTabs()
     }
-
+    initInlines(target){
+        target = target || document
+        const inlineGroups = target.querySelectorAll('.inline-group')
+        inlineGroups.forEach(group => {
+            window.django.jQuery(group).djangoFormset()
+        })
+    }
     initInputs(target){
         this.datepicker = new Datepicker(target)
         this.range = new Range(null, null, target)

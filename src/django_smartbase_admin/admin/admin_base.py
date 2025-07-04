@@ -13,6 +13,7 @@ from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import (
     FieldDoesNotExist,
@@ -121,7 +122,10 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
     SBAdminBaseQuerysetMixin,
-    SBADMIN_IS_MODAL_VAR, SBADMIN_PARENT_INSTANCE_PK_VAR, SBADMIN_PARENT_INSTANCE_LABEL_VAR, SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
+    SBADMIN_IS_MODAL_VAR,
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
+    SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
 )
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
@@ -655,6 +659,18 @@ class SBAdminTranslationStatusMixin:
         return mark_safe(result)
 
 
+class SBAdminGenericInlineFormSet(BaseGenericInlineFormSet):
+    @classmethod
+    def get_default_prefix(cls):
+        view = getattr(cls.form, "view", None)
+        if view and view.parent_model and view.opts:
+            parent_opts = view.parent_model._meta
+            opts = view.opts
+            return f"{parent_opts.app_label}_{parent_opts.model_name}_{opts.app_label}-{opts.model_name}"
+
+        return super().get_default_prefix()
+
+
 class SBAdmin(
     SBAdminInlineAndAdminCommon,
     SBAdminBaseQuerysetMixin,
@@ -959,7 +975,6 @@ class SBAdmin(
         super().save_model(request, obj, form, change)
 
 
-
 class SBAdminInline(
     SBAdminInlineAndAdminCommon, SBAdminBaseQuerysetMixin, SBAdminBaseView
 ):
@@ -1098,6 +1113,7 @@ class SBAdminTableInline(SBAdminInline, NestedTabularInline):
 
 class SBAdminGenericTableInline(SBAdminInline, NestedGenericTabularInline):
     template = "sb_admin/inlines/table_inline.html"
+    formset = SBAdminGenericInlineFormSet
 
 
 class SBAdminTableInlinePaginated(SBAdminTableInline, TabularInlinePaginated):
