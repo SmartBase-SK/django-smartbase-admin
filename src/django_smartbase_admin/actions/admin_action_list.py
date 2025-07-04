@@ -35,7 +35,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     FilterVersions,
     ADVANCED_FILTER_DATA_NAME,
-    XLSX_DOWNLOAD_ALL,
+    IGNORE_LIST_SELECTION,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import import_with_injection
@@ -464,7 +464,7 @@ class SBAdminListAction(SBAdminAction):
         )
         columns = self.get_excel_columns()
         additional_filter = Q()
-        if request.request_data.modifier != XLSX_DOWNLOAD_ALL:
+        if request.request_data.modifier != IGNORE_LIST_SELECTION:
             additional_filter = self.get_selection_queryset()
         data_list = []
         report_data = self.get_data(
