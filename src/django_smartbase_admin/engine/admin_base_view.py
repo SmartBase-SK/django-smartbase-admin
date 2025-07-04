@@ -34,6 +34,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_RELOAD_DATA_EVENT_NAME,
     TABLE_UPDATE_ROW_DATA_EVENT_NAME,
     FILTER_DATA_NAME,
+    XLSX_DOWNLOAD_ALL,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
@@ -480,6 +481,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     title=_("Download XLSX"),
                     view=self,
                     action_id=Action.XLSX_EXPORT.value,
+                    action_modifier=XLSX_DOWNLOAD_ALL,
                 )
             ]
         return self.sbadmin_list_actions
