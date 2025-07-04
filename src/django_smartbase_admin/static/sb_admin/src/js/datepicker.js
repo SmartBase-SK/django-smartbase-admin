@@ -8,7 +8,8 @@ import {
 
 
 export default class Datepicker {
-    constructor() {
+    constructor(target) {
+        target = target || document
         let documentLocale = document.documentElement.lang || 'default'
         documentLocale = documentLocale.split('-')[0]
         if (documentLocale === 'en') {
@@ -16,10 +17,11 @@ export default class Datepicker {
         }
         flatpickr.localize(this.getLocale(documentLocale))
         this.initWidgets()
-
-        document.addEventListener('formset:added', (e) => {
-            this.initWidgets(e.target)
-        })
+        if(target === document) {
+            document.addEventListener('formset:added', (e) => {
+                this.initWidgets(e.target)
+            })
+        }
     }
 
     getLocale(locale) {

@@ -1,9 +1,10 @@
 
 export default class Range {
-    constructor(selector_override, options_override) {
+    constructor(selector_override, options_override, target) {
+        target = target || document
         const selector = selector_override || '.js-range'
         this.separator = ' - '
-        document.querySelectorAll(selector).forEach(el => {
+        target.querySelectorAll(selector).forEach(el => {
             this.initRange(el, options_override)
         })
     }
