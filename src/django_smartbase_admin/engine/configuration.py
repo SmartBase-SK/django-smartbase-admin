@@ -3,6 +3,7 @@ from django.db.models import Q
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.engine.admin_base_view import SBADMIN_IS_MODAL_VAR
 from django_smartbase_admin.engine.const import (
     GLOBAL_FILTER_DATA_KEY,
     FilterVersions,
@@ -226,3 +227,12 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
 
     def process_global_filter_response(self, response, request):
         return response
+
+    def autocomplete_show_related_buttons(
+        self,
+        related_model,
+        field_name,
+        current_view,
+        request,
+    ) -> bool:
+        return not SBADMIN_IS_MODAL_VAR in request.GET

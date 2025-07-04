@@ -2,13 +2,13 @@
 {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
-        <div id="{{ widget.attrs.id }}-wrapper" class="relative flex items-center gap-4">
+        <div id="{{ widget.attrs.id }}-wrapper" class="relative flex items-center gap-4  max-w-full overflow-hidden">
             <button
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
                     data-bs-offset="[0, 8]"
                     data-bs-config='{"popperConfig":{"strategy":"fixed"}}'
-                    class="autocomplete-button btn px-10 font-normal flex-grow"
+                    class="autocomplete-button btn px-10 font-normal flex-1 min-w-0"
             >
                 {% block autocomplete_button_text %}
                     <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label }}</span>

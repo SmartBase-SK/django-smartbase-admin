@@ -61,7 +61,11 @@ class SBAdminBaseWidget(ContextMixin):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
         opts = (
-            self.form_field.view.opts if hasattr(self.form_field.view, "opts") else None
+            self.form_field.view.opts
+            if self.form_field
+            and hasattr(self.form_field, "view")
+            and hasattr(self.form_field.view, "opts")
+            else None
         )
         if opts:
             context["widget"]["attrs"][
@@ -393,7 +397,14 @@ class SBAdminAutocompleteWidget(
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
 
-        if not SBADMIN_IS_MODAL_VAR in threadsafe_request.GET:
+        if (
+            threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+                self.model,
+                field_name=self.field_name,
+                current_view=self.view,
+                request=threadsafe_request,
+            )
+        ):
             self.add_related_buttons_urls(parsed_value, context)
 
         return context
