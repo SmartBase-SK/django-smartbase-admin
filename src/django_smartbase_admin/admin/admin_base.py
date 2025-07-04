@@ -691,7 +691,7 @@ class SBAdmin(
     sbadmin_tabs = None
     request_data = None
     menu_label = None
-    sbadmin_is_generic_model = None
+    sbadmin_is_generic_model = False
 
     def __init__(self, model, admin_site):
         super().__init__(model, admin_site)
