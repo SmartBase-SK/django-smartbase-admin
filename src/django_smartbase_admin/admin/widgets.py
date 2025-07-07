@@ -63,11 +63,17 @@ class SBAdminBaseWidget(ContextMixin):
         opts = (
             self.form_field.view.opts
             if self.form_field
-               and hasattr(self.form_field, "view")
-               and hasattr(self.form_field.view, "opts")
+            and hasattr(self.form_field, "view")
+            and hasattr(self.form_field.view, "opts")
             else None
         )
-        modal_prefix = "modal__" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+        modal_prefix = ""
+        try:
+            modal_prefix = (
+                "modal__" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
+        except:
+            pass
         if opts:
             context["widget"]["attrs"][
                 "id"
@@ -136,12 +142,12 @@ class SBAdminToggleWidget(SBAdminBaseWidget, forms.CheckboxInput):
 class SBAdminCKEditorWidget(SBAdminBaseWidget, CKEditorWidget):
 
     def __init__(
-            self,
-            config_name="default",
-            extra_plugins=None,
-            external_plugin_resources=None,
-            form_field=None,
-            attrs=None,
+        self,
+        config_name="default",
+        extra_plugins=None,
+        external_plugin_resources=None,
+        form_field=None,
+        attrs=None,
     ):
         super().__init__(
             form_field,
@@ -358,13 +364,13 @@ class SBAdminAutocompleteWidget(
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         self.input_id = (
-                context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
+            context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
         )
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
         context["widget"]["attrs"]["data-empty-label"] = (
-                getattr(self.form_field, "empty_label", "---------") or "---------"
+            getattr(self.form_field, "empty_label", "---------") or "---------"
         )
         query_suffix = "__in"
         threadsafe_request = SBAdminThreadLocalService.get_request()
@@ -386,7 +392,7 @@ class SBAdminAutocompleteWidget(
             if parsed_value:
                 selected_options = []
                 for item in self.get_queryset(threadsafe_request).filter(
-                        **{f"{self.get_value_field()}{query_suffix}": parsed_value}
+                    **{f"{self.get_value_field()}{query_suffix}": parsed_value}
                 ):
                     selected_options.append(
                         {
@@ -398,13 +404,11 @@ class SBAdminAutocompleteWidget(
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
 
-        if (
-                threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
-                    self.model,
-                    field_name=self.field_name,
-                    current_view=self.view,
-                    request=threadsafe_request,
-                )
+        if threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+            self.model,
+            field_name=self.field_name,
+            current_view=self.view,
+            request=threadsafe_request,
         ):
             self.add_related_buttons_urls(parsed_value, context)
 
@@ -551,16 +555,16 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
     def __init__(self, form_field=None, *args, **kwargs):
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {
-                         "code-mirror-options": json.dumps(
-                             {
-                                 "mode": "django",
-                                 "theme": "dracula",
-                                 "lineWrapping": "true",
-                             }
-                         ),
-                         "code-mirror-width": "100%",
-                         "code-mirror-height": "300",
-                     } | self.attrs
+            "code-mirror-options": json.dumps(
+                {
+                    "mode": "django",
+                    "theme": "dracula",
+                    "lineWrapping": "true",
+                }
+            ),
+            "code-mirror-width": "100%",
+            "code-mirror-height": "300",
+        } | self.attrs
 
     class Media:
         css = {
@@ -670,9 +674,9 @@ class SBAdminTreeWidget(SBAdminTreeWidgetMixin, SBAdminAutocompleteWidget):
         parsed_value = self.parse_value_from_input(threadsafe_request, input_value)
         obj = self.form.instance
         if (
-                obj
-                and parsed_value
-                and self.relationship_pick_mode == self.RELATIONSHIP_PICK_MODE_PARENT
+            obj
+            and parsed_value
+            and self.relationship_pick_mode == self.RELATIONSHIP_PICK_MODE_PARENT
         ):
             if obj.id == parsed_value:
                 raise ValidationError(_("Cannot set parent to itself"))
