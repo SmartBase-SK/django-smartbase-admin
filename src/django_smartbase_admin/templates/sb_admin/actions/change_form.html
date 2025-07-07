@@ -111,7 +111,7 @@
 
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
-              id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+              id="{% if sbadmin_is_modal %}modal__{% endif %}{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
         <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto sbadmin_is_modal realative flex-grow{% endif %}">
             {% csrf_token %}
             {% if errors %}
@@ -136,8 +136,8 @@
                     {% for tab, tab_content_object in tabular_context.context.items %}
                         <li role="presentation">
                             <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ tab|slugify }}" data-bs-toggle="tab"
-                                    data-bs-target="#{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" type="button" role="tab"
-                                    aria-controls="{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" aria-selected="true">
+                                    data-bs-target="#{% if sbadmin_is_modal %}modal__{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" type="button" role="tab"
+                                    aria-controls="{% if sbadmin_is_modal %}modal__{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" aria-selected="true">
                                 {{ tab }}
                             </button>
                         </li>
@@ -145,7 +145,7 @@
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="{% if sbadmin_is_modal %}modal__{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
                      aria-labelledby="tab_{{ tab|slugify }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">
@@ -206,7 +206,7 @@
                         {% url opts|admin_urlname:'add' as post_url %}
                     {% endif %}
                     <button
-                            form="{{ opts.model_name }}_form"
+                            form="{% if sbadmin_is_modal %}modal__{% endif %}{{ opts.model_name }}_form"
                             hx-post="{{ post_url }}"
                             hx-target="#sb-admin-modal .modal-content"
                             hx-swap="innerHTML"
