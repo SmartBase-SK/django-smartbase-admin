@@ -195,7 +195,7 @@ class SBAdminFormFieldWidgetsMixin:
         )
 
     def get_autocomplete_widget(
-            self, request, form_field, db_field, model, multiselect=False
+        self, request, form_field, db_field, model, multiselect=False
     ):
         return request.request_data.configuration.get_autocomplete_widget(
             self, request, form_field, db_field, model, multiselect
@@ -286,7 +286,7 @@ class SBAdminFormFieldWidgetsMixin:
             )
             form_field.widget = form_field_widget_instance
             if form_field.help_text == _(
-                    "Hold down “Control”, or “Command” on a Mac, to select more than one."
+                "Hold down “Control”, or “Command” on a Mac, to select more than one."
             ):
                 form_field.help_text = ""
         return form_field
@@ -367,25 +367,25 @@ if parler_enabled:
                     for translations_model in form_model._parler_meta.get_all_models():
                         fields = getattr(form_new_meta, "fields", form_meta.fields)
                         exclude = (
-                                getattr(form_new_meta, "exclude", form_meta.exclude) or ()
+                            getattr(form_new_meta, "exclude", form_meta.exclude) or ()
                         )
                         widgets = (
-                                getattr(form_new_meta, "widgets", form_meta.widgets) or ()
+                            getattr(form_new_meta, "widgets", form_meta.widgets) or ()
                         )
                         labels = (
-                                getattr(form_new_meta, "labels", form_meta.labels) or ()
+                            getattr(form_new_meta, "labels", form_meta.labels) or ()
                         )
                         help_texts = (
-                                getattr(form_new_meta, "help_texts", form_meta.help_texts)
-                                or ()
+                            getattr(form_new_meta, "help_texts", form_meta.help_texts)
+                            or ()
                         )
                         error_messages = (
-                                getattr(
-                                    form_new_meta,
-                                    "error_messages",
-                                    form_meta.error_messages,
-                                )
-                                or ()
+                            getattr(
+                                form_new_meta,
+                                "error_messages",
+                                form_meta.error_messages,
+                            )
+                            or ()
                         )
                         formfield_callback = attrs.get("formfield_callback", None)
 
@@ -406,10 +406,10 @@ if parler_enabled:
                             # The next code holds the same logic as fields_for_model()
                             # The f.editable check happens in _get_model_form_field()
                             elif (
-                                    f_name not in form_base_fields
-                                    and (fields is None or f_name in fields)
-                                    and f_name not in exclude
-                                    and not f_name in attrs
+                                f_name not in form_base_fields
+                                and (fields is None or f_name in fields)
+                                and f_name not in exclude
+                                and not f_name in attrs
                             ):
                                 # Get declared widget kwargs
                                 if f_name in widgets:
@@ -430,7 +430,7 @@ if parler_enabled:
                                 # See if this formfield was previously defined using a TranslatedField placeholder.
                                 placeholder = _get_mro_attribute(bases, f_name)
                                 if placeholder and isinstance(
-                                        placeholder, TranslatedField
+                                    placeholder, TranslatedField
                                 ):
                                     kwargs.update(placeholder.kwargs)
 
@@ -462,7 +462,6 @@ if parler_enabled:
                     # is not yet defined (while only class is initializing not instance), resulting in skipping callback
                     mcs.parler_orig__new__(mcs, name, bases, attrs)
             return super().__new__(mcs, name, bases, attrs)
-
 
     class SBTranslatableModelForm(
         BaseTranslatableModelForm,
@@ -514,7 +513,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         if SBAdminTranslationsService.is_translated_model(self.model):
             has_default_form = (
-                    self.form == TranslatableModelForm or self.form == forms.ModelForm
+                self.form == TranslatableModelForm or self.form == forms.ModelForm
             )
             if not self.form or has_default_form:
                 self.form = SBTranslatableModelForm
@@ -568,12 +567,12 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
 
 class SBAdminTranslationStatusMixin:
     def sbadmin_translation_status_row_context(
-            self,
-            language,
-            languages_count,
-            main_language_code,
-            current_lang_code,
-            translations_edit_url,
+        self,
+        language,
+        languages_count,
+        main_language_code,
+        current_lang_code,
+        translations_edit_url,
     ) -> dict[str, Any]:
         language_code = language[0]
         language_title = language[1]
@@ -665,7 +664,9 @@ class SBAdminInlineFormSetMixin:
         if view and view.parent_model and view.opts:
             parent_opts = view.parent_model._meta
             opts = view.opts
-            modal_prefix = "modal__" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            modal_prefix = (
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
             return f"{modal_prefix}{parent_opts.app_label}_{parent_opts.model_name}_{opts.app_label}-{opts.model_name}"
 
         return super().get_default_prefix()
@@ -723,7 +724,7 @@ class SBAdmin(
         return self.get_model_path()
 
     def get_sbadmin_fieldsets(
-            self, request, object_id=None
+        self, request, object_id=None
     ) -> Iterable[tuple[str | None, dict[str, Any]]]:
         fieldsets = self.sbadmin_fieldsets or self.fieldsets
         if fieldsets:
@@ -737,7 +738,7 @@ class SBAdmin(
         self.get_form(request)()
 
     def get_fieldsets(
-            self, request, obj=None
+        self, request, obj=None
     ) -> list[tuple[str | None, dict[str, Any]]]:
         fieldsets = []
         object_id = obj.id if obj else None
@@ -754,7 +755,7 @@ class SBAdmin(
         return fieldsets
 
     def get_fieldsets_context(
-            self, request, object_id
+        self, request, object_id
     ) -> dict[str, dict[str | None, dict[str, Any]]]:
         fielsets_context = {}
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
@@ -970,7 +971,9 @@ class SBAdmin(
         parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
 
         if parent_model_path and parent_pk:
-            app_label, model_name, field, parent_model = parent_model_path.split("_", 4)
+            prefix, app_label, model_name, field, parent_model = (
+                parent_model_path.split("_", 5)
+            )
             content_type = ContentType.objects.get(
                 app_label=app_label, model=parent_model
             )
@@ -1041,7 +1044,7 @@ class SBAdminInline(
 
     def get_context_data(self, request) -> dict[str, Any]:
         is_sortable_active: bool = self.sortable_field_name and (
-                self.has_add_permission(request) or self.has_change_permission(request)
+            self.has_add_permission(request) or self.has_change_permission(request)
         )
         add_url = None
         try:

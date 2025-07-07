@@ -70,7 +70,7 @@ class SBAdminBaseWidget(ContextMixin):
         modal_prefix = ""
         try:
             modal_prefix = (
-                "modal__" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
             )
         except:
             pass
