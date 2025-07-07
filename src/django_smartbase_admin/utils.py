@@ -40,6 +40,11 @@ def render_notifications(request):
     return render_to_string("sb_admin/includes/notifications.html", request=request)
 
 
+def is_modal(request):
+    from django_smartbase_admin.engine.admin_base_view import SBADMIN_IS_MODAL_VAR
+    return request and (SBADMIN_IS_MODAL_VAR in request.GET or SBADMIN_IS_MODAL_VAR in request.POST)
+
+
 class FormFieldsetMixin(forms.Form):
     def get_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)

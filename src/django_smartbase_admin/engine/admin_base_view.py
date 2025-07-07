@@ -42,7 +42,13 @@ from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXOptions,
     SBAdminXLSXFormat,
 )
-from django_smartbase_admin.utils import is_htmx_request, render_notifications
+from django_smartbase_admin.utils import is_htmx_request, render_notifications, is_modal
+
+SBADMIN_IS_MODAL_VAR = "sbadmin_is_modal"
+SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR = "sbadmin_parent_instance_field"
+SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
+SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
+SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 
 class SBAdminBaseView(object):
@@ -97,7 +103,7 @@ class SBAdminBaseView(object):
         return inner_view
 
     def process_actions(
-        self, request, actions: list[SBAdminCustomAction]
+            self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
         processed_actions = self.process_actions_permissions(request, actions)
         for processed_action in processed_actions:
@@ -114,7 +120,7 @@ class SBAdminBaseView(object):
         return processed_actions
 
     def process_actions_permissions(
-        self, request, actions: list[SBAdminCustomAction]
+            self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
         result = []
         for action in actions:
@@ -193,12 +199,12 @@ class SBAdminBaseView(object):
         }
 
     def get_sbadmin_detail_actions(
-        self, request, object_id: int | str | None = None
+            self, request, object_id: int | str | None = None
     ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
 
     def get_global_context(
-        self, request, object_id: int | str | None = None
+            self, request, object_id: int | str | None = None
     ) -> dict[str, Any]:
         return {
             "view_id": self.get_id(),
@@ -208,6 +214,9 @@ class SBAdminBaseView(object):
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
             "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
+            SBADMIN_IS_MODAL_VAR: is_modal(request),
+            SBADMIN_RELOAD_ON_SAVE_VAR: SBADMIN_RELOAD_ON_SAVE_VAR in request.GET
+                                        or SBADMIN_RELOAD_ON_SAVE_VAR in request.POST,
             "const": json.dumps(
                 {
                     "MULTISELECT_FILTER_MAX_CHOICES_SHOWN": MULTISELECT_FILTER_MAX_CHOICES_SHOWN,
@@ -288,8 +297,8 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def is_reorder_active(self, request) -> bool:
         return (
-            self.is_reorder_available(request)
-            and getattr(request, "reorder_active", False) == True
+                self.is_reorder_available(request)
+                and getattr(request, "reorder_active", False) == True
         )
 
     def is_reorder_available(self, request) -> str | None:
@@ -324,7 +333,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             qs.filter(**{f"{pk_field}__in": item_ids}).update(
                 **{
                     self.sbadmin_list_reorder_field: F(self.sbadmin_list_reorder_field)
-                    + int(diff)
+                                                     + int(diff)
                 }
             )
         return JsonResponse({"message": request.POST})
@@ -504,7 +513,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.sbadmin_list_selection_actions
 
     def get_sbadmin_list_selection_actions_grouped(
-        self, request
+            self, request
     ) -> dict[str, list[SBAdminCustomAction]]:
         result = {}
         list_selection_actions = self.process_actions(
@@ -536,8 +545,8 @@ class SBAdminBaseListView(SBAdminBaseView):
     def action_bulk_delete(self, request, modifier):
         action = self.sbadmin_list_action_class(self, request)
         if (
-            request.request_data.request_method == "POST"
-            and request.headers.get("X-TabulatorRequest", None) == "true"
+                request.request_data.request_method == "POST"
+                and request.headers.get("X-TabulatorRequest", None) == "true"
         ):
             return redirect(
                 self.get_action_url("action_bulk_delete")
@@ -615,13 +624,13 @@ class SBAdminBaseListView(SBAdminBaseView):
         return redirect_to
 
     def action_list(
-        self,
-        request,
-        page_size=None,
-        tabulator_definition=None,
-        extra_context=None,
-        list_actions=None,
-        template=None,
+            self,
+            request,
+            page_size=None,
+            tabulator_definition=None,
+            extra_context=None,
+            list_actions=None,
+            template=None,
     ):
         action = self.sbadmin_list_action_class(
             self,
@@ -674,8 +683,8 @@ class SBAdminBaseListView(SBAdminBaseView):
             getattr(field, "filter_field", field): ""
             for field in list_fields
             if field in list_filter
-            or getattr(field, "name", None) in list_filter
-            or getattr(field, "filter_field", None) in list_filter
+               or getattr(field, "name", None) in list_filter
+               or getattr(field, "filter_field", None) in list_filter
         }
         url_params = None
         if base_filter:
@@ -750,7 +759,7 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_filters_version(self, request) -> FilterVersions:
         return (
-            self.filters_version or request.request_data.configuration.filters_version
+                self.filters_version or request.request_data.configuration.filters_version
         )
 
     def get_filters_template_name(self, request) -> str:

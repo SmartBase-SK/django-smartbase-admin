@@ -10,7 +10,9 @@
 {% block view_class %}change-form{% endblock %}
 
 {% block js %}
-    {{ block.super }}
+    {% if not sbadmin_is_modal %}
+        {{ block.super }}
+    {% endif %}
     <script type="text/javascript"
             id="django-admin-form-add-constants"
             src="{% static 'admin/js/change_form.js' %}"
@@ -109,7 +111,8 @@
 
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
-              id="{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+              id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
+        <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto sbadmin_is_modal realative flex-grow{% endif %}">
             {% csrf_token %}
             {% if errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
@@ -133,8 +136,8 @@
                     {% for tab, tab_content_object in tabular_context.context.items %}
                         <li role="presentation">
                             <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ tab|slugify }}" data-bs-toggle="tab"
-                                    data-bs-target="#tabcontent_{{ tab|slugify }}" type="button" role="tab"
-                                    aria-controls="tabcontent_{{ tab|slugify }}" aria-selected="true">
+                                    data-bs-target="#{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" type="button" role="tab"
+                                    aria-controls="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" aria-selected="true">
                                 {{ tab }}
                             </button>
                         </li>
@@ -142,7 +145,7 @@
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="tabcontent_{{ tab|slugify }}" role="tabpanel"
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
                      aria-labelledby="tab_{{ tab|slugify }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">
@@ -150,7 +153,7 @@
                                 {% if tab_content.type == 'fieldset' %}
                                     {% block tab_content_fieldset %}
                                         {% with tab_content.value as fieldset %}
-                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS not in fieldset.classes or sbadmin_is_modal %}
                                                 {% include "sb_admin/includes/fieldset.html" %}
                                             {% endif %}
                                         {% endwith %}
@@ -170,7 +173,7 @@
                                 {% for tab_content in tab_content_object.content %}
                                     {% if tab_content.type == 'fieldset' %}
                                         {% with tab_content.value as fieldset %}
-                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes %}
+                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes and not sbadmin_is_modal %}
                                                 {% include "sb_admin/includes/fieldset.html" %}
                                             {% endif %}
                                         {% endwith %}
@@ -191,41 +194,77 @@
                     {% endif %}>
                 </script>
             {% endblock %}
+        </div>
             {% if is_popup %}
                 {# TODO: check sticky bar in popups #}
-             {% endif %}
-            {% block action_bar %}
-                <div class="detail-view-action-bar">
-                    <div>
-                        <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
-                            {% include 'sb_admin/includes/change_form_title.html' %}
-                        </h2>
-                        {% if previous_url or next_url %}
-                            <div class="flex items-center gap-8 mr-8">
-                                <{% if previous_url %}a href="{{ previous_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Prev' %}">
-                                    <svg class="w-20 h-20">
-                                        <use xlink:href="#Left"></use>
-                                    </svg>
-                                </{% if previous_url %}a{% else %}button{% endif %}>
-                                <div class="text-12">{% blocktrans %}<strong>{{ current_index }}</strong> / {{ all_objects_count }}{% endblocktrans %}</div>
-                                <{% if next_url %}a href="{{ next_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Next' %}">
-                                    <svg class="w-20 h-20">
-                                        <use xlink:href="#Right"></use>
-                                    </svg>
-                                </{% if next_url %}a{% else %}button{% endif %}>
-                            </div>
-                        {% endif %}
-                        <div class="flex ml-auto gap-8">
-                            {% if not is_popup and has_view_permission %}
-                                {% url opts|admin_urlname:'changelist' as changelist_url %}
-                                <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+            {% endif %}
+            {% if sbadmin_is_modal %}
+                <div class="bg-light bottom-0 left-0 w-full px-24 py-24 flex justify-between gap-8">
+                    {% if original %}
+                        {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
+                    {% else %}
+                        {% url opts|admin_urlname:'add' as post_url %}
+                    {% endif %}
+                    <button
+                            form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
+                            hx-post="{{ post_url }}"
+                            hx-target="#sb-admin-modal .modal-content"
+                            hx-swap="innerHTML"
+                            hx-encoding="multipart/form-data"
+                            hx-vals='{
+                                "sbadmin_is_modal": 1,
+                                "sb_admin_source_field": "{{ request.GET.sb_admin_source_field }}",
+                                "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
+                                "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field }}",
+                                "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk | default:"" }}",
+                                "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label }}"
+                            }'
+                            class="btn btn-primary flex-grow flex items-center justify-center">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Save"></use>
+                        </svg>
+                        {% trans 'Save' %}
+                    </button>
+                    <button type="button"
+                            class="btn flex-grow"
+                            data-bs-dismiss="modal" aria-label="Close">
+                        {% trans 'Close' %}
+                    </button>
+                </div>
+            {% else %}
+                {% block action_bar %}
+                    <div class="detail-view-action-bar">
+                        <div>
+                            <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
+                                {% include 'sb_admin/includes/change_form_title.html' %}
+                            </h2>
+                            {% if previous_url or next_url %}
+                                <div class="flex items-center gap-8 mr-8">
+                                    <{% if previous_url %}a href="{{ previous_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Prev' %}">
+                                        <svg class="w-20 h-20">
+                                            <use xlink:href="#Left"></use>
+                                        </svg>
+                                        </{% if previous_url %}a{% else %}button{% endif %}>
+                                        <div class="text-12">{% blocktrans %}<strong>{{ current_index }}</strong> / {{ all_objects_count }}{% endblocktrans %}</div>
+                                        <{% if next_url %}a href="{{ next_url }}"{% else %}button type="button" disabled{% endif %} class="btn btn-small" title="{% trans 'Next' %}">
+                                            <svg class="w-20 h-20">
+                                                <use xlink:href="#Right"></use>
+                                            </svg>
+                                            </{% if next_url %}a{% else %}button{% endif %}>
+                                </div>
                             {% endif %}
+                            <div class="flex ml-auto gap-8">
+                                {% if not is_popup and has_view_permission %}
+                                    {% url opts|admin_urlname:'changelist' as changelist_url %}
+                                    <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+                                {% endif %}
 
-                            {% submit_row %}
+                                {% submit_row %}
+                            </div>
                         </div>
                     </div>
-                </div>
-            {% endblock %}
+                {% endblock %}
+            {% endif %}
         </form>
     {% endblock %}
 {% endblock %}

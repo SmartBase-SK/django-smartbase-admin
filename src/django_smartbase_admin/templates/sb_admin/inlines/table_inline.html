@@ -24,12 +24,28 @@
                                     class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
                         {% endfor %}
                         {% if inline_admin_formset.has_add_permission %}
-                            <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
-                                <svg class="w-20 h-20 md:mr-8">
-                                    <use xlink:href="#Plus"></use>
-                                </svg>
-                                <span>{% trans 'Add' %}</span>
-                            </a>
+                            {% if context_data.add_url and not sbadmin_is_modal %}
+                                <a
+                                        class="btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#sb-admin-modal"
+                                        hx-get="{{ context_data.add_url }}?_popup=1&sbadmin_is_modal=1&sbadmin_reload_on_save=1&sbadmin_parent_instance_field=modal_{{ context_data.parent_data.sbadmin_parent_instance_field }}&sbadmin_parent_instance_pk={{ context_data.parent_data.sbadmin_parent_instance_pk }}&sbadmin_parent_instance_label={{ context_data.parent_data.sbadmin_parent_instance_label }}"
+                                        hx-target="#sb-admin-modal .modal-content"
+                                        hx-swap="innerHTML"
+                                >
+                                    <svg class="w-20 h-20 md:mr-8">
+                                        <use xlink:href="#Plus"></use>
+                                    </svg>
+                                    <span>{% trans 'Add' %}</span>
+                                </a>
+                            {% else %}
+                                <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
+                                    <svg class="w-20 h-20 md:mr-8">
+                                        <use xlink:href="#Plus"></use>
+                                    </svg>
+                                    <span>{% trans 'Add' %}</span>
+                                </a>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </header>
@@ -47,35 +63,35 @@
                         <table class="djn-items inline-related djn-table">
                             {% with inline_admin_formset.opts.sortable_field_name|default:"" as sortable_field_name %}
                                 <thead class="djn-module djn-thead">
-                                    <tr>
-                                        {% if context_data.is_sortable_active %}
-                                            <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
-                                        {% endif %}
-                                        {% for field in inline_admin_formset.fields %}
-                                            {% if not field.widget.is_hidden and not field|is_row_class_field %}
-                                                <th class="djn-th
+                                <tr>
+                                    {% if context_data.is_sortable_active %}
+                                        <th class="original{% if sortable_field_name %} is-sortable{% endif %}"></th>
+                                    {% endif %}
+                                    {% for field in inline_admin_formset.fields %}
+                                        {% if not field.widget.is_hidden and not field|is_row_class_field %}
+                                            <th class="djn-th
                                                     {{ field.label|lower|slugify }}{% if field.required %} required{% endif %}">
-                                                    <div class="flex items-center">
-                                                        <span class="mr-auto">{{ field.label|capfirst }}{% if field.required %}<span class="ml-4 text-negative">*</span>{% endif %}</span>
-                                                        {% if field.help_text %}&nbsp;
-                                                            <div class="ml-4">
-                                                                <div class="js-tooltip flex" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ field.help_text|striptags }}">
-                                                                    <svg class="w-12 h-12">
-                                                                        <use xlink:href="#Help"></use>
-                                                                    </svg>
-                                                                </div>
+                                                <div class="flex items-center">
+                                                    <span class="mr-auto">{{ field.label|capfirst }}{% if field.required %}<span class="ml-4 text-negative">*</span>{% endif %}</span>
+                                                    {% if field.help_text %}&nbsp;
+                                                        <div class="ml-4">
+                                                            <div class="js-tooltip flex" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ field.help_text|striptags }}">
+                                                                <svg class="w-12 h-12">
+                                                                    <use xlink:href="#Help"></use>
+                                                                </svg>
                                                             </div>
-                                                        {% endif %}
-                                                    </div>
-                                                </th>
-                                            {% endif %}
-                                        {% endfor %}
-                                        {% block table_inline_delete_table_head %}
-                                            {% if inline_admin_formset.formset.can_delete %}
-                                                <th class="djn-th sticky-table-head" style="min-width: 54px; width: 54px;"></th>
-                                            {% endif %}
-                                        {% endblock %}
-                                    </tr>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </th>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% block table_inline_delete_table_head %}
+                                        {% if inline_admin_formset.formset.can_delete %}
+                                            <th class="djn-th sticky-table-head" style="min-width: 54px; width: 54px;"></th>
+                                        {% endif %}
+                                    {% endblock %}
+                                </tr>
                                 </thead>
 
 

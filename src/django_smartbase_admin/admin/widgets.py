@@ -12,7 +12,7 @@ from django.contrib.admin.widgets import (
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
@@ -22,12 +22,17 @@ from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
 from filer.fields.image import AdminImageWidget
 from filer.models import File
 
+from django_smartbase_admin.engine.admin_base_view import (
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
+    SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+)
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     SBAdminTreeWidgetMixin,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
+from django_smartbase_admin.utils import is_modal
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,25 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
+        opts = (
+            self.form_field.view.opts
+            if self.form_field
+            and hasattr(self.form_field, "view")
+            and hasattr(self.form_field.view, "opts")
+            else None
+        )
+        modal_prefix = ""
+        try:
+            modal_prefix = (
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
+        except:
+            pass
+        if opts:
+            context["widget"]["attrs"][
+                "id"
+            ] = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
+
         return context
 
 
@@ -353,6 +377,16 @@ class SBAdminAutocompleteWidget(
         if not self.is_multiselect():
             query_suffix = ""
             self.multiselect = False
+        context["widget"]["attrs"]["preselect_field"] = threadsafe_request.GET.get(
+            "sbadmin_parent_instance_field"
+        )
+        context["widget"]["attrs"]["preselect_field_label"] = (
+            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_LABEL_VAR)
+        )
+        context["widget"]["attrs"]["preselect_field_value"] = (
+            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+        )
+        parsed_value = None
         if value:
             parsed_value = self.parse_value_from_input(threadsafe_request, value)
             if parsed_value:
@@ -366,9 +400,37 @@ class SBAdminAutocompleteWidget(
                             "label": self.get_label(threadsafe_request, item),
                         }
                     )
+
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
+
+        if threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+            self.model,
+            field_name=self.field_name,
+            current_view=self.view,
+            request=threadsafe_request,
+        ):
+            self.add_related_buttons_urls(parsed_value, context)
+
         return context
+
+    def add_related_buttons_urls(self, parsed_value, context):
+        related_model = self.model
+        app_label = related_model._meta.app_label
+        model_name = related_model._meta.model_name
+
+        try:
+            if parsed_value:
+                change_url = reverse(
+                    "sb_admin:{}_{}_change".format(app_label, model_name),
+                    args=(parsed_value,),
+                )
+                context["widget"]["attrs"]["related_edit_url"] = change_url
+
+            add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
+            context["widget"]["attrs"]["related_add_url"] = add_url
+        except NoReverseMatch:
+            pass
 
     def is_multiselect(self):
         if self.multiselect is not None:

@@ -50,6 +50,14 @@ export const choicesJSOptions = (choiceInput) => ({
 
 
 export const choicesJSListeners = {
+    'selectItem': (item, inputEl) => {
+        if (!item) return
+        const choiceValue = [{
+            value: item.value,
+            label: item.label
+        }]
+        inputEl.value = JSON.stringify(choiceValue)
+    },
     'addItem': (choicesJS, inputEl) => {
         const choiceValue = []
         let choicesJSValue = choicesJS.getValue()

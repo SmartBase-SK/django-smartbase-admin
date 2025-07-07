@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib.parse
 from collections.abc import Iterable
 from functools import partial
@@ -12,6 +13,8 @@ from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
@@ -24,15 +27,18 @@ from django.forms.models import (
     ModelFormMetaclass,
     modelform_factory,
 )
+from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
+from django_htmx.http import trigger_client_event
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
+from nested_admin.formsets import NestedInlineFormSet
 from nested_admin.nested import (
     NestedModelAdmin,
     NestedTabularInline,
@@ -43,7 +49,7 @@ from nested_admin.nested import (
 
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
-from django_smartbase_admin.utils import FormFieldsetMixin
+from django_smartbase_admin.utils import FormFieldsetMixin, is_modal
 
 parler_enabled = None
 try:
@@ -68,7 +74,6 @@ try:
 except ImportError:
     pass
 
-
 django_cms_attributes = None
 try:
     from djangocms_attributes_field.fields import AttributesFormField
@@ -77,7 +82,6 @@ try:
 except ImportError:
     pass
 
-
 color_field_enabled = None
 try:
     from colorfield.fields import ColorField
@@ -85,7 +89,6 @@ try:
     color_field_enabled = True
 except ImportError:
     pass
-
 
 from django_smartbase_admin.admin.widgets import (
     SBAdminTextInputWidget,
@@ -117,6 +120,10 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
     SBAdminBaseQuerysetMixin,
+    SBADMIN_IS_MODAL_VAR,
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
+    SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
 )
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
@@ -125,6 +132,8 @@ from django_smartbase_admin.engine.const import (
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
+
+logger = logging.getLogger(__name__)
 
 
 class SBAdminFormFieldWidgetsMixin:
@@ -648,6 +657,29 @@ class SBAdminTranslationStatusMixin:
         return mark_safe(result)
 
 
+class SBAdminInlineFormSetMixin:
+    @classmethod
+    def get_default_prefix(cls):
+        view = getattr(cls.form, "view", None)
+        if view and view.parent_model and view.opts:
+            parent_opts = view.parent_model._meta
+            opts = view.opts
+            modal_prefix = (
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
+            return f"{modal_prefix}{parent_opts.app_label}_{parent_opts.model_name}_{opts.app_label}-{opts.model_name}"
+
+        return super().get_default_prefix()
+
+
+class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
+    pass
+
+
+class SBAdminNestedInlineFormSet(SBAdminInlineFormSetMixin, NestedInlineFormSet):
+    pass
+
+
 class SBAdmin(
     SBAdminInlineAndAdminCommon,
     SBAdminBaseQuerysetMixin,
@@ -668,6 +700,10 @@ class SBAdmin(
     sbadmin_tabs = None
     request_data = None
     menu_label = None
+    sbadmin_is_generic_model = False
+
+    def __init__(self, model, admin_site):
+        super().__init__(model, admin_site)
 
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
@@ -903,6 +939,52 @@ class SBAdmin(
         except Exception as e:
             return super().history_view(request, object_id, extra_context)
 
+    @classmethod
+    def get_modal_save_response(cls, request, obj):
+        response = HttpResponse()
+        trigger_client_event(
+            response,
+            "sbadmin:modal-change-form-response",
+            {
+                "field": request.POST.get("sb_admin_source_field"),
+                "id": obj.pk,
+                "label": str(obj),
+                "reload": request.POST.get("sbadmin_reload_on_save") == "1",
+            },
+        )
+        trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
+        return response
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if is_modal(request):
+            return self.get_modal_save_response(request, obj)
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        if is_modal(request):
+            return self.get_modal_save_response(request, obj)
+        return super().response_change(request, obj)
+
+    @classmethod
+    def set_generic_relation_from_parent(cls, request, obj):
+        parent_model_path = request.POST.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
+        parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+
+        if parent_model_path and parent_pk:
+            prefix, app_label, model_name, field, parent_model = (
+                parent_model_path.split("_", 5)
+            )
+            content_type = ContentType.objects.get(
+                app_label=app_label, model=parent_model
+            )
+            obj.content_type = content_type
+            obj.object_id = int(parent_pk)
+
+    def save_model(self, request, obj, form, change):
+        if self.sbadmin_is_generic_model and SBADMIN_IS_MODAL_VAR in request.POST:
+            self.set_generic_relation_from_parent(request, obj)
+        super().save_model(request, obj, form, change)
+
 
 class SBAdminInline(
     SBAdminInlineAndAdminCommon, SBAdminBaseQuerysetMixin, SBAdminBaseView
@@ -914,6 +996,7 @@ class SBAdminInline(
     extra = 0
     ordering = None
     all_base_fields_form = None
+    sb_admin_add_modal = False
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
@@ -963,10 +1046,35 @@ class SBAdminInline(
         is_sortable_active: bool = self.sortable_field_name and (
             self.has_add_permission(request) or self.has_change_permission(request)
         )
-        return {
+        add_url = None
+        try:
+            if self.sb_admin_add_modal and self.has_add_permission(request):
+                add_url = reverse(
+                    "sb_admin:{}_{}_add".format(
+                        self.opts.app_label, self.opts.model_name
+                    )
+                )
+        except NoReverseMatch:
+            logger.warning(
+                "To use Add in modal, You have to specify SBAdmin view for %s model",
+                self.opts.model_name,
+            )
+        context_data = {
             "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
             "is_sortable_active": is_sortable_active,
+            "add_url": add_url,
         }
+        if self.parent_instance:
+            context_data["parent_data"] = {
+                SBADMIN_PARENT_INSTANCE_PK_VAR: self.parent_instance.pk,
+                SBADMIN_PARENT_INSTANCE_LABEL_VAR: str(self.parent_instance),
+                SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: "{}_{}_id_{}".format(
+                    self.model._meta.app_label,
+                    self.model._meta.model_name,
+                    self.parent_model._meta.model_name,
+                ),
+            }
+        return context_data
 
     def init_sortable_field(self) -> None:
         if not self.sortable_field_name:
@@ -1012,10 +1120,12 @@ class SBAdminInline(
 
 class SBAdminTableInline(SBAdminInline, NestedTabularInline):
     template = "sb_admin/inlines/table_inline.html"
+    formset = SBAdminNestedInlineFormSet
 
 
 class SBAdminGenericTableInline(SBAdminInline, NestedGenericTabularInline):
     template = "sb_admin/inlines/table_inline.html"
+    formset = SBAdminGenericInlineFormSet
 
 
 class SBAdminTableInlinePaginated(SBAdminTableInline, TabularInlinePaginated):
