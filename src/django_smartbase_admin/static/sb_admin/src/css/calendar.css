@@ -28,6 +28,19 @@
         height: 9rem;
     }
 
+    .fc-day-other {
+        @apply bg-dark-100;
+        .fc-daygrid-day-top {
+            opacity: 1;
+            .fc-daygrid-day-number {
+                @apply text-dark;
+            }
+        }
+        .fc-daygrid-day-events {
+            opacity: 0.6;
+        }
+    }
+
     .fc-daygrid-day-frame,
     .fc-daygrid-day-events,
     .fc-daygrid-event-harness,
