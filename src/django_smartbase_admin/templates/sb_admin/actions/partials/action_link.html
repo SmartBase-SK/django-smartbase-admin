@@ -6,7 +6,7 @@
 {% endif %}
     class="{{ extra_classes|default:'' }} {{ action.css_class|default_if_none:'' }}">
     {% if action.icon %}
-        <svg class="w-16 h-16 md:mr-8">
+        <svg class="w-16 h-16 mr-8">
             <use xlink:href="#{{ action.icon }}"></use>
         </svg>
     {% endif %}
