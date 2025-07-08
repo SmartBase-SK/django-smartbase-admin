@@ -82,6 +82,7 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_widget_context_data(self, request):
         return {
             "widget_id": self.get_id(),
+            "widget_name": self.name,
             "ajax_url": self.get_ajax_url,
             "filters": self.get_filters(),
             "settings": self.get_settings(),
