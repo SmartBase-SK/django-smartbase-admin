@@ -5,34 +5,48 @@
 
 {% block content %}
     {% block page_header %}
-        <div class="list-view-header py-16 md:pb-32 flex items-center max-xs:px-20">
+        <div class="list-view-header py-16 md:pb-32 flex flex-wrap items-center max-xs:px-20 gap-x-16 gap-y-8">
             {% block heading %}
                 <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">{{ list_title|capfirst }}</h1>
             {% endblock %}
-            <ul class="ml-auto flex gap-8 md:gap-16">
-                <li class="relative md:hidden">
-                    <button
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                        data-bs-popper-placement="bottom-end"
-                        class="btn btn-empty btn-icon">
-                        <svg class="w-16 h-16">
-                            <use xlink:href="#More"></use>
-                        </svg>
-                        <span></span>
-                    </button>
-                    <div class="dropdown-menu w-248 max-h-432">
-                        <ul>
-                            {% block dropdown_actions %}
-                                {% for list_action in content_context.list_actions %}
-                                    <li>
-                                       {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="dropdown-menu-link" %}
-                                    </li>
-                                {% endfor %}
-                            {% endblock %}
-                        </ul>
-                    </div>
-                </li>
+            <ul class="ml-auto flex flex-wrap gap-8 md:gap-16">
+                {% if content_context.list_actions %}
+                    <li class="relative md:hidden">
+                        <button
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-bs-popper-placement="bottom-end"
+                                class="btn btn-empty btn-icon">
+                            <svg class="w-16 h-16">
+                                <use xlink:href="#More"></use>
+                            </svg>
+                            <span></span>
+                        </button>
+                        <div class="dropdown-menu w-248 max-h-432">
+                            <ul>
+                                {% block dropdown_actions %}
+                                    {% for list_action in content_context.list_actions %}
+                                        {% if not list_action.sub_actions %}
+                                            <li>
+                                                {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="dropdown-menu-link items-center" %}
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <script>
+                                        (function(){
+                                            if(document.currentScript && !document.currentScript.previousElementSibling) {
+                                                const li = document.currentScript.closest('li');
+                                                if(li) {
+                                                    li.classList.add('hidden');
+                                                }
+                                            }
+                                        }());
+                                    </script>
+                                {% endblock %}
+                            </ul>
+                        </div>
+                    </li>
+                {% endif %}
 
                 {% block actions %}
                     {% for list_action in content_context.list_actions %}
@@ -40,15 +54,15 @@
                             <button
                                     data-bs-toggle="dropdown"
                                     aria-expanded="false"
-                                    data-bs-popper-placement="bottom"
-                                    class="btn">
+                                    data-bs-popper-placement="bottom-end"
+                                    class="btn btn-icon">
                                 {% if list_action.icon %}
                                     <svg class="w-16 h-16 md:mr-8">
                                         <use xlink:href="#{{ list_action.icon }}"></use>
                                     </svg>
                                 {% endif %}
                                 <span>{{ list_action.title }}</span>
-                                <svg class="w-16 h-16 ml-4">
+                                <svg class="w-16 h-16 ml-4 max-sm:hidden">
                                     <use xlink:href="#Down"></use>
                                 </svg>
                             </button>
@@ -56,7 +70,7 @@
                                 <ul>
                                     {% for list_sub_action in list_action.sub_actions %}
                                         <li>
-                                          {% include "sb_admin/actions/partials/action_link.html" with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
+                                            {% include "sb_admin/actions/partials/action_link.html" with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
                                         </li>
                                     {% endfor %}
                                 </ul>
