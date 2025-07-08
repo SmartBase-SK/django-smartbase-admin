@@ -28,24 +28,8 @@ class SBAdminChart {
         this.chart = new Chart(ctx, {
             type: this.options.chartType,
             data: {},
-            options: {
-                scales: {
-                    x: {
-                        ticks: {
-                            font: {
-                                weight: 600,
-                            }
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            font: {
-                                weight: 600,
-                            }
-                        }
-                    }
-                }
-            }
+            options: this.options.chartOptions || {},
+            plugins: this.options.chartPlugins || []
         })
         this.refreshData()
         document.addEventListener(window.sb_admin_const.TABLE_RELOAD_DATA_EVENT_NAME, () => {
@@ -112,6 +96,7 @@ class SBAdminChart {
                         }
                     })
                 }
+                this.chart.canvas.dispatchEvent(new CustomEvent('chartDataLoaded'))
             })
     }
 

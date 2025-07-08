@@ -101,7 +101,7 @@ class Main {
     initInputs(target) {
         this.datepicker = new Datepicker(target)
         this.range = new Range(null, null, target)
-        this.multiselect = new Multiselect()
+        this.multiselect = new Multiselect(null, null, target)
     }
 
     handleLocationHashFromTabs() {

@@ -1,0 +1,35 @@
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load sb_admin_tags static i18n %}
+
+{% block filters %}{% endblock %}
+
+{% block content_inner %}
+    <div class="card p-16 pb-0">
+        <div class="mt-16 -mx-16">
+            <script type="text/javascript" src="{% static 'sb_admin/js/fullcalendar.min.js' %}"></script>
+            <link rel="stylesheet" href="{% static 'sb_admin/dist/calendar_style.css' %}">
+            <script type="text/javascript" src="{% static 'sb_admin/dist/calendar.js' %}"></script>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    window.SBAdminCalendar = window.SBAdminCalendar || {};
+                    window.SBAdminCalendar["{{ widget_id }}"] = new window.SBAdminCalendarClass({
+                        "widgetId": "{{ widget_id }}",
+                        "calendarOptions": {
+                            initialView: 'dayGridMonth',
+                            events: {
+                                url: "{{ ajax_url }}",
+                            },
+                            dayMaxEvents: 3,
+                            height: 'auto',
+                            locale: 'sk',
+                            headerToolbar: false,
+                            fixedWeekCount: false,
+                        }
+                    });
+                });
+            </script>
+            <div id="{{ widget_id }}-calendar"></div>
+        </div>
+    </div>
+{% endblock %}

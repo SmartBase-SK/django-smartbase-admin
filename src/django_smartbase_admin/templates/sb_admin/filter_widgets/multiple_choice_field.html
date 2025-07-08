@@ -6,6 +6,20 @@
                    {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %}
                    value="{{ filter_widget.get_default_value }}"{% endif %}>
     <ul class="relative py-8">
+        {% if filter_widget.enable_select_all %}
+            <li>
+                <div class="relative px-12 py-8">
+                    <input type="checkbox"
+                           value="{{ filter_widget.select_all_keyword }}"
+                           name="{{ filter_widget.input_name }}_dummy"
+                           class="checkbox js-simple-multiselect-all"
+                           id="{{ filter_widget.input_id }}_all" {% if filter_widget.get_default_value == filter_widget.select_all_keyword %} checked{% endif %} data-label="{{ filter_widget.select_all_label }}">
+                    <label for="{{ filter_widget.input_id }}_all">
+                        {{ filter_widget.select_all_label }}
+                    </label>
+                </div>
+            </li>
+        {% endif %}
         {% for choice in filter_widget.choices %}
             <li>
                 <div class="relative px-12 py-8">

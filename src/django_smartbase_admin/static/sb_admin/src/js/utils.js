@@ -95,6 +95,9 @@ export const filterInputValueChangedUtil = (field) => {
             if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN) {
                 break
             }
+            if(entries.length > 1 && item.value === window.sb_admin_const.SELECT_ALL_KEYWORD) {
+                continue
+            }
             if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN - 2 && entries[index + 2]) {
                 labelArray.push(item.label)
                 hasMaxEntries = true

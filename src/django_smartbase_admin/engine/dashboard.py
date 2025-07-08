@@ -1,5 +1,4 @@
-import pickle
-from copy import copy, deepcopy
+from copy import copy
 from datetime import timedelta
 
 from django.core.cache import cache
@@ -17,10 +16,8 @@ from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
-    ChoiceFilterWidget,
     DateFilterWidget,
-    RadioChoiceFilterWidget,
-)
+    RadioChoiceFilterWidget, )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import to_list
 
@@ -666,5 +663,13 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             "viewsModule",
             "tableParamsModule",
             "detailViewModule",
+            "filterModule",
         ]
         return tabulator_definition
+
+
+class SbAdminCalendarWidget(SBAdminDashboardWidget):
+    template_name = "sb_admin/dashboard/calendar_widget.html"
+
+    def action_get_data(self, request, modifier):
+        return JsonResponse(data=self.get_cached_data(request), safe=False)

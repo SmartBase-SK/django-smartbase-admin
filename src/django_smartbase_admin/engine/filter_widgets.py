@@ -19,7 +19,7 @@ from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_PAGE_SIZE,
     Action,
     AUTOCOMPLETE_PAGE_NUM,
-    AUTOCOMPLETE_FORWARD_NAME,
+    AUTOCOMPLETE_FORWARD_NAME, SELECT_ALL_KEYWORD,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -220,6 +220,31 @@ class RadioChoiceFilterWidget(ChoiceFilterWidget):
 
 class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
     template_name = "sb_admin/filter_widgets/multiple_choice_field.html"
+    enable_select_all = False
+    select_all_keyword = None
+    select_all_label = None
+
+    def __init__(
+        self,
+        choices,
+        template_name=None,
+        default_value=None,
+        default_label=None,
+        enable_select_all=False,
+        select_all_keyword=SELECT_ALL_KEYWORD,
+        select_all_label=_('All'),
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            choices=choices,
+            template_name=template_name,
+            default_value=default_value,
+            default_label=default_label,
+            **kwargs,
+        )
+        self.enable_select_all = enable_select_all
+        self.select_all_keyword = select_all_keyword
+        self.select_all_label = select_all_label
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
         return Q(**{f"{self.field.filter_field}__in": filter_value})

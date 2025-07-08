@@ -19,7 +19,25 @@
                 window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
                     "widgetId": "{{ widget_id }}",
                     "ajaxUrl": "{{ ajax_url }}",
-                    "chartType": "{{ chart_type }}"
+                    "chartType": "{{ chart_type }}",
+                    "chartOptions": {
+                        scales: {
+                            x: {
+                                ticks: {
+                                    font: {
+                                        weight: 600,
+                                    }
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    font: {
+                                        weight: 600,
+                                    }
+                                }
+                            }
+                        }
+                    }
                 });
             </script>
         </div>
