@@ -44,15 +44,15 @@
                             <button
                                     data-bs-toggle="dropdown"
                                     aria-expanded="false"
-                                    data-bs-popper-placement="bottom"
-                                    class="btn">
+                                    data-bs-popper-placement="bottom-end"
+                                    class="btn btn-icon">
                                 {% if list_action.icon %}
-                                    <svg class="w-16 h-16 mr-8">
+                                    <svg class="w-16 h-16 md:mr-8">
                                         <use xlink:href="#{{ list_action.icon }}"></use>
                                     </svg>
                                 {% endif %}
                                 <span>{{ list_action.title }}</span>
-                                <svg class="w-16 h-16 ml-4">
+                                <svg class="w-16 h-16 ml-4 max-sm:hidden">
                                     <use xlink:href="#Down"></use>
                                 </svg>
                             </button>
