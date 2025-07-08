@@ -32,6 +32,16 @@
                                             </li>
                                         {% endif %}
                                     {% endfor %}
+                                    <script>
+                                        (function(){
+                                            if(document.currentScript && !document.currentScript.previousElementSibling) {
+                                                const li = document.currentScript.closest('li');
+                                                if(li) {
+                                                    li.classList.add('hidden');
+                                                }
+                                            }
+                                        }());
+                                    </script>
                                 {% endblock %}
                             </ul>
                         </div>
