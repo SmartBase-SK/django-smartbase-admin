@@ -24,6 +24,7 @@ class SBAdminChart {
     }
 
     initChart() {
+        this.options.formId = this.options.formId || `${this.options.widgetId}-filter-form`
         const ctx = document.getElementById(`${this.options.widgetId}-chart`)
         this.chart = new Chart(ctx, {
             type: this.options.chartType,
@@ -47,7 +48,7 @@ class SBAdminChart {
     }
 
     refreshData() {
-        const filterForm = document.querySelector(`#${this.options.widgetId}-filter-form`)
+        const filterForm = document.getElementById(this.options.formId)
         const filterData = new FormData(filterForm).entries()
         const filterDataNotEmpty = {}
         for (const [key, value] of filterData) {
@@ -101,7 +102,7 @@ class SBAdminChart {
     }
 
     initFilters() {
-        filterInputValueChangeListener(`[form="${this.options.widgetId}-filter-form"]`, (event) => {
+        filterInputValueChangeListener(`[form="${this.options.formId}"]`, (event) => {
             this.refreshData()
             filterInputValueChangedUtil(event.target)
         })

@@ -93,6 +93,12 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_sub_widgets(self):
         return self.sub_widgets
 
+    def get_sub_views(self, configuration):
+        for idx, sub_widget_view in enumerate(self.sub_widgets):
+            sub_widget_view.widget_id = f"{self.get_id()}_{idx}"
+            sub_widget_view.init_widget_static(configuration)
+        return self.sub_widgets
+
     def get_template_name(self):
         return self.template_name
 
