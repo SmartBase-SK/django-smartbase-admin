@@ -1,5 +1,6 @@
 import json
 import math
+from typing import Any
 
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -36,6 +37,7 @@ from django_smartbase_admin.engine.const import (
     FilterVersions,
     ADVANCED_FILTER_DATA_NAME,
     IGNORE_LIST_SELECTION,
+    Action,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import import_with_injection
@@ -407,12 +409,19 @@ class SBAdminListAction(SBAdminAction):
             "last_row": total_count,
         }
 
-    def process_final_data(self, final_data):
+    def process_final_data(self, final_data: list[dict[str, Any]]) -> None:
         visible_columns = self.get_visible_column_fields()
+        is_xlsx_export = (
+            self.threadsafe_request.request_data.action == Action.XLSX_EXPORT.value
+        )
         fields_with_methods_to_call_by_field_key = {
             field.field: field
             for field in visible_columns
-            if field.view_method or field.python_formatter
+            if field.view_method
+            or field.python_formatter
+            or (
+                is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None)
+            )
         }
         for row in final_data:
             additional_data = {}
@@ -427,7 +436,11 @@ class SBAdminListAction(SBAdminAction):
                     object_id = row.get(self.get_pk_field().name, None)
                     if field.view_method:
                         value = field.view_method(object_id, value, **additional_data)
-                    if field.python_formatter:
+                    if is_xlsx_export and getattr(
+                        field.xlsx_options, "python_formatter", None
+                    ):
+                        value = field.xlsx_options.python_formatter(object_id, value)
+                    elif field.python_formatter:
                         value = field.python_formatter(object_id, value)
                 if isinstance(value, str) and not isinstance(value, SafeString):
                     value = escape(value)
