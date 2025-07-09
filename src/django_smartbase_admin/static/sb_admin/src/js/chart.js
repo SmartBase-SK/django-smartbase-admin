@@ -65,7 +65,7 @@ class SBAdminChart {
             .then(res => {
                 this.chart.data.labels = res.data.main.labels
                 this.chart.data.datasets = this.processDatasets(res.data.main.datasets)
-                if (this.chart.data.labels.length > 1) {
+                if (this.chart.data.labels.length >= 1) {
                     this.chart.canvas.classList.remove('!hidden')
                 } else {
                     this.chart.canvas.classList.add('!hidden')

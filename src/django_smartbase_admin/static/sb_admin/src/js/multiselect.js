@@ -10,7 +10,7 @@ export default class Multiselect {
                 const wrapperEl = e.target.closest(this.wrapperSelector)
                 const multiselectInput = wrapperEl?.querySelector(selector)
                 const isCheckboxClicked = e.target.type === 'checkbox'
-                const selectAllEl = wrapperEl.querySelector(`.${selectAllClass}`)
+                const selectAllEl = wrapperEl?.querySelector(`.${selectAllClass}`)
                 if(multiselectInput && isCheckboxClicked) {
                     const checkboxes = Array.from(this.getCheckboxes(multiselectInput))
                     if(e.target.classList.contains(selectAllClass)) {
@@ -20,7 +20,7 @@ export default class Multiselect {
                     } else {
                         selectAllEl.checked = false
                     }
-                    if(!checkboxes.some(el => el.checked)) {
+                    if(!checkboxes.some(el => el.checked) && selectAllEl) {
                         selectAllEl.checked = true
                     }
                     let checked = []
