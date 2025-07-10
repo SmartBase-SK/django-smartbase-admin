@@ -71,7 +71,6 @@ class XLSXFieldOptions(JSONSerializableMixin):
         self.title = title
         self.field = field
         self.formatter = formatter
-        # if provided, for XLSX export overrides `python_formatter` from SBAdminField
         self.python_formatter = python_formatter
 
 
