@@ -1,46 +1,58 @@
 {% load sb_admin_tags %}
 
-{% if fieldset.name %}
-    <header class="mb-24">
-        <span class="text-dark-900">{{ fieldset.name }}</span>
-        <div class="ml-auto flex items-center">
-            {% for action in fieldset_context.actions %}
-                <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
-            {% endfor %}
-            {% if fieldset.description %}
-                <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
-                    <svg class="w-20 h-20">
-                        <use xlink:href="#Help"></use>
-                    </svg>
+{% block content %}
+	{% block header %}
+		{% if fieldset.name %}
+            <header class="mb-24">
+                <span class="text-dark-900">{{ fieldset.name }}</span>
+                <div class="ml-auto flex items-center">
+                    {% block actions %}
+                        {% for action in fieldset_context.actions %}
+                            <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
+                        {% endfor %}
+                    {% endblock %}
+                    {% block description %}
+                        {% if fieldset.description %}
+                            <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
+                                <svg class="w-20 h-20">
+                                    <use xlink:href="#Help"></use>
+                                </svg>
+                            </div>
+                        {% endif %}
+                    {% endblock %}
                 </div>
-            {% endif %}
-        </div>
-    </header>
-{% endif %}
-{% for line in fieldset %}
-    <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
-        {% if line.fields|length > 1 %}
-            <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
+            </header>
+        {% endif %}
+	{% endblock %}
 
-        {% for field in line %}
-            <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden or field.field|is_row_class_field %} hidden{% endif %}">
-                {% if field.is_readonly %}
-                    {% call_method field "contents" request %}
-                {% else %}
-                    {{ field.field }}
-                    {% if not line.fields|length == 1 %}{{ field.errors }}{% endif %}
+    {% block lines %}
+        {% for line in fieldset %}
+            <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
+                {% if line.fields|length > 1 %}
+                    <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
+
+                {% for field in line %}
+                    <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden or field.field|is_row_class_field %} hidden{% endif %}">
+                        {% if field.is_readonly %}
+                            {% call_method field "contents" request %}
+                        {% else %}
+                            {{ field.field }}
+                            {% if not line.fields|length == 1 %}{{ field.errors }}{% endif %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                {% if line.fields|length == 1 and line.errors %}
+                    <div class="-mt-16 mb-24">
+                        {{ line.errors }}
+                    </div>
                 {% endif %}
+                {% if line.fields|length > 1 %}</div>{% endif %}
             </div>
         {% endfor %}
 
-        {% if line.fields|length == 1 and line.errors %}
-            <div class="-mt-16 mb-24">
-                {{ line.errors }}
-            </div>
-        {% endif %}
-        {% if line.fields|length > 1 %}</div>{% endif %}
-    </div>
-{% endfor %}
-{% block additional_fields %}
+    {% endblock %}
+    {% block additional_fields %}
 
+    {% endblock %}
 {% endblock %}

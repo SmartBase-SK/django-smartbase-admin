@@ -17,7 +17,8 @@ from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     DateFilterWidget,
-    RadioChoiceFilterWidget, )
+    RadioChoiceFilterWidget,
+)
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import to_list
 
@@ -91,6 +92,12 @@ class SBAdminDashboardWidget(SBAdminView):
         }
 
     def get_sub_widgets(self):
+        return self.sub_widgets
+
+    def get_sub_views(self, configuration):
+        for idx, sub_widget_view in enumerate(self.sub_widgets):
+            sub_widget_view.widget_id = f"{self.get_id()}_{idx}"
+            sub_widget_view.init_widget_static(configuration)
         return self.sub_widgets
 
     def get_template_name(self):
@@ -193,6 +200,12 @@ class SBAdminChartAggregateSubWidget(object):
 
     def render(self, request):
         return render_to_string(self.template_name, self.get_context_data(request))
+
+    def init_widget_static(self, configuration):
+        pass
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs):
+        pass
 
 
 class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
