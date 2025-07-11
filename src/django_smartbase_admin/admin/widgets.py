@@ -58,6 +58,8 @@ class SBAdminBaseWidget(ContextMixin):
         self.form_field = form_field
 
     def get_updated_widget_id(self, base_id, opts=None):
+        if not opts:
+            return base_id
         modal_prefix = ""
         try:
             modal_prefix = (
@@ -65,9 +67,7 @@ class SBAdminBaseWidget(ContextMixin):
             )
         except:
             pass
-        if opts:
-            return f"{modal_prefix}{opts.app_label}_{opts.model_name}_{base_id}"
-        return base_id
+        return f"{modal_prefix}{opts.app_label}_{opts.model_name}_{base_id}"
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
@@ -410,12 +410,15 @@ class SBAdminAutocompleteWidget(
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
 
-        if threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
-            self.model,
-            field_name=self.field_name,
-            current_view=self.view,
-            request=threadsafe_request,
-        ) and not self.is_multiselect():
+        if (
+            threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+                self.model,
+                field_name=self.field_name,
+                current_view=self.view,
+                request=threadsafe_request,
+            )
+            and not self.is_multiselect()
+        ):
             self.add_related_buttons_urls(parsed_value, context)
 
         return context
