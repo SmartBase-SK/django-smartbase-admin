@@ -60,13 +60,16 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
-        opts = (
-            self.form_field.view.opts
-            if self.form_field
-            and hasattr(self.form_field, "view")
-            and hasattr(self.form_field.view, "opts")
-            else None
-        )
+        opts = None
+
+        if self.form_field:
+            view = getattr(self.form_field, "view", None)
+            if view:
+                if hasattr(view, "opts"):
+                    opts = view.opts
+                elif hasattr(view, "view") and hasattr(view.view, "opts"):
+                    opts = view.view.opts
+
         modal_prefix = ""
         try:
             modal_prefix = (
@@ -74,6 +77,7 @@ class SBAdminBaseWidget(ContextMixin):
             )
         except:
             pass
+
         if opts:
             context["widget"]["attrs"][
                 "id"
@@ -404,12 +408,15 @@ class SBAdminAutocompleteWidget(
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
 
-        if threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
-            self.model,
-            field_name=self.field_name,
-            current_view=self.view,
-            request=threadsafe_request,
-        ) and not self.is_multiselect():
+        if (
+            threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+                self.model,
+                field_name=self.field_name,
+                current_view=self.view,
+                request=threadsafe_request,
+            )
+            and not self.is_multiselect()
+        ):
             self.add_related_buttons_urls(parsed_value, context)
 
         return context
