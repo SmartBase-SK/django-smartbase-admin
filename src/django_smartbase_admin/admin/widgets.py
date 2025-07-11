@@ -57,6 +57,18 @@ class SBAdminBaseWidget(ContextMixin):
     def init_widget_dynamic(self, form, form_field, field_name, view, request):
         self.form_field = form_field
 
+    def get_updated_widget_id(self, base_id, opts=None):
+        if not opts:
+            return base_id
+        modal_prefix = ""
+        try:
+            modal_prefix = (
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
+        except:
+            pass
+        return f"{modal_prefix}{opts.app_label}_{opts.model_name}_{base_id}"
+
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
@@ -83,6 +95,16 @@ class SBAdminBaseWidget(ContextMixin):
                 "id"
             ] = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
 
+        opts = (
+            self.form_field.view.opts
+            if self.form_field
+            and hasattr(self.form_field, "view")
+            and hasattr(self.form_field.view, "opts")
+            else None
+        )
+        context["widget"]["attrs"]["id"] = self.get_updated_widget_id(
+            context["widget"]["attrs"]["id"], opts
+        )
         return context
 
 
@@ -370,6 +392,9 @@ class SBAdminAutocompleteWidget(
         self.input_id = (
             context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
         )
+        if self.field_name == "value":
+            self.input_id = self.get_updated_widget_id(self.input_id, self.view.opts)
+
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
