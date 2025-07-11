@@ -1,7 +1,8 @@
+from __future__ import annotations
 import json
 import math
+from typing import Any, TYPE_CHECKING
 
-from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.html import escape
@@ -33,7 +34,6 @@ from django_smartbase_admin.engine.const import (
     CONFIG_NAME,
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
-    FilterVersions,
     ADVANCED_FILTER_DATA_NAME,
     IGNORE_LIST_SELECTION,
 )
@@ -43,6 +43,9 @@ from django_smartbase_admin.utils import import_with_injection
 QueryBuilderService = import_with_injection(
     "django_smartbase_admin.actions.advanced_filters", "QueryBuilderService"
 )
+
+if TYPE_CHECKING:
+    from django_smartbase_admin.engine.field import SBAdminField
 
 
 class SBAdminAction(object):
@@ -289,7 +292,7 @@ class SBAdminListAction(SBAdminAction):
             **self.get_annotates(visible_fields)
         )
 
-    def get_visible_column_fields(self):
+    def get_visible_column_fields(self) -> list[SBAdminField]:
         columns_data_dict = self.columns_data.get(COLUMNS_DATA_COLUMNS_NAME, {})
         return [
             field
@@ -407,14 +410,13 @@ class SBAdminListAction(SBAdminAction):
             "last_row": total_count,
         }
 
-    def process_final_data(self, final_data):
+    def process_final_data(self, final_data: list[dict[str, Any]]) -> None:
         visible_columns = self.get_visible_column_fields()
-        fields_with_methods_to_call_by_field_key = {
-            field.field: field
-            for field in visible_columns
-            if field.view_method or field.python_formatter
+        field_key_field_map: dict[str, SBAdminField] = {
+            field.field: field for field in visible_columns
         }
         for row in final_data:
+            obj_id = row.get(self.get_pk_field().name, None)
             additional_data = {}
             if self.view.sbadmin_list_display_data:
                 additional_data = {
@@ -422,13 +424,11 @@ class SBAdminListAction(SBAdminAction):
                     for data in self.view.sbadmin_list_display_data
                 }
             for field_key, value in row.items():
-                if field_key in fields_with_methods_to_call_by_field_key:
-                    field = fields_with_methods_to_call_by_field_key[field_key]
-                    object_id = row.get(self.get_pk_field().name, None)
-                    if field.view_method:
-                        value = field.view_method(object_id, value, **additional_data)
-                    if field.python_formatter:
-                        value = field.python_formatter(object_id, value)
+                if field_key in field_key_field_map:
+                    field = field_key_field_map[field_key]
+                    value = self.view.process_field_data(
+                        self.threadsafe_request, field, obj_id, value, additional_data
+                    )
                 if isinstance(value, str) and not isinstance(value, SafeString):
                     value = escape(value)
                 row[field_key] = value

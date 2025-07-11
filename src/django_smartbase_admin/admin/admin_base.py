@@ -36,6 +36,7 @@ from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django_htmx.http import trigger_client_event
+from django_smartbase_admin.engine.field import SBAdminField
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
 from nested_admin.formsets import NestedInlineFormSet
@@ -129,6 +130,7 @@ from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     TRANSLATIONS_SELECTED_LANGUAGES,
     ROW_CLASS_FIELD,
+    Action,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -981,6 +983,23 @@ class SBAdmin(
         if self.sbadmin_is_generic_model and SBADMIN_IS_MODAL_VAR in request.POST:
             self.set_generic_relation_from_parent(request, obj)
         super().save_model(request, obj, form, change)
+
+    def process_field_data(
+        self,
+        request,
+        field: SBAdminField,
+        obj_id: Any,
+        value: Any,
+        additional_data: dict[str, Any],
+    ) -> Any:
+        is_xlsx_export = request.request_data.action == Action.XLSX_EXPORT.value
+        if field.view_method:
+            value = field.view_method(obj_id, value, **additional_data)
+        if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
+            value = field.xlsx_options.python_formatter(obj_id, value)
+        elif field.python_formatter:
+            value = field.python_formatter(obj_id, value)
+        return value
 
 
 class SBAdminInline(
