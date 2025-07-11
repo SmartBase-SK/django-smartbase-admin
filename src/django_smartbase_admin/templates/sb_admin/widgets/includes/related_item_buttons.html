@@ -1,8 +1,8 @@
 {% load i18n %}
-<div class="flex items-center gap-4  flex-shrink-0">
+<div class="flex items-center gap-4  flex-shrink-0 related-item-buttons">
     {% if widget.attrs.related_edit_url %}
-        <a href="{{ widget.attrs.related_edit_url }}"
-           class="btn btn-icon"
+        <a
+           class="btn btn-icon edit-button"
            title="{% trans 'Edit' %}"
            data-bs-toggle="modal"
            data-bs-target="#sb-admin-modal"
@@ -15,7 +15,7 @@
         </a>
     {% endif %}
     {% if widget.attrs.related_add_url %}
-        <a href="{{ widget.attrs.related_add_url }}"
+        <a
            class="btn btn-icon"
            title="{% trans 'Add' %}"
            data-bs-toggle="modal"
