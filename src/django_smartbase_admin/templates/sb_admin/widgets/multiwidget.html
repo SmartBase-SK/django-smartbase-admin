@@ -1,7 +1,7 @@
 {% include 'sb_admin/widgets/includes/field_label.html' %}
 <div class="flex gap-16">
     {% for widget in widget.subwidgets %}
-        <div class="relative flex-1">
+        <div class="relative">
             {% include widget.template_name with subwidget=True %}
         </div>
     {% endfor %}
