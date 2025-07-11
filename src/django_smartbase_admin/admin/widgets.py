@@ -412,6 +412,16 @@ class SBAdminAutocompleteWidget(
         ):
             self.add_related_buttons_urls(parsed_value, context)
 
+        if (
+            context.get("filter_widget")
+            and context["filter_widget"].input_id
+            and context["filter_widget"].input_id.endswith("value")
+        ):
+            modal_prefix = "modal_" if is_modal(threadsafe_request) else ""
+            context["filter_widget"].input_id = (
+                f"{modal_prefix}{self.view.opts.app_label}_{self.view.opts.model_name}_{context['filter_widget'].input_id}"
+            )
+
         return context
 
     def add_related_buttons_urls(self, parsed_value, context):
