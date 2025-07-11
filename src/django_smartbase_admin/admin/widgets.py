@@ -415,7 +415,7 @@ class SBAdminAutocompleteWidget(
             field_name=self.field_name,
             current_view=self.view,
             request=threadsafe_request,
-        ):
+        ) and not self.is_multiselect():
             self.add_related_buttons_urls(parsed_value, context)
 
         return context

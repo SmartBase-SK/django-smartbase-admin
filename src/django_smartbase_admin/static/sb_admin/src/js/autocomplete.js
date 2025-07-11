@@ -94,6 +94,9 @@ export default class Autocomplete {
         }, 200))
 
         choiceInput.addEventListener('selectItem', (event) => {
+            if(!event.target.hasAttribute('multiple')) {
+                this.updateEditButtonUrl(event)
+            }
             choicesJSListeners.selectItem(event.detail, inputEl)
         })
         choiceInput.addEventListener('addItem', () => {
@@ -105,6 +108,7 @@ export default class Autocomplete {
         choiceInput.addEventListener('change', (e) => {
             if(!e.target.hasAttribute('multiple')) {
                 choicesJS.SBwrapperElButton.click()
+                this.updateEditButtonUrl(e)
             }
             inputEl.dispatchEvent(new CustomEvent('SBAutocompleteChange'))
         })
@@ -295,4 +299,32 @@ export default class Autocomplete {
             document.getElementById(`${field}-value`).textContent = label
         }
     }
+
+    updateEditButtonUrl(event) {
+        const group = event.srcElement.dataset.autocompleteDataId?.replace("_data", "-wrapper")
+        if (!group) return
+
+        const wrapper = document.getElementById(group)
+        const editButton = wrapper?.querySelector('.edit-button')
+        const value = event.detail?.value
+
+        if (editButton && value) {
+            let originalUrl = editButton.getAttribute('hx-get') || editButton.dataset.addUrl || ''
+            if (!originalUrl) return
+
+            const newUrl = originalUrl
+                .replace(/\/add\/\?/, `/${value}/change/?`)
+                .replace(/\/\d+\/change\/\?/, `/${value}/change/?`)
+
+            const newEditButton = editButton.cloneNode(true)
+            newEditButton.setAttribute('hx-get', newUrl)
+            newEditButton.classList.remove('hidden')
+
+            editButton.replaceWith(newEditButton)
+            window.htmx.process(newEditButton)
+        }
+    }
+
+
+
 }
