@@ -300,22 +300,31 @@ export default class Autocomplete {
         }
     }
 
-    updateEditButtonUrl(event){
-        const group = event.srcElement.dataset.autocompleteDataId?.replace("_data","-wrapper")
-        if (group) {
-            const wrapper = document.getElementById(group)
-            const editButton = wrapper?.querySelector('.edit-button')
+    updateEditButtonUrl(event) {
+        const group = event.srcElement.dataset.autocompleteDataId?.replace("_data", "-wrapper")
+        if (!group) return
 
-            if (editButton) {
-                const originalUrl = editButton.getAttribute('hx-get') || ''
-                const newUrl = originalUrl.replace(/\/\d+\/change\//, `/${event.detail.value}/change/`)
-                const newEditButton = editButton.cloneNode(true)
-                newEditButton.setAttribute('hx-get', newUrl)
-                editButton.replaceWith(newEditButton)
-                window.htmx.process(newEditButton)
+        const wrapper = document.getElementById(group)
+        const editButton = wrapper?.querySelector('.edit-button')
+        const value = event.detail?.value
 
-            }
+        if (editButton && value) {
+            let originalUrl = editButton.getAttribute('hx-get') || editButton.dataset.addUrl || ''
+            if (!originalUrl) return
+
+            const newUrl = originalUrl
+                .replace(/\/add\/\?/, `/${value}/change/?`)
+                .replace(/\/\d+\/change\/\?/, `/${value}/change/?`)
+
+            const newEditButton = editButton.cloneNode(true)
+            newEditButton.setAttribute('hx-get', newUrl)
+            newEditButton.classList.remove('hidden')
+
+            editButton.replaceWith(newEditButton)
+            window.htmx.process(newEditButton)
         }
     }
+
+
 
 }

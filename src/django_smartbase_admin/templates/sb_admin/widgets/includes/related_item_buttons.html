@@ -1,14 +1,19 @@
 {% load i18n %}
 <div class="flex items-center gap-4  flex-shrink-0 related-item-buttons">
-    {% if widget.attrs.related_edit_url %}
+    {% if widget.attrs.related_edit_url or widget.attrs.related_add_url %}
         <a
-           class="btn btn-icon edit-button"
-           title="{% trans 'Edit' %}"
-           data-bs-toggle="modal"
-           data-bs-target="#sb-admin-modal"
-           hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
-           hx-target="#sb-admin-modal .modal-content"
-           hx-swap="innerHTML">
+                class="btn btn-icon edit-button {% if not widget.attrs.related_edit_url %}hidden{% endif %}"
+                title="{% trans 'Edit' %}"
+                {% if widget.attrs.related_edit_url %}
+                    hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
+                {% endif %}
+                {% if widget.attrs.related_add_url and not widget.attrs.related_edit_url %}
+                    data-add-url="{{ widget.attrs.related_add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
+                {% endif %}
+                data-bs-toggle="modal"
+                data-bs-target="#sb-admin-modal"
+                hx-target="#sb-admin-modal .modal-content"
+                hx-swap="innerHTML">
             <svg class="w-20 h-20">
                 <use xlink:href="#Preview-open"></use>
             </svg>
@@ -16,13 +21,13 @@
     {% endif %}
     {% if widget.attrs.related_add_url %}
         <a
-           class="btn btn-icon"
-           title="{% trans 'Add' %}"
-           data-bs-toggle="modal"
-           data-bs-target="#sb-admin-modal"
-           hx-get="{{ widget.attrs.related_add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
-           hx-target="#sb-admin-modal .modal-content"
-           hx-swap="innerHTML">
+                class="btn btn-icon"
+                title="{% trans 'Add' %}"
+                data-bs-toggle="modal"
+                data-bs-target="#sb-admin-modal"
+                hx-get="{{ widget.attrs.related_add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
+                hx-target="#sb-admin-modal .modal-content"
+                hx-swap="innerHTML">
             <svg class="w-20 h-20">
                 <use xlink:href="#Add-one"></use>
             </svg>
