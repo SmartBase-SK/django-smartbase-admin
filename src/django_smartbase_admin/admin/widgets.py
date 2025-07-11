@@ -57,6 +57,18 @@ class SBAdminBaseWidget(ContextMixin):
     def init_widget_dynamic(self, form, form_field, field_name, view, request):
         self.form_field = form_field
 
+    def get_updated_widget_id(self, base_id, opts=None):
+        modal_prefix = ""
+        try:
+            modal_prefix = (
+                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+            )
+        except:
+            pass
+        if opts:
+            return f"{modal_prefix}{opts.app_label}_{opts.model_name}_{base_id}"
+        return base_id
+
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
@@ -67,18 +79,9 @@ class SBAdminBaseWidget(ContextMixin):
             and hasattr(self.form_field.view, "opts")
             else None
         )
-        modal_prefix = ""
-        try:
-            modal_prefix = (
-                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
-            )
-        except:
-            pass
-        if opts:
-            context["widget"]["attrs"][
-                "id"
-            ] = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
-
+        context["widget"]["attrs"]["id"] = self.get_updated_widget_id(
+            context["widget"]["attrs"]["id"], opts
+        )
         return context
 
 
@@ -366,6 +369,9 @@ class SBAdminAutocompleteWidget(
         self.input_id = (
             context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
         )
+        if self.field_name == "value":
+            self.input_id = self.get_updated_widget_id(self.input_id, self.view.opts)
+
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
@@ -411,16 +417,6 @@ class SBAdminAutocompleteWidget(
             request=threadsafe_request,
         ):
             self.add_related_buttons_urls(parsed_value, context)
-
-        if (
-            context.get("filter_widget")
-            and context["filter_widget"].input_id
-            and context["filter_widget"].input_id.endswith("value")
-        ):
-            modal_prefix = "modal_" if is_modal(threadsafe_request) else ""
-            context["filter_widget"].input_id = (
-                f"{modal_prefix}{self.view.opts.app_label}_{self.view.opts.model_name}_{context['filter_widget'].input_id}"
-            )
 
         return context
 
