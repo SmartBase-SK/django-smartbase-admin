@@ -284,7 +284,7 @@ class Main {
             const id = textarea.id
             if (!id) return
             if (window.CKEDITOR.instances[id]) {
-                return
+                window.CKEDITOR.instances[id].destroy(true)
             }
             window.CKEDITOR.replace(id)
         })
