@@ -19,7 +19,8 @@ from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_PAGE_SIZE,
     Action,
     AUTOCOMPLETE_PAGE_NUM,
-    AUTOCOMPLETE_FORWARD_NAME, SELECT_ALL_KEYWORD,
+    AUTOCOMPLETE_FORWARD_NAME,
+    SELECT_ALL_KEYWORD,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -232,7 +233,7 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         default_label=None,
         enable_select_all=False,
         select_all_keyword=SELECT_ALL_KEYWORD,
-        select_all_label=_('All'),
+        select_all_label=_("All"),
         **kwargs,
     ) -> None:
         super().__init__(
