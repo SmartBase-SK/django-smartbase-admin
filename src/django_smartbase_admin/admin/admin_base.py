@@ -702,9 +702,6 @@ class SBAdmin(
     menu_label = None
     sbadmin_is_generic_model = False
 
-    def __init__(self, model=None, admin_site=None):
-        super().__init__(model, admin_site)
-
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
             # update inline_instance parent_instance on formset when creating new object

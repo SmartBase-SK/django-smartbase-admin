@@ -60,25 +60,29 @@ class SBAdminBaseWidget(ContextMixin):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["form_field"] = self.form_field
-        opts = (
-            self.form_field.view.opts
-            if self.form_field
-            and hasattr(self.form_field, "view")
-            and hasattr(self.form_field.view, "opts")
-            else None
-        )
-        modal_prefix = ""
-        try:
-            modal_prefix = (
-                "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
-            )
-        except:
-            pass
+        opts = None
+
+        if self.form_field:
+            view = getattr(self.form_field, "view", None)
+            if view:
+                if hasattr(view, "opts"):
+                    opts = view.opts
+                elif hasattr(view, "view") and hasattr(view.view, "opts"):
+                    opts = view.view.opts
+
         if opts:
+            modal_prefix = ""
+            try:
+                modal_prefix = (
+                    "modal_"
+                    if is_modal(SBAdminThreadLocalService.get_request())
+                    else ""
+                )
+            except:
+                pass
             context["widget"]["attrs"][
                 "id"
             ] = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
-
         return context
 
 
@@ -366,6 +370,7 @@ class SBAdminAutocompleteWidget(
         self.input_id = (
             context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
         )
+
         context["widget"]["type"] = "hidden"
         context["widget"]["attrs"]["id"] = self.input_id
         context["widget"]["attrs"]["class"] = "js-autocomplete-detail"
@@ -404,11 +409,14 @@ class SBAdminAutocompleteWidget(
                 context["widget"]["value"] = json.dumps(selected_options)
                 context["widget"]["value_list"] = selected_options
 
-        if threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
-            self.model,
-            field_name=self.field_name,
-            current_view=self.view,
-            request=threadsafe_request,
+        if (
+            threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
+                self.model,
+                field_name=self.field_name,
+                current_view=self.view,
+                request=threadsafe_request,
+            )
+            and not self.is_multiselect()
         ):
             self.add_related_buttons_urls(parsed_value, context)
 
