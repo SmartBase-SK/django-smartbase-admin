@@ -50,6 +50,7 @@ class Main {
             if (e.target !== e.target.parentNode.firstChild) {
                 e.target.parentNode.insertBefore(e.target, e.target.parentNode.firstChild)
             }
+            window.htmx.process(e.target)
         })
         document.addEventListener('openUrl', (e) => {
             window.open(e.detail.url, e.detail?.target || '_blank')
