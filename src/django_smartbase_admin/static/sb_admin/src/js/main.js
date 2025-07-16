@@ -50,18 +50,26 @@ class Main {
             if (e.target !== e.target.parentNode.firstChild) {
                 e.target.parentNode.insertBefore(e.target, e.target.parentNode.firstChild)
             }
+            window.htmx.process(e.target)
         })
         document.addEventListener('openUrl', (e) => {
             window.open(e.detail.url, e.detail?.target || '_blank')
         })
 
         if (window.htmx) {
-            window.htmx.on("htmx:afterSwap", (detail) => {
+            const shouldProcessAfterSwap = (detail) => {
                 const requestEl = detail.detail.requestConfig.elt.closest('[hx-swap]')
                 if (requestEl && requestEl.getAttribute('hx-swap') === "none") {
                     // do not process afterSwap if none swap is performed
                     // this should prevent double processing of afterSwap for first oob-swapped element
                     // which in case of hx-swap=none is returned here in the detail.target
+                    return false
+                }
+                return true
+            }
+
+            window.htmx.on("htmx:afterSwap", (detail) => {
+                if(!shouldProcessAfterSwap(detail)) {
                     return
                 }
                 this.initFileInputs(detail.target)
@@ -69,6 +77,12 @@ class Main {
                 this.initInputs(detail.target)
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
                 this.initInlines(detail.target)
+            })
+
+            window.htmx.on("htmx:afterSettle", (detail) => {
+                if(!shouldProcessAfterSwap(detail)) {
+                    return
+                }
                 this.initCKEditor(detail.target)
             })
         }
@@ -279,14 +293,24 @@ class Main {
     }
 
     initCKEditor(target) {
+        if(!window.CKEDITOR) {
+            return
+        }
         target = target || document
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
             const id = textarea.id
-            if (!id) return
-            if (window.CKEDITOR.instances[id]) {
-                window.CKEDITOR.instances[id].destroy(true)
+            if (!id) {
+                return
             }
-            window.CKEDITOR.replace(id)
+            if(
+                textarea.getAttribute("data-processed") == "0" &&
+                textarea.id.indexOf("__prefix__") == -1
+            ) {
+                if(window.CKEDITOR.instances[id]) {
+                    window.CKEDITOR.instances[id].destroy(true)
+                }
+                window.CKEDITOR.replace(id, JSON.parse(textarea.getAttribute("data-config")))
+            }
         })
     }
 
