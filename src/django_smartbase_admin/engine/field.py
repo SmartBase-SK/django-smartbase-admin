@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import Any
+
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.db.models import (
     Count,
@@ -52,17 +55,23 @@ class TabulatorFieldOptions(JSONSerializableMixin):
 
 
 class XLSXFieldOptions(JSONSerializableMixin):
-    title = None
-    field = None
-    formatter = None
+    title: str | None = None
+    field: str | None = None
+    formatter: Formatter | None = None
+    python_formatter: Callable[[int, Any], Any] | None = None
 
     def __init__(
-        self, title: str = None, field: str = None, formatter: Formatter = None
+        self,
+        title: str | None = None,
+        field: str | None = None,
+        formatter: Formatter | None = None,
+        python_formatter: Callable[[int, Any], Any] | None = None,
     ) -> None:
         super().__init__()
         self.title = title
         self.field = field
         self.formatter = formatter
+        self.python_formatter = python_formatter
 
 
 class SBAdminField(JSONSerializableMixin):
