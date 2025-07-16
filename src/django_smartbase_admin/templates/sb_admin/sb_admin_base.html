@@ -6,8 +6,40 @@
     <div class="w-full h-full min-h-full{% if not sec_fetch_site or request.META.HTTP_SEC_FETCH_DEST == 'document' %} xl:pl-260{% endif %}">
         {% include 'sb_admin/navigation.html' %}
         <div id="content" class="min-h-screen sm:p-24 relative flex flex-col {% block view_class %}{% endblock %}">
-            {% include "sb_admin/includes/loading.html" %}
-            {% include "sb_admin/includes/notifications.html" %}
+            {% if sbadmin_is_modal %}
+                {# load media which are missing #}
+                <script>
+                    (function(){
+                        const mediaString = '{{ media|escapejs }}';
+                        const mediaList = mediaString.split('\n');
+                        const tmpEl = document.createElement('div');
+                        function duplicateScript(script) {
+                            const newScript = document.createElement('script');
+                            for (let i = 0; i < script.attributes.length; i++) {
+                                const attr = script.attributes[i];
+                                newScript.setAttribute(attr.name, attr.value);
+                            }
+                            newScript.textContent = script.textContent;
+                            newScript.async = false;
+                            return newScript;
+                        }
+                        mediaList.forEach(media => {
+                            tmpEl.innerHTML = media.trim();
+                            const mediaEl = tmpEl.firstElementChild;
+                            if(mediaEl.tagName === 'LINK' && !document.head.querySelector(`link[href="${mediaEl.getAttribute('href')}"]`)) {
+                                document.head.appendChild(mediaEl);
+                                return
+                            }
+                            if(mediaEl.tagName === 'SCRIPT' && !document.head.querySelector(`script[src="${mediaEl.getAttribute('src')}"]`)) {
+                                document.head.appendChild(duplicateScript(mediaEl));
+                            }
+                        });
+                    }());
+                </script>
+            {% else %}
+                {% include "sb_admin/includes/loading.html" %}
+                {% include "sb_admin/includes/notifications.html" %}
+            {% endif %}
 
             {% block content %}
             {% endblock %}

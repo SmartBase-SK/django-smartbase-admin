@@ -283,10 +283,13 @@ class Main {
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
             const id = textarea.id
             if (!id) return
-            if (window.CKEDITOR.instances[id]) {
-                window.CKEDITOR.instances[id].destroy(true)
+            if(window.CKEDITOR) {
+                if (window.CKEDITOR.instances[id]) {
+                    window.CKEDITOR.instances[id].destroy(true)
+                }
+                window.CKEDITOR.replace(id)
             }
-            window.CKEDITOR.replace(id)
+
         })
     }
 
