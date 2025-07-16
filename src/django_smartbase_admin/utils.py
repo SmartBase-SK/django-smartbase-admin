@@ -107,22 +107,3 @@ def import_with_injection(from_import, import_name):
         return _pluck_classes([overridden_module, original_module], [import_name])[0]
     else:
         return _pluck_classes([original_module], [import_name])[0]
-
-
-def is_simple_user(user):
-
-    user_groups = set(user.groups.values_list("name", flat=True))
-
-    from project.sb_admin_configuration import (
-        ORGANIZATION_ADMIN_ROLE,
-        BRANCH_MANAGER_ROLE,
-        USER_ROLE,
-    )
-
-    return (
-        not user.is_superuser
-        and not (
-            ORGANIZATION_ADMIN_ROLE in user_groups or BRANCH_MANAGER_ROLE in user_groups
-        )
-        or USER_ROLE in user_groups
-    )
