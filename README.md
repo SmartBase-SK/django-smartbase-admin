@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     "django_smartbase_admin",
     "easy_thumbnails",
     "widget_tweaks",
+    "ckeditor",
+    "ckeditor_uploader",
 ]
 ```
 
