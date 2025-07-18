@@ -252,14 +252,20 @@ def get_file_extension(file):
 
 
 @register.simple_tag
-def get_file_preview_image(file, file_extension=None):
+def get_file_preview_image(
+    file, file_extension=None, thumbnail_width=64, thumbnail_height=64
+):
     file_extension = file_extension or get_file_extension(file)
     if file_extension in ["jpg", "png"]:
         from easy_thumbnails.files import get_thumbnailer
 
         thumbnailer = get_thumbnailer(file)
         thumb = thumbnailer.get_thumbnail(
-            {"size": (64, 64), "crop": True, "replace_alpha": "#fff"}
+            {
+                "size": (thumbnail_width, thumbnail_height),
+                "crop": True,
+                "replace_alpha": "#fff",
+            }
         )
         return thumb.url
     if file_extension == "svg":
