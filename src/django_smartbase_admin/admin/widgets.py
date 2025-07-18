@@ -31,7 +31,9 @@ from django_smartbase_admin.engine.filter_widgets import (
     SBAdminTreeWidgetMixin,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
-from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
+from django_smartbase_admin.templatetags.sb_admin_tags import (
+    SBAdminJSONEncoder,
+)
 from django_smartbase_admin.utils import is_modal
 
 logger = logging.getLogger(__name__)

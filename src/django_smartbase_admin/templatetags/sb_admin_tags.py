@@ -1,4 +1,5 @@
 import json
+import os
 
 from django import template
 from django.contrib.admin.templatetags.admin_modify import submit_row
@@ -6,6 +7,7 @@ from django.contrib.admin.utils import lookup_field
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.defaultfilters import json_script
+from django.templatetags.static import static
 from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
 from django.utils.translation import gettext
@@ -239,3 +241,35 @@ def get_row_class(inline_admin_form):
 @register.filter
 def is_row_class_field(field):
     return isinstance(field, dict) and field["name"] == ROW_CLASS_FIELD
+
+
+@register.simple_tag
+def get_file_extension(file):
+    if not file:
+        return ""
+    name, extension = os.path.splitext(file.name)
+    return extension.lower().replace(".", "")
+
+
+@register.simple_tag
+def get_file_preview_image(file, file_extension=None):
+    file_extension = file_extension or get_file_extension(file)
+    if file_extension in ["jpg", "png"]:
+        from easy_thumbnails.files import get_thumbnailer
+
+        thumbnailer = get_thumbnailer(file)
+        thumb = thumbnailer.get_thumbnail(
+            {"size": (64, 64), "crop": True, "replace_alpha": "#fff"}
+        )
+        return thumb.url
+    if file_extension == "svg":
+        return file.url
+    if file_extension == "pdf":
+        # TODO change pdf file image
+        return static("sb_admin/images/file_types/file-doc.svg")
+    if file_extension in ["doc", "docx"]:
+        return static("sb_admin/images/file_types/file-doc.svg")
+    if file_extension in ["xls", "xlsx", "xlsm"]:
+        return static("sb_admin/images/file_types/file-xlsx.svg")
+    # TODO change default file image
+    return static("sb_admin/images/file_types/file-doc.svg")
