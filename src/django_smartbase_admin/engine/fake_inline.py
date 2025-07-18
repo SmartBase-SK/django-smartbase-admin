@@ -3,7 +3,9 @@ from django.db import models
 from django.db.models import F
 from django.forms import BaseInlineFormSet
 
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
+from django_smartbase_admin.utils import is_modal
 
 
 class FakeQueryset(models.QuerySet):
@@ -32,6 +34,14 @@ class FakeQueryset(models.QuerySet):
 class SBAdminFakeInlineFormset(BaseInlineFormSet):
     original_model = None
     inline_instance = None
+
+    @classmethod
+    def get_default_prefix(cls):
+        prefix = super().get_default_prefix()
+        modal_prefix = (
+            "modal_" if is_modal(SBAdminThreadLocalService.get_request()) else ""
+        )
+        return f"{modal_prefix}{prefix}"
 
     def save_new(self, form, commit=True):
         return self.inline_instance.save_new_fake_inline_instance(

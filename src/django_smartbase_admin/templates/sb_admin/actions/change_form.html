@@ -28,91 +28,103 @@
     {% get_tabular_context adminform inline_admin_formsets tabs_context as tabular_context %}
 
     {% block header %}
-        <div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
-            {% if not is_popup and has_view_permission %}
-                {% url opts|admin_urlname:'changelist' as changelist_url %}
-                <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
-                    <svg class="w-20 h-20">
-                        <use xlink:href="#Left-small"></use>
-                    </svg>
-                </a>
-            {% endif %}
-            <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">
-                {% include 'sb_admin/includes/change_form_title.html' %}
-            </h1>
-            {% if change and not is_popup %}
-                <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
-                    <li class="relative md:hidden">
-                        <button
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                            data-bs-popper-placement="bottom-end"
-                            class="btn btn-empty btn-icon">
-                            <svg class="w-16 h-16">
-                                <use xlink:href="#More"></use>
-                            </svg>
-                            <span></span>
-                        </button>
-                        <div class="dropdown-menu w-248 max-h-432">
-                            <ul>
-                                {% block dropdown_actions %}
-                                    {% if detail_actions %}
-                                        {% for action in detail_actions %}
-                                            <li>
-                                                <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link {{ action.css_class|default_if_none:'' }}">
-                                                    {{ action.title }}
-                                                </a>
-                                            </li>
-                                        {% endfor %}
-                                    {% endif %}
-
-                                    <li>
-                                        {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
-                                        <a href="{% add_preserved_filters history_url %}" class="dropdown-menu-link">{% trans "History" %}</a>
-                                    </li>
-                                {% endblock %}
-                            </ul>
-                        </div>
-                    </li>
-
-
-                    {% block actions %}
-                        <li class="max-sm:hidden">
-                            {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
-                            <a href="{% add_preserved_filters history_url %}" class="btn btn-empty">{% trans "History" %}</a>
-                        </li>
-
-                        {% if detail_actions %}
-                            {% for action in detail_actions %}
-                                <li class="max-sm:hidden">
-                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty {{ action.css_class|default_if_none:'' }}">
-                                        {{ action.title }}
-                                    </a>
-                                </li>
-                            {% endfor %}
-                        {% endif %}
-                    {% endblock %}
-                    {% if has_absolute_url %}
-                        <li>
-                            <a href="{{ absolute_url }}" class="btn btn-icon">
-                                <svg class="w-20 h-20 md:mr-8">
-                                    <use xlink:href="#Preview-open"></use>
+        {% if sbadmin_is_modal %}
+            <div class="modal-header">
+                <h3 class="text-dark-900 text-18 font-semibold leading-28">
+                    {% include 'sb_admin/includes/change_form_title.html' %}
+                </h3>
+                <svg data-bs-dismiss="modal" aria-label="Close"
+                     class="w-24 h-24 absolute top-16 right-16 cursor-pointer transition-transform hover:rotate-90">
+                    <use xlink:href="#Close-small"></use>
+                </svg>
+            </div>
+        {% else %}
+            <div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+                {% if not is_popup and has_view_permission %}
+                    {% url opts|admin_urlname:'changelist' as changelist_url %}
+                    <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
+                        <svg class="w-20 h-20">
+                            <use xlink:href="#Left-small"></use>
+                        </svg>
+                    </a>
+                {% endif %}
+                <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">
+                    {% include 'sb_admin/includes/change_form_title.html' %}
+                </h1>
+                {% if change and not is_popup %}
+                    <ul class="detail-view-actions flex ml-auto gap-8 md:gap-16">
+                        <li class="relative md:hidden">
+                            <button
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-bs-popper-placement="bottom-end"
+                                class="btn btn-empty btn-icon">
+                                <svg class="w-16 h-16">
+                                    <use xlink:href="#More"></use>
                                 </svg>
-                                <span>
-                                    {% trans "View on site" %}
-                                </span>
-                            </a>
+                                <span></span>
+                            </button>
+                            <div class="dropdown-menu w-248 max-h-432">
+                                <ul>
+                                    {% block dropdown_actions %}
+                                        {% if detail_actions %}
+                                            {% for action in detail_actions %}
+                                                <li>
+                                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link {{ action.css_class|default_if_none:'' }}">
+                                                        {{ action.title }}
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        {% endif %}
+
+                                        <li>
+                                            {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
+                                            <a href="{% add_preserved_filters history_url %}" class="dropdown-menu-link">{% trans "History" %}</a>
+                                        </li>
+                                    {% endblock %}
+                                </ul>
+                            </div>
                         </li>
-                    {% endif %}
-                </ul>
-            {% endif %}
-        </div>
+
+
+                        {% block actions %}
+                            <li class="max-sm:hidden">
+                                {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
+                                <a href="{% add_preserved_filters history_url %}" class="btn btn-empty">{% trans "History" %}</a>
+                            </li>
+
+                            {% if detail_actions %}
+                                {% for action in detail_actions %}
+                                    <li class="max-sm:hidden">
+                                        <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty {{ action.css_class|default_if_none:'' }}">
+                                            {{ action.title }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            {% endif %}
+                        {% endblock %}
+                        {% if has_absolute_url %}
+                            <li>
+                                <a href="{{ absolute_url }}" class="btn btn-icon">
+                                    <svg class="w-20 h-20 md:mr-8">
+                                        <use xlink:href="#Preview-open"></use>
+                                    </svg>
+                                    <span>
+                                        {% trans "View on site" %}
+                                    </span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endif %}
     {% endblock %}
 
     {% block form %}
         <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
-              id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="detail-view-form flex-grow flex flex-col w-full max-w-1180 mx-auto" novalidate>
-        <div class=" {% if sbadmin_is_modal %}max-h-[70vh] overflow-y-auto sbadmin_is_modal realative flex-grow{% endif %}">
+              id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="flex flex-col{% if sbadmin_is_modal %} min-h-0{% else %} detail-view-form flex-grow w-full max-w-1180 mx-auto{% endif %}" novalidate>
+        <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
             {% csrf_token %}
             {% if errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
@@ -199,7 +211,7 @@
                 {# TODO: check sticky bar in popups #}
             {% endif %}
             {% if sbadmin_is_modal %}
-                <div class="bg-light bottom-0 left-0 w-full px-24 py-24 flex justify-between gap-8">
+                <div class="modal-footer">
                     {% if original %}
                         {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
                     {% else %}
@@ -210,6 +222,7 @@
                             hx-post="{{ post_url }}"
                             hx-target="#sb-admin-modal .modal-content"
                             hx-swap="innerHTML"
+                            hx-select="#content"
                             hx-encoding="multipart/form-data"
                             hx-vals='{
                                 "sbadmin_is_modal": 1,
