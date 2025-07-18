@@ -21,7 +21,7 @@ from django.core.exceptions import (
     PermissionDenied,
 )
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.forms import HiddenInput
 from django.forms.models import (
     ModelFormMetaclass,
@@ -818,6 +818,9 @@ class SBAdmin(
     def get_new_url(self, request) -> str:
         return reverse(f"sb_admin:{self.get_id()}_add")
 
+    def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
+        return Q()
+
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
@@ -833,14 +836,17 @@ class SBAdmin(
         list_action = self.sbadmin_list_action_class(
             self, request, all_params=all_params
         )
+        additional_filter = self.get_additional_filter_for_previous_next_context(
+            request, object_id
+        )
         all_ids = list(
-            list_action.build_final_data_count_queryset()
+            list_action.build_final_data_count_queryset(additional_filter)
             .order_by(*list_action.get_order_by_from_request())
             .values_list("id", flat=True)
         )
         index = all_ids.index(int(object_id))
-        previous_id = None if index == 0 else all_ids[index - 1]
-        next_id = None if index == len(all_ids) - 1 else all_ids[index + 1]
+        previous_id = all_ids[-1] if index == 0 else all_ids[index - 1]
+        next_id = all_ids[0] if index == len(all_ids) - 1 else all_ids[index + 1]
         return {
             "previous_url": (
                 f"{self.get_detail_url(previous_id)}?_changelist_filters={changelist_filters}"
