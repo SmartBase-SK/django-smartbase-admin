@@ -1,4 +1,4 @@
-<a  {% if action.open_in_modal %}
+<a {% if action.open_in_modal %}
     {% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=action %}
     hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}"
 {% else %}
