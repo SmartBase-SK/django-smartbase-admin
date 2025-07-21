@@ -10,6 +10,7 @@ class SBAdminCustomAction(object):
     css_class = None
     no_params = False
     open_in_modal = False
+    open_in_new_tab = False
 
     def __init__(
         self,
@@ -24,6 +25,7 @@ class SBAdminCustomAction(object):
         group=None,
         sub_actions=None,
         icon=None,
+        open_in_new_tab=None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -37,6 +39,7 @@ class SBAdminCustomAction(object):
         self.group = group
         self.sub_actions = sub_actions
         self.icon = icon
+        self.open_in_new_tab = open_in_new_tab
         self.resolve_url()
 
     def resolve_url(self):
