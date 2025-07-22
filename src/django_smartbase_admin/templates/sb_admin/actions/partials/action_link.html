@@ -2,7 +2,7 @@
     {% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=action %}
     hx-vals="js:{params: window.SBAdminTable['{{ view_id }}'].getAllUrlParams()}"
 {% else %}
-    onclick="window.SBAdmin.executeListAction('{{ view_id }}', '{{ action.url }}', {{ action.no_params|yesno:'true,false' }})"
+    onclick="window.SBAdmin.executeListAction('{{ view_id }}', '{{ action.url }}', {{ action.no_params|yesno:'true,false' }}, {{ action.open_in_new_tab|default:False|yesno:'true,false'|lower }})"
 {% endif %}
     class="{{ extra_classes|default:'' }} {{ action.css_class|default_if_none:'' }}">
     {% if action.icon %}

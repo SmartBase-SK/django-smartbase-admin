@@ -301,7 +301,7 @@ class SBAdminTable {
         })
     }
 
-    executeListAction(action_url, no_params) {
+    executeListAction(action_url, no_params, open_in_new_tab = false) {
         const params = this.getUrlParamsString()
         if (this.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
             const urlParams = new URLSearchParams(params)
@@ -348,7 +348,11 @@ class SBAdminTable {
             if (!no_params) {
                 action_url += params
             }
-            window.location.href = action_url
+            if (open_in_new_tab) {
+                window.open(action_url, '_blank')
+            } else {
+                window.location.href = action_url
+            }
         }
     }
 }

@@ -293,7 +293,7 @@ class Main {
     }
 
     initCKEditor(target) {
-        if(!window.CKEDITOR) {
+        if (!window.CKEDITOR) {
             return
         }
         target = target || document
@@ -321,11 +321,15 @@ class Main {
         fieldElem.dispatchEvent(new CustomEvent('clear', {detail: {refresh: true}}))
     }
 
-    executeListAction(table_id, action_url, no_params) {
+    executeListAction(table_id, action_url, no_params, open_in_new_tab = false) {
         if (window.SBAdminTable && window.SBAdminTable[table_id]) {
-            window.SBAdminTable[table_id].executeListAction(action_url, no_params)
+            window.SBAdminTable[table_id].executeListAction(action_url, no_params, open_in_new_tab)
         } else {
-            window.location.href = action_url
+            if (open_in_new_tab) {
+                window.open(action_url, '_blank')
+            } else {
+                window.location.href = action_url
+            }
         }
     }
 }
