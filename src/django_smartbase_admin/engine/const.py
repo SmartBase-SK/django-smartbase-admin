@@ -74,3 +74,4 @@ TRANSLATIONS_SELECTED_LANGUAGES = "translation_selected_languages"
 OVERRIDE_CONTENT_OF_NOTIFICATION = "override_notification_content"
 FIELDSET_HIDE_HEADER_CLASS = "hide-header"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"
+SUPPORTED_FILE_TYPE_ICONS = ["doc", "docx", "csv", "xls", "xlsx", "pdf", "ppt", "zip"]

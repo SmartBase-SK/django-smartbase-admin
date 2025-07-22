@@ -84,6 +84,9 @@
             @apply bg-dark-100;
             @apply transition-colors;
         }
+        img[src^="/media"] {
+            @apply border;
+        }
         &:not(.filled) {
             &:hover {
                 @apply border-primary bg-primary-50;

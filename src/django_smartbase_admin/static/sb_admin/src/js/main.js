@@ -272,7 +272,19 @@ class Main {
                 if (e.target.files[0]) {
                     fileInput.classList.add('filled')
                     fileInput.querySelectorAll('.js-input-file-image').forEach(el => {
-                        el.src = URL.createObjectURL(e.target.files[0])
+                        const nameSplit= e.target.files[0].name.split('.')
+                        const extension = nameSplit[nameSplit.length - 1]
+                        if(['jpg', 'png', 'svg', 'webp'].includes(extension)) {
+                            el.src = URL.createObjectURL(e.target.files[0])
+                            el.classList.add('border')
+                            return
+                        }
+                        el.classList.remove('border')
+                        if(window.sb_admin_const.SUPPORTED_FILE_TYPE_ICONS.includes(extension)) {
+                            el.src =  `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-${extension}.svg`
+                            return
+                        }
+                        el.src =  `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-other.svg`
                     })
                     fileInput.querySelector('.js-input-file-filename').innerHTML = e.target.files[0].name
                 } else {

@@ -12,7 +12,10 @@ from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
 from django.utils.translation import gettext
 
-from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
+from django_smartbase_admin.engine.const import (
+    ROW_CLASS_FIELD,
+    SUPPORTED_FILE_TYPE_ICONS,
+)
 from django_smartbase_admin.templatetags.base import InclusionSBAdminNode
 
 register = template.Library()
@@ -268,14 +271,9 @@ def get_file_preview_image(
             }
         )
         return thumb.url
-    if file_extension == "svg":
+    if file_extension == "svg" or file_extension == "webp":
         return file.url
-    if file_extension == "pdf":
-        # TODO change pdf file image
-        return static("sb_admin/images/file_types/file-doc.svg")
-    if file_extension in ["doc", "docx"]:
-        return static("sb_admin/images/file_types/file-doc.svg")
-    if file_extension in ["xls", "xlsx", "xlsm"]:
-        return static("sb_admin/images/file_types/file-xlsx.svg")
-    # TODO change default file image
-    return static("sb_admin/images/file_types/file-doc.svg")
+    for extension in SUPPORTED_FILE_TYPE_ICONS:
+        if file_extension == extension:
+            return static(f"sb_admin/images/file_types/file-{extension}.svg")
+    return static("sb_admin/images/file_types/file-other.svg")

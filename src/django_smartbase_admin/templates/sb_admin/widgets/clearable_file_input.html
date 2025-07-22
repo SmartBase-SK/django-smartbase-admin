@@ -4,7 +4,7 @@
 <div class="relative input-file-wrapper">
     <div class="input-file js-input-file{% if widget.is_initial %} filled{% endif %}">
         <div class="flex items-center flex-shrink-0">
-            <img src="{% if widget.is_initial %}{% get_file_preview_image widget.value %}{% endif %}" alt="" class="js-input-file-image object-cover w-64 h-64 rounded-xs border border-dark-300 mr-16" width="64" height="64">
+            <img src="{% if widget.is_initial %}{% get_file_preview_image widget.value %}{% endif %}" alt="" class="js-input-file-image border-dark-300 object-cover w-64 h-64 rounded-xs mr-16" width="64" height="64">
             <span class="w-40 h-40 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon">
                 <svg class="w-24 h-24">
                     <use xlink:href="#Upload"></use>
