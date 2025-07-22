@@ -184,11 +184,13 @@
                             <div class="lg:flex-shrink-0 w-full lg:w-370 empty:hidden">
                                 {% for tab_content in tab_content_object.content %}
                                     {% if tab_content.type == 'fieldset' %}
-                                        {% with tab_content.value as fieldset %}
-                                            {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes and not sbadmin_is_modal %}
-                                                {% include "sb_admin/includes/fieldset.html" %}
-                                            {% endif %}
-                                        {% endwith %}
+                                        {% block tab_content_fieldset_right %}
+                                            {% with tab_content.value as fieldset %}
+                                                {% if DETAIL_STRUCTURE_RIGHT_CLASS in fieldset.classes and not sbadmin_is_modal %}
+                                                    {% include "sb_admin/includes/fieldset.html" %}
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endblock %}
                                     {% endif %}
                                 {% endfor %}
                             </div>
