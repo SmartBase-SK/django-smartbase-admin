@@ -82,9 +82,10 @@ class SBAdminBaseWidget(ContextMixin):
                 )
             except:
                 pass
-            context["widget"]["attrs"][
-                "id"
-            ] = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
+            widget_id = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
+            context["widget"]["attrs"]["id"] = widget_id
+            # needed for BoundField.id_for_label to work correctly
+            self.form_field.widget.attrs["id"] = widget_id
         return context
 
 
