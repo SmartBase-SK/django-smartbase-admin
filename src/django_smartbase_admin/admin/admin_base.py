@@ -990,23 +990,6 @@ class SBAdmin(
             self.set_generic_relation_from_parent(request, obj)
         super().save_model(request, obj, form, change)
 
-    def process_field_data(
-        self,
-        request,
-        field: SBAdminField,
-        obj_id: Any,
-        value: Any,
-        additional_data: dict[str, Any],
-    ) -> Any:
-        is_xlsx_export = request.request_data.action == Action.XLSX_EXPORT.value
-        if field.view_method:
-            value = field.view_method(obj_id, value, **additional_data)
-        if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
-            value = field.xlsx_options.python_formatter(obj_id, value)
-        elif field.python_formatter:
-            value = field.python_formatter(obj_id, value)
-        return value
-
 
 class SBAdminInline(
     SBAdminInlineAndAdminCommon, SBAdminBaseQuerysetMixin, SBAdminBaseView
