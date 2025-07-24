@@ -3,22 +3,22 @@
 {% block content %}
 	{% block header %}
 		{% if fieldset.name %}
-            <header class="mb-24">
+            <header class="mb-24 flex items-center">
                 <span class="text-dark-900">{{ fieldset.name }}</span>
-                <div class="ml-auto flex items-center">
+                {% block description %}
+                    {% if fieldset.description %}
+                        <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
+                            <svg class="w-20 h-20">
+                                <use xlink:href="#Help"></use>
+                            </svg>
+                        </div>
+                    {% endif %}
+                {% endblock %}
+                <div class="ml-auto flex items-center gap-4">
                     {% block actions %}
                         {% for action in fieldset_context.actions %}
                             <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
                         {% endfor %}
-                    {% endblock %}
-                    {% block description %}
-                        {% if fieldset.description %}
-                            <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
-                                <svg class="w-20 h-20">
-                                    <use xlink:href="#Help"></use>
-                                </svg>
-                            </div>
-                        {% endif %}
                     {% endblock %}
                 </div>
             </header>
