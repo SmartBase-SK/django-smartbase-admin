@@ -2,7 +2,7 @@ import json
 import urllib.parse
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
@@ -45,6 +45,9 @@ from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXFormat,
 )
 from django_smartbase_admin.utils import is_htmx_request, render_notifications, is_modal
+
+if TYPE_CHECKING:
+    from django_smartbase_admin.engine.field import SBAdminField
 
 SBADMIN_IS_MODAL_VAR = "sbadmin_is_modal"
 SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR = "sbadmin_parent_instance_field"
@@ -235,6 +238,23 @@ class SBAdminBaseView(object):
 
     def get_model_path(self) -> str:
         return SBAdminViewService.get_model_path(self.model)
+
+    def process_field_data(
+        self,
+        request,
+        field: "SBAdminField",
+        obj_id: Any,
+        value: Any,
+        additional_data: dict[str, Any],
+    ) -> Any:
+        is_xlsx_export = request.request_data.action == Action.XLSX_EXPORT.value
+        if field.view_method:
+            value = field.view_method(obj_id, value, **additional_data)
+        if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
+            value = field.xlsx_options.python_formatter(obj_id, value)
+        elif field.python_formatter:
+            value = field.python_formatter(obj_id, value)
+        return value
 
 
 class SBAdminBaseQuerysetMixin(object):
