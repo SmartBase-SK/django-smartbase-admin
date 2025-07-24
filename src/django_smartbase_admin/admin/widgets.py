@@ -421,25 +421,25 @@ class SBAdminAutocompleteWidget(
             )
             and not self.is_multiselect()
         ):
-            self.add_related_buttons_urls(parsed_value, context)
+            self.add_related_buttons_urls(parsed_value, threadsafe_request, context)
 
         return context
 
-    def add_related_buttons_urls(self, parsed_value, context):
+    def add_related_buttons_urls(self, parsed_value, request, context):
         related_model = self.model
         app_label = related_model._meta.app_label
         model_name = related_model._meta.model_name
 
         try:
-            if parsed_value:
+            if parsed_value and self.has_view_or_change_permission(request, self.model):
                 change_url = reverse(
                     "sb_admin:{}_{}_change".format(app_label, model_name),
                     args=(parsed_value,),
                 )
                 context["widget"]["attrs"]["related_edit_url"] = change_url
-
-            add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
-            context["widget"]["attrs"]["related_add_url"] = add_url
+            if self.has_add_permission(request, self.model):
+                add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
+                context["widget"]["attrs"]["related_add_url"] = add_url
         except NoReverseMatch:
             pass
 
