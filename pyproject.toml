@@ -40,4 +40,13 @@ setuptools = "^67.0.0"
 
 [build-system]
 requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api" 
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+force_exclude = '''
+/(
+  | migrations
+)/
+
+'''
+
