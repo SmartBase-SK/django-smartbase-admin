@@ -219,6 +219,7 @@
                     {% else %}
                         {% url opts|admin_urlname:'add' as post_url %}
                     {% endif %}
+                {% if has_change_permission %}
                     <button
                             form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
                             hx-post="{{ post_url }}"
@@ -240,6 +241,7 @@
                         </svg>
                         {% trans 'Save' %}
                     </button>
+                    {% endif %}
                     <button type="button"
                             class="btn flex-grow"
                             data-bs-dismiss="modal" aria-label="Close">
