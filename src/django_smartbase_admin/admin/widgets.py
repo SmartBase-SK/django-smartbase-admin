@@ -431,7 +431,7 @@ class SBAdminAutocompleteWidget(
         model_name = related_model._meta.model_name
 
         try:
-            if parsed_value and self.has_change_permission(request, self.model):
+            if parsed_value and self.has_view_or_change_permission(request, self.model):
                 change_url = reverse(
                     "sb_admin:{}_{}_change".format(app_label, model_name),
                     args=(parsed_value,),
