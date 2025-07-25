@@ -148,6 +148,33 @@
                                 </svg>
                                 {% trans 'Change password' %}
                             </li>
+                            <li class="flex js-dropdown-wrapper">
+                                <div class="dropdown-btn flex items-center p-12 text-dark-900 cursor-pointer hover:bg-dark-100 w-full"
+                                     data-bs-toggle="dropdown"
+                                     data-bs-offset="[0,8]"
+                                     data-bs-popper-placement="top-start">
+                                    <span class="js-dropdown-label">test</span>
+                                </div>
+                                <div class="dropdown-menu max-h-432">
+                                    <ul>
+                                        <li class="relative">
+                                            <input type="radio" name="color-scheme" id="color-scheme-dark" class="radio">
+                                            <label for="color-scheme-dark">
+                                                <svg class="w-20 h-20"><use href="#Logout"></use></svg>
+                                                Dark
+                                            </label>
+                                        </li>
+                                        <li class="relative">
+                                            <input type="radio" name="color-scheme" id="color-scheme-light" class="radio">
+                                            <label for="color-scheme-light">Light</label>
+                                        </li>
+                                        <li class="relative">
+                                            <input type="radio" name="color-scheme" id="color-scheme-default" class="radio">
+                                            <label for="color-scheme-default">Predvolena</label>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
                             {% if request_data.global_filter_instance %}
                                 <li class="p-12 text-dark-900">
                                     {% trans 'Choose domain' %}
