@@ -1159,7 +1159,7 @@ class SBAdminGenericStackedInline(SBAdminInline, NestedGenericStackedInline):
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
 
 
-class SbTranslatableAdmin(SBAdmin, TranslatableAdmin):
+class SBTranslatableAdmin(SBAdmin, TranslatableAdmin):
     def get_readonly_fields(self, request, obj=...):
         readonly_fields = super().get_readonly_fields(request, obj)
         if "sbadmin_translation_status" not in readonly_fields:
