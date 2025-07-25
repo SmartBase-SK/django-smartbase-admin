@@ -42,7 +42,10 @@ def render_notifications(request):
 
 def is_modal(request):
     from django_smartbase_admin.engine.admin_base_view import SBADMIN_IS_MODAL_VAR
-    return request and (SBADMIN_IS_MODAL_VAR in request.GET or SBADMIN_IS_MODAL_VAR in request.POST)
+
+    return request and (
+        SBADMIN_IS_MODAL_VAR in request.GET or SBADMIN_IS_MODAL_VAR in request.POST
+    )
 
 
 class FormFieldsetMixin(forms.Form):

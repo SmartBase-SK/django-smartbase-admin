@@ -208,11 +208,17 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
 
     def format_translation_status(self, object_id, value):
         if value == self.TRANSLATION_NOT_TRANSLATED:
-            return mark_safe(f'<span class="badge badge-simple badge-neutral"><svg class="w-16 h-16 mr-4 text-invisible"><use xlink:href="#Add-one"></use></svg>{_("Not Translated")}</span>')
+            return mark_safe(
+                f'<span class="badge badge-simple badge-neutral"><svg class="w-16 h-16 mr-4 text-invisible"><use xlink:href="#Add-one"></use></svg>{_("Not Translated")}</span>'
+            )
         if value == self.TRANSLATION_INCOMPLETE:
-            return mark_safe(f'<span class="badge badge-simple badge-warning"><svg class="w-16 h-16 mr-4 text-warning"><use xlink:href="#Attention"></use></svg>{_("Incomplete")}</span>')
+            return mark_safe(
+                f'<span class="badge badge-simple badge-warning"><svg class="w-16 h-16 mr-4 text-warning"><use xlink:href="#Attention"></use></svg>{_("Incomplete")}</span>'
+            )
         if value == self.TRANSLATION_TRANSLATED:
-            return mark_safe(f'<span class="badge badge-simple badge-positive"><svg class="w-16 h-16 mr-4 text-success"><use xlink:href="#Check"></use></svg>{_("Translated")}</span>')
+            return mark_safe(
+                f'<span class="badge badge-simple badge-positive"><svg class="w-16 h-16 mr-4 text-success"><use xlink:href="#Check"></use></svg>{_("Translated")}</span>'
+            )
 
     def get_translated_fields(self):
         return SBAdminTranslationsService.get_translated_fields_for_model(self.model)

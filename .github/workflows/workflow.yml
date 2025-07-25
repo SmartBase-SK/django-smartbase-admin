@@ -24,9 +24,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.x"    
-    - name: Install pypa/build
-      run: python3 -m pip install poetry==1.8.5
+        python-version: "3.x"
+    - name: Install dependencies
+      run: |
+        python3 -m pip install poetry==1.8.5
+        poetry install
+        poetry run pip install black
+    - name: Check Python code formatting with Black
+      run: poetry run black --check .
     - name: Build a binary wheel and a source tarball
       run: poetry build
     - name: Store the distribution packages
