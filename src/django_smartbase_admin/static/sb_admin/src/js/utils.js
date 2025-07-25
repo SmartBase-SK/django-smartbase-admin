@@ -66,6 +66,32 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
     })
 }
 
+const getResultLabel = (valueOrObject, separator=', ') => {
+    const labelArray = []
+    const entries = Object.values(valueOrObject)
+    let hasMaxEntries = false
+    for (let [index, item] of entries.entries()) {
+        if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN) {
+            break
+        }
+        if(entries.length > 1 && item.value === window.sb_admin_const.SELECT_ALL_KEYWORD) {
+            continue
+        }
+        if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN - 2 && entries[index + 2]) {
+            labelArray.push(item.label)
+            hasMaxEntries = true
+            break
+        }
+        labelArray.push(item.label)
+    }
+    let resultLabel = labelArray.join(separator)
+    if(hasMaxEntries) {
+        resultLabel = resultLabel.substring(0, resultLabel.length)
+        resultLabel += `... +${entries.length - window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN + 1}`
+    }
+    return resultLabel
+}
+
 export const setDropdownLabel = (dropdownMenuEl, dropdownLabelEl) => {
     if(!dropdownMenuEl) {
         return
@@ -76,13 +102,14 @@ export const setDropdownLabel = (dropdownMenuEl, dropdownLabelEl) => {
     if(!dropdownLabelEl) {
         return
     }
-    let labels = []
-    dropdownMenuEl.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
-        if (el.checked) {
-            labels.push(document.querySelector(`label[for="${el.id}"]`).innerHTML)
+    const fields = Array.from(dropdownMenuEl.querySelectorAll('input[type="checkbox"]:checked, input[type="radio"]:checked')).map(el => {
+        const label = el.parentElement.querySelector(`label[for="${el.id}"]`)
+        return {
+            'value': el.value,
+            'label': label?label.innerHTML:''
         }
     })
-    dropdownLabelEl.innerHTML = labels.join(',')
+    dropdownLabelEl.innerHTML = getResultLabel(fields)
 }
 
 export const filterInputValueChangedUtil = (field) => {
@@ -107,29 +134,7 @@ export const filterInputValueChangedUtil = (field) => {
         return valueElem
     }
     if (typeof valueOrObject === 'object') {
-        const labelArray = []
-        const entries = Object.values(valueOrObject)
-        let hasMaxEntries = false
-        for (let [index, item] of entries.entries()) {
-            if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN) {
-                break
-            }
-            if(entries.length > 1 && item.value === window.sb_admin_const.SELECT_ALL_KEYWORD) {
-                continue
-            }
-            if (index === window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN - 2 && entries[index + 2]) {
-                labelArray.push(item.label)
-                hasMaxEntries = true
-                break
-            }
-            labelArray.push(item.label)
-        }
-        let resultLabel = labelArray.join(separator)
-        if(hasMaxEntries) {
-            resultLabel = resultLabel.substring(0, resultLabel.length)
-            resultLabel += `... +${entries.length - window.sb_admin_const.MULTISELECT_FILTER_MAX_CHOICES_SHOWN + 1}`
-        }
-        valueElem.innerHTML = resultLabel
+        valueElem.innerHTML = getResultLabel(valueOrObject, separator)
     } else {
         try {
             // select
