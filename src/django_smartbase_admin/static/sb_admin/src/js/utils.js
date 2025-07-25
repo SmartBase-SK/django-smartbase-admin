@@ -66,6 +66,16 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
     })
 }
 
+export const setDropdownLabel = (dropdownMenuEl, dropdownlabelEl) => {
+    let labels = []
+    dropdownMenuEl.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
+        if (el.checked) {
+            labels.push(document.querySelector(`label[for="${el.id}"]`).innerHTML)
+        }
+    })
+    dropdownlabelEl.innerHTML = labels.join(',')
+}
+
 export const filterInputValueChangedUtil = (field) => {
     const filterId = field.dataset.filterId || field.id
     const separator = field.dataset.labelSeparator || ', '

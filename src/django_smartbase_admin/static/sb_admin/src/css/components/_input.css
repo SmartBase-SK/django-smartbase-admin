@@ -5,7 +5,7 @@
         @apply text-14;
         @apply h-40;
         @apply p-10;
-        @apply text-dark-900 bg-light border border-dark-300 rounded shadow-xs outline outline-transparent;
+        @apply text-dark-900 bg-bg-input border border-dark-300 rounded shadow-xs outline outline-transparent;
         transition: color .1s ease-in, background-color .1s ease-in, border-color .1s ease-in, box-shadow .1s ease-in, outline-color .1s ease-in;
 
         & ~ .error {

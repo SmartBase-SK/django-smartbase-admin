@@ -1,3 +1,5 @@
+import {setDropdownLabel} from "./utils"
+
 export default class Multiselect {
     constructor(selector_override, options_override, target) {
         target = target || document
@@ -79,13 +81,7 @@ export default class Multiselect {
 
 
     setLabel(wrapper, valueEl) {
-        let labels = []
-        wrapper.querySelectorAll('input[type="checkbox"]').forEach(el => {
-            if (el.checked) {
-                labels.push(document.querySelector(`label[for="${el.id}"]`).innerText)
-            }
-        })
-        valueEl.innerHTML = labels.join(',')
+        setDropdownLabel(wrapper, valueEl)
     }
 
     clearAll(wrapper, valueEl) {
@@ -100,9 +96,6 @@ export default class Multiselect {
         const valueEl = wrapper.querySelector('.js-value')
         const clearEl = wrapper.querySelector('.js-clear')
 
-        wrapper.addEventListener('change', () => {
-            this.setLabel(wrapper, valueEl)
-        })
         clearEl?.addEventListener('click', () => {
             this.clearAll(wrapper, valueEl)
         })

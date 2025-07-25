@@ -27,7 +27,7 @@ import Range from "./range"
 import Sorting from "./sorting"
 import Autocomplete from "./autocomplete"
 import ChoicesJS from "./choices"
-import {setCookie} from "./utils"
+import {setCookie, setDropdownLabel} from "./utils"
 import Multiselect from "./multiselect"
 
 class Main {
@@ -173,7 +173,7 @@ class Main {
             } else {
                 offset = [0, 8]
             }
-            return new Dropdown(dropdownToggleEl, {
+            const dropdown = new Dropdown(dropdownToggleEl, {
                 autoClose: 'outside',
                 offset: offset,
                 popperConfig(defaultBsPopperConfig) {
@@ -184,6 +184,14 @@ class Main {
                     return {...defaultBsPopperConfig, ...elementConf, strategy: 'fixed'}
                 }
             })
+            const dropdownWrapper = dropdownToggleEl.closest('.js-dropdown-wrapper')
+            if(dropdownWrapper) {
+                const dropdownLabelEl = dropdownWrapper.querySelector('.js-dropdown-label')
+                dropdown._menu.addEventListener('change', ()=>{
+                    setDropdownLabel(dropdown._menu, dropdownLabelEl)
+                })
+            }
+            return dropdown
         })
     }
 
