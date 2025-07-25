@@ -81,26 +81,20 @@ export default class Multiselect {
         })
     }
 
-
-    setLabel(wrapper, valueEl) {
-        setDropdownLabel(wrapper, valueEl)
-    }
-
     clearAll(wrapper, valueEl) {
         wrapper.querySelectorAll('input[type="checkbox"]').forEach(el => {
             el.checked = false
         })
-        this.setLabel(wrapper, valueEl)
+        setDropdownLabel(wrapper, valueEl)
     }
 
 
     initDetailMultiselect(wrapper) {
-        const valueEl = wrapper.querySelector('.js-value')
         const clearEl = wrapper.querySelector('.js-clear')
 
         clearEl?.addEventListener('click', () => {
-            this.clearAll(wrapper, valueEl)
+            this.clearAll(wrapper)
         })
-        this.setLabel(wrapper, valueEl)
+        setDropdownLabel(wrapper)
     }
 }

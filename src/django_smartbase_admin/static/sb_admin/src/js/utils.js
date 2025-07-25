@@ -66,14 +66,23 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
     })
 }
 
-export const setDropdownLabel = (dropdownMenuEl, dropdownlabelEl) => {
+export const setDropdownLabel = (dropdownMenuEl, dropdownLabelEl) => {
+    if(!dropdownMenuEl) {
+        return
+    }
+    if(!dropdownLabelEl) {
+        dropdownLabelEl = dropdownMenuEl.querySelector('.js-dropdown-label')
+    }
+    if(!dropdownLabelEl) {
+        return
+    }
     let labels = []
     dropdownMenuEl.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
         if (el.checked) {
             labels.push(document.querySelector(`label[for="${el.id}"]`).innerHTML)
         }
     })
-    dropdownlabelEl.innerHTML = labels.join(',')
+    dropdownLabelEl.innerHTML = labels.join(',')
 }
 
 export const filterInputValueChangedUtil = (field) => {
