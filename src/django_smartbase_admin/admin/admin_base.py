@@ -36,6 +36,8 @@ from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django_htmx.http import trigger_client_event
+from parler.admin import TranslatableAdmin
+
 from django_smartbase_admin.engine.field import SBAdminField
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
@@ -821,6 +823,9 @@ class SBAdmin(
     def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
         return Q()
 
+    def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
+        return {"show_back_button": True}
+
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
@@ -871,6 +876,7 @@ class SBAdmin(
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
+        extra_context.update(self.get_change_view_context(request, object_id))
         extra_context.update(self.get_global_context(request, object_id))
         extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
@@ -1151,3 +1157,16 @@ class SBAdminStackedInline(SBAdminInline, NestedStackedInline):
 class SBAdminGenericStackedInline(SBAdminInline, NestedGenericStackedInline):
     template = "sb_admin/inlines/stacked_inline.html"
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
+
+
+class SbTranslatableAdmin(SBAdmin, TranslatableAdmin):
+    def get_readonly_fields(self, request, obj=...):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        if "sbadmin_translation_status" not in readonly_fields:
+            readonly_fields += ("sbadmin_translation_status",)
+        return readonly_fields
+
+    def get_fieldsets(self, request, obj=...):
+        fieldsets = super().get_fieldsets(request, obj)
+        fieldsets.append(SBAdminTranslationsService.get_translation_fieldset())
+        return fieldsets
