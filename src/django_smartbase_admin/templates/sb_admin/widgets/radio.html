@@ -2,7 +2,7 @@
     <ul{% if id %} id="{{ id }}"{% endif %}>
         {% for group, options, index in widget.optgroups %}
             {% for option in options %}
-                <li>
+                <li class="relative py-8">
                     {% include option.template_name with widget=option %}
                 </li>
             {% endfor %}

@@ -264,6 +264,34 @@
 
     input.radio,
     div.radio > input[type="radio"] {
+        & ~ label {
+            &::before {
+                @apply rounded-full;
+            }
+
+            &::after {
+                @apply transition-opacity;
+                @apply w-8 h-8;
+                top: 6px;
+                left: 6px;
+                opacity: 0;
+                @apply bg-light rounded-full;
+            }
+        }
+
+        &:checked {
+            &:not(:disabled) {
+                &:hover + label {
+                    &::after {
+                        opacity: 1;
+                    }
+                }
+            }
+        }
+    }
+
+    input.radio.radio-list,
+    div.radio.radio-list > input[type="radio"] {
         & + label {
             @apply px-16 py-12 flex items-center justify-between text-dark-900;
 
@@ -273,6 +301,9 @@
 
             &::after {
                 @apply relative w-16 h-16 flex-shrink-0 ml-16 hidden;
+                top:0;
+                left:0;
+                border-radius: 0;
                 background: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="%23009FA7" fill-rule="evenodd" clip-rule="evenodd" d="M8.43734 17.0892L20.7944 4.7912L22.2053 6.2088L9.14275 19.2088C8.75262 19.5971 8.12207 19.5971 7.73193 19.2088L1.79443 13.2997L3.20525 11.8821L8.43734 17.0892Z"/></svg>');
             }
         }
