@@ -20,9 +20,11 @@ export default class Multiselect {
                             el.checked = e.target.checked
                         })
                     } else {
-                        selectAllEl.checked = false
+                        if(selectAllEl) {
+                            selectAllEl.checked = false
+                        }
                     }
-                    if(!checkboxes.some(el => el.checked) && selectAllEl) {
+                    if(selectAllEl && !checkboxes.some(el => el.checked)) {
                         selectAllEl.checked = true
                     }
                     let checked = []
