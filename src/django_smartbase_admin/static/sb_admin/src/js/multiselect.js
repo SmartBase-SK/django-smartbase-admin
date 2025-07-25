@@ -11,9 +11,13 @@ export default class Multiselect {
             document.addEventListener('change', e => {
                 const wrapperEl = e.target.closest(this.wrapperSelector)
                 const multiselectInput = wrapperEl?.querySelector(selector)
+                if(!wrapperEl || !multiselectInput) {
+                    // not filter widget
+                    return
+                }
                 const isCheckboxClicked = e.target.type === 'checkbox'
                 const selectAllEl = wrapperEl?.querySelector(`.${selectAllClass}`)
-                if(multiselectInput && isCheckboxClicked) {
+                if(isCheckboxClicked) {
                     const checkboxes = Array.from(this.getCheckboxes(multiselectInput))
                     if(e.target.classList.contains(selectAllClass)) {
                         checkboxes.forEach(el => {

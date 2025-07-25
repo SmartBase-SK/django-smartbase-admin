@@ -1,3 +1,4 @@
+{% include 'sb_admin/widgets/includes/field_label.html' %}
 {% with id=widget.attrs.id %}
     <ul{% if id %} id="{{ id }}"{% endif %}>
         {% for group, options, index in widget.optgroups %}
@@ -9,4 +10,4 @@
         {% endfor %}
     </ul>
 {% endwith %}
-
+{% include 'sb_admin/widgets/includes/help_text.html' %}

@@ -190,8 +190,20 @@ class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
         )
 
 
+class SBAdminRadioDropdownWidget(SBAdminBaseWidget, forms.RadioSelect):
+    template_name = "sb_admin/widgets/radio_dropdown.html"
+    option_template_name = "sb_admin/widgets/radio_option.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=()):
+        super().__init__(
+            form_field,
+            attrs={"class": "radio radio-list", **(attrs or {})},
+            choices=choices,
+        )
+
+
 class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultiple):
-    template_name = "sb_admin/widgets/checkbox_select.html"
+    template_name = "sb_admin/widgets/checkbox_dropdown.html"
     option_template_name = "sb_admin/widgets/checkbox_option.html"
 
     def __init__(self, form_field=None, attrs=None, choices=()):
