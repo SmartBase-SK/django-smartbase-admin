@@ -51,7 +51,7 @@
     vertical-align: bottom;
     overflow: hidden;
     @apply transition-colors;
-    @apply bg-dark-50 text-dark-600;
+    @apply text-dark-600;
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-col-content {
@@ -391,7 +391,7 @@
 .tabulator-row {
     position: relative;
     box-sizing: border-box;
-    @apply bg-light min-h-40 border-b border-dark-200 cursor-pointer;
+    @apply bg-bg-elevated min-h-40 border-b border-dark-200 cursor-pointer;
     @apply transition-colors;
 }
 

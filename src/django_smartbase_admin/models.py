@@ -1,7 +1,14 @@
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.querysets import SBAdminListViewConfigurationQueryset
+
+
+class ColorScheme(models.TextChoices):
+    BROWSER = "", _("Browser")
+    DARK = "dark", _("Dark")
+    LIGHT = "light", _("Light")
 
 
 class SBAdminListViewConfiguration(models.Model):
@@ -18,3 +25,15 @@ class SBAdminListViewConfiguration(models.Model):
     url_params = models.TextField()
 
     objects = SBAdminListViewConfigurationQueryset.as_manager()
+
+
+class SBAdminUserConfiguration(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+    color_scheme = models.CharField(
+        max_length=255, choices=ColorScheme.choices, default=ColorScheme.BROWSER
+    )

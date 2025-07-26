@@ -37,3 +37,9 @@
         }
     }
 }
+
+@media (prefers-color-scheme: dark) {
+    .tabulator .tabulator-header {
+        @apply bg-light-a/50;
+    }
+}

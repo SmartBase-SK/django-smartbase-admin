@@ -9,13 +9,7 @@
     }
 
     .radio.radio-default {
-        @apply bg-light border border-dark-200 transition-colors;
-        &:first-child {
-            @apply rounded-t;
-        }
-        &:last-child {
-            @apply rounded-b;
-        }
+        @apply bg-light border border-dark-200 transition-colors p-8;
         &:hover {
             @apply border-dark-400;
         }
