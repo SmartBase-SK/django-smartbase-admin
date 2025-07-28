@@ -102,6 +102,21 @@ class Main {
         this.initFileInputs()
         this.initAliasName()
         this.handleLocationHashFromTabs()
+        this.handleColorSchemeChange()
+    }
+
+    handleColorSchemeChange() {
+        const picker = document.querySelector('.js-color-scheme-picker')
+        if(!picker) {
+            return
+        }
+        picker.addEventListener('change', (e)=>{
+            if(e.target.value) {
+                document.documentElement.setAttribute('data-color-scheme', e.target.value)
+                return
+            }
+            document.documentElement.removeAttribute('data-color-scheme')
+        })
     }
 
     initInlines(target) {

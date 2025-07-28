@@ -148,33 +148,13 @@
                                 </svg>
                                 {% trans 'Change password' %}
                             </li>
-                            <li class="flex js-dropdown-wrapper">
-                                <div class="dropdown-btn flex items-center p-12 text-dark-900 cursor-pointer hover:bg-dark-100 w-full"
-                                     data-bs-toggle="dropdown"
-                                     data-bs-offset="[0,8]"
-                                     data-bs-popper-placement="top-start">
-                                    <span class="js-dropdown-label">test</span>
-                                </div>
-                                <div class="dropdown-menu max-h-432">
-                                    <ul>
-                                        <li class="relative">
-                                            <input type="radio" name="color-scheme" id="color-scheme-dark" class="radio">
-                                            <label for="color-scheme-dark">
-                                                <svg class="w-20 h-20"><use href="#Logout"></use></svg>
-                                                Dark
-                                            </label>
-                                        </li>
-                                        <li class="relative">
-                                            <input type="radio" name="color-scheme" id="color-scheme-light" class="radio">
-                                            <label for="color-scheme-light">Light</label>
-                                        </li>
-                                        <li class="relative">
-                                            <input type="radio" name="color-scheme" id="color-scheme-default" class="radio">
-                                            <label for="color-scheme-default">Predvolena</label>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </li>
+                            {% block color_scheme %}
+                                <li class="border-t border-dark-100 pt-8">
+                                    <form hx-post="{% url 'sb_admin:color_scheme' %}" hx-trigger="change" hx-swap="none" id="color-schema-form" class="js-color-scheme-picker">
+                                        {{ color_scheme_form.color_scheme }}
+                                    </form>
+                                </li>
+                            {% endblock %}
                             {% if request_data.global_filter_instance %}
                                 <li>
                                     <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">

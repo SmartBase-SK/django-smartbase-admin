@@ -1,7 +1,7 @@
 {% load i18n %}
 
 <div class="relative">
-    {% include 'sb_admin/widgets/includes/field_label.html' %}
+    {% include 'sb_admin/widgets/includes/simple_field_label.html' with label_classes="radio-dropdown-label inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium" %}
     <div id="{{ widget.attrs.id }}-wrapper" class="js-simple-multiselect-detail js-dropdown-wrapper">
         <button
                 data-bs-toggle="dropdown"
@@ -9,9 +9,9 @@
                 data-bs-offset="[0, 8]"
                 class="btn px-10 font-normal w-full"
         >
-            <span id="{{ widget.attrs.id }}-value" class="js-dropdown-label">{{ widget.form_field.empty_label }}</span>
-            <svg class="ml-8">
-                <use xlink:href="#Down"></use>
+            <span id="{{ widget.attrs.id }}-value" class="js-dropdown-label flex gap-8">{{ widget.form_field.empty_label }}</span>
+            <svg class="ml-8 no-rotate">
+                <use xlink:href="#Sort Alt"></use>
             </svg>
         </button>
         <div id="{{ widget.attrs.id }}-dropdown" class="dropdown-menu">

@@ -1,7 +1,7 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="{{ request.LANGUAGE_CODE }}" data-theme="light" data-color-scheme="light">
+<html lang="{{ request.LANGUAGE_CODE }}" data-color-scheme="{{ user_config.color_scheme }}">
 <head>
     {% include 'sb_admin/fonts.html' %}
     <meta name="robots" content="noindex"/>

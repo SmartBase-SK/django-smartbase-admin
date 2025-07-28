@@ -77,6 +77,7 @@ class SBAdminSite(admin.AdminSite):
             PasswordChangeView,
             PasswordChangeDoneView,
         )
+        from django_smartbase_admin.views.user_config_view import ColorSchemeView
 
         urls = [
             path(
@@ -151,6 +152,11 @@ class SBAdminSite(admin.AdminSite):
                     "global-filter",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
+                ),
+                path(
+                    "color-scheme",
+                    self.admin_view(ColorSchemeView.as_view()),
+                    name="color_scheme",
                 ),
                 path(
                     "<str:view>/<str:action>/<str:modifier>",

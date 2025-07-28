@@ -1,14 +1,21 @@
 from django.conf import settings
 from django.db import models
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.querysets import SBAdminListViewConfigurationQueryset
 
 
 class ColorScheme(models.TextChoices):
-    BROWSER = "", _("Browser")
-    DARK = "dark", _("Dark")
-    LIGHT = "light", _("Light")
+    SYSTEM = "system", format_html(
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Translation"></use></svg><span>{_("System")}</span></span>'
+    )
+    DARK = "dark", format_html(
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Moon"></use></svg><span>{_("Dark")}</span></span>'
+    )
+    LIGHT = "light", format_html(
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Sun-one"></use></svg><span>{_("Light")}</span></span>'
+    )
 
 
 class SBAdminListViewConfiguration(models.Model):
@@ -35,5 +42,8 @@ class SBAdminUserConfiguration(models.Model):
         on_delete=models.CASCADE,
     )
     color_scheme = models.CharField(
-        max_length=255, choices=ColorScheme.choices, default=ColorScheme.BROWSER
+        max_length=255,
+        choices=ColorScheme.choices,
+        default=ColorScheme.SYSTEM,
+        verbose_name=_("Theme"),
     )
