@@ -15,7 +15,7 @@
             </svg>
         </button>
         <div id="{{ widget.attrs.id }}-dropdown" class="dropdown-menu">
-            <ul class="relative py-8">
+            <ul id="{{ widget.attrs.id }}" class="relative py-8">
                 {% for group, options, index in widget.optgroups %}
                     {% for option in options %}
                         <li>
