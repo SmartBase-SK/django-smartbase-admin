@@ -38,7 +38,9 @@ from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     SUPPORTED_FILE_TYPE_ICONS,
 )
-from django_smartbase_admin.models import SBAdminUserConfiguration, ColorScheme
+from django_smartbase_admin.services.configuration import (
+    SBAdminUserConfigurationService,
+)
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXExportService,
@@ -209,18 +211,10 @@ class SBAdminBaseView(object):
     ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
 
-    def get_user_config(self, request) -> SBAdminUserConfiguration | None:
-        if not request.user:
-            return None
-        user_config, created = SBAdminUserConfiguration.objects.get_or_create(
-            user_id=request.user.id
-        )
-        return user_config
-
     def get_color_scheme_context(self, request):
         from django_smartbase_admin.views.user_config_view import ColorSchemeForm
 
-        user_config = self.get_user_config(request)
+        user_config = SBAdminUserConfigurationService.get_user_config(request)
         color_scheme_form = ColorSchemeForm(instance=user_config)
         return {
             "user_config": user_config,

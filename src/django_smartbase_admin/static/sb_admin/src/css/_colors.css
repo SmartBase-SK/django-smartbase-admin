@@ -178,22 +178,11 @@
     @extend .light-style;
 }
 
-@media (prefers-color-scheme: light) {
-    :root {
-        @extend .light-style;
-    }
-}
-
 @media (prefers-color-scheme: dark) {
-    :root {
+    html:not([data-color-scheme="light"]) {
         @extend .dark-style;
+        .tabulator .tabulator-header {
+            @apply bg-light-a/50;
+        }
     }
-}
-
-html[data-color-scheme="light"] {
-    @extend .light-style;
-}
-
-html[data-color-scheme="dark"] {
-    @extend .dark-style;
 }

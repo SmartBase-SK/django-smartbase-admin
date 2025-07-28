@@ -20,3 +20,16 @@ class SBAdminConfigurationService(object):
             return slugify(view_id)
         else:
             return view_id
+
+
+class SBAdminUserConfigurationService(object):
+    @classmethod
+    def get_user_config(cls, request):
+        if not request.user:
+            return None
+        from django_smartbase_admin.models import SBAdminUserConfiguration
+
+        user_config, created = SBAdminUserConfiguration.objects.get_or_create(
+            user_id=request.user.id
+        )
+        return user_config
