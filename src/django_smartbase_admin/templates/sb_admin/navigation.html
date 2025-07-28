@@ -156,7 +156,7 @@
                                 </li>
                             {% endblock %}
                             {% if request_data.global_filter_instance %}
-                                <li>
+                                <li class="border-t border-dark-100 pt-8">
                                     <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">
                                         {% for field in request_data.global_filter_instance %}
                                             {{ field }}

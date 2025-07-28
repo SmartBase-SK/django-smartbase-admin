@@ -189,6 +189,10 @@
                 }
             }
         }
+
+        .btn-secondary {
+            @apply text-light;
+        }
     }
 }
 

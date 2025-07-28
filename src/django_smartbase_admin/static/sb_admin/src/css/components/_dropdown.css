@@ -43,6 +43,7 @@
 
         .btn[data-bs-toggle="dropdown"] {
             @apply border-0 rounded-t-none;
+            @apply bg-transparent hover:bg-dark-100;
         }
 
         label.radio-dropdown-label {
