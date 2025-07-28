@@ -176,15 +176,10 @@
                                 </div>
                             </li>
                             {% if request_data.global_filter_instance %}
-                                <li class="p-12 text-dark-900">
-                                    {% trans 'Choose domain' %}
-                                </li>
                                 <li>
                                     <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">
                                         {% for field in request_data.global_filter_instance %}
-                                            <div class="relative">
-                                                {{ field }}
-                                            </div>
+                                            {{ field }}
                                             {{ field.errors }}
                                         {% endfor %}
                                     </form>
