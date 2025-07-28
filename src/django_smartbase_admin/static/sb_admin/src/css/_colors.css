@@ -1,4 +1,4 @@
-.light-style {
+:root {
     --color-light: #ffffff;
     --color-transparent: rgb(0 0 0 / 0%);
     --color-light-a: 0 0 0;
@@ -174,15 +174,41 @@
     --color-bg-input: #2B3645;
 }
 
-:root {
-    @extend .light-style;
-}
-
 @media (prefers-color-scheme: dark) {
     html:not([data-color-scheme="light"]) {
         @extend .dark-style;
         .tabulator .tabulator-header {
             @apply bg-light-a/50;
         }
+
+        input.checkbox,
+        div.checkbox > input[type="checkbox"] {
+            & ~ label {
+                &::after {
+                    filter: invert(1);
+                }
+            }
+        }
+    }
+}
+
+html[data-color-scheme="dark"] {
+    @extend .dark-style;
+
+    .tabulator .tabulator-header {
+        @apply bg-light-a/50;
+    }
+
+    input.checkbox,
+    div.checkbox > input[type="checkbox"] {
+        & ~ label {
+            &::after {
+                filter: invert(1);
+            }
+        }
+    }
+
+    .btn-secondary {
+        @apply text-light;
     }
 }

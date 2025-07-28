@@ -74,7 +74,7 @@
 
     .input-file {
         @apply relative flex items-center;
-        @apply border border-dark-300 border-dashed rounded;
+        @apply border border-dark-300 border-dashed rounded bg-light;
         @apply p-16;
         @apply transition-colors;
         input[type="file"] {
