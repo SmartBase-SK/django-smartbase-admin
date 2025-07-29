@@ -33,6 +33,7 @@ import Multiselect from "./multiselect"
 class Main {
     constructor() {
         document.body.classList.add('js-ready')
+        this.handleColorSchemeChange()
 
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         tooltipTriggerList.map((tooltipTriggerEl) => {
@@ -102,7 +103,6 @@ class Main {
         this.initFileInputs()
         this.initAliasName()
         this.handleLocationHashFromTabs()
-        this.handleColorSchemeChange()
     }
 
     handleColorSchemeChange() {
@@ -355,8 +355,11 @@ class Main {
     }
 
     switchCKEditorTheme(colorScheme) {
+        if(!window.CKEDITOR) {
+            return
+        }
         let dark = colorScheme === 'dark'
-        if(colorScheme === 'system') {
+        if(colorScheme === 'auto') {
             dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
         }
         if(dark) {

@@ -7,7 +7,7 @@ from django_smartbase_admin.querysets import SBAdminListViewConfigurationQueryse
 
 
 class ColorScheme(models.TextChoices):
-    SYSTEM = "system", format_html(
+    AUTO = "auto", format_html(
         f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Translation"></use></svg><span>{_("System")}</span></span>'
     )
     DARK = "dark", format_html(
@@ -44,6 +44,6 @@ class SBAdminUserConfiguration(models.Model):
     color_scheme = models.CharField(
         max_length=255,
         choices=ColorScheme.choices,
-        default=ColorScheme.SYSTEM,
+        default=ColorScheme.AUTO,
         verbose_name=_("Theme"),
     )
