@@ -8,6 +8,7 @@ module.exports = {
         'src/django_smartbase_admin/templates/**/*.html',
         'src/django_smartbase_admin/static/sb_admin/src/js/**/*.js',
     ],
+    darkMode: 'class',
     corePlugins: {
         container: false,
     },

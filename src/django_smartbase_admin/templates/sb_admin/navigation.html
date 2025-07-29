@@ -17,7 +17,9 @@
         <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50 z-1"
              id="main-navigation">
             <header class="px-24 py-32 hidden xl:!block">
-                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
+                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto dark:hidden"
+                     alt="SBAdmin" width="133" height="20">
+                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo_light.svg' %}" class="lazyload h-32 w-auto hidden dark:block"
                      alt="SBAdmin" width="133" height="20">
             </header>
             <header class="px-16 py-8 flex items-center xl:hidden border-b border-dark-200 bg-light min-h-56">

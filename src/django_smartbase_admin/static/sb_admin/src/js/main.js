@@ -364,8 +364,10 @@ class Main {
         }
         if(dark) {
             this.initCKEditor(document, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
+            document.body.classList.add('dark')
             return
         }
+        document.body.classList.remove('dark')
         this.initCKEditor(document, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
     }
 
