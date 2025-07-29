@@ -105,6 +105,20 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
+    isDarkMode(colorScheme) {
+        let isDark = colorScheme === 'dark'
+        if(colorScheme === 'auto') {
+            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        }
+        if(isDark) {
+            document.body.classList.add('dark')
+        }
+        else {
+            document.body.classList.remove('dark')
+        }
+        return isDark
+    }
+
     handleColorSchemeChange() {
         const picker = document.querySelector('.js-color-scheme-picker')
         if(!picker) {
@@ -113,12 +127,14 @@ class Main {
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
                 document.documentElement.setAttribute('data-theme', e.target.value)
-                this.switchCKEditorTheme(e.target.value)
+                const isDarkMode = this.isDarkMode(e.target.value)
+                this.switchCKEditorTheme(isDarkMode)
                 return
             }
             document.documentElement.removeAttribute('data-theme')
         })
-        this.switchCKEditorTheme(document.documentElement.dataset.theme)
+        const isDarkMode = this.isDarkMode(document.documentElement.dataset.theme)
+        this.switchCKEditorTheme(isDarkMode)
     }
 
     initInlines(target) {
@@ -354,20 +370,15 @@ class Main {
         window.CKEDITOR.replace(id, new_config)
     }
 
-    switchCKEditorTheme(colorScheme) {
+    switchCKEditorTheme(isDarkMode) {
         if(!window.CKEDITOR) {
             return
         }
-        let dark = colorScheme === 'dark'
-        if(colorScheme === 'auto') {
-            dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-        }
-        if(dark) {
+
+        if(isDarkMode) {
             this.initCKEditor(document, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
-            document.body.classList.add('dark')
             return
         }
-        document.body.classList.remove('dark')
         this.initCKEditor(document, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
     }
 
