@@ -5,16 +5,20 @@ from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.querysets import SBAdminListViewConfigurationQueryset
 
+AUTO_LABEL = _("System")
+DARK_LABEL = _("Dark")
+LIGHT_LABEL = _("Light")
+
 
 class ColorScheme(models.TextChoices):
     AUTO = "auto", format_html(
-        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Translation"></use></svg><span>{_("System")}</span></span>'
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Translation"></use></svg><span>{AUTO_LABEL}</span></span>'
     )
     DARK = "dark", format_html(
-        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Moon"></use></svg><span>{_("Dark")}</span></span>'
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Moon"></use></svg><span>{DARK_LABEL}</span></span>'
     )
     LIGHT = "light", format_html(
-        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Sun-one"></use></svg><span>{_("Light")}</span></span>'
+        f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#Sun-one"></use></svg><span>{LIGHT_LABEL}</span></span>'
     )
 
 
