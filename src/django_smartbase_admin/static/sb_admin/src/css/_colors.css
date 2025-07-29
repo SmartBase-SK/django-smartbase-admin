@@ -175,7 +175,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-    html:not([data-color-scheme="light"]) {
+    html:not([data-theme="light"]) {
         @extend .dark-style;
         .tabulator .tabulator-header {
             @apply bg-light-a/50;
@@ -208,7 +208,7 @@
     }
 }
 
-html[data-color-scheme="dark"] {
+html[data-theme="dark"] {
     @extend .dark-style;
 
     .tabulator .tabulator-header {

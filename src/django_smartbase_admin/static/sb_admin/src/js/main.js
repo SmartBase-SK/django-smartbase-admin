@@ -112,13 +112,13 @@ class Main {
         }
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
-                document.documentElement.setAttribute('data-color-scheme', e.target.value)
+                document.documentElement.setAttribute('data-theme', e.target.value)
                 this.switchCKEditorTheme(e.target.value)
                 return
             }
-            document.documentElement.removeAttribute('data-color-scheme')
+            document.documentElement.removeAttribute('data-theme')
         })
-        this.switchCKEditorTheme(document.documentElement.dataset.colorScheme)
+        this.switchCKEditorTheme(document.documentElement.dataset.theme)
     }
 
     initInlines(target) {
