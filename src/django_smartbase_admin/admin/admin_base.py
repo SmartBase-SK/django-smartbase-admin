@@ -36,9 +36,6 @@ from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django_htmx.http import trigger_client_event
-from parler.admin import TranslatableAdmin
-
-from django_smartbase_admin.engine.field import SBAdminField
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
 from nested_admin.formsets import NestedInlineFormSet
@@ -56,6 +53,8 @@ from django_smartbase_admin.utils import FormFieldsetMixin, is_modal
 
 parler_enabled = None
 try:
+    from parler.admin import TranslatableAdmin
+
     from parler.forms import (
         TranslatableModelForm,
         TranslatableModelFormMetaclass,
@@ -132,7 +131,6 @@ from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     TRANSLATIONS_SELECTED_LANGUAGES,
     ROW_CLASS_FIELD,
-    Action,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -1159,14 +1157,16 @@ class SBAdminGenericStackedInline(SBAdminInline, NestedGenericStackedInline):
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
 
 
-class SBTranslatableAdmin(SBAdmin, TranslatableAdmin):
-    def get_readonly_fields(self, request, obj=...):
-        readonly_fields = super().get_readonly_fields(request, obj)
-        if "sbadmin_translation_status" not in readonly_fields:
-            readonly_fields += ("sbadmin_translation_status",)
-        return readonly_fields
+if parler_enabled:
 
-    def get_fieldsets(self, request, obj=...):
-        fieldsets = super().get_fieldsets(request, obj)
-        fieldsets.append(SBAdminTranslationsService.get_translation_fieldset())
-        return fieldsets
+    class SBTranslatableAdmin(SBAdmin, TranslatableAdmin):
+        def get_readonly_fields(self, request, obj=...):
+            readonly_fields = super().get_readonly_fields(request, obj)
+            if "sbadmin_translation_status" not in readonly_fields:
+                readonly_fields += ("sbadmin_translation_status",)
+            return readonly_fields
+
+        def get_fieldsets(self, request, obj=...):
+            fieldsets = super().get_fieldsets(request, obj)
+            fieldsets.append(SBAdminTranslationsService.get_translation_fieldset())
+            return fieldsets
