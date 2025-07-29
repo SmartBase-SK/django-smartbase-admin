@@ -6,7 +6,7 @@
     }
 
     body {
-        @apply font-body text-dark bg-dark-100;
+        @apply font-body text-dark bg-bg;
     }
 
     svg {

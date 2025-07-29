@@ -11,6 +11,11 @@
         white-space: normal;
         > ul {
             @apply overflow-y-auto overflow-x-hidden custom-scrollbar;
+            >li:not(:last-child) {
+                .btn[data-bs-toggle="dropdown"] {
+                    @apply rounded-b-none;
+                }
+            }
         }
 
         &:not(.show) {
@@ -29,6 +34,24 @@
 
         &.show {
             @apply flex;
+        }
+
+        hr {
+            @apply my-4;
+            @apply border border-dark-200;
+        }
+
+        .btn[data-bs-toggle="dropdown"] {
+            @apply border-0 rounded-t-none;
+            @apply bg-transparent hover:bg-dark-100;
+        }
+
+        label.radio-dropdown-label {
+            @apply px-8 mb-4;
+            @apply text-12 font-normal;
+            span {
+                @apply hidden;
+            }
         }
     }
 
@@ -50,21 +73,16 @@
         }
     }
 
-    .dropdown-menu hr {
-        @apply my-4;
-        @apply border border-dark-200;
-    }
-
     .btn[data-bs-toggle="dropdown"] {
         &:focus {
             @apply shadow-none;
         }
-        svg:last-child {
+        svg:last-child:not(.no-rotate) {
             transition: transform .2s;
         }
         &.show {
             @apply bg-primary-50 text-primary border-primary;
-            svg:last-child {
+            svg:last-child:not(.no-rotate) {
                 @apply rotate-180;
             }
         }
