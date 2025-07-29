@@ -172,6 +172,17 @@
     --color-bg: #111827;
     --color-bg-elevated: #1F2937;
     --color-bg-input: #2B3645;
+
+    /* filler colors */
+    --dca-white: #111827;
+    --dca-black: #ffffff;
+    --dca-gray: #9CA3AF;
+    --dca-gray-lightest: #1F2937;
+    --dca-gray-lighter:  #374151;
+    --dca-gray-light: #6B7280;
+    --dca-gray-darker: #E5E7EB;
+    --dca-gray-darkest: #F3F4F6;
+    --dca-gray-super-lightest: #1F2937;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -188,6 +199,9 @@
                     filter: invert(1);
                 }
             }
+        }
+        .fancytree-checkbox:after {
+            filter: invert(1);
         }
 
         .btn-secondary {
@@ -222,6 +236,9 @@ html[data-theme="dark"] {
                 filter: invert(1);
             }
         }
+    }
+    .fancytree-checkbox:after {
+        filter: invert(1);
     }
 
     .btn-secondary {
