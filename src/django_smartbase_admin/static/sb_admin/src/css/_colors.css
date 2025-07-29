@@ -193,6 +193,18 @@
         .btn-secondary {
             @apply text-light;
         }
+
+        .cke_button_icon {
+            filter: invert(1) !important;
+        }
+        .cke_top,
+        .cke_bottom {
+            @apply bg-bg;
+        }
+        .cke_combo_text,
+        .cke_button_label {
+            @apply text-dark;
+        }
     }
 }
 
@@ -214,5 +226,17 @@ html[data-color-scheme="dark"] {
 
     .btn-secondary {
         @apply text-light;
+    }
+
+    .cke_button_icon {
+        filter: invert(1) !important;
+    }
+    .cke_top,
+    .cke_bottom {
+        @apply bg-bg;
+    }
+    .cke_combo_text,
+    .cke_button_label {
+        @apply text-dark;
     }
 }

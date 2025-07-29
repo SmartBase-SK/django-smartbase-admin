@@ -113,10 +113,12 @@ class Main {
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
                 document.documentElement.setAttribute('data-color-scheme', e.target.value)
+                this.switchCKEditorTheme(e.target.value)
                 return
             }
             document.documentElement.removeAttribute('data-color-scheme')
         })
+        this.switchCKEditorTheme(document.documentElement.dataset.colorScheme)
     }
 
     initInlines(target) {
@@ -327,26 +329,41 @@ class Main {
         })
     }
 
-    initCKEditor(target) {
+    initCKEditor(target, config, force=false) {
         if (!window.CKEDITOR) {
             return
         }
         target = target || document
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
-            const id = textarea.id
-            if (!id) {
-                return
-            }
-            if(
-                textarea.getAttribute("data-processed") == "0" &&
-                textarea.id.indexOf("__prefix__") == -1
-            ) {
-                if(window.CKEDITOR.instances[id]) {
-                    window.CKEDITOR.instances[id].destroy(true)
-                }
-                window.CKEDITOR.replace(id, JSON.parse(textarea.getAttribute("data-config")))
+            if( force || (textarea.getAttribute("data-processed") == "0" && textarea.id.indexOf("__prefix__") == -1)) {
+                this.reinitCKEditor(textarea, config)
             }
         })
+    }
+
+    reinitCKEditor(textarea, config) {
+        const id = textarea.id
+        if (!id) {
+            return
+        }
+        if(window.CKEDITOR.instances[id]) {
+            window.CKEDITOR.instances[id].destroy(true)
+        }
+        config = config || {}
+        const new_config = {...JSON.parse(textarea.getAttribute("data-config")), ...config}
+        window.CKEDITOR.replace(id, new_config)
+    }
+
+    switchCKEditorTheme(colorScheme) {
+        let dark = colorScheme === 'dark'
+        if(colorScheme === 'system') {
+            dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        }
+        if(dark) {
+            this.initCKEditor(document, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
+            return
+        }
+        this.initCKEditor(document, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
     }
 
     clearFilter(inputId) {
