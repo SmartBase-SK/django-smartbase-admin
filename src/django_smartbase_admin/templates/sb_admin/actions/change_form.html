@@ -223,9 +223,9 @@
                         <button
                                 form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
                                 hx-post="{{ post_url }}"
-                                hx-target="#sb-admin-modal .modal-content"
+                                hx-target="#sb-admin-modal"
                                 hx-swap="innerHTML"
-                                hx-select="#content"
+                                hx-select="#modal-content"
                                 hx-encoding="multipart/form-data"
                                 hx-vals='{
                                     "sbadmin_is_modal": 1,

@@ -30,8 +30,8 @@
                                         data-bs-toggle="modal"
                                         data-bs-target="#sb-admin-modal"
                                         hx-get="{{ context_data.add_url }}?_popup=1&sbadmin_is_modal=1&sbadmin_reload_on_save=1&sbadmin_parent_instance_field=modal_{{ context_data.parent_data.sbadmin_parent_instance_field }}&sbadmin_parent_instance_pk={{ context_data.parent_data.sbadmin_parent_instance_pk }}&sbadmin_parent_instance_label={{ context_data.parent_data.sbadmin_parent_instance_label }}"
-                                        hx-target="#sb-admin-modal .modal-content"
-                                        hx-select="#content"
+                                        hx-target="#sb-admin-modal"
+                                        hx-select="#modal-content"
                                         hx-swap="innerHTML"
                                 >
                                     <svg class="w-20 h-20 md:mr-8">
