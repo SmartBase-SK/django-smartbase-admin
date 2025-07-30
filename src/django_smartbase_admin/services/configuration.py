@@ -30,6 +30,9 @@ class SBAdminUserConfigurationService(object):
         from django_smartbase_admin.models import SBAdminUserConfiguration
 
         user_config, created = SBAdminUserConfiguration.objects.get_or_create(
-            user_id=request.user.id
+            defaults={
+                "color_scheme": request.request_data.configuration.default_color_scheme
+            },
+            user_id=request.user.id,
         )
         return user_config

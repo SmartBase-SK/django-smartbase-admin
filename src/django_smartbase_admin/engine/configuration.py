@@ -8,6 +8,7 @@ from django_smartbase_admin.engine.const import (
     FilterVersions,
     Action,
 )
+from django_smartbase_admin.models import ColorScheme
 from django_smartbase_admin.utils import to_list, is_modal
 
 
@@ -39,6 +40,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     menu_items = None
     global_filter_form = None
     filters_version = FilterVersions.FILTERS_VERSION_1
+    default_color_scheme = ColorScheme.AUTO
 
     def __init__(
         self,
@@ -47,6 +49,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         menu_items=None,
         global_filter_form=None,
         filters_version=None,
+        default_color_scheme=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -56,6 +59,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.init_configuration_static()
         self.autocomplete_map = {}
         self.filters_version = filters_version or self.filters_version
+        self.default_color_scheme = default_color_scheme or self.default_color_scheme
 
     def init_registered_views(self):
         registered_views = []
