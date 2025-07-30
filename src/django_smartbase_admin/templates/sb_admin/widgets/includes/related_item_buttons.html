@@ -12,8 +12,8 @@
                 {% endif %}
                 data-bs-toggle="modal"
                 data-bs-target="#sb-admin-modal"
-                hx-target="#sb-admin-modal .modal-content"
-                hx-select="#content"
+                hx-target="#sb-admin-modal"
+                hx-select="#modal-content"
                 hx-swap="innerHTML">
             <svg class="w-20 h-20">
                 <use xlink:href="#Preview-open"></use>
@@ -27,8 +27,8 @@
                 data-bs-toggle="modal"
                 data-bs-target="#sb-admin-modal"
                 hx-get="{{ widget.attrs.related_add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
-                hx-target="#sb-admin-modal .modal-content"
-                hx-select="#content"
+                hx-target="#sb-admin-modal"
+                hx-select="#modal-content"
                 hx-swap="innerHTML">
             <svg class="w-20 h-20">
                 <use xlink:href="#Add-one"></use>

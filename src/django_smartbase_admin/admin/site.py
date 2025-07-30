@@ -33,8 +33,8 @@ class SBAdminSite(admin.AdminSite):
             pass
         request.sbadmin_selected_view = selected_view
         kwargs["view"] = selected_view.get_id() if selected_view else None
-        request_data = SBAdminViewRequestData.from_request_and_kwargs(request, **kwargs)
         SBAdminThreadLocalService.set_request(request)
+        request_data = SBAdminViewRequestData.from_request_and_kwargs(request, **kwargs)
         if selected_view:
             # Initialize SBAdmin, ModelAdmin instances, class-based SBAdminEntrypointView are initialized with request_data
             selected_view.init_view_dynamic(
@@ -77,6 +77,7 @@ class SBAdminSite(admin.AdminSite):
             PasswordChangeView,
             PasswordChangeDoneView,
         )
+        from django_smartbase_admin.views.user_config_view import ColorSchemeView
 
         urls = [
             path(
@@ -151,6 +152,11 @@ class SBAdminSite(admin.AdminSite):
                     "global-filter",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
+                ),
+                path(
+                    "color-scheme",
+                    self.admin_view(ColorSchemeView.as_view()),
+                    name="color_scheme",
                 ),
                 path(
                     "<str:view>/<str:action>/<str:modifier>",

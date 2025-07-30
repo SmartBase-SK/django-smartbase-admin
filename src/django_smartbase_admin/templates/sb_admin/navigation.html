@@ -17,7 +17,9 @@
         <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50 z-1"
              id="main-navigation">
             <header class="px-24 py-32 hidden xl:!block">
-                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto"
+                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo.svg' %}" class="lazyload h-32 w-auto dark:hidden"
+                     alt="SBAdmin" width="133" height="20">
+                <img src="{{ LAZY_LOAD_DEFAULT_IMAGE }}" data-src="{% static 'sb_admin/images/logo_light.svg' %}" class="lazyload h-32 w-auto hidden dark:block"
                      alt="SBAdmin" width="133" height="20">
             </header>
             <header class="px-16 py-8 flex items-center xl:hidden border-b border-dark-200 bg-light min-h-56">
@@ -148,16 +150,18 @@
                                 </svg>
                                 {% trans 'Change password' %}
                             </li>
-                            {% if request_data.global_filter_instance %}
-                                <li class="p-12 text-dark-900">
-                                    {% trans 'Choose domain' %}
+                            {% block color_scheme %}
+                                <li class="border-t border-dark-100 pt-8">
+                                    <form hx-post="{% url 'sb_admin:color_scheme' %}" hx-trigger="change" hx-swap="none" id="color-schema-form" class="js-color-scheme-picker">
+                                        {{ color_scheme_form.color_scheme }}
+                                    </form>
                                 </li>
-                                <li>
+                            {% endblock %}
+                            {% if request_data.global_filter_instance %}
+                                <li class="border-t border-dark-100 pt-8">
                                     <form hx-post="{% url 'sb_admin:global_filter' %}" hx-trigger="change" hx-swap="none" id="global_filter_form">
                                         {% for field in request_data.global_filter_instance %}
-                                            <div class="relative">
-                                                {{ field }}
-                                            </div>
+                                            {{ field }}
                                             {{ field.errors }}
                                         {% endfor %}
                                     </form>

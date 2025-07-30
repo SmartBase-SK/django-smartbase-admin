@@ -25,7 +25,11 @@ module.exports = {
     colors: {
         current: 'currentColor',
         light: 'var(--color-light)',
+        'light-a': 'rgb(var(--color-light-a) / <alpha-value>)',
         'transparent': 'var(--color-transparent)',
         ...createColorConfig(),
+        'bg': 'var(--color-bg)',
+        'bg-elevated': 'var(--color-bg-elevated)',
+        'bg-input': 'var(--color-bg-input)',
     }
 }

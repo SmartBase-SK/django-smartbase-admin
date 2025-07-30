@@ -4,7 +4,7 @@
         @apply h-40;
         @apply px-16;
         @apply rounded border border-dark-200;
-        @apply text-dark-900 bg-light shadow-xs;
+        @apply text-dark-900 bg-bg-input shadow-xs;
         @apply text-14 leading-18 font-medium;
         transition-property: color, background-color, border, outline, box-shadow;
         transition-duration: .1s;

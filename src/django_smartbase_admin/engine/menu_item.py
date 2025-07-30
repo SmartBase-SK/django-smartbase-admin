@@ -56,11 +56,14 @@ class SBAdminMenuItem(object):
         return self.label or self.view.get_menu_label()
 
     def get_url(self, request):
-        return (
-            self.url
-            or (self.view.get_menu_view_url(request) if self.view else None)
-            or ""
-        )
+        if callable(self.url):
+            return self.url(request)
+        elif self.url:
+            return self.url
+        elif self.view:
+            return self.view.get_menu_view_url(request)
+        else:
+            return ""
 
     def get_icon(self):
         return self.icon or getattr(self.view, "icon", None)

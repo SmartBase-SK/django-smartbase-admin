@@ -27,12 +27,13 @@ import Range from "./range"
 import Sorting from "./sorting"
 import Autocomplete from "./autocomplete"
 import ChoicesJS from "./choices"
-import {setCookie} from "./utils"
+import {setCookie, setDropdownLabel} from "./utils"
 import Multiselect from "./multiselect"
 
 class Main {
     constructor() {
         document.body.classList.add('js-ready')
+        this.handleColorSchemeChange()
 
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         tooltipTriggerList.map((tooltipTriggerEl) => {
@@ -104,6 +105,38 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
+    isDarkMode(colorScheme) {
+        let isDark = colorScheme === 'dark'
+        if(colorScheme === 'auto') {
+            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        }
+        if(isDark) {
+            document.body.classList.add('dark')
+        }
+        else {
+            document.body.classList.remove('dark')
+        }
+        return isDark
+    }
+
+    handleColorSchemeChange() {
+        const picker = document.querySelector('.js-color-scheme-picker')
+        if(!picker) {
+            return
+        }
+        picker.addEventListener('change', (e)=>{
+            if(e.target.value) {
+                document.documentElement.setAttribute('data-theme', e.target.value)
+                const isDarkMode = this.isDarkMode(e.target.value)
+                this.switchCKEditorTheme(isDarkMode)
+                return
+            }
+            document.documentElement.removeAttribute('data-theme')
+        })
+        const isDarkMode = this.isDarkMode(document.documentElement.dataset.theme)
+        this.switchCKEditorTheme(isDarkMode)
+    }
+
     initInlines(target) {
         target = target || document
         const inlineGroups = target.querySelectorAll('.inline-group')
@@ -173,7 +206,7 @@ class Main {
             } else {
                 offset = [0, 8]
             }
-            return new Dropdown(dropdownToggleEl, {
+            const dropdown = new Dropdown(dropdownToggleEl, {
                 autoClose: 'outside',
                 offset: offset,
                 popperConfig(defaultBsPopperConfig) {
@@ -184,6 +217,14 @@ class Main {
                     return {...defaultBsPopperConfig, ...elementConf, strategy: 'fixed'}
                 }
             })
+            const dropdownWrapper = dropdownToggleEl.closest('.js-dropdown-wrapper')
+            if(dropdownWrapper) {
+                const dropdownLabelEl = dropdownWrapper.querySelector('.js-dropdown-label')
+                dropdown._menu.addEventListener('change', ()=>{
+                    setDropdownLabel(dropdown._menu, dropdownLabelEl)
+                })
+            }
+            return dropdown
         })
     }
 
@@ -304,26 +345,41 @@ class Main {
         })
     }
 
-    initCKEditor(target) {
+    initCKEditor(target, config, force=false) {
         if (!window.CKEDITOR) {
             return
         }
         target = target || document
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
-            const id = textarea.id
-            if (!id) {
-                return
-            }
-            if(
-                textarea.getAttribute("data-processed") == "0" &&
-                textarea.id.indexOf("__prefix__") == -1
-            ) {
-                if(window.CKEDITOR.instances[id]) {
-                    window.CKEDITOR.instances[id].destroy(true)
-                }
-                window.CKEDITOR.replace(id, JSON.parse(textarea.getAttribute("data-config")))
+            if( force || (textarea.getAttribute("data-processed") == "0" && textarea.id.indexOf("__prefix__") == -1)) {
+                this.reinitCKEditor(textarea, config)
             }
         })
+    }
+
+    reinitCKEditor(textarea, config) {
+        const id = textarea.id
+        if (!id) {
+            return
+        }
+        if(window.CKEDITOR.instances[id]) {
+            window.CKEDITOR.instances[id].destroy(true)
+        }
+        config = config || {}
+        const new_config = {...JSON.parse(textarea.getAttribute("data-config")), ...config}
+        window.CKEDITOR.replace(id, new_config)
+    }
+
+    switchCKEditorTheme(isDarkMode) {
+        if(!window.CKEDITOR) {
+            return
+        }
+
+        if(isDarkMode) {
+            this.initCKEditor(document, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
+            return
+        }
+        this.initCKEditor(document, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
     }
 
     clearFilter(inputId) {

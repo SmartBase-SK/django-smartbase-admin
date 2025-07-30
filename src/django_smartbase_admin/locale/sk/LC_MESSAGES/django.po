@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-02-11 13:28+0100\n"
+"POT-Creation-Date: 2025-07-29 12:46+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -206,6 +206,18 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr "Žiadne dáta."
 
+msgid "System"
+msgstr "Systém"
+
+msgid "Dark"
+msgstr "Tmavá"
+
+msgid "Light"
+msgstr "Svetlá"
+
+msgid "Theme"
+msgstr "Téma"
+
 msgid "Translations"
 msgstr "Preklady"
 
@@ -221,15 +233,21 @@ msgstr[0] "Opravte chybu nižšie."
 msgstr[1] "Opravte chyby nižšie."
 msgstr[2] "Opravte chyby nižšie."
 
+msgid "Save"
+msgstr "Uložiť"
+
+msgid "Close"
+msgstr "Zatvoriť"
+
 msgid "Prev"
-msgstr ""
+msgstr "Pred."
 
 #, python-format
 msgid "<strong>%(current_index)s</strong> / %(all_objects_count)s"
 msgstr ""
 
 msgid "Next"
-msgstr ""
+msgstr "Ďal."
 
 msgid "Back"
 msgstr "Naspäť"
@@ -326,9 +344,6 @@ msgstr "Vyhľadať"
 msgid "Copy"
 msgstr "Kopírovať"
 
-msgid "Save"
-msgstr "Uložiť"
-
 msgid "Show translations"
 msgstr "Zobraziť preklady"
 
@@ -337,7 +352,7 @@ msgstr "Uložiť zoradenie"
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
-msgstr ""
+msgstr "Ste prihlásený ako %(username)s, ale k tejto stránke nemáte prístup. Chcete sa prihlásiť pod iným účtom?"
 
 msgid "Welcome back"
 msgstr "Vitajte späť"
@@ -650,9 +665,6 @@ msgstr "Zobraziť menu"
 msgid "Change current folder details"
 msgstr "Zmeniť detaily priečinka"
 
-msgid "Close"
-msgstr "Zatvoriť"
-
 msgid "Limit"
 msgstr "Limit"
 
@@ -703,9 +715,6 @@ msgstr "Poradie sa upravuje, prosím čakajte"
 
 msgid "Logout"
 msgstr "Odhlásiť sa"
-
-msgid "Choose domain"
-msgstr "Zvoľte si doménu"
 
 msgid "Continue"
 msgstr "Pokračovať"

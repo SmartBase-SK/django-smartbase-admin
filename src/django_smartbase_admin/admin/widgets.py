@@ -190,8 +190,20 @@ class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
         )
 
 
+class SBAdminRadioDropdownWidget(SBAdminBaseWidget, forms.RadioSelect):
+    template_name = "sb_admin/widgets/radio_dropdown.html"
+    option_template_name = "sb_admin/widgets/radio_option.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=()):
+        super().__init__(
+            form_field,
+            attrs={"class": "radio radio-list", **(attrs or {})},
+            choices=choices,
+        )
+
+
 class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultiple):
-    template_name = "sb_admin/widgets/checkbox_select.html"
+    template_name = "sb_admin/widgets/checkbox_dropdown.html"
     option_template_name = "sb_admin/widgets/checkbox_option.html"
 
     def __init__(self, form_field=None, attrs=None, choices=()):
@@ -421,25 +433,25 @@ class SBAdminAutocompleteWidget(
             )
             and not self.is_multiselect()
         ):
-            self.add_related_buttons_urls(parsed_value, context)
+            self.add_related_buttons_urls(parsed_value, threadsafe_request, context)
 
         return context
 
-    def add_related_buttons_urls(self, parsed_value, context):
+    def add_related_buttons_urls(self, parsed_value, request, context):
         related_model = self.model
         app_label = related_model._meta.app_label
         model_name = related_model._meta.model_name
 
         try:
-            if parsed_value:
+            if parsed_value and self.has_view_or_change_permission(request, self.model):
                 change_url = reverse(
                     "sb_admin:{}_{}_change".format(app_label, model_name),
                     args=(parsed_value,),
                 )
                 context["widget"]["attrs"]["related_edit_url"] = change_url
-
-            add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
-            context["widget"]["attrs"]["related_add_url"] = add_url
+            if self.has_add_permission(request, self.model):
+                add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
+                context["widget"]["attrs"]["related_add_url"] = add_url
         except NoReverseMatch:
             pass
 

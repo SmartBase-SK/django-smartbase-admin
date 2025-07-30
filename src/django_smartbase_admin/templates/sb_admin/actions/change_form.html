@@ -40,7 +40,7 @@
             </div>
         {% else %}
             <div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
-                {% if not is_popup and has_view_permission %}
+                {% if not is_popup and has_view_permission and show_back_button %}
                     {% url opts|admin_urlname:'changelist' as changelist_url %}
                     <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
                         <svg class="w-20 h-20">
@@ -219,27 +219,29 @@
                     {% else %}
                         {% url opts|admin_urlname:'add' as post_url %}
                     {% endif %}
-                    <button
-                            form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
-                            hx-post="{{ post_url }}"
-                            hx-target="#sb-admin-modal .modal-content"
-                            hx-swap="innerHTML"
-                            hx-select="#content"
-                            hx-encoding="multipart/form-data"
-                            hx-vals='{
-                                "sbadmin_is_modal": 1,
-                                "sb_admin_source_field": "{{ request.GET.sb_admin_source_field }}",
-                                "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
-                                "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field }}",
-                                "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk | default:"" }}",
-                                "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label }}"
-                            }'
-                            class="btn btn-primary flex-grow flex items-center justify-center">
-                        <svg class="w-20 h-20 mr-8">
-                            <use xlink:href="#Save"></use>
-                        </svg>
-                        {% trans 'Save' %}
-                    </button>
+                    {% if has_change_permission %}
+                        <button
+                                form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
+                                hx-post="{{ post_url }}"
+                                hx-target="#sb-admin-modal"
+                                hx-swap="innerHTML"
+                                hx-select="#modal-content"
+                                hx-encoding="multipart/form-data"
+                                hx-vals='{
+                                    "sbadmin_is_modal": 1,
+                                    "sb_admin_source_field": "{{ request.GET.sb_admin_source_field }}",
+                                    "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
+                                    "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field }}",
+                                    "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk | default:"" }}",
+                                    "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label }}"
+                                }'
+                                class="btn btn-primary flex-grow flex items-center justify-center">
+                            <svg class="w-20 h-20 mr-8">
+                                <use xlink:href="#Save"></use>
+                            </svg>
+                            {% trans 'Save' %}
+                        </button>
+                    {% endif %}
                     <button type="button"
                             class="btn flex-grow"
                             data-bs-dismiss="modal" aria-label="Close">
@@ -269,7 +271,7 @@
                                 </div>
                             {% endif %}
                             <div class="flex ml-auto gap-8">
-                                {% if not is_popup and has_view_permission %}
+                                {% if not is_popup and has_view_permission and show_back_button %}
                                     {% url opts|admin_urlname:'changelist' as changelist_url %}
                                     <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
                                 {% endif %}

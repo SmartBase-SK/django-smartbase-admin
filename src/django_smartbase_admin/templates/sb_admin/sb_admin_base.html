@@ -5,6 +5,12 @@
     {% get_item request.META 'HTTP_SEC_FETCH_SITE' as sec_fetch_site %}
     <div class="w-full h-full min-h-full{% if not sec_fetch_site or request.META.HTTP_SEC_FETCH_DEST == 'document' %} xl:pl-260{% endif %}">
         {% include 'sb_admin/navigation.html' %}
+
+        {% if sbadmin_is_modal %}
+            <div id="modal-content" class="modal-dialog">
+                <div class="modal-content">
+        {% endif %}
+
         <div id="content" class="relative flex flex-col{% if sbadmin_is_modal %} min-h-0 h-full{% else %} min-h-screen sm:p-24 {% block view_class %}{% endblock %}{% endif %}">
             {% if sbadmin_is_modal %}
                 {# load media which are missing #}
@@ -45,5 +51,10 @@
             {% endblock %}
             {{ inner_content }}
         </div>
+
+        {% if sbadmin_is_modal %}
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

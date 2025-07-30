@@ -261,7 +261,7 @@ export const createRadioInput = (id, name, value, label, checked, index) => {
     inputEl.name = name
     inputEl.value = value
     inputEl.type = 'radio'
-    inputEl.classList.add('radio', 'flatpickr-shortcut')
+    inputEl.classList.add('radio', 'radio-list', 'flatpickr-shortcut')
     inputEl.checked = checked
     inputEl.dataset["index"] = index
     inputWrapperEl.append(inputEl)

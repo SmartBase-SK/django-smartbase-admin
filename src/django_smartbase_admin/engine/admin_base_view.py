@@ -38,6 +38,9 @@ from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     SUPPORTED_FILE_TYPE_ICONS,
 )
+from django_smartbase_admin.services.configuration import (
+    SBAdminUserConfigurationService,
+)
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXExportService,
@@ -208,6 +211,16 @@ class SBAdminBaseView(object):
     ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
 
+    def get_color_scheme_context(self, request):
+        from django_smartbase_admin.views.user_config_view import ColorSchemeForm
+
+        user_config = SBAdminUserConfigurationService.get_user_config(request)
+        color_scheme_form = ColorSchemeForm(instance=user_config)
+        return {
+            "user_config": user_config,
+            "color_scheme_form": color_scheme_form,
+        }
+
     def get_global_context(
         self, request, object_id: int | str | None = None
     ) -> dict[str, Any]:
@@ -234,6 +247,7 @@ class SBAdminBaseView(object):
                     "STATIC_BASE_PATH": static("sb_admin"),
                 }
             ),
+            **self.get_color_scheme_context(request),
         }
 
     def get_model_path(self) -> str:

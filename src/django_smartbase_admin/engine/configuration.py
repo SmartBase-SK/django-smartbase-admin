@@ -8,6 +8,7 @@ from django_smartbase_admin.engine.const import (
     FilterVersions,
     Action,
 )
+from django_smartbase_admin.models import ColorScheme
 from django_smartbase_admin.utils import to_list, is_modal
 
 
@@ -39,14 +40,16 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     menu_items = None
     global_filter_form = None
     filters_version = FilterVersions.FILTERS_VERSION_1
+    default_color_scheme = ColorScheme.AUTO
 
     def __init__(
-            self,
-            default_view=None,
-            registered_views=None,
-            menu_items=None,
-            global_filter_form=None,
-            filters_version=None,
+        self,
+        default_view=None,
+        registered_views=None,
+        menu_items=None,
+        global_filter_form=None,
+        filters_version=None,
+        default_color_scheme=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -56,6 +59,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.init_configuration_static()
         self.autocomplete_map = {}
         self.filters_version = filters_version or self.filters_version
+        self.default_color_scheme = default_color_scheme or self.default_color_scheme
 
     def init_registered_views(self):
         registered_views = []
@@ -134,13 +138,13 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.autocomplete_map[view.get_id()] = view
 
     def restrict_queryset(
-            self,
-            qs,
-            model,
-            request,
-            request_data,
-            global_filter=True,
-            global_filter_data_map=None,
+        self,
+        qs,
+        model,
+        request,
+        request_data,
+        global_filter=True,
+        global_filter_data_map=None,
     ):
         return qs
 
@@ -154,7 +158,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         return request.user.is_staff
 
     def has_permission(
-            self, request, request_data, view, model=None, obj=None, permission=None
+        self, request, request_data, view, model=None, obj=None, permission=None
     ):
         if isinstance(permission, SBAdminCustomAction):
             return self.has_action_permission(
@@ -174,7 +178,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         return request.user.is_staff
 
     def get_autocomplete_widget(
-            self, view, request, form_field, db_field, model, multiselect=False
+        self, view, request, form_field, db_field, model, multiselect=False
     ):
         from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 
@@ -186,12 +190,12 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         return default_widget
 
     def get_form_field_widget_class(
-            self, view, request, form_field, db_field, default_widget_class
+        self, view, request, form_field, db_field, default_widget_class
     ):
         return default_widget_class
 
     def apply_global_filter_to_queryset(
-            self, qs, request, request_data, global_filter_data_map
+        self, qs, request, request_data, global_filter_data_map
     ):
         global_filter_data_map = global_filter_data_map or {}
         global_filter_data_map = {
@@ -211,9 +215,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             except:
                 pass
             if (
-                    include_all_values_for_empty_fields
-                    and field.name in include_all_values_for_empty_fields
-                    and not field_value
+                include_all_values_for_empty_fields
+                and field.name in include_all_values_for_empty_fields
+                and not field_value
             ):
                 continue
             field_value = to_list(field_value)
@@ -228,10 +232,10 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         return response
 
     def autocomplete_show_related_buttons(
-            self,
-            related_model,
-            field_name,
-            current_view,
-            request,
+        self,
+        related_model,
+        field_name,
+        current_view,
+        request,
     ) -> bool:
         return not is_modal(request)

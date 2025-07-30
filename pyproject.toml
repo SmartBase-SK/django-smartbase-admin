@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-smartbase-admin"
-version = "1.0.13"
+version = "1.0.17"
 description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
@@ -40,4 +40,13 @@ setuptools = "^67.0.0"
 
 [build-system]
 requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api" 
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+force_exclude = '''
+/(
+  | migrations
+)/
+
+'''
+
