@@ -1150,11 +1150,13 @@ class SBAdminGenericTableInlinePaginated(SBAdminGenericTableInline):
 class SBAdminStackedInline(SBAdminInline, NestedStackedInline):
     template = "sb_admin/inlines/stacked_inline.html"
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
+    formset = SBAdminNestedInlineFormSet
 
 
 class SBAdminGenericStackedInline(SBAdminInline, NestedGenericStackedInline):
     template = "sb_admin/inlines/stacked_inline.html"
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
+    formset = SBAdminGenericInlineFormSet
 
 
 if parler_enabled:
