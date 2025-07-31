@@ -84,7 +84,7 @@ class Main {
                 if(!shouldProcessAfterSwap(detail)) {
                     return
                 }
-                this.initCKEditor(detail.target)
+                this.switchCKEditorTheme(this.isDarkMode(document.documentElement.dataset.theme))
             })
         }
 
