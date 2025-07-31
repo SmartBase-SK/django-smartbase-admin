@@ -1,6 +1,7 @@
-{% load i18n nested_admin admin_urls widget_tweaks %}
+{% load i18n nested_admin admin_urls widget_tweaks sb_admin_tags %}
 {% block extra_style %}{% endblock %}
 
+{% call_method inline_admin_formset.opts "get_context_data" request as context_data %}
 {% with inline_admin_formset.formset.is_nested as is_nested %}
 
 {% with inline_admin_formset.opts as inline_opts %}
@@ -17,7 +18,11 @@
             {% if inline_admin_formset.opts.title %}{{ inline_admin_formset.opts.title }}{% else %}{{ inline_admin_formset.opts.verbose_name_plural|capfirst }}{% endif %}
         </h2>
 
-        <div class="djn-module djn-add-item add-item add-row max-sm:px-24 ml-auto">
+        <div class="djn-module djn-add-item add-item add-row max-sm:px-24 ml-auto flex items-center gap-8">
+            {% for list_action in context_data.inline_list_actions %}
+                <a {% if list_action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' with action=list_action %}{% endif %} href="{{ list_action.url }}"
+                        class="btn {{ list_action.css_class|default_if_none:'' }}">{{ list_action.title }}</a>
+            {% endfor %}
             <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
                 <svg class="w-20 h-20 md:mr-8">
                     <use xlink:href="#Plus"></use>
