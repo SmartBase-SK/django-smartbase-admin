@@ -107,7 +107,7 @@ class Main {
 
     isDarkMode(colorScheme) {
         let isDark = colorScheme === 'dark'
-        if(colorScheme === 'auto') {
+        if(!colorScheme || colorScheme === 'auto') {
             isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
         }
         if(isDark) {
@@ -120,6 +120,7 @@ class Main {
     }
 
     handleColorSchemeChange() {
+        const isDarkMode = this.isDarkMode(document.documentElement.dataset.theme)
         const picker = document.querySelector('.js-color-scheme-picker')
         if(!picker) {
             return
@@ -133,7 +134,6 @@ class Main {
             }
             document.documentElement.removeAttribute('data-theme')
         })
-        const isDarkMode = this.isDarkMode(document.documentElement.dataset.theme)
         this.switchCKEditorTheme(isDarkMode)
     }
 
@@ -229,6 +229,9 @@ class Main {
     }
 
     initAliasName() {
+        if(!window.sb_admin_const) {
+            return
+        }
         const aliasGroup = document.getElementById(window.sb_admin_const.GLOBAL_FILTER_ALIAS_WIDGET_ID)
         if (!aliasGroup) {
             return
