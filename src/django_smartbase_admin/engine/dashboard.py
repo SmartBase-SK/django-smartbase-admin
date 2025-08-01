@@ -553,25 +553,26 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                     self.date_annotate_field
                 )
             )
-            date_range_compare = date_range
-            if compare == self.CompareOptions.COMPARE_PREVIOUS:
-                period_length = (date_range_compare[1] - date_range_compare[0]).days + 1
-                date_range_compare[0] = date_range_compare[0] - timedelta(
-                    days=period_length
+            if date_range[0] and date_range[1]:
+                date_range_compare = date_range
+                if compare == self.CompareOptions.COMPARE_PREVIOUS:
+                    period_length = (date_range_compare[1] - date_range_compare[0]).days + 1
+                    date_range_compare[0] = date_range_compare[0] - timedelta(
+                        days=period_length
+                    )
+                    date_range_compare[1] = date_range_compare[1] - timedelta(
+                        days=period_length
+                    )
+                if compare == self.CompareOptions.COMPARE_PREVIOUS_YOY:
+                    date_range_compare[0] = date_range_compare[0].replace(
+                        year=date_range_compare[0].year - 1
+                    )
+                    date_range_compare[1] = date_range_compare[1].replace(
+                        year=date_range_compare[1].year - 1
+                    )
+                request_data_modified_date_filter.request_get[self.date_annotate_field] = (
+                    DateFilterWidget.get_value_from_date_or_range(date_range_compare)
                 )
-                date_range_compare[1] = date_range_compare[1] - timedelta(
-                    days=period_length
-                )
-            if compare == self.CompareOptions.COMPARE_PREVIOUS_YOY:
-                date_range_compare[0] = date_range_compare[0].replace(
-                    year=date_range_compare[0].year - 1
-                )
-                date_range_compare[1] = date_range_compare[1].replace(
-                    year=date_range_compare[1].year - 1
-                )
-            request_data_modified_date_filter.request_get[self.date_annotate_field] = (
-                DateFilterWidget.get_value_from_date_or_range(date_range_compare)
-            )
             queryset_with_modified_date = self.get_data_queryset(request_copy)
 
             sub_widget_data = {}
