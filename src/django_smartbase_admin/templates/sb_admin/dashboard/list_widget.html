@@ -2,3 +2,9 @@
 
 {% block page_header %}{% endblock %}
 {% block tabulator_custom_header_controls %}{% endblock %}
+
+{% block content %}
+	<div id="{{ widget_id }}" class="col-span-12">
+        {{ block.super }}
+    </div>
+{% endblock %}

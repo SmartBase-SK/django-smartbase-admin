@@ -2,7 +2,8 @@
     --fc-small-font-size: .75rem;
     --fc-border-color: var(--color-dark-200);
     --fc-today-bg-color: var(--color-primary-50);
-    --fc-neutral-bg-color: var(--color-bg-elevated);
+    --fc-neutral-bg-color: var(--color-bg);
+    --fc-page-bg-color: var(--color-bg-elevated);
 }
 
 .fc-theme-standard {
@@ -67,6 +68,13 @@
         .fc-daygrid-day-number {
             @apply bg-primary rounded-full text-light;
         }
+        &.fc-day-other {
+            .fc-daygrid-day-top {
+                .fc-daygrid-day-number {
+                    @apply text-light;
+                }
+            }
+        }
     }
     .fc-daygrid-event {
         @apply !m-0 flex gap-4;
@@ -78,6 +86,30 @@
         }
         .fc-event-title {
             @apply font-normal text-dark-900 text-ellipsis leading-16;
+        }
+        &.event-positive {
+            @apply border-success-200 bg-success-50;
+            .fc-daygrid-event-dot {
+                @apply border-success;
+            }
+        }
+         &.event-warning {
+            @apply border-warning-200 bg-warning-50;
+            .fc-daygrid-event-dot {
+                @apply border-warning;
+            }
+        }
+         &.event-negative {
+            @apply border-negative-200 bg-negative-50;
+            .fc-daygrid-event-dot {
+                @apply border-negative;
+            }
+        }
+        &.event-notice {
+            @apply border-notice-200 bg-notice-50;
+            .fc-daygrid-event-dot {
+                @apply border-notice;
+            }
         }
     }
     .fc-daygrid-event-dot {
