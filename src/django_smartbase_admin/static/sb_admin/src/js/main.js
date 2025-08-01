@@ -106,16 +106,11 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
-    isDarkMode(colorScheme) {
+    isDarkMode() {
+        const colorScheme = document.documentElement.dataset.theme
         let isDark = colorScheme === 'dark'
         if(!colorScheme || colorScheme === 'auto') {
             isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-        }
-        if(isDark) {
-            document.body.classList.add('dark')
-        }
-        else {
-            document.body.classList.remove('dark')
         }
         return isDark
     }
@@ -128,12 +123,22 @@ class Main {
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
                 document.documentElement.setAttribute('data-theme', e.target.value)
-                this.switchCKEditorTheme(document, e.target.value)
+                this.switchBodyColorSchemeClass()
+                this.switchCKEditorTheme()
                 return
             }
             document.documentElement.removeAttribute('data-theme')
         })
-        this.switchCKEditorTheme(document)
+        this.switchBodyColorSchemeClass()
+        this.switchCKEditorTheme()
+    }
+
+    switchBodyColorSchemeClass() {
+        if(this.isDarkMode()) {
+            document.body.classList.add('dark')
+            return
+        }
+        document.body.classList.remove('dark')
     }
 
     initInlines(target) {
@@ -374,12 +379,11 @@ class Main {
         window.CKEDITOR.replace(id, new_config)
     }
 
-    switchCKEditorTheme(target, colorScheme) {
+    switchCKEditorTheme(target) {
         if(!window.CKEDITOR) {
             return
         }
-        colorScheme = colorScheme || document.documentElement.dataset.theme
-        if(this.isDarkMode(colorScheme)) {
+        if(this.isDarkMode()) {
             this.initCKEditor(target, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
             return
         }
