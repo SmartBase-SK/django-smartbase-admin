@@ -2,7 +2,7 @@
 {% load sb_admin_tags static %}
 
 {% block content_inner %}
-    <div class="card sm:mb-24 p-16">
+    <div id="{{ widget_id }}" class="card p-16 col-span-12">
         <div class="mt-16">
             <script type="text/javascript" src="{% static 'sb_admin/dist/chart.js' %}"></script>
             <div class="flex flex-wrap -m-8 mb-16">

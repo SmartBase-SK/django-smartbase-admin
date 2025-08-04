@@ -493,4 +493,13 @@
             @apply bg-light;
         }
     }
+
+    .dashboard-wrapper {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        @apply gap-24;
+        > form {
+            @apply absolute;
+        }
+    }
 }
