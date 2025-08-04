@@ -5,7 +5,6 @@ from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
 from django.conf import settings
-from django.contrib.admin.exceptions import NotRegistered
 from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
     ForeignKeyRawIdWidget,
@@ -37,6 +36,12 @@ from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
 from django_smartbase_admin.utils import is_modal
+
+try:
+    # Django >= 5.0
+    from django.contrib.admin.exceptions import NotRegistered
+except ImportError:
+    from django.contrib.admin.sites import NotRegistered
 
 logger = logging.getLogger(__name__)
 
@@ -441,7 +446,13 @@ class SBAdminAutocompleteWidget(
 
     def add_related_buttons_urls(self, parsed_value, request, context):
         try:
-            related_model_admin = sb_admin_site.get_model_admin(self.model)
+            if hasattr(sb_admin_site, "get_model_admin"):
+                # Django >= 5.0
+                related_model_admin = sb_admin_site.get_model_admin(self.model)
+            else:
+                related_model_admin = sb_admin_site._registry.get(self.model)
+                if not related_model_admin:
+                    return
             if parsed_value and related_model_admin.has_view_or_change_permission(
                 request, self.model
             ):
