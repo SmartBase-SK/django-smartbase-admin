@@ -35,15 +35,15 @@ class SBAdminDashboardWidget(SBAdminView):
     SUB_WIDGET_NAME_SUFFIX = "_sub_widget"
 
     def __init__(
-            self,
-            template_name=None,
-            name=None,
-            model=None,
-            annotates=None,
-            filters=None,
-            settings=None,
-            sub_widgets=None,
-            global_filter_data_map=None,
+        self,
+        template_name=None,
+        name=None,
+        model=None,
+        annotates=None,
+        filters=None,
+        settings=None,
+        sub_widgets=None,
+        global_filter_data_map=None,
     ) -> None:
         super().__init__()
         self.template_name = self.template_name or template_name
@@ -54,7 +54,7 @@ class SBAdminDashboardWidget(SBAdminView):
         self.settings = self.settings or settings or []
         self.sub_widgets = self.sub_widgets or sub_widgets or []
         self.global_filter_data_map = (
-                self.global_filter_data_map or global_filter_data_map
+            self.global_filter_data_map or global_filter_data_map
         )
 
     def init_widget_static(self, configuration):
@@ -152,7 +152,7 @@ class SBAdminChartAggregateSubWidget(object):
     parent_view = None
 
     def __init__(
-            self, title=None, aggregate=None, python_formatter=None, template_name=None
+        self, title=None, aggregate=None, python_formatter=None, template_name=None
     ) -> None:
         super().__init__()
         self.title = self.title or title
@@ -168,7 +168,7 @@ class SBAdminChartAggregateSubWidget(object):
 
     def get_data(self, request, base_qs):
         value = (
-                base_qs.aggregate(result=self.get_aggregate(request)).get("result", 0) or 0
+            base_qs.aggregate(result=self.get_aggregate(request)).get("result", 0) or 0
         )
         return {
             "raw_value": value,
@@ -215,18 +215,18 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
     order_by = None
 
     def __init__(
-            self,
-            name=None,
-            template_name=None,
-            model=None,
-            annotates=None,
-            filters=None,
-            settings=None,
-            x_axis_annotate=None,
-            y_axis_annotate=None,
-            order_by=None,
-            sub_widgets=None,
-            global_filter_data_map=None,
+        self,
+        name=None,
+        template_name=None,
+        model=None,
+        annotates=None,
+        filters=None,
+        settings=None,
+        x_axis_annotate=None,
+        y_axis_annotate=None,
+        order_by=None,
+        sub_widgets=None,
+        global_filter_data_map=None,
     ) -> None:
         super().__init__(
             template_name=template_name,
@@ -391,23 +391,23 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
     default_date_resolution = DateResolutionsOptions.DATE_RESOLUTION_MONTH
 
     def __init__(
-            self,
-            date_annotate_field=None,
-            date_resolutions=None,
-            cumulative_data=None,
-            name=None,
-            template_name=None,
-            model=None,
-            annotates=None,
-            filters=None,
-            settings=None,
-            y_axis_annotate=None,
-            sub_widgets=None,
-            global_filter_data_map=None,
+        self,
+        date_annotate_field=None,
+        date_resolutions=None,
+        cumulative_data=None,
+        name=None,
+        template_name=None,
+        model=None,
+        annotates=None,
+        filters=None,
+        settings=None,
+        y_axis_annotate=None,
+        sub_widgets=None,
+        global_filter_data_map=None,
     ) -> None:
         self.date_annotate_field = self.date_annotate_field or date_annotate_field
         self.date_resolutions = (
-                self.date_resolutions or date_resolutions or self.DateResolutionsOptions
+            self.date_resolutions or date_resolutions or self.DateResolutionsOptions
         )
         self.cumulative_data = self.cumulative_data or cumulative_data
         if self.cumulative_data is None:
@@ -485,8 +485,8 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
 
     def get_current_resolution(self, request):
         return (
-                self.get_settings_from_request(request)[self.RESOLUTION_KEY]
-                or self.default_date_resolution
+            self.get_settings_from_request(request)[self.RESOLUTION_KEY]
+            or self.default_date_resolution
         )
 
     def get_x_axis_annotate(self, request):
@@ -555,7 +555,9 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
             if date_range[0] and date_range[1]:
                 date_range_compare = date_range
                 if compare == self.CompareOptions.COMPARE_PREVIOUS:
-                    period_length = (date_range_compare[1] - date_range_compare[0]).days + 1
+                    period_length = (
+                        date_range_compare[1] - date_range_compare[0]
+                    ).days + 1
                     date_range_compare[0] = date_range_compare[0] - timedelta(
                         days=period_length
                     )
@@ -569,9 +571,9 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                     date_range_compare[1] = date_range_compare[1].replace(
                         year=date_range_compare[1].year - 1
                     )
-                request_data_modified_date_filter.request_get[self.date_annotate_field] = (
-                    DateFilterWidget.get_value_from_date_or_range(date_range_compare)
-                )
+                request_data_modified_date_filter.request_get[
+                    self.date_annotate_field
+                ] = DateFilterWidget.get_value_from_date_or_range(date_range_compare)
             queryset_with_modified_date = self.get_data_queryset(request_copy)
 
             sub_widget_data = {}
@@ -623,18 +625,18 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     sbadmin_table_history_enabled = False
 
     def __init__(
-            self,
-            list_display=None,
-            sbadmin_list_display=None,
-            list_per_page=None,
-            template_name=None,
-            name=None,
-            model=None,
-            annotates=None,
-            filters=None,
-            settings=None,
-            sub_widgets=None,
-            global_filter_data_map=None,
+        self,
+        list_display=None,
+        sbadmin_list_display=None,
+        list_per_page=None,
+        template_name=None,
+        name=None,
+        model=None,
+        annotates=None,
+        filters=None,
+        settings=None,
+        sub_widgets=None,
+        global_filter_data_map=None,
     ) -> None:
         super().__init__(
             template_name=template_name,
