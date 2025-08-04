@@ -48,6 +48,7 @@ class Main {
         document.addEventListener('formset:added', (e) => {
             this.initDropdowns(e.target)
             this.initFileInputs(e.target)
+            this.switchCKEditorTheme(e.target)
             if (e.target !== e.target.parentNode.firstChild) {
                 e.target.parentNode.insertBefore(e.target, e.target.parentNode.firstChild)
             }
@@ -84,7 +85,7 @@ class Main {
                 if(!shouldProcessAfterSwap(detail)) {
                     return
                 }
-                this.initCKEditor(detail.target)
+                this.switchCKEditorTheme(detail.target)
             })
         }
 
@@ -105,16 +106,11 @@ class Main {
         this.handleLocationHashFromTabs()
     }
 
-    isDarkMode(colorScheme) {
+    isDarkMode() {
+        const colorScheme = document.documentElement.dataset.theme
         let isDark = colorScheme === 'dark'
-        if(colorScheme === 'auto') {
+        if(!colorScheme || colorScheme === 'auto') {
             isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-        }
-        if(isDark) {
-            document.body.classList.add('dark')
-        }
-        else {
-            document.body.classList.remove('dark')
         }
         return isDark
     }
@@ -127,14 +123,22 @@ class Main {
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
                 document.documentElement.setAttribute('data-theme', e.target.value)
-                const isDarkMode = this.isDarkMode(e.target.value)
-                this.switchCKEditorTheme(isDarkMode)
+                this.switchBodyColorSchemeClass()
+                this.switchCKEditorTheme()
                 return
             }
             document.documentElement.removeAttribute('data-theme')
         })
-        const isDarkMode = this.isDarkMode(document.documentElement.dataset.theme)
-        this.switchCKEditorTheme(isDarkMode)
+        this.switchBodyColorSchemeClass()
+        this.switchCKEditorTheme()
+    }
+
+    switchBodyColorSchemeClass() {
+        if(this.isDarkMode()) {
+            document.body.classList.add('dark')
+            return
+        }
+        document.body.classList.remove('dark')
     }
 
     initInlines(target) {
@@ -229,6 +233,9 @@ class Main {
     }
 
     initAliasName() {
+        if(!window.sb_admin_const) {
+            return
+        }
         const aliasGroup = document.getElementById(window.sb_admin_const.GLOBAL_FILTER_ALIAS_WIDGET_ID)
         if (!aliasGroup) {
             return
@@ -351,8 +358,10 @@ class Main {
         }
         target = target || document
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
-            if( force || (textarea.getAttribute("data-processed") == "0" && textarea.id.indexOf("__prefix__") == -1)) {
-                this.reinitCKEditor(textarea, config)
+            if( force || textarea.getAttribute("data-processed") == "0") {
+                if(textarea.id.indexOf("__prefix__") == -1) {
+                    this.reinitCKEditor(textarea, config)
+                }
             }
         })
     }
@@ -370,16 +379,15 @@ class Main {
         window.CKEDITOR.replace(id, new_config)
     }
 
-    switchCKEditorTheme(isDarkMode) {
+    switchCKEditorTheme(target) {
         if(!window.CKEDITOR) {
             return
         }
-
-        if(isDarkMode) {
-            this.initCKEditor(document, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
+        if(this.isDarkMode()) {
+            this.initCKEditor(target, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
             return
         }
-        this.initCKEditor(document, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
+        this.initCKEditor(target, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
     }
 
     clearFilter(inputId) {

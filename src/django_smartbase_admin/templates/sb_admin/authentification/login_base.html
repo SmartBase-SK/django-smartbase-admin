@@ -3,7 +3,8 @@
 
 {% block main_wrapper %}
     <div class="flex items-center max-h-screen">
-        <img loading="lazy" src="{% static "sb_admin/images/logo.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24">
+        <img loading="lazy" src="{% static "sb_admin/images/logo.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 dark:hidden">
+        <img loading="lazy" src="{% static "sb_admin/images/logo_light.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 hidden dark:block">
         <div class="md:max-w-640 w-full flex justify-center items-center h-screen">
             <div class="max-w-370 w-full mx-24">
                 {% block content %}{% endblock %}

@@ -8,9 +8,14 @@
             {% trans 'Remove' %}
         </button>
     {% endif %}
-    <button type="button"
-            class="text-primary ml-auto"
-            onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')">
-        {% trans 'Clear' %}
-    </button>
+        <button type="button"
+                class="text-primary ml-auto"
+                {% if view_id %}
+                onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')"
+                {% else %}
+                onclick="window.SBAdmin.clearFilter('{{ filter_field.filter_widget.input_id }}')"
+                {% endif %}
+        >
+            {% trans 'Clear' %}
+        </button>
 </div>

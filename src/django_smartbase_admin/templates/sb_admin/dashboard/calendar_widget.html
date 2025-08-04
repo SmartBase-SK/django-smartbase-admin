@@ -4,7 +4,32 @@
 {% block filters %}{% endblock %}
 
 {% block content_inner %}
-    <div class="card p-16 pb-0">
+    <div id="{{ widget_id }}" class="card p-16 pb-0 col-span-12">
+        <div class="p-8 flex items-center justify-between">
+            <div class="flex flex-col">
+                <div class="text-18 text-dark-900 font-semibold">
+                    {% trans 'Calendar' %}
+                </div>
+                <div class="text-14">
+                    <span id="{{ widget_id }}-date-from"></span>
+                    -
+                    <span id="{{ widget_id }}-date-to"></span>
+                </div>
+            </div>
+
+            <div class="flex gap-16 items-center">
+                {% include 'sb_admin/components/filters.html' with filters=settings all_filters_visible=True %}
+                <div class="btn-group">
+                    <button class="btn p-0 w-40" onclick="window.SBAdminCalendar['{{ widget_id }}'].calendar.prev();">
+                        <svg><use href="#Left-small"></use></svg>
+                    </button>
+                    <div class="btn pointer-events-none" id="{{ widget_id }}-selected-month" style="width: 150px;"></div>
+                    <button class="btn p-0 w-40" onclick="window.SBAdminCalendar['{{ widget_id }}'].calendar.next();">
+                        <svg><use href="#Right-small"></use></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="mt-16 -mx-16">
             <script type="text/javascript" src="{% static 'sb_admin/js/fullcalendar.min.js' %}"></script>
             <link rel="stylesheet" href="{% static 'sb_admin/dist/calendar_style.css' %}">
@@ -12,6 +37,10 @@
 
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
+                    const selectedMonth = document.getElementById('{{ widget_id }}-selected-month');
+                    const dateFrom = document.getElementById('{{ widget_id }}-date-from');
+                    const dateTo = document.getElementById('{{ widget_id }}-date-to');
+
                     window.SBAdminCalendar = window.SBAdminCalendar || {};
                     window.SBAdminCalendar["{{ widget_id }}"] = new window.SBAdminCalendarClass({
                         "widgetId": "{{ widget_id }}",
@@ -22,9 +51,14 @@
                             },
                             dayMaxEvents: 3,
                             height: 'auto',
-                            locale: 'sk',
+                            locale: '{{request.LANGUAGE_CODE}}',
                             headerToolbar: false,
                             fixedWeekCount: false,
+                            datesSet: function(info) {
+                                selectedMonth.innerText = info.view.title;
+                                dateFrom.innerText = info.view.currentStart.toLocaleDateString('{{request.LANGUAGE_CODE}}', {day: 'numeric', month: 'long', year: 'numeric'});
+                                dateTo.innerText = new Date(info.view.currentStart.getFullYear(), info.view.currentStart.getMonth() + 1, 0).toLocaleDateString('{{request.LANGUAGE_CODE}}', {day: 'numeric', month: 'long', year: 'numeric'});
+                            }
                         }
                     });
                 });

@@ -7,6 +7,7 @@ from django_smartbase_admin.admin.site import sb_admin_site
 
 class SBAdminConfig(AppConfig):
     name = "django_smartbase_admin"
+    default_auto_field = "django.db.models.AutoField"
 
     def ready(self):
         super().ready()

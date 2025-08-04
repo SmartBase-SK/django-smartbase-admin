@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any, TYPE_CHECKING
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
@@ -11,7 +12,6 @@ from django.db.models import F
 from django.http import HttpResponse, Http404, JsonResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
-from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
@@ -244,7 +244,7 @@ class SBAdminBaseView(object):
                     "TABLE_UPDATE_ROW_DATA_EVENT_NAME": TABLE_UPDATE_ROW_DATA_EVENT_NAME,
                     "SELECT_ALL_KEYWORD": SELECT_ALL_KEYWORD,
                     "SUPPORTED_FILE_TYPE_ICONS": SUPPORTED_FILE_TYPE_ICONS,
-                    "STATIC_BASE_PATH": static("sb_admin"),
+                    "STATIC_BASE_PATH": f"{settings.STATIC_URL}sb_admin",
                 }
             ),
             **self.get_color_scheme_context(request),
