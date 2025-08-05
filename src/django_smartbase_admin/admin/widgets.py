@@ -454,12 +454,12 @@ class SBAdminAutocompleteWidget(
                 if not related_model_admin:
                     return
             if parsed_value and related_model_admin.has_view_or_change_permission(
-                request, self.model
+                request
             ):
                 context["widget"]["attrs"]["related_edit_url"] = (
                     related_model_admin.get_detail_url(parsed_value)
                 )
-            if related_model_admin.has_add_permission(request, self.model):
+            if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
                     related_model_admin.get_new_url(request)
                 )
