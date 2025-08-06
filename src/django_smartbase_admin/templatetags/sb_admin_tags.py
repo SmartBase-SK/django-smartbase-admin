@@ -259,7 +259,7 @@ def get_file_preview_image(
     file, file_extension=None, thumbnail_width=64, thumbnail_height=64
 ):
     file_extension = file_extension or get_file_extension(file)
-    if file_extension in ["jpg", "png"]:
+    if file_extension in ["jpg", "jpeg", "png"]:
         from easy_thumbnails.files import get_thumbnailer
 
         thumbnailer = get_thumbnailer(file)
