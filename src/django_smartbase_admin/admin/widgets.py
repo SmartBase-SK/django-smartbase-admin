@@ -12,7 +12,7 @@ from django.contrib.admin.widgets import (
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
-from django.urls import reverse, NoReverseMatch
+from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
@@ -22,6 +22,7 @@ from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
 from filer.fields.image import AdminImageWidget
 from filer.models import File
 
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
@@ -35,6 +36,12 @@ from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
 from django_smartbase_admin.utils import is_modal
+
+try:
+    # Django >= 5.0
+    from django.contrib.admin.exceptions import NotRegistered
+except ImportError:
+    from django.contrib.admin.sites import NotRegistered
 
 logger = logging.getLogger(__name__)
 
@@ -438,21 +445,25 @@ class SBAdminAutocompleteWidget(
         return context
 
     def add_related_buttons_urls(self, parsed_value, request, context):
-        related_model = self.model
-        app_label = related_model._meta.app_label
-        model_name = related_model._meta.model_name
-
         try:
-            if parsed_value and self.has_view_or_change_permission(request, self.model):
-                change_url = reverse(
-                    "sb_admin:{}_{}_change".format(app_label, model_name),
-                    args=(parsed_value,),
+            if hasattr(sb_admin_site, "get_model_admin"):
+                # Django >= 5.0
+                related_model_admin = sb_admin_site.get_model_admin(self.model)
+            else:
+                related_model_admin = sb_admin_site._registry.get(self.model)
+                if not related_model_admin:
+                    return
+            if parsed_value and related_model_admin.has_view_or_change_permission(
+                request
+            ):
+                context["widget"]["attrs"]["related_edit_url"] = (
+                    related_model_admin.get_detail_url(parsed_value)
                 )
-                context["widget"]["attrs"]["related_edit_url"] = change_url
-            if self.has_add_permission(request, self.model):
-                add_url = reverse("sb_admin:{}_{}_add".format(app_label, model_name))
-                context["widget"]["attrs"]["related_add_url"] = add_url
-        except NoReverseMatch:
+            if related_model_admin.has_add_permission(request):
+                context["widget"]["attrs"]["related_add_url"] = (
+                    related_model_admin.get_new_url(request)
+                )
+        except NotRegistered:
             pass
 
     def is_multiselect(self):
