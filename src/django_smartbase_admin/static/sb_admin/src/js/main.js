@@ -322,7 +322,7 @@ class Main {
                     fileInput.querySelectorAll('.js-input-file-image').forEach(el => {
                         const nameSplit= e.target.files[0].name.split('.')
                         const extension = nameSplit[nameSplit.length - 1]
-                        if(['jpg', 'png', 'svg', 'webp'].includes(extension)) {
+                        if(['jpg', 'jpeg', 'png', 'svg', 'webp'].includes(extension)) {
                             el.src = URL.createObjectURL(e.target.files[0])
                             el.classList.add('border')
                             return
