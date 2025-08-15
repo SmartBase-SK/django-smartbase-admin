@@ -263,14 +263,17 @@ def get_file_preview_image(
         from easy_thumbnails.files import get_thumbnailer
 
         thumbnailer = get_thumbnailer(file)
-        thumb = thumbnailer.get_thumbnail(
-            {
-                "size": (thumbnail_width, thumbnail_height),
-                "crop": True,
-                "replace_alpha": "#fff",
-            }
-        )
-        return thumb.url
+        try:
+            thumb = thumbnailer.get_thumbnail(
+                {
+                    "size": (thumbnail_width, thumbnail_height),
+                    "crop": True,
+                    "replace_alpha": "#fff",
+                }
+            )
+            return thumb.url
+        except ValueError:
+            return file.url
     if file_extension == "svg" or file_extension == "webp":
         return file.url
     for extension in SUPPORTED_FILE_TYPE_ICONS:
