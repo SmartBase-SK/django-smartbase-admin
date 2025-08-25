@@ -1,3 +1,5 @@
+<img width="1660" height="520" alt="image" src="https://github.com/user-attachments/assets/b0d5537f-29c4-46ca-b514-9862b26cb000" />
+
 # Django SmartBase Admin
 
 A modern, modular, and developer-friendly admin interface for Django.  
@@ -17,8 +19,18 @@ Built to **speed up development** of internal tools and admin panels — beautif
 - Beautiful modern UI (Tailwind CSS)
 - Responsive & mobile-friendly
 - End-user ready for building SaaS or similar projects with global queryset configuration
-![image](https://github.com/user-attachments/assets/4bacb8c2-fd3d-4137-9b5a-fa849d9aeff6)
-![image](https://github.com/user-attachments/assets/f7719377-eb88-42c4-8fe0-5d4ca0ff29bf)
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/ebbcacea-9052-409e-99bb-9f9e0804bbc5" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/8003df6a-e035-4c8f-8e90-0e710818d33e" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/29e116de-a8c6-4f22-8485-3e0eba5ed564" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/46aefe59-e49c-4483-ba1f-eb18397db6ae" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/ea354dcb-b4a9-47af-8046-ba0d55d72746" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/10a5d75c-ae3e-4e2b-aeb2-e943e6363a2f" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/3e6bfdbb-0c07-4fad-96f0-552cbcc9d4ae" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/b3acd00b-c425-4e5f-b113-97215bb85157" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/dc5f3f80-3325-4f5d-acec-236d6b241a7f" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/216d4e50-5af4-4e57-8649-1211a82f493e" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/167461dd-ec2e-4327-a208-4014f42100f9" />
+<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/3871e505-1bc9-4a6c-8457-4ad363a582af" />
 
 
 ## 📚 Full Documentation (in progress)
