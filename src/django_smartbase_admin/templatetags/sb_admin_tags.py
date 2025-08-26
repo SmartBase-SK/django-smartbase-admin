@@ -11,6 +11,7 @@ from django.templatetags.static import static
 from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
 from django.utils.translation import gettext
+from easy_thumbnails.exceptions import InvalidImageFormatError
 
 from django_smartbase_admin.engine.const import (
     ROW_CLASS_FIELD,
@@ -274,6 +275,8 @@ def get_file_preview_image(
             return thumb.url
         except ValueError:
             return file.url
+        except InvalidImageFormatError:
+            return static("sb_admin/images/file_types/file-other.svg")
     if file_extension == "svg" or file_extension == "webp":
         return file.url
     for extension in SUPPORTED_FILE_TYPE_ICONS:
