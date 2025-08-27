@@ -418,4 +418,7 @@ document.body.addEventListener('sbadmin:modal-change-form-response', function (e
     if (event.detail.reload) {
         window.location.reload()
     }
+    if (event.detail.loadUrl) {
+        window.location.href = event.detail.loadUrl
+    }
 })
