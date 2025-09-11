@@ -422,15 +422,30 @@ class Main {
 
         const collapseAll = event.target.closest('.collapse-all-stacked-inlines')
         if (collapseAll) {
+            event.preventDefault()
             const parentWrapper = collapseAll.closest('.djn-fieldset')
             const collapseElements = parentWrapper.querySelectorAll('.collapse')
+            const collapseTriggers = parentWrapper.querySelectorAll('.js-collapse-stacked-inline')
             const isCurrentlyCollapsed = collapseAll.classList.contains('collapsed')
+
+            collapseTriggers.forEach(el => {
+                if(el.closest('.djn-empty-form')) {
+                    return
+                }
+                if (isCurrentlyCollapsed) {
+                    el.setAttribute('aria-expanded', 'true')
+                } else {
+                    el.setAttribute('aria-expanded', 'false')
+                }
+            })
+
             collapseElements.forEach(el => {
                 if(el.closest('.djn-empty-form')) {
                     return
                 }
                 const instance = Collapse.getOrCreateInstance(el)
                 if (isCurrentlyCollapsed) {
+                    collapseTriggers.c
                     instance.show()
                 } else {
                     instance.hide()
@@ -442,9 +457,6 @@ class Main {
             } else {
                 collapseAll.classList.add('collapsed')
             }
-
-            event.preventDefault()
-            return false
         }
     }
 }
