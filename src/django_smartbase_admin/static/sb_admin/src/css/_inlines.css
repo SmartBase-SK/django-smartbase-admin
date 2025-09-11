@@ -200,3 +200,14 @@ fieldset.module > header {
     z-index: 1;
 }
 
+.js-collapse-stacked-inline svg {
+    transition: transform 0.3s ease-in-out;
+}
+
+.js-collapse-stacked-inline[aria-expanded="true"] svg {
+    transform: rotate(0deg);
+}
+
+.js-collapse-stacked-inline[aria-expanded="false"] svg {
+    transform: rotate(-90deg);
+}

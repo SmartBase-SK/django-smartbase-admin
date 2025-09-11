@@ -100,6 +100,7 @@ class Main {
             this.saveState(e)
             this.fileDownload(e)
             this.passwordToggleFnc(e)
+            this.collapseStackedInlineButtons(e)
         })
         this.initFileInputs()
         this.initAliasName()
@@ -397,6 +398,8 @@ class Main {
         fieldElem.dispatchEvent(new CustomEvent('clear', {detail: {refresh: true}}))
     }
 
+
+
     executeListAction(table_id, action_url, no_params, open_in_new_tab = false) {
         if (window.SBAdminTable && window.SBAdminTable[table_id]) {
             window.SBAdminTable[table_id].executeListAction(action_url, no_params, open_in_new_tab)
@@ -406,6 +409,42 @@ class Main {
             } else {
                 window.location.href = action_url
             }
+        }
+    }
+    collapseStackedInlineButtons(event) {
+        const collapseStackedInline = event.target.closest('.js-collapse-stacked-inline')
+        if(collapseStackedInline) {
+            const collapseEl = event.target.closest('.djn-inline-form').querySelector('.collapse')
+            const instance = Collapse.getOrCreateInstance(collapseEl)
+            instance.toggle()
+            collapseStackedInline.setAttribute('aria-expanded', collapseStackedInline.getAttribute('aria-expanded') !== 'true');
+        }
+
+        const collapseAll = event.target.closest('.collapse-all-stacked-inlines')
+        if (collapseAll) {
+            const parentWrapper = collapseAll.closest('.djn-fieldset')
+            const collapseElements = parentWrapper.querySelectorAll('.collapse')
+            const isCurrentlyCollapsed = collapseAll.classList.contains('collapsed')
+            collapseElements.forEach(el => {
+                if(el.closest('.djn-empty-form')) {
+                    return
+                }
+                const instance = Collapse.getOrCreateInstance(el)
+                if (isCurrentlyCollapsed) {
+                    instance.show()
+                } else {
+                    instance.hide()
+                }
+            })
+
+            if (isCurrentlyCollapsed) {
+                collapseAll.classList.remove('collapsed')
+            } else {
+                collapseAll.classList.add('collapsed')
+            }
+
+            event.preventDefault()
+            return false
         }
     }
 }

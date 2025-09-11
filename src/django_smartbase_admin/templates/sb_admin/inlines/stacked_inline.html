@@ -51,11 +51,15 @@
                  data-is-initial="{% if inline_admin_form.pk_field.field.value %}true{% else %}false{% endif %}"
                  {% endif %}
                  id="{{ inline_admin_formset.formset.prefix }}-{% if forloop.last and inline_admin_formset.has_add_permission %}empty{% else %}{{ inline_admin_form.form|form_index }}{% endif %}">
-                <div class="card p-0 sm:mb-24 {% if inline_admin_form.formset.nesting_depth > 1 %}border-0{% endif %}">
-                    {% if not inline_opts.sortable_options or not inline_opts.sortable_options.disabled %}<div class="djn-drag-handler"></div>{% endif %}
-                    <div class="p-24 pb-0">
+                <div class="djn-tools card level-{{ inline_admin_form.formset.nesting_depth }} p-0 sm:mb-24 {% if inline_admin_form.formset.nesting_depth > 1 %}border-0{% endif %}">
+                    <div class="p-24">
         {#                    <b>{{ inline_admin_formset.opts.verbose_name|capfirst }}:</b>&nbsp;#}
                         <div class="flex items-center">
+                            {% if not inline_opts.sortable_options or not inline_opts.sortable_options.disabled %}
+                                <div class="drag-handler btn btn-empty cursor-move static transform-none mr-8">
+                                    <svg class="w-20 h-20 text-dark-400"><use xlink:href="#Drag"></use></svg>
+                                </div>
+                            {% endif %}
                             <span class="text-dark-900 font-semibold">{% if inline_admin_form.original %}{{ inline_admin_form.original }}{% else %}#{{ forloop.counter }}{% endif %}</span>
                             <div class="ml-auto">
                                 {% if inline_admin_form.original and inline_admin_form.model_admin.show_change_link and inline_admin_form.model_admin.has_registered_model %}
@@ -64,8 +68,8 @@
                                     </a>
                                 {% endif %}
                                 {% if inline_admin_form.show_url %}<a href="{{ inline_admin_form.absolute_url }}" class="ml-8">{% trans "View on site" %}</a>{% endif %}
-                                {% if inline_admin_formset.formset.can_delete %}
-                                    <div class="ml-8">
+                                <div class="ml-8 flex items-center gap-8">
+                                    {% if inline_admin_formset.formset.can_delete %}
                                         {% if inline_admin_form.original %}
                                             <div class="delete djn-delete-handler {{ inline_admin_formset.handler_classes|join:" " }}">
                                                 <div class="relative flex items-center h-40">
@@ -78,8 +82,14 @@
                                         {% else %}
                                             <span><a class="inline-deletelink djn-remove-handler {{ inline_admin_formset.handler_classes|join:" " }}" href="javascript:void(0)">{% trans 'Delete' %}</a></span>
                                         {% endif %}
-                                    </div>
-                                {% endif %}
+                                    {% endif %}
+                                    <div class="w-2 bg-dark-200 self-stretch"></div>
+                                    <button type="button" class="btn btn-empty js-collapse-stacked-inline" aria-expanded="{{ context_data.default_collapsed|yesno:"false,true" }}">
+                                        <svg class="w-20 h-20 text-dark-400">
+                                            <use xlink:href="#Down"></use>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -90,25 +100,25 @@
                         {% endif %}
                     </div>
 
-
-                    {% for fieldset in inline_admin_form %}
-                        <div class="p-24 stacked-row{% if not forloop.first %} border-t border-dark-200{% endif %}">
-                            {% include inline_admin_formset.opts.fieldset_template %}
-                        </div>
-                    {% endfor %}
-                    {% if inline_admin_form.has_auto_field or inline_admin_form.needs_explicit_pk_field %}
-                        {{ inline_admin_form.pk_field.field }}
-                    {% endif %}
-                    {% if inline_admin_form.fk_field %}{{ inline_admin_form.fk_field.field }}{% endif %}
+                    <div class="collapse flex flex-col {% if not context_data.default_collapsed %}show{% endif %}">
+                        {% for fieldset in inline_admin_form %}
+                            <div class="pt-0 pb-24 px-24 stacked-row{% if not forloop.first %} border-t border-dark-200{% endif %}">
+                                {% include inline_admin_formset.opts.fieldset_template %}
+                            </div>
+                        {% endfor %}
+                        {% if inline_admin_form.has_auto_field or inline_admin_form.needs_explicit_pk_field %}
+                            {{ inline_admin_form.pk_field.field }}
+                        {% endif %}
+                        {% if inline_admin_form.fk_field %}{{ inline_admin_form.fk_field.field }}{% endif %}
+                        {% if inline_admin_form.form.inlines %}
+                            {% for nested in inline_admin_form.form.inlines %}
+                                <div class="card level-{{ nested.formset.nesting_depth }} p-0 mx-24 sm:my-24">
+                                    {% include nested.opts.template with inline_admin_formset=nested %}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
-                {% if inline_admin_form.form.inlines %}
-                    {% for nested in inline_admin_form.form.inlines %}
-                        <div class="card p-0 sm:mb-24 {% if nested.formset.nesting_depth > 2 %}border-x-0 rounded-none{% endif %}">
-                            {% include nested.opts.template with inline_admin_formset=nested %}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-
             </div>
         {% endfor %}
         {% endwith %}
