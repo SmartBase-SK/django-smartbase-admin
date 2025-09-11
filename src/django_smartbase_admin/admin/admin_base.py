@@ -1147,13 +1147,36 @@ class SBAdminGenericTableInlinePaginated(SBAdminGenericTableInline):
     per_page = 50
 
 
-class SBAdminStackedInline(SBAdminInline, NestedStackedInline):
+class SBAdminStackedInlineBase(SBAdminInline):
+    default_collapsed = False
+
+    def get_sbadmin_default_collapsed(self, request):
+        return self.default_collapsed
+
+    def get_context_data(self, request) -> dict[str, Any]:
+        context_data = super().get_context_data(request)
+        context_data["default_collapsed"] = self.get_sbadmin_default_collapsed(request)
+        return context_data
+
+    def get_sbadmin_inline_list_actions(self, request) -> list:
+        actions = super().get_sbadmin_inline_list_actions(request)
+        actions.append(
+            SBAdminCustomAction(
+                title="Collapse",
+                css_class=f"collapse-all-stacked-inlines {'collapsed' if self.get_sbadmin_default_collapsed(request) else ''}",
+                url=request.get_full_path(),
+            )
+        )
+        return actions
+
+
+class SBAdminStackedInline(SBAdminStackedInlineBase, NestedStackedInline):
     template = "sb_admin/inlines/stacked_inline.html"
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
     formset = SBAdminNestedInlineFormSet
 
 
-class SBAdminGenericStackedInline(SBAdminInline, NestedGenericStackedInline):
+class SBAdminGenericStackedInline(SBAdminStackedInlineBase, NestedGenericStackedInline):
     template = "sb_admin/inlines/stacked_inline.html"
     fieldset_template = "sb_admin/includes/inline_fieldset.html"
     formset = SBAdminGenericInlineFormSet

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-07-29 12:46+0200\n"
+"POT-Creation-Date: 2025-09-11 16:32+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -481,6 +481,9 @@ msgstr "alebo uložiť ako"
 msgid "Cancel"
 msgstr "Zrušiť"
 
+msgid "Calendar"
+msgstr "Kalendár"
+
 msgid "Yes"
 msgstr "Áno"
 
@@ -730,6 +733,12 @@ msgstr "Posunúť nižšie"
 
 msgid "Reorder"
 msgstr "Preusporiadať"
+
+msgid "Expand"
+msgstr "Rozbaliť"
+
+msgid "Collapse"
+msgstr "Zbaliť"
 
 #, python-brace-format
 msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
