@@ -3,6 +3,7 @@ import Collapse from 'bootstrap/js/dist/collapse'
 import Tab from 'bootstrap/js/dist/tab'
 import Modal from 'bootstrap/js/dist/modal'
 import Tooltip from 'bootstrap/js/dist/tooltip'
+import debounce from 'lodash/debounce'
 
 // remove Modal focus trap to fix interaction with fields in modals inside another modal
 Modal.prototype._initializeFocusTrap = function () {
@@ -105,6 +106,7 @@ class Main {
         this.initFileInputs()
         this.initAliasName()
         this.handleLocationHashFromTabs()
+        this.initCollapseEventListeners()
     }
 
     isDarkMode() {
@@ -411,6 +413,67 @@ class Main {
             }
         }
     }
+    isCurrentlyCollapsed(parentWrapper) {
+        const collapseElements = parentWrapper.querySelectorAll('.collapse')
+        return Array.from(collapseElements).every(el => {
+            if(el.closest('.djn-empty-form')) {
+                return true
+            }
+            return !el.classList.contains('show')
+        })
+    }
+
+    updateCollapseAllButton(parentWrapper) {
+        const collapseAll = parentWrapper.querySelector('.collapse-all-stacked-inlines')
+        if (!collapseAll) return
+
+        const isCollapsed = this.isCurrentlyCollapsed(parentWrapper)
+        const expandText = `<svg class="mr-8"><use xlink:href="#View-grid-list"></use></svg><span>${window.sb_admin_translation_strings["expand"]}</span>`
+        const collapseText = `<svg class="mr-8"><use xlink:href="#List-checkbox"></use></svg><span>${window.sb_admin_translation_strings["collapse"]}</span>`
+
+        if (isCollapsed) {
+            collapseAll.classList.add('collapsed')
+            collapseAll.innerHTML = expandText
+        } else {
+            collapseAll.classList.remove('collapsed')
+            collapseAll.innerHTML = collapseText
+        }
+    }
+
+    initCollapseEventListeners() {
+        this.initCollapseAllButtons()
+
+        const debouncedUpdateCollapseAllButton = debounce((parentWrapper) => {
+            this.updateCollapseAllButton(parentWrapper)
+        }, 50)
+
+        document.addEventListener('shown.bs.collapse', (e) => {
+            const parentWrapper = e.target.closest('.djn-fieldset')
+            if (parentWrapper) {
+                debouncedUpdateCollapseAllButton(parentWrapper)
+            }
+        })
+        
+        document.addEventListener('hidden.bs.collapse', (e) => {
+            const parentWrapper = e.target.closest('.djn-fieldset')
+            if (parentWrapper) {
+                debouncedUpdateCollapseAllButton(parentWrapper)
+            }
+        })
+    }
+
+
+
+    initCollapseAllButtons() {
+        const collapseAllButtons = document.querySelectorAll('.collapse-all-stacked-inlines')
+        collapseAllButtons.forEach(button => {
+            const parentWrapper = button.closest('.djn-fieldset')
+            if (parentWrapper) {
+                this.updateCollapseAllButton(parentWrapper)
+            }
+        })
+    }
+
     collapseStackedInlineButtons(event) {
         const collapseStackedInline = event.target.closest('.js-collapse-stacked-inline')
         if(collapseStackedInline) {
@@ -426,7 +489,7 @@ class Main {
             const parentWrapper = collapseAll.closest('.djn-fieldset')
             const collapseElements = parentWrapper.querySelectorAll('.collapse')
             const collapseTriggers = parentWrapper.querySelectorAll('.js-collapse-stacked-inline')
-            const isCurrentlyCollapsed = collapseAll.classList.contains('collapsed')
+            const isCurrentlyCollapsed = this.isCurrentlyCollapsed(parentWrapper)
 
             collapseTriggers.forEach(el => {
                 if(el.closest('.djn-empty-form')) {
@@ -445,18 +508,11 @@ class Main {
                 }
                 const instance = Collapse.getOrCreateInstance(el)
                 if (isCurrentlyCollapsed) {
-                    collapseTriggers.c
                     instance.show()
                 } else {
                     instance.hide()
                 }
             })
-
-            if (isCurrentlyCollapsed) {
-                collapseAll.classList.remove('collapsed')
-            } else {
-                collapseAll.classList.add('collapsed')
-            }
         }
     }
 }

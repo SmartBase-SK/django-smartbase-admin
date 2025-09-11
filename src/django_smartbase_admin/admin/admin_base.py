@@ -1162,7 +1162,7 @@ class SBAdminStackedInlineBase(SBAdminInline):
         actions = super().get_sbadmin_inline_list_actions(request)
         actions.append(
             SBAdminCustomAction(
-                title=_("Toggle collapse"),
+                title="Collapse",
                 css_class=f"collapse-all-stacked-inlines {'collapsed' if self.get_sbadmin_default_collapsed(request) else ''}",
                 url=request.get_full_path(),
             )
