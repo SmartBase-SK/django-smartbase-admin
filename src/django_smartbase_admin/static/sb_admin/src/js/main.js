@@ -417,7 +417,7 @@ class Main {
             const collapseEl = event.target.closest('.djn-inline-form').querySelector('.collapse')
             const instance = Collapse.getOrCreateInstance(collapseEl)
             instance.toggle()
-            collapseStackedInline.setAttribute('aria-expanded', collapseStackedInline.getAttribute('aria-expanded') !== 'true');
+            collapseStackedInline.setAttribute('aria-expanded', collapseStackedInline.getAttribute('aria-expanded') !== 'true')
         }
 
         const collapseAll = event.target.closest('.collapse-all-stacked-inlines')
