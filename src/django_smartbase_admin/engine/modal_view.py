@@ -66,7 +66,7 @@ class ListActionModalView(ActionModalView):
     def get_selection_queryset(self, request, form):
         list_action = self.view.sbadmin_list_action_class(self.view, request)
         return list_action.get_data_queryset().filter(
-            list_action.get_selection_queryset()
+            list_action.get_selection_queryset(), list_action.get_filter_from_request()
         )
 
     def process_form_valid_list_selection_queryset(
