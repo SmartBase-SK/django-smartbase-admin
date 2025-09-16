@@ -126,7 +126,7 @@ class Main {
         picker.addEventListener('change', (e)=>{
             if(e.target.value) {
                 document.documentElement.setAttribute('data-theme', e.target.value)
-                this.switchBodyColorSchemeClass()
+                this.switchBodyColorSchemeClass(true)
                 this.switchCKEditorTheme()
                 return
             }
@@ -136,12 +136,18 @@ class Main {
         this.switchCKEditorTheme()
     }
 
-    switchBodyColorSchemeClass() {
+    switchBodyColorSchemeClass(fireEvents = false) {
         if(this.isDarkMode()) {
             document.body.classList.add('dark')
+            if(fireEvents) {
+                document.body.dispatchEvent(new CustomEvent('color-scheme-change', {detail: 'dark'}))
+            }
             return
         }
         document.body.classList.remove('dark')
+        if(fireEvents) {
+            document.body.dispatchEvent(new CustomEvent('color-scheme-change', {detail: 'light'}))
+        }
     }
 
     initInlines(target) {
