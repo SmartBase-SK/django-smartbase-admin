@@ -1,8 +1,14 @@
+from collections.abc import Callable
 from functools import update_wrapper
+from typing import Any
 
 from django.conf import settings
 from django.contrib import admin
-from django.urls import path, reverse_lazy
+from django.contrib.auth.decorators import login_not_required
+from django.http import HttpRequest, HttpResponse
+from django.urls import path, reverse_lazy, URLPattern, URLResolver
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
 from django.views.generic import TemplateView
 
 from django_smartbase_admin.engine.admin_entrypoint_view import SBAdminEntrypointView
@@ -20,16 +26,18 @@ class SBAdminSite(admin.AdminSite):
         "sb_admin/authentification/password_change_done.html"
     )
 
-    def initialize_admin_view(self, view_function, request, **kwargs):
+    def initialize_admin_view(
+        self, view_func: Callable[..., HttpResponse], request: HttpRequest, **kwargs
+    ) -> None:
         request.current_app = "sb_admin"
         selected_view = None
         try:
-            selected_view = view_function.__self__
+            selected_view = view_func.__self__
             from django_smartbase_admin.admin.admin_base import SBAdminBaseView
 
             if not isinstance(selected_view, SBAdminBaseView):
                 selected_view = None
-        except:
+        except Exception:
             pass
         request.sbadmin_selected_view = selected_view
         kwargs["view"] = selected_view.get_id() if selected_view else None
@@ -41,34 +49,46 @@ class SBAdminSite(admin.AdminSite):
                 request, request_data=request_data, **kwargs
             )
 
-    def admin_view_response_wrapper(self, response, request, *args, **kwargs):
+    def admin_view_response_wrapper(
+        self, response: HttpResponse, request: HttpRequest, *args, **kwargs
+    ) -> HttpResponse:
         from django_smartbase_admin.admin.admin_base import SBAdminThirdParty
 
         if isinstance(request.sbadmin_selected_view, SBAdminThirdParty):
             response = SBAdminViewService.replace_legacy_admin_access_in_response(
                 response
             )
-
         return response
 
-    def admin_view(self, view_function, cacheable=False):
-        def inner(request, *args, **kwargs):
-            self.initialize_admin_view(view_function, request, **kwargs)
-            return self.admin_view_response_wrapper(
-                view_function(request, *args, **kwargs), request, *args, **kwargs
-            )
+    def admin_view(
+        self,
+        view_func: Callable[..., HttpResponse],
+        *,
+        cacheable: bool = False,
+        public: bool = False
+    ) -> Callable[[HttpRequest, ...], HttpResponse]:
+        def inner(request: HttpRequest, *args, **kwargs):
+            self.initialize_admin_view(view_func, request, **kwargs)
+            response = view_func(request, *args, **kwargs)
+            return self.admin_view_response_wrapper(response, request, *args, **kwargs)
 
-        return super(SBAdminSite, self).admin_view(
-            update_wrapper(inner, view_function), cacheable
-        )
+        if not public:
+            return super().admin_view(update_wrapper(inner, view_func), cacheable)
+        # standard Django admin behaviour, expect it skips staff/permission checks
+        if not cacheable:
+            inner = never_cache(inner)
+        if not getattr(view_func, "csrf_exempt", False):
+            inner = csrf_protect(inner)
+        inner = login_not_required(inner)
+        return update_wrapper(inner, view_func)
 
-    def each_context(self, request):
+    def each_context(self, request: HttpRequest) -> dict[str, Any]:
         try:
             return request.sbadmin_selected_view.get_global_context(request)
-        except:
+        except Exception:
             return {}
 
-    def get_urls(self):
+    def get_urls(self) -> list[URLPattern | URLResolver]:
         from django.contrib.auth.views import (
             PasswordResetView,
             PasswordResetDoneView,
@@ -80,6 +100,8 @@ class SBAdminSite(admin.AdminSite):
         from django_smartbase_admin.views.user_config_view import ColorSchemeView
 
         urls = [
+            path("login/", self.admin_view(self.login, public=True), name="login"),
+            path("logout/", self.admin_view(self.logout), name="logout"),
             path(
                 "password_change/",
                 self.admin_view(
