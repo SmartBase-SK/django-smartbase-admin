@@ -66,8 +66,8 @@ class SBAdminSite(admin.AdminSite):
     def admin_view(
         self,
         view_func: Callable[..., HttpResponse],
-        *,
         cacheable: bool = False,
+        *,
         public: bool = False
     ) -> Callable[[HttpRequest, ...], HttpResponse]:
         def inner(request: HttpRequest, *args, **kwargs):
