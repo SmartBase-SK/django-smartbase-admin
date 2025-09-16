@@ -2,9 +2,12 @@
 {% load i18n static %}
 
 {% block main_wrapper %}
+    {% include "sb_admin/includes/notifications.html" with classes="top-16 xl:left-0" %}
     <div class="flex items-center max-h-screen">
-        <img loading="lazy" src="{% static "sb_admin/images/logo.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 dark:hidden">
-        <img loading="lazy" src="{% static "sb_admin/images/logo_light.svg" %}" alt="Logo" class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 hidden dark:block">
+        <img loading="lazy" src="{% static "sb_admin/images/logo.svg" %}" alt="Logo"
+             class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 dark:hidden">
+        <img loading="lazy" src="{% static "sb_admin/images/logo_light.svg" %}" alt="Logo"
+             class="max-h-40 absolute md:left-40 md:top-40 left-24 top-24 hidden dark:block">
         <div class="md:max-w-640 w-full flex justify-center items-center h-screen">
             <div class="max-w-370 w-full mx-24">
                 {% block content %}{% endblock %}
