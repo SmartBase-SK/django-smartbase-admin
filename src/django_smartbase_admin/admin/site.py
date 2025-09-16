@@ -4,9 +4,12 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_not_required
-from django.http import HttpRequest, HttpResponse
-from django.urls import path, reverse_lazy, URLPattern, URLResolver
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.urls import path, reverse_lazy, URLPattern, URLResolver, reverse
+from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.generic import TemplateView
@@ -194,6 +197,47 @@ class SBAdminSite(admin.AdminSite):
         )
         urls.extend(super().get_urls())
         return urls
+
+    @method_decorator(never_cache)
+    @login_not_required
+    def login(self, request: HttpRequest, extra_context: dict[str, Any] | None = None):
+        """
+        Same as Django's built-in AdminSite.login view, except it allows the
+        login view class to be overridden via configuration.
+        """
+        if request.method == "GET" and self.has_permission(request):
+            # Already logged-in, redirect to admin index
+            index_path = reverse("admin:index", current_app=self.name)
+            return HttpResponseRedirect(index_path)
+
+        # Since this module gets imported in the application's root package,
+        # it cannot import models from other applications at the module level,
+        # and django.contrib.admin.forms eventually imports User.
+        from django.contrib.admin.forms import AdminAuthenticationForm
+
+        context = {
+            **self.each_context(request),
+            "title": _("Log in"),
+            "subtitle": None,
+            "app_path": request.get_full_path(),
+            "username": request.user.get_username(),
+        }
+        if (
+            REDIRECT_FIELD_NAME not in request.GET
+            and REDIRECT_FIELD_NAME not in request.POST
+        ):
+            context[REDIRECT_FIELD_NAME] = reverse("admin:index", current_app=self.name)
+        context.update(extra_context or {})
+
+        defaults = {
+            "extra_context": context,
+            "authentication_form": self.login_form or AdminAuthenticationForm,
+            "template_name": self.login_template or "admin/login.html",
+        }
+        request.current_app = self.name
+        return request.request_data.configuration.login_view_class.as_view(**defaults)(
+            request
+        )
 
 
 sb_admin_site = SBAdminSite(name="sb_admin")

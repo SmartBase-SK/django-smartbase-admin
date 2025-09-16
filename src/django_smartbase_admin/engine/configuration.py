@@ -1,4 +1,5 @@
 from django.contrib.auth import get_permission_codename
+from django.contrib.auth.views import LoginView
 from django.db.models import Q
 
 from django_smartbase_admin.admin.site import sb_admin_site
@@ -41,6 +42,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     global_filter_form = None
     filters_version = FilterVersions.FILTERS_VERSION_1
     default_color_scheme = ColorScheme.AUTO
+    login_view_class = LoginView
 
     def __init__(
         self,
@@ -50,6 +52,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         global_filter_form=None,
         filters_version=None,
         default_color_scheme=None,
+        login_view_class=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -60,6 +63,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.autocomplete_map = {}
         self.filters_version = filters_version or self.filters_version
         self.default_color_scheme = default_color_scheme or self.default_color_scheme
+        self.login_view_class = login_view_class or self.login_view_class
 
     def init_registered_views(self):
         registered_views = []
