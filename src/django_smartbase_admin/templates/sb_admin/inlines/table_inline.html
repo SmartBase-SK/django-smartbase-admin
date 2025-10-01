@@ -40,12 +40,14 @@
                                     <span>{% trans 'Add' %}</span>
                                 </a>
                             {% else %}
-                                <a href="javascript://" class="add-handler djn-add-handler btn btn-icon ml-auto {{ inline_admin_formset.handler_classes|join:" " }}">
-                                    <svg class="w-20 h-20 md:mr-8">
-                                        <use xlink:href="#Plus"></use>
-                                    </svg>
-                                    <span>{% trans 'Add' %}</span>
-                                </a>
+                                <div class="djn-add-item ml-auto">
+                                    <a href="javascript://" class="add-handler djn-add-handler btn btn-icon {{ inline_admin_formset.handler_classes|join:" " }}">
+                                        <svg class="w-20 h-20 md:mr-8">
+                                            <use xlink:href="#Plus"></use>
+                                        </svg>
+                                        <span>{% trans 'Add' %}</span>
+                                    </a>
+                                </div>
                             {% endif %}
                         {% endif %}
                     </div>

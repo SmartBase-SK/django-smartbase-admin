@@ -48,9 +48,12 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             $treeEl.on('change', (e) => {
                 const changeTarget = e.target.dataset['changeTarget']
                 if(changeTarget) {
-                    const changeTargetEl = document.querySelector(changeTarget)
-                    if(changeTargetEl) {
-                        changeTargetEl.value = e.target.value
+                    const inlineWrapper = e.target.closest('.djn-inline-form')
+                    if (inlineWrapper) {
+                        const changeTargetEl = inlineWrapper.querySelector(changeTarget)
+                        if(changeTargetEl) {
+                            changeTargetEl.value = e.target.value
+                        }
                     }
                 }
             })
@@ -371,7 +374,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
         const initAllTrees = function () {
             $('.js-tree-widget').each(function (index, element) {
                 const $treeEl = $(element)
-                if ($treeEl.hasClass('fancytree-container')) {
+                if ($treeEl.hasClass('fancytree-container') || element.closest('.djn-empty-form')) {
                     return
                 }
                 const $dropdownMenu = $treeEl.closest('.dropdown-menu')
