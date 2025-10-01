@@ -1,4 +1,4 @@
-<img width="1660" height="520" alt="image" src="https://github.com/user-attachments/assets/b0d5537f-29c4-46ca-b514-9862b26cb000" style="max-width: 100%; height: auto; max-height: 520px;" />
+<img alt="image" src="https://github.com/user-attachments/assets/b0d5537f-29c4-46ca-b514-9862b26cb000"/>
 
 # Django SmartBase Admin
 
@@ -19,18 +19,18 @@ Built to **speed up development** of internal tools and admin panels — beautif
 - Beautiful modern UI (Tailwind CSS)
 - Responsive & mobile-friendly
 - End-user ready for building SaaS or similar projects with global queryset configuration
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/ebbcacea-9052-409e-99bb-9f9e0804bbc5" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/8003df6a-e035-4c8f-8e90-0e710818d33e" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/29e116de-a8c6-4f22-8485-3e0eba5ed564" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/46aefe59-e49c-4483-ba1f-eb18397db6ae" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/ea354dcb-b4a9-47af-8046-ba0d55d72746" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/10a5d75c-ae3e-4e2b-aeb2-e943e6363a2f" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/3e6bfdbb-0c07-4fad-96f0-552cbcc9d4ae" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/b3acd00b-c425-4e5f-b113-97215bb85157" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/dc5f3f80-3325-4f5d-acec-236d6b241a7f" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/216d4e50-5af4-4e57-8649-1211a82f493e" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/167461dd-ec2e-4327-a208-4014f42100f9" style="max-width: 100%; height: auto; max-height: 1720px;" />
-<img width="2880" height="1720" alt="image" src="https://github.com/user-attachments/assets/3871e505-1bc9-4a6c-8457-4ad363a582af" style="max-width: 100%; height: auto; max-height: 1720px;" />
+<img alt="image" src="https://github.com/user-attachments/assets/ebbcacea-9052-409e-99bb-9f9e0804bbc5" />
+<img alt="image" src="https://github.com/user-attachments/assets/8003df6a-e035-4c8f-8e90-0e710818d33e" />
+<img alt="image" src="https://github.com/user-attachments/assets/29e116de-a8c6-4f22-8485-3e0eba5ed564" />
+<img alt="image" src="https://github.com/user-attachments/assets/46aefe59-e49c-4483-ba1f-eb18397db6ae" />
+<img alt="image" src="https://github.com/user-attachments/assets/ea354dcb-b4a9-47af-8046-ba0d55d72746" />
+<img alt="image" src="https://github.com/user-attachments/assets/10a5d75c-ae3e-4e2b-aeb2-e943e6363a2f" />
+<img alt="image" src="https://github.com/user-attachments/assets/3e6bfdbb-0c07-4fad-96f0-552cbcc9d4ae" />
+<img alt="image" src="https://github.com/user-attachments/assets/b3acd00b-c425-4e5f-b113-97215bb85157" />
+<img alt="image" src="https://github.com/user-attachments/assets/dc5f3f80-3325-4f5d-acec-236d6b241a7f" />
+<img alt="image" src="https://github.com/user-attachments/assets/216d4e50-5af4-4e57-8649-1211a82f493e" />
+<img alt="image" src="https://github.com/user-attachments/assets/167461dd-ec2e-4327-a208-4014f42100f9" />
+<img alt="image" src="https://github.com/user-attachments/assets/3871e505-1bc9-4a6c-8457-4ad363a582af" />
 
 
 ## 📚 Full Documentation (in progress)
