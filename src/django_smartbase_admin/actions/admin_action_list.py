@@ -208,7 +208,7 @@ class SBAdminListAction(SBAdminAction):
                 "search_field_placeholder": self.view.get_search_field_placeholder(
                     self.threadsafe_request
                 ),
-                "list_actions": self.view.process_actions_permissions(
+                "list_actions": self.view.process_actions(
                     self.threadsafe_request, list_actions
                 ),
                 "list_selection_actions": self.view.get_sbadmin_list_selection_actions_grouped(

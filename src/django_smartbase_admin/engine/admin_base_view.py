@@ -388,6 +388,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         if self.sbadmin_actions_initialized:
             return
         self.process_actions(request, self.get_sbadmin_list_selection_actions(request))
+        self.process_actions(request, self.get_sbadmin_list_actions(request))
         self.sbadmin_actions_initialized = True
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
@@ -408,6 +409,12 @@ class SBAdminBaseListView(SBAdminBaseView):
             force=True,
         )
         for list_action in self.get_sbadmin_list_selection_actions(request):
+            if isinstance(list_action, SBAdminFormViewAction):
+                form = list_action.target_view.form_class
+                form.view = self
+                form()
+
+        for list_action in self.get_sbadmin_list_actions(request):
             if isinstance(list_action, SBAdminFormViewAction):
                 form = list_action.target_view.form_class
                 form.view = self
