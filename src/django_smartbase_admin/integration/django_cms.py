@@ -29,3 +29,8 @@ class DjangoCMSPluginSBAdmin(SBAdmin):
         ]
         self.sbadmin_fieldsets = fieldsets
         return fieldsets
+
+    def response_add(self, request, obj, **kwargs):
+        # response_add from CMSPluginBase
+        self.object_successfully_changed = True
+        return self.render_close_frame(request, obj)
