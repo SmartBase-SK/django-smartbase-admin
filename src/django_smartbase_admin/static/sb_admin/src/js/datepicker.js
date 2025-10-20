@@ -16,7 +16,7 @@ export default class Datepicker {
             documentLocale = 'default'
         }
         flatpickr.localize(this.getLocale(documentLocale))
-        this.initWidgets()
+        this.initWidgets(target)
         if(target === document) {
             document.addEventListener('formset:added', (e) => {
                 this.initWidgets(e.target)
