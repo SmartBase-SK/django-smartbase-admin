@@ -1,5 +1,7 @@
 import json
 import logging
+import sys
+from email.policy import default
 
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -358,6 +360,7 @@ class SBAdminAutocompleteWidget(
     form = None
     field_name = None
     initialised = None
+    default_create_data = None
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
@@ -370,7 +373,9 @@ class SBAdminAutocompleteWidget(
             base_id += f"_{self.form.__class__.__name__}"
         return base_id
 
-    def init_widget_dynamic(self, form, form_field, field_name, view, request):
+    def init_widget_dynamic(
+        self, form, form_field, field_name, view, request, default_create_data=None
+    ):
         super().init_widget_dynamic(form, form_field, field_name, view, request)
         if self.initialised:
             return
@@ -378,6 +383,7 @@ class SBAdminAutocompleteWidget(
         self.field_name = field_name
         self.view = view
         self.form = form
+        self.default_create_data = default_create_data or {}
         self.init_autocomplete_widget_static(
             self.field_name,
             self.model,
@@ -416,8 +422,19 @@ class SBAdminAutocompleteWidget(
         parsed_value = None
         if value:
             parsed_value = self.parse_value_from_input(threadsafe_request, value)
+            is_create = self.parse_is_create_from_input(
+                threadsafe_request,
+                threadsafe_request.request_data.request_post.get(name),
+            )
+            selected_options = []
+            if is_create:
+                errors = getattr(self.form, "errors", {})
+                if errors.get(self.field_name):
+                    parsed_value = None
             if parsed_value:
-                selected_options = []
+                if self.is_multiselect() and not isinstance(parsed_value, list):
+                    parsed_value = [parsed_value]
+
                 for item in self.get_queryset(threadsafe_request).filter(
                     **{f"{self.get_value_field()}{query_suffix}": parsed_value}
                 ):
@@ -428,8 +445,8 @@ class SBAdminAutocompleteWidget(
                         }
                     )
 
-                context["widget"]["value"] = json.dumps(selected_options)
-                context["widget"]["value_list"] = selected_options
+            context["widget"]["value"] = json.dumps(selected_options)
+            context["widget"]["value_list"] = selected_options
 
         if (
             threadsafe_request.request_data.configuration.autocomplete_show_related_buttons(
@@ -472,13 +489,154 @@ class SBAdminAutocompleteWidget(
         model_field = getattr(self.field, "model_field", None)
         return not (model_field and (model_field.one_to_one or model_field.many_to_one))
 
+    def _is_in_validation_context(self):
+        """
+        Check if value_from_datadict is being called during form validation
+        (full_clean, _clean_fields, etc.) vs. during change detection by formsets.
+
+        Returns True if called during actual validation, False if called during
+        change detection or other non-validation contexts.
+
+        Uses sys._getframe() instead of inspect.currentframe() for better performance,
+        as this method is called frequently during form processing.
+        """
+        # Get the call stack - using sys._getframe() for better performance
+        # sys._getframe(1) gets the caller's frame (skipping this method)
+        try:
+            current_frame = sys._getframe(1)
+        except ValueError:
+            # Fallback if _getframe is not available (unlikely in CPython)
+            return False
+
+        # Look for validation-related methods in the call stack
+        validation_methods = {
+            "_clean_bound_field",
+        }
+
+        # Walk up the call stack
+        depth = 0
+        while current_frame and depth < 5:  # Limit depth to avoid infinite loops
+            method_name = current_frame.f_code.co_name
+            if method_name in validation_methods:
+                return True
+            current_frame = current_frame.f_back
+            depth += 1
+
+        return False
+
+    def get_forward_data(self, request, name):
+        """
+        Parse forward data from request.request_data.request_post.
+
+        For each field in self.forward, use name as base field name and replace
+        in it current field name with forward field name, return dict.
+
+        Args:
+            request: The request object
+            name: The base field name (e.g., "product__category")
+
+        Returns:
+            dict: Forward data with keys being forward field names and values
+                  from request data
+        """
+        forward_data = {}
+        if not getattr(self, "forward", None):
+            return forward_data
+
+        post_data = getattr(request.request_data, "request_post", {})
+        if not post_data:
+            return forward_data
+
+        # For each field in self.forward list
+        for forward_field in self.forward:
+            # Replace only from end of name, separated by last -
+            # Example: if name="prefix-field_name", self.field_name="field_name",
+            # forward_field="parent" -> result="prefix-parent"
+            name_parts = name.split("-")
+
+            # Replace only if the last part matches self.field_name
+            if name_parts and name_parts[-1] == self.field_name:
+                # Replace the last part with forward_field and join back
+                name_parts[-1] = forward_field
+                forward_field_name = "-".join(name_parts)
+            else:
+                # If last part doesn't match, don't create forward field name
+                continue
+
+            # Get value from post_data if it exists
+            if forward_field_name in post_data:
+                forward_data[forward_field] = post_data.get(forward_field_name)
+
+        return forward_data
+
     def value_from_datadict(self, data, files, name):
         input_value = super().value_from_datadict(data, files, name)
         threadsafe_request = SBAdminThreadLocalService.get_request()
         parsed_value = self.parse_value_from_input(threadsafe_request, input_value)
         if parsed_value is None:
             return parsed_value
-        return parsed_value if self.is_multiselect() else next(iter(parsed_value), None)
+
+        if not self.is_multiselect():
+            parsed_value = next(iter(parsed_value), None)
+
+        # Only perform validation during actual form cleaning, not during change detection
+        # by inline formsets or during HTML rendering
+        is_in_validation = self._is_in_validation_context()
+        if is_in_validation:
+            try:
+                has_changed = self.form_field.has_changed(
+                    self.form.initial.get(self.field_name, None), parsed_value
+                )
+            except AttributeError:
+                has_changed = False
+            if has_changed:
+                parsed_is_create = self.parse_is_create_from_input(
+                    threadsafe_request, input_value
+                )
+                if not self.is_multiselect():
+                    parsed_is_create = next(iter(parsed_is_create), None)
+                base_qs = self.get_queryset(threadsafe_request)
+                forward_data = self.get_forward_data(threadsafe_request, name)
+                qs = self.filter_search_queryset(
+                    threadsafe_request,
+                    base_qs,
+                    forward_data=forward_data,
+                )
+                self.form_field.queryset = qs
+                parsed_value = self.validate(parsed_value, qs, parsed_is_create)
+
+        return parsed_value
+
+    def should_create_new_obj(self):
+        return self.allow_add and self.create_value_field
+
+    def create_new_obj(self, value, queryset, is_create):
+        if isinstance(value, list):
+            # TODO: multiselect validation
+            return value
+        else:
+            data_to_create = {
+                self.create_value_field: value,
+                **self.default_create_data,
+            }
+            new_obj = queryset.model.objects.create(**data_to_create)
+            try:
+                return self.form_field.to_python(new_obj.id)
+            except ValidationError:
+                new_obj.delete()
+                raise ValidationError(
+                    self.form_field.error_messages["invalid_choice"],
+                    code="invalid_choice",
+                    params={"value": value},
+                )
+
+    def validate(self, value, queryset, is_create=False):
+        is_create_value = (
+            True in is_create if isinstance(is_create, list) else is_create
+        )
+        if is_create_value and self.should_create_new_obj():
+            return self.create_new_obj(value, queryset, is_create)
+        return self.form_field.to_python(value)
 
     @classmethod
     def apply_to_model_field(cls, model_field):

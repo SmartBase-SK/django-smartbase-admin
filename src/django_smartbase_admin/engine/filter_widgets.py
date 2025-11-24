@@ -45,6 +45,22 @@ class AutocompleteParseMixin:
             value = input_value
         return value
 
+    def parse_is_create_from_input(self, request, input_value):
+        try:
+            input_value = json.loads(input_value)
+        except:
+            pass
+        if isinstance(input_value, list):
+            value = []
+            for data in input_value:
+                if type(data) is dict:
+                    value.append(data.get("create", False))
+                else:
+                    value.append(False)
+        else:
+            value = False
+        return value
+
 
 class SBAdminFilterWidget(JSONSerializableMixin):
     template_name = None
@@ -471,6 +487,7 @@ class AutocompleteFilterWidget(
     allow_add = False
     hide_clear_button = False
     search_query_lambda = None
+    create_value_field = None
 
     def get_field_name(self):
         return self.field.name
@@ -493,13 +510,16 @@ class AutocompleteFilterWidget(
         allow_add=None,
         hide_clear_button=None,
         search_query_lambda=None,
+        create_value_field=None,
         **kwargs,
     ) -> None:
         super().__init__(template_name, default_value, **kwargs)
         self.model = model or self.model
         self.value_field = value_field or self.value_field
         self.filter_query_lambda = filter_query_lambda or self.filter_query_lambda
+        # filters queryset to search in
         self.filter_search_lambda = filter_search_lambda or self.filter_search_lambda
+        # defines fields to search on
         self.search_query_lambda = search_query_lambda or self.search_query_lambda
         self.label_lambda = label_lambda or self.label_lambda
         self.value_lambda = value_lambda or self.value_lambda
@@ -507,6 +527,7 @@ class AutocompleteFilterWidget(
         self.multiselect = self.multiselect if self.multiselect is not None else True
         self.forward = forward or self.forward
         self.allow_add = allow_add or self.allow_add
+        self.create_value_field = create_value_field or self.create_value_field
         self.hide_clear_button = (
             hide_clear_button
             if hide_clear_button is not None
@@ -615,8 +636,9 @@ class AutocompleteFilterWidget(
     def get_value_field(self):
         return self.value_field or self.model._meta.pk.name
 
-    def filter_search_queryset(self, request, qs, search_term, forward_data):
+    def filter_search_queryset(self, request, qs, search_term="", forward_data=None):
         if self.filter_search_lambda:
+            forward_data = forward_data or {}
             qs = qs.filter(
                 self.filter_search_lambda(request, search_term, forward_data)
             )
@@ -628,9 +650,16 @@ class AutocompleteFilterWidget(
         page_num = int(post_data.get(AUTOCOMPLETE_PAGE_NUM, 1))
         from_item = (page_num - 1) * AUTOCOMPLETE_PAGE_SIZE
         to_item = (page_num) * AUTOCOMPLETE_PAGE_SIZE
+
+        # filter queryset
+        # base restricted queryset
         qs = self.get_queryset(request)
+        # filters queryset to search in, uses filter_search_lambda
         qs = self.filter_search_queryset(request, qs, search_term, forward_data)
+
+        # search in queryset
         if self.search_query_lambda:
+            # defines fields to search on
             qs = self.search_query_lambda(
                 request,
                 qs,
@@ -639,6 +668,7 @@ class AutocompleteFilterWidget(
                 SBAdminTranslationsService.get_main_lang_code(),
             )
         else:
+            # defines default fields to search on - all char fields
             qs = self.get_default_search_query(
                 request,
                 qs,

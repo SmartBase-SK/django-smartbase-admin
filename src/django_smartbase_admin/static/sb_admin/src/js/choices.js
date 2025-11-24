@@ -49,13 +49,21 @@ export const choicesJSOptions = (choiceInput) => ({
 })
 
 
+const getChoiceValueForInput = (currentValue) => {
+    let value = {
+        'value': currentValue.value,
+        'label': currentValue.label,
+    }
+    if(currentValue.customProperties?.create){
+        value['create'] = true
+    }
+    return value
+}
+
 export const choicesJSListeners = {
     'selectItem': (item, inputEl) => {
         if (!item) return
-        const choiceValue = [{
-            value: item.value,
-            label: item.label
-        }]
+        const choiceValue = [getChoiceValueForInput(item)]
         inputEl.value = JSON.stringify(choiceValue)
     },
     'addItem': (choicesJS, inputEl) => {
@@ -63,10 +71,7 @@ export const choicesJSListeners = {
         let choicesJSValue = choicesJS.getValue()
         choicesJSValue = Array.isArray(choicesJSValue) ? choicesJSValue : [choicesJSValue]
         choicesJSValue.forEach(function (currentValue) {
-            choiceValue.push({
-                'value': currentValue.value,
-                'label': currentValue.label,
-            })
+            choiceValue.push(getChoiceValueForInput(currentValue))
         })
         inputEl.value = JSON.stringify(choiceValue)
     },
@@ -76,10 +81,7 @@ export const choicesJSListeners = {
         if (choicesJSValue !== undefined) {
             choicesJSValue = Array.isArray(choicesJSValue) ? choicesJSValue : [choicesJSValue]
             choicesJSValue.forEach(function (currentValue) {
-                choiceValue.push({
-                    'value': currentValue.value,
-                    'label': currentValue.label,
-                })
+                choiceValue.push(getChoiceValueForInput(currentValue))
             })
         }
         inputEl.value = JSON.stringify(choiceValue)
