@@ -207,7 +207,7 @@ class SBAdminBaseView(object):
         }
 
     def get_sbadmin_detail_actions(
-        self, request, object_id: int | str | None = None
+        self, request, object_id: int | str | None = None, obj=None
     ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
 
@@ -222,7 +222,7 @@ class SBAdminBaseView(object):
         }
 
     def get_global_context(
-        self, request, object_id: int | str | None = None
+        self, request, object_id: int | str | None = None, obj=None
     ) -> dict[str, Any]:
         return {
             "view_id": self.get_id(),
@@ -231,7 +231,7 @@ class SBAdminBaseView(object):
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
-            "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
+            "detail_actions": self.get_sbadmin_detail_actions(request, object_id, obj),
             SBADMIN_IS_MODAL_VAR: is_modal(request),
             SBADMIN_RELOAD_ON_SAVE_VAR: SBADMIN_RELOAD_ON_SAVE_VAR in request.GET
             or SBADMIN_RELOAD_ON_SAVE_VAR in request.POST,
