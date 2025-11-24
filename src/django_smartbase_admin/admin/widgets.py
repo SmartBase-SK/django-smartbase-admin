@@ -612,8 +612,8 @@ class SBAdminAutocompleteWidget(
 
     def create_new_obj(self, value, queryset, is_create):
         if isinstance(value, list):
-            # TODO: multiselect validation
-            return value
+            # TODO: multiselect creation
+            return self.form_field.to_python(value)
         else:
             data_to_create = {
                 self.create_value_field: value,
