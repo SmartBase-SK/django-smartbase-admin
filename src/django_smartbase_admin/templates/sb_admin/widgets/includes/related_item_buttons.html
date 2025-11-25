@@ -5,7 +5,7 @@
                 class="btn btn-icon edit-button {% if not widget.attrs.related_edit_url %}hidden{% endif %}"
                 title="{% trans 'Edit' %}"
                 {% if widget.attrs.related_edit_url %}
-                    hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"
+                    hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}{% if reload_on_save %}&sbadmin_reload_on_save=1{% endif %}"
                 {% endif %}
                 {% if widget.attrs.related_add_url and not widget.attrs.related_edit_url %}
                     data-add-url="{{ widget.attrs.related_add_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}"

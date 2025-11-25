@@ -361,9 +361,11 @@ class SBAdminAutocompleteWidget(
     field_name = None
     initialised = None
     default_create_data = None
+    reload_on_save = None
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
+        self.reload_on_save = kwargs.pop("reload_on_save", False)
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
 
@@ -458,6 +460,7 @@ class SBAdminAutocompleteWidget(
             and not self.is_multiselect()
         ):
             self.add_related_buttons_urls(parsed_value, threadsafe_request, context)
+            context["reload_on_save"] = self.reload_on_save
 
         return context
 
