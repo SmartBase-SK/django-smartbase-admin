@@ -1,5 +1,5 @@
 {% load i18n %}
-<div class="flex items-center gap-4  flex-shrink-0 related-item-buttons">
+<div class="flex items-center gap-4 flex-shrink-0 related-item-buttons">
     {% if widget.attrs.related_edit_url or widget.attrs.related_add_url %}
         <a
                 class="btn btn-icon edit-button {% if not widget.attrs.related_edit_url %}hidden{% endif %}"

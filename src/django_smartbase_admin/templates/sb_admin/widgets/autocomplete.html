@@ -2,7 +2,7 @@
 {% with autocomplete_data_id=filter_widget.view_id|add:"-"|add:filter_widget.input_id|add:"_data" %}
     <div class="relative">
         {% include 'sb_admin/widgets/includes/field_label.html' %}
-        <div id="{{ widget.attrs.id }}-wrapper" class="relative flex items-center gap-4  max-w-full overflow-hidden">
+        <div id="{{ widget.attrs.id }}-wrapper" class="relative flex items-center max-w-full overflow-hidden{% if widget.attrs.related_edit_url or widget.attrs.related_add_url %} gap-4{% endif %}">
             <button
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
