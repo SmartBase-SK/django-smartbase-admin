@@ -830,7 +830,14 @@ class SBAdmin(
     def get_change_view_context(
         self, request, object_id, obj=None
     ) -> dict | dict[str, Any]:
-        return {"show_back_button": True}
+        return {
+            "show_back_button": True,
+            "back_url": reverse(
+                "sb_admin:{}_{}_changelist".format(
+                    self.opts.app_label, self.opts.model_name
+                )
+            ),
+        }
 
     def get_previous_next_context(
         self, request, object_id, obj=None

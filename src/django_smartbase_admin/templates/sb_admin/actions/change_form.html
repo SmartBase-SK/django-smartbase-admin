@@ -42,7 +42,7 @@
             <div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
                 {% if not is_popup and has_view_permission and show_back_button %}
                     {% url opts|admin_urlname:'changelist' as changelist_url %}
-                    <a href="{% add_preserved_filters changelist_url %}" class="btn p-0 w-40 mr-16">
+                    <a href="{% add_preserved_filters back_url %}" class="btn p-0 w-40 mr-16">
                         <svg class="w-20 h-20">
                             <use xlink:href="#Left-small"></use>
                         </svg>
@@ -272,8 +272,7 @@
                             {% endif %}
                             <div class="flex ml-auto gap-8">
                                 {% if not is_popup and has_view_permission and show_back_button %}
-                                    {% url opts|admin_urlname:'changelist' as changelist_url %}
-                                    <a href="{% add_preserved_filters changelist_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
+                                    <a href="{% add_preserved_filters back_url %}" class="btn btn-empty">{% trans 'Back' %}</a>
                                 {% endif %}
 
                                 {% submit_row %}
