@@ -11,7 +11,7 @@ from django.contrib.admin.widgets import (
     ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ImproperlyConfigured
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.formats import get_format
@@ -367,6 +367,10 @@ class SBAdminAutocompleteWidget(
         self.reload_on_save = kwargs.pop("reload_on_save", False)
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
+        if self.multiselect and self.allow_add:
+            raise ImproperlyConfigured(
+                "Multiselect with creation is currently not supported."
+            )
 
     def get_id(self):
         base_id = super().get_id()
