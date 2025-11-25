@@ -1,7 +1,6 @@
 import json
 import logging
 import sys
-from email.policy import default
 
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
