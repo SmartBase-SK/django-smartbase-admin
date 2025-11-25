@@ -1079,6 +1079,8 @@ class SBAdminInline(
         resolved = resolve(urlparse(referer).path)
         # Try common kwargs for object ID
         object_id = resolved.kwargs.get("object_id")
+        if not object_id:
+            return None
         base_qs = SBAdminViewService.get_restricted_queryset(
             self.parent_model, request, request.request_data
         )
