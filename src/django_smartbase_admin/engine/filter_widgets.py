@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from django.core.exceptions import ImproperlyConfigured
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
 from django.utils import timezone
@@ -212,6 +213,8 @@ class ChoiceFilterWidget(SBAdminFilterWidget):
             return found_label[0] if found_label else default_value
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
+        if isinstance(self.model_field, ArrayField):
+            return Q(**{f"{self.field.filter_field}__contains": [filter_value]})
         return Q(**{self.field.filter_field: filter_value})
 
 
@@ -248,6 +251,11 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         self.select_all_label = select_all_label
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
+        if isinstance(self.model_field, ArrayField):
+            q_objects = Q()
+            for value in filter_value:
+                q_objects |= Q(**{f"{self.field.filter_field}__contains": [value]})
+            return q_objects
         return Q(**{f"{self.field.filter_field}__in": filter_value})
 
     def get_advanced_filter_operators(self):
@@ -257,14 +265,6 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
             AllOperators.IS_NULL,
             AllOperators.IS_NOT_NULL,
         ]
-
-
-class ArrayFieldMultipleChoiceFilterWidget(MultipleChoiceFilterWidget):
-    def get_base_filter_query_for_parsed_value(self, request, filter_value):
-        q_objects = Q()
-        for value in filter_value:
-            q_objects |= Q(**{f"{self.field.filter_field}__contains": [value]})
-        return q_objects
 
 
 class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
