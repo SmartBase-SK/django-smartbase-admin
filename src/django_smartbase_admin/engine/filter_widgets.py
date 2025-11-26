@@ -259,6 +259,14 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         ]
 
 
+class ArrayFieldMultipleChoiceFilterWidget(MultipleChoiceFilterWidget):
+    def get_base_filter_query_for_parsed_value(self, request, filter_value):
+        q_objects = Q()
+        for value in filter_value:
+            q_objects |= Q(**{f"{self.field.filter_field}__contains": [value]})
+        return q_objects
+
+
 class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/number_range_field.html"
 
