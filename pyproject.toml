@@ -37,6 +37,7 @@ easy-thumbnails = {extras = ["svg"], version = "^2.8.5"}
 django-htmx = "^1.17.3"
 # required for django-filer
 setuptools = "^67.0.0"
+lxml = "==5.4.0"
 
 [build-system]
 requires = ["poetry-core"]
