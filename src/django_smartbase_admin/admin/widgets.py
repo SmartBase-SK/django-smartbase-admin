@@ -440,15 +440,25 @@ class SBAdminAutocompleteWidget(
                 if self.is_multiselect() and not isinstance(parsed_value, list):
                     parsed_value = [parsed_value]
 
-                for item in self.get_queryset(threadsafe_request).filter(
-                    **{f"{self.get_value_field()}{query_suffix}": parsed_value}
-                ):
-                    selected_options.append(
-                        {
-                            "value": self.get_value(threadsafe_request, item),
-                            "label": self.get_label(threadsafe_request, item),
-                        }
-                    )
+                try:
+                    for item in self.get_queryset(threadsafe_request).filter(
+                        **{f"{self.get_value_field()}{query_suffix}": parsed_value}
+                    ):
+                        selected_options.append(
+                            {
+                                "value": self.get_value(threadsafe_request, item),
+                                "label": self.get_label(threadsafe_request, item),
+                            }
+                        )
+                except ValueError as e:
+                    if hasattr(self.form, "add_error"):
+                        self.form.add_error(
+                            self.field_name,
+                            _(
+                                "The new value was created but became unselected due to another validation error. Please select it again."
+                            ),
+                        )
+                    pass
 
             context["widget"]["value"] = json.dumps(selected_options)
             context["widget"]["value_list"] = selected_options
