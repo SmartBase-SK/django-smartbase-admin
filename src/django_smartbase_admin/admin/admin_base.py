@@ -1084,6 +1084,8 @@ class SBAdminInline(
             return None
 
         referer = request.META.get("HTTP_REFERER")
+        if not referer:
+            return None
         resolved = resolve(urlparse(referer).path)
         # Try common kwargs for object ID
         object_id = resolved.kwargs.get("object_id")
