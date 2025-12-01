@@ -535,11 +535,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if form:
             form.view = self
 
-    def initialize_used_base_fields_form(self, request) -> None:
-        fields = self.fields or "__all__"
+    def initialize_all_base_fields_form(self, request) -> None:
         params = {
             "form": self.form,
-            "fields": fields,
+            "fields": "__all__",
             "formfield_callback": partial(self.formfield_for_dbfield, request=request),
         }
         self.all_base_fields_form = modelform_factory(self.model, **params)
@@ -720,7 +719,7 @@ class SBAdmin(
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
     def get_form(self, request, obj=None, **kwargs):
-        self.initialize_used_base_fields_form(request)
+        self.initialize_all_base_fields_form(request)
         form = super().get_form(request, obj, **kwargs)
         self.initialize_form_class(form, request)
         return form
@@ -1030,13 +1029,13 @@ class SBAdminInline(
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
         if ROW_CLASS_FIELD not in readonly_fields:
-            readonly_fields = [*readonly_fields] + [ROW_CLASS_FIELD]
+            readonly_fields += (ROW_CLASS_FIELD,)
         return readonly_fields
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
         if ROW_CLASS_FIELD not in fields:
-            fields = [*fields] + [ROW_CLASS_FIELD]
+            fields += (ROW_CLASS_FIELD,)
         return fields
 
     def get_sbadmin_row_class(self, obj):
@@ -1165,7 +1164,7 @@ class SBAdminInline(
         return formfield
 
     def get_formset(self, request, obj=None, **kwargs):
-        self.initialize_used_base_fields_form(request)
+        self.initialize_all_base_fields_form(request)
         formset = super().get_formset(request, obj, **kwargs)
         form_class = formset.form
         self.initialize_form_class(form_class, request)
