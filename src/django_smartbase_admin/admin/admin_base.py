@@ -4,6 +4,7 @@ import urllib.parse
 from collections.abc import Iterable
 from functools import partial
 from typing import Any
+from urllib.parse import urlparse
 
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
@@ -30,7 +31,7 @@ from django.forms.models import (
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
-from django.urls import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch, resolve
 from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
@@ -126,6 +127,7 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
     SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
+    SBADMIN_RELOAD_ON_SAVE_VAR,
 )
 from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
@@ -316,6 +318,13 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
             "request", SBAdminThreadLocalService.get_request()
         )
         super().__init__(*args, **kwargs)
+        self.init_widgets_dynamic(threadsafe_request)
+        for field in self.declared_fields:
+            form_field = self.fields.get(field)
+            if form_field:
+                self.assign_widget_to_form_field(form_field, request=threadsafe_request)
+
+    def init_widgets_dynamic(self, request):
         for field in self.fields:
             if not hasattr(self.fields[field].widget, "init_widget_dynamic"):
                 continue
@@ -324,12 +333,8 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
                 self.fields[field],
                 field,
                 self.view,
-                threadsafe_request,
+                request,
             )
-        for field in self.declared_fields:
-            form_field = self.fields.get(field)
-            if form_field:
-                self.assign_widget_to_form_field(form_field, request=threadsafe_request)
 
 
 class SBAdminBaseForm(SBAdminBaseFormInit, forms.ModelForm):
@@ -822,7 +827,14 @@ class SBAdmin(
         return Q()
 
     def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
-        return {"show_back_button": True}
+        return {
+            "show_back_button": True,
+            "back_url": reverse(
+                "sb_admin:{}_{}_changelist".format(
+                    self.opts.app_label, self.opts.model_name
+                )
+            ),
+        }
 
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
@@ -958,7 +970,7 @@ class SBAdmin(
                 "field": request.POST.get("sb_admin_source_field"),
                 "id": obj.pk,
                 "label": str(obj),
-                "reload": request.POST.get("sbadmin_reload_on_save") == "1",
+                "reload": request.POST.get(SBADMIN_RELOAD_ON_SAVE_VAR) == "1",
             },
         )
         trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
@@ -1050,6 +1062,31 @@ class SBAdminInline(
         form_class = self.get_formset(request, self.model()).form
         self.initialize_form_class(form_class, request)
         form_class()
+
+    def get_parent_instance_from_request(self):
+        # Try to get parent instance from request referrer
+        request = (
+            getattr(self, "threadsafe_request", None)
+            or SBAdminThreadLocalService.get_request()
+        )
+        allowed = SBAdminViewService.has_permission(
+            request=request, model=self.parent_model, permission="view"
+        )
+        if not allowed:
+            return None
+
+        referer = request.META.get("HTTP_REFERER")
+        if not referer:
+            return None
+        resolved = resolve(urlparse(referer).path)
+        # Try common kwargs for object ID
+        object_id = resolved.kwargs.get("object_id")
+        if not object_id:
+            return None
+        base_qs = SBAdminViewService.get_restricted_queryset(
+            self.parent_model, request, request.request_data
+        )
+        return base_qs.get(pk=object_id)
 
     def get_context_data(self, request) -> dict[str, Any]:
         is_sortable_active: bool = self.sortable_field_name and (

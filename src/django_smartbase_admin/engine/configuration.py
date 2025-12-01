@@ -99,7 +99,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
 
             for name, view in plugin_pool.plugins.items():
                 if hasattr(view, "get_id"):
-                    view_instance = view()
+                    view_instance = view(view.model, sb_admin_site)
                     self.view_map[view_instance.get_id()] = view_instance
                     view_instance.init_view_static(
                         self, view_instance.model, sb_admin_site

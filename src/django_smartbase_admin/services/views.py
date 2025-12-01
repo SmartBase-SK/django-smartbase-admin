@@ -141,7 +141,7 @@ class SBAdminViewService(object):
         )
 
     @classmethod
-    def has_permission(cls, request, view, model=None, obj=None, permission=None):
+    def has_permission(cls, request, view=None, model=None, obj=None, permission=None):
         return request.request_data.configuration.has_permission(
             request, request.request_data, view, model, obj, permission
         )
@@ -154,8 +154,9 @@ class SBAdminViewService(object):
         request_data,
         global_filter=True,
         global_filter_data_map=None,
+        qs=None,
     ):
-        qs = model.objects.all()
+        qs = qs or model.objects.all()
         if global_filter:
             qs = cls.apply_global_filter_to_queryset(
                 qs, request, request_data, global_filter_data_map

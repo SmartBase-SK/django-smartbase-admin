@@ -20,6 +20,7 @@ class SBAdminViewRequestData(object):
     configuration = None
     selected_view = None
     session = None
+    additional_data = None
 
     def __init__(
         self,
@@ -47,6 +48,7 @@ class SBAdminViewRequestData(object):
         self.request_method = request_method
         self.global_filter = global_filter or {}
         self.session = session or {}
+        self.additional_data = {}
 
     def refresh_selected_view(self, request):
         self.configuration = SBAdminConfigurationService.get_configuration(self)

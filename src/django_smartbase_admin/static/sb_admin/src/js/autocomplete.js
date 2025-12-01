@@ -135,7 +135,14 @@ export default class Autocomplete {
         })
         addNewButton?.addEventListener('click', (event) => {
             choicesJS.clearStore()
-            choicesJS.setValue([event.currentTarget.dataset.value])
+            choicesJS.setValue([
+                {
+                    value:event.currentTarget.dataset.value,
+                    customProperties: {
+                        create: true
+                    }
+                }
+            ])
             choicesJS.SBwrapperElButton.click()
             filterInputValueChangedUtil(inputEl)
         })
@@ -259,6 +266,7 @@ export default class Autocomplete {
                             choicesJSChoices.push({
                                 value: value.value,
                                 label: value.label,
+                                customProperties: value.customProperties,
                                 selected: true
                             })
                         })
