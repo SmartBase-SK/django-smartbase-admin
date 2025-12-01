@@ -728,7 +728,7 @@ class SBAdmin(
         return self.get_model_path()
 
     def get_sbadmin_fieldsets(
-        self, request, object_id=None, obj=None
+        self, request, object_id=None
     ) -> Iterable[tuple[str | None, dict[str, Any]]]:
         fieldsets = self.sbadmin_fieldsets or self.fieldsets
         if fieldsets:
@@ -746,7 +746,7 @@ class SBAdmin(
     ) -> list[tuple[str | None, dict[str, Any]]]:
         fieldsets = []
         object_id = obj.id if obj else None
-        for fieldset in self.get_sbadmin_fieldsets(request, object_id, obj):
+        for fieldset in self.get_sbadmin_fieldsets(request, object_id):
             fieldset_dict = {"fields": fieldset[1].get("fields")}
             classes = fieldset[1].get("classes")
             description = fieldset[1].get("description")
@@ -759,10 +759,10 @@ class SBAdmin(
         return fieldsets
 
     def get_fieldsets_context(
-        self, request, object_id, obj=None
+        self, request, object_id
     ) -> dict[str, dict[str | None, dict[str, Any]]]:
         fielsets_context = {}
-        for fieldset in self.get_sbadmin_fieldsets(request, object_id, obj):
+        for fieldset in self.get_sbadmin_fieldsets(request, object_id):
             actions = fieldset[1].get("actions", [])
             for index, action in enumerate(actions):
                 if isinstance(action, SBAdminCustomAction):
@@ -774,11 +774,11 @@ class SBAdmin(
             fielsets_context[fieldset[0]] = fieldset[1]
         return {"fieldsets_context": fielsets_context}
 
-    def get_sbadmin_tabs(self, request, object_id, obj=None) -> Iterable:
+    def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
 
-    def get_tabs_context(self, request, object_id, obj=None) -> dict[str, Iterable]:
-        return {"tabs_context": self.get_sbadmin_tabs(request, object_id, obj)}
+    def get_tabs_context(self, request, object_id) -> dict[str, Iterable]:
+        return {"tabs_context": self.get_sbadmin_tabs(request, object_id)}
 
     def get_context_data(self, request) -> dict[str, Any]:
         return {
@@ -827,7 +827,7 @@ class SBAdmin(
         return Q()
 
     def get_change_view_context(
-        self, request, object_id, obj=None
+        self, request, object_id
     ) -> dict | dict[str, Any]:
         return {
             "show_back_button": True,
@@ -838,9 +838,7 @@ class SBAdmin(
             ),
         }
 
-    def get_previous_next_context(
-        self, request, object_id, obj=None
-    ) -> dict | dict[str, Any]:
+    def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
         changelist_filters = request.GET.get("_changelist_filters", "")
@@ -890,14 +888,11 @@ class SBAdmin(
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
-        obj = None
-        if object_id:
-            obj = self.get_object(request, unquote(object_id))
-        extra_context.update(self.get_change_view_context(request, object_id, obj))
-        extra_context.update(self.get_global_context(request, object_id, obj))
-        extra_context.update(self.get_fieldsets_context(request, object_id, obj))
-        extra_context.update(self.get_tabs_context(request, object_id, obj))
-        extra_context.update(self.get_previous_next_context(request, object_id, obj))
+        extra_context.update(self.get_change_view_context(request, object_id))
+        extra_context.update(self.get_global_context(request, object_id))
+        extra_context.update(self.get_fieldsets_context(request, object_id))
+        extra_context.update(self.get_tabs_context(request, object_id))
+        extra_context.update(self.get_previous_next_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
