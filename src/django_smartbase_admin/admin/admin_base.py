@@ -826,9 +826,7 @@ class SBAdmin(
     def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
         return Q()
 
-    def get_change_view_context(
-        self, request, object_id
-    ) -> dict | dict[str, Any]:
+    def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
         return {
             "show_back_button": True,
             "back_url": reverse(
