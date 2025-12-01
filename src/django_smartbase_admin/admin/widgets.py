@@ -361,6 +361,7 @@ class SBAdminAutocompleteWidget(
     initialised = None
     default_create_data = None
     reload_on_save = None
+    REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
@@ -451,14 +452,23 @@ class SBAdminAutocompleteWidget(
                             }
                         )
                 except ValueError as e:
-                    if hasattr(self.form, "add_error"):
+                    new_object_id = threadsafe_request.request_data.additional_data.get(
+                        self.REQUEST_CREATED_DATA_KEY, {}
+                    ).get(self.field_name)
+                    if new_object_id:
+                        selected_options.append(
+                            {
+                                "value": new_object_id,
+                                "label": value,
+                            }
+                        )
+                    elif hasattr(self.form, "add_error"):
                         self.form.add_error(
                             self.field_name,
                             _(
                                 "The new value was created but became unselected due to another validation error. Please select it again."
                             ),
                         )
-                    pass
 
             context["widget"]["value"] = json.dumps(selected_options)
             context["widget"]["value_list"] = selected_options
@@ -619,7 +629,9 @@ class SBAdminAutocompleteWidget(
                     forward_data=forward_data,
                 )
                 self.form_field.queryset = qs
-                parsed_value = self.validate(parsed_value, qs, parsed_is_create)
+                parsed_value = self.validate(
+                    parsed_value, qs, threadsafe_request, parsed_is_create
+                )
 
         return parsed_value
 
@@ -646,12 +658,21 @@ class SBAdminAutocompleteWidget(
                     params={"value": value},
                 )
 
-    def validate(self, value, queryset, is_create=False):
+    def validate(self, value, queryset, request, is_create=False):
         is_create_value = (
             True in is_create if isinstance(is_create, list) else is_create
         )
         if is_create_value and self.should_create_new_obj():
-            return self.create_new_obj(value, queryset, is_create)
+            new_object = self.create_new_obj(value, queryset, is_create)
+            request.request_data.additional_data[self.REQUEST_CREATED_DATA_KEY] = (
+                request.request_data.additional_data.get(
+                    self.REQUEST_CREATED_DATA_KEY, {}
+                )
+            )
+            request.request_data.additional_data[self.REQUEST_CREATED_DATA_KEY][
+                self.field_name
+            ] = new_object.pk
+            return new_object
         return self.form_field.to_python(value)
 
     @classmethod
