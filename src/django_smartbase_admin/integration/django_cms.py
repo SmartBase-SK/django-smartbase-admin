@@ -1,3 +1,5 @@
+from typing import Any
+
 from django_smartbase_admin.admin.site import sb_admin_site
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
@@ -34,3 +36,8 @@ class DjangoCMSPluginSBAdmin(SBAdmin):
         # response_add from CMSPluginBase
         self.object_successfully_changed = True
         return self.render_close_frame(request, obj)
+
+    def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
+        return {
+            "show_back_button": True,
+        }
