@@ -690,6 +690,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             {
                 "content_context": data,
                 "model_name": self.model._meta.verbose_name,
+                "add_verbose": getattr(self.model, "add_verbose", False),
                 "list_title": self.model._meta.verbose_name_plural,
             }
         )
