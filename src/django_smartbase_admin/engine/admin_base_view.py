@@ -222,6 +222,9 @@ class SBAdminBaseView(object):
             "color_scheme_form": color_scheme_form,
         }
 
+    def get_add_label(self, request, object_id: int | str | None = None):
+        return self.add_label
+
     def get_global_context(
         self, request, object_id: int | str | None = None
     ) -> dict[str, Any]:
@@ -229,7 +232,7 @@ class SBAdminBaseView(object):
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
-            "add_label": self.add_label,
+            "add_label": self.get_add_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
