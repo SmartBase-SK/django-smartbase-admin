@@ -64,6 +64,7 @@ class SBAdminBaseView(object):
     global_filter_data_map = None
     field_cache = None
     sbadmin_detail_actions = None
+    add_label = None
     delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
 
     def init_view_static(self, configuration, model, admin_site):
@@ -228,7 +229,7 @@ class SBAdminBaseView(object):
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
-            "add_label": getattr(self, "add_label", False),
+            "add_label": self.add_label,
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
