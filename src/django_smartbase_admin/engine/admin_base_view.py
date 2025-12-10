@@ -228,6 +228,7 @@ class SBAdminBaseView(object):
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
+            "add_label": getattr(self, "add_label", False),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
@@ -690,7 +691,6 @@ class SBAdminBaseListView(SBAdminBaseView):
             {
                 "content_context": data,
                 "model_name": self.model._meta.verbose_name,
-                "add_verbose": getattr(self.model, "add_verbose", False),
                 "list_title": self.model._meta.verbose_name_plural,
             }
         )
