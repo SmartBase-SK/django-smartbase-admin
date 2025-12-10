@@ -1,7 +1,7 @@
 {% load i18n %}
 
 {% if add %}
-    {% blocktrans with name=opts.verbose_name %}Add {{ name }}{% endblocktrans %}
+    {% trans 'Add' %}{% if add_label %} {{ add_label }}{% endif %}
 {% else %}
     {{ original|truncatewords:"18" }}
 {% endif %}
