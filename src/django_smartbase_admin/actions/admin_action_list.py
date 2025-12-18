@@ -309,6 +309,10 @@ class SBAdminListAction(SBAdminAction):
         values = [self.get_pk_field().name]
         visible_column_fields = self.get_visible_column_fields()
         values.extend([field.field for field in visible_column_fields])
+        # Include supporting_annotates keys for visible columns
+        for field in visible_column_fields:
+            if field.supporting_annotates:
+                values.extend(field.supporting_annotates.keys())
         if self.view.sbadmin_list_display_data:
             values.extend(self.view.sbadmin_list_display_data)
         values.extend(

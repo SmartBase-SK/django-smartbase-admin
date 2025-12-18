@@ -119,10 +119,14 @@ MIDDLEWARE = [
 ]
 ```
 
+## 🤖 AI/Developer Reference
+
+See [AGENTS.md](./AGENTS.md) for development patterns, gotchas, and AI assistant instructions.
+
 ##  🤝 Need Help with Development?
 We at SmartBase are experts in Django and custom software.
 
 Whether you're building a new platform or modernizing an internal tool —
 💡 We can help you design, build, and scale it.
 
-📬 [Let’s talk](https://en.smartbase.sk/contact-us/) — We’d love to work with you.
+📬 [Let's talk](https://en.smartbase.sk/contact-us/) — We'd love to work with you.
