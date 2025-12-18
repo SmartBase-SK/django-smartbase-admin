@@ -60,7 +60,14 @@
                                     <svg class="w-20 h-20 text-dark-400"><use xlink:href="#Drag"></use></svg>
                                 </div>
                             {% endif %}
-                            <span class="text-dark-900 font-semibold">{% if inline_admin_form.original %}{{ inline_admin_form.original }}{% else %}#{{ forloop.counter }}{% endif %}</span>
+                            <span class="text-dark-900 font-semibold">
+                                {% call_method inline_opts "get_instance_label" request inline_admin_form.original as instance_label %}
+                                {% if instance_label %}
+                                    {{ instance_label }}
+                                {% else %}
+                                    #{{ forloop.counter }}
+                                {% endif %}
+                            </span>
                             <div class="ml-auto">
                                 {% if inline_admin_form.original and inline_admin_form.model_admin.show_change_link and inline_admin_form.model_admin.has_registered_model %}
                                     <a href="{% url inline_admin_form.model_admin.opts|admin_urlname:'change' inline_admin_form.original.pk|admin_urlquote %}" class="{% if inline_admin_formset.has_change_permission %}inlinechangelink{% else %}inlineviewlink{% endif %}">

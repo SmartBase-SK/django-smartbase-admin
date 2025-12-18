@@ -22,7 +22,7 @@ from django.core.exceptions import (
     PermissionDenied,
 )
 from django.db import models
-from django.db.models import QuerySet, Q
+from django.db.models import QuerySet, Q, Model
 from django.forms import HiddenInput
 from django.forms.models import (
     ModelFormMetaclass,
@@ -729,7 +729,7 @@ class SBAdmin(
 
     def get_sbadmin_fieldsets(
         self, request, object_id=None
-    ) -> Iterable[tuple[str | None, dict[str, Any]]]:
+    ) -> list[tuple[str | None, dict[str, Any]]]:
         fieldsets = self.sbadmin_fieldsets or self.fieldsets
         if fieldsets:
             return fieldsets
@@ -1018,6 +1018,11 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
     sb_admin_add_modal = False
+
+    def get_instance_label(self, request, obj: Model | None = None) -> str | None:
+        if obj:
+            return str(obj)
+        return None
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
