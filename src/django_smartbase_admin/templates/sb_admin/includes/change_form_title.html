@@ -2,6 +2,8 @@
 
 {% if add %}
     {% trans 'Add' %}{% if add_label %} {{ add_label }}{% endif %}
+{% elif change_label %}
+    {{ change_label }}
 {% else %}
     {{ original|truncatewords:"18" }}
 {% endif %}
