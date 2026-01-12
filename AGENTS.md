@@ -75,6 +75,28 @@ supporting_annotates={"created_at": F("created_at")}
 supporting_annotates={"created_at_val": F("created_at")}
 ```
 
+### supporting_annotates Requires Expressions
+
+**CRITICAL**: Values in `supporting_annotates` must be Django ORM expressions (like `F()`), NOT plain strings!
+
+```python
+# ❌ BAD - Causes "QuerySet.annotate() received non-expression(s)" error
+supporting_annotates={
+    "work_ids_data": "work_ids",
+    "tag_ids_data": "tag_ids",
+}
+
+# ✅ GOOD - Use F() expressions
+from django.db.models import F
+
+supporting_annotates={
+    "work_ids_data": F("work_ids"),
+    "tag_ids_data": F("tag_ids"),
+}
+```
+
+This applies even when referencing simple model fields - always wrap field names in `F()`.
+
 ### Mixed Types in Expressions
 
 When using `Concat`, `Coalesce`, or `Case`, always specify `output_field`:
@@ -153,6 +175,84 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 Format: `{app_label}_{model_name}` (lowercase)
 
 Example: `myapp.models.Product` → `view_id="myapp_product"`
+
+### Menu Item Icons
+
+Icons are SVG sprites from the `static/sb_admin/sprites/sb_admin/` directory. Use the filename without extension:
+
+**Available Icons:**
+```
+Accept-email, Ad-product, Add-one, Add-picture, Add-three, Aiming, All-application,
+Alphabetical-sorting, Alphabetical-sorting-two, Application, Application-menu,
+Application-two, Arrow-circle-down, Arrow-circle-left, Arrow-circle-right,
+Arrow-circle-up, At-sign, Attention, Back-one, Bank-card, Bank-card-one, Bolt-one,
+Bookmark, Box, Calendar, Camera, Caution, Check, Check-correct, Check-one,
+Check-one-filled, Check-small, Close, Close-one, Close-small, Column,
+Corner-up-left, Corner-up-right, Cut, Cylinder, Delete, Delete-two, Double-down,
+Double-left, Double-right, Double-up, Down, Down-c, Down-small, Download,
+Download-one, Drag, Edit, Electric-drill, Excel-one, Export, Figma-component,
+Filter, Find, Fire-extinguisher, Gas, Go-ahead, Go-on, Hamburger-button,
+Headset-one, Help, Home, Id-card-h, Info, Left, Left-c, Left-small,
+Left-small-down, Left-small-up, Lightning, Lightning-fill, Like, Link-two,
+List-checkbox, Lock, Login, Logout, Magic, Magic-wand, Mail, Mail-download,
+Mail-open, Message-emoji, Message-one, Minus, Minus-the-top, Moon, More,
+More-one, More-three, More-two, Paperclip, Parallel-gateway, People-top-card,
+Percentage, Phone-telephone, Picture-one, Pin, Pin Filled, Plus, Preview-close,
+Preview-close-one, Preview-open, Printer, Pull, Pushpin, Reduce-one, Refresh-one,
+Return, Rewora, Rewora Filled, Right, Right-c, Right-small, Right-small-down,
+Right-small-up, Save, Search, Send-email, Setting-config, Setting-two, Shop,
+Shopping, Shopping-bag, Shopping-cart-one, Sort, Sort-amount-down, Sort-amount-up,
+Sort-one, Sort-three, Sort Alt, Star, Success, Sun-one, Switch, Table-report,
+Tag, Tag-one, Time, Tips-one, To-top, Transfer-data, Translate, Translation,
+Triangle-round-rectangle, Truck, Undo, Unlock, Up, Up-c, Up-small, Upload,
+Upload-one, User-business, View-grid-list, Write, Zoom-in, Zoom-out
+```
+
+Example:
+```python
+SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+SBAdminMenuItem(label="Users", icon="User-business", view_id="myapp_user"),
+SBAdminMenuItem(label="Products", icon="Box", view_id="myapp_product"),
+SBAdminMenuItem(label="Settings", icon="Setting-config", view_id="myapp_settings"),
+```
+
+### Nested Menu Items (sub_items)
+
+Use `sub_items` to create nested/dropdown menu sections:
+
+```python
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(
+            label="Content",
+            icon="Box",
+            sub_items=[
+                SBAdminMenuItem(label="Articles", view_id="myapp_article"),
+                SBAdminMenuItem(label="Categories", view_id="myapp_category"),
+                SBAdminMenuItem(label="Tags", view_id="myapp_tag"),
+            ],
+        ),
+        SBAdminMenuItem(
+            label="Users",
+            icon="User-business",
+            sub_items=[
+                SBAdminMenuItem(label="All Users", view_id="myapp_user"),
+                SBAdminMenuItem(label="Groups", view_id="auth_group"),
+            ],
+        ),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+    ],
+)
+```
+
+**Key points:**
+- Parent menu items with `sub_items` don't need a `view_id` (they act as dropdown containers)
+- Child items in `sub_items` typically don't need icons (parent icon is shown)
+- Nested items automatically highlight when their view is active
 
 ### Global Queryset Filtering
 
@@ -635,6 +735,182 @@ class MyAdmin(SBAdmin):
 | "The annotation 'X' conflicts with a field" | `supporting_annotates` key matches model field | Rename annotation key |
 | "Expression contains mixed types" | Missing `output_field` in expression | Add `output_field=TextField()` to all parts |
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
+
+---
+
+## Inlines
+
+Use `SBAdminTableInline` instead of Django's `admin.TabularInline` for inlines in SBAdmin. This provides automatic autocomplete widgets for FK fields.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminTableInline
+
+class MyInline(SBAdminTableInline):
+    model = MyRelatedModel
+    extra = 0
+    verbose_name = _("Related Item")
+    verbose_name_plural = _("Related Items")
+
+@admin.register(MyModel, site=sb_admin_site)
+class MyModelAdmin(SBAdmin):
+    model = MyModel
+    inlines = [MyInline]
+```
+
+**Available inline classes:**
+- `SBAdminTableInline` - Tabular layout (like `TabularInline`)
+- `SBAdminStackedInline` - Stacked layout (like `StackedInline`)
+- `SBAdminGenericTableInline` - For GenericForeignKey relations
+- `SBAdminGenericStackedInline` - Stacked GenericForeignKey
+
+---
+
+## Global Autocomplete Widget Customization
+
+Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autocomplete widgets globally. This applies to all auto-generated admin form fields including inlines.
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `model` | Model class | **Required**. The Django model to query |
+| `multiselect` | bool | Allow multiple selections (default: `True`) |
+| `label_lambda` | callable | `(request, item) -> str` - Format how items appear in dropdown |
+| `value_lambda` | callable | `(request, item) -> any` - Extract value from item (default: primary key) |
+| `value_field` | str | Field name to use as value (alternative to `value_lambda`) |
+| `search_query_lambda` | callable | `(request, qs, model, search_term, lang_code) -> QuerySet` - Define which fields to search. Default searches all CharField/TextField |
+| `filter_search_lambda` | callable | `(request, search_term, forward_data) -> Q` - Pre-filter queryset before search. Use for dependent dropdowns with `forward` |
+| `filter_query_lambda` | callable | `(request, selected_values) -> Q` - How selected values filter the main list (for filter widgets only) |
+| `forward` | list[str] | Field names to forward to `filter_search_lambda` for dependent dropdowns |
+| `allow_add` | bool | Allow creating new items inline (default: `False`, not supported with multiselect) |
+| `hide_clear_button` | bool | Hide the clear/reset button (default: `False`) |
+
+### Lambda Signatures
+
+```python
+# label_lambda - Format display label
+def my_label(request, item) -> str:
+    return f"{item.field1} / {item.field2}"
+
+# value_lambda - Extract value (default uses primary key)
+def my_value(request, item) -> any:
+    return item.pk
+
+# search_query_lambda - Define searchable fields
+def my_search(request, qs, model, search_term, language_code) -> QuerySet:
+    if not search_term:
+        return qs
+    return qs.filter(Q(field1__icontains=search_term) | Q(field2__icontains=search_term))
+
+# filter_search_lambda - Pre-filter based on forward data (dependent dropdowns)
+def my_filter(request, search_term, forward_data) -> Q:
+    parent_id = forward_data.get("parent_field")
+    if parent_id:
+        return Q(parent_id=parent_id)
+    return Q()
+
+# filter_query_lambda - How selection filters main list (filter widgets only)
+def my_filter_query(request, selected_ids) -> Q:
+    return Q(related_field__in=selected_ids)
+```
+
+### Example
+
+Override `get_autocomplete_widget` on your `SBAdminRoleConfiguration` subclass:
+
+```python
+from django.db.models import Q
+
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+
+from myapp.models import MyModel
+
+
+def my_model_label(request, item):
+    return f"{item.category} / {item.name}"
+
+
+def my_model_search(request, qs, model, search_term, language_code):
+    if not search_term:
+        return qs
+    return qs.filter(Q(category__icontains=search_term) | Q(name__icontains=search_term))
+
+
+class MyRoleConfiguration(SBAdminRoleConfiguration):
+    def get_autocomplete_widget(self, view, request, form_field, db_field, model, multiselect=False):
+        if model == MyModel:
+            return SBAdminAutocompleteWidget(
+                form_field,
+                model=model,
+                multiselect=multiselect,
+                label_lambda=my_model_label,
+                search_query_lambda=my_model_search,
+            )
+        return super().get_autocomplete_widget(view, request, form_field, db_field, model, multiselect)
+```
+
+### Example: Dependent Dropdown with Forward
+
+```python
+# In a form, make "city" dropdown depend on selected "country"
+city = forms.ModelChoiceField(
+    queryset=City.objects.all(),
+    widget=SBAdminAutocompleteWidget(
+        model=City,
+        multiselect=False,
+        forward=["country"],  # Forward country field value
+        filter_search_lambda=lambda req, term, fwd: Q(country_id=fwd.get("country")) if fwd.get("country") else Q(),
+    ),
+)
+```
+
+**Key points:**
+- `search_query_lambda` should search the same fields shown in `label_lambda` for intuitive UX
+- `filter_search_lambda` runs BEFORE search - use for dependent dropdowns
+- `search_query_lambda` defines WHICH fields to search
+- Global config does NOT apply to manually-created widgets - pass lambdas directly
+
+---
+
+## Pre-filtered List Views (sbadmin_list_view_config)
+
+Use `sbadmin_list_view_config` to define pre-filtered view tabs that appear at the top of the list view.
+
+### Usage
+
+```python
+class MyModelAdmin(SBAdmin):
+    sbadmin_list_view_config = [
+        {
+            "name": "Active only",
+            "url_params": {"filterData": {"status": "ACTIVE"}},
+        },
+        {
+            "name": "Pending",
+            "url_params": {"filterData": {"status": "PENDING", "is_reviewed": "false"}},
+        },
+    ]
+    
+    list_filter = ("status", "is_reviewed")
+```
+
+### Structure
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `name` | str | **Required**. Tab label shown in the UI |
+| `url_params` | dict | **Required**. Contains `filterData` with filter key-value pairs |
+
+### Filter Data Keys
+
+The keys in `filterData` should match:
+- Model field names for direct fields
+- `filter_field` value from `SBAdminField` for custom filter fields
+
+An "All" tab is automatically added as the first tab.
+
+**Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
 
 ---
 
