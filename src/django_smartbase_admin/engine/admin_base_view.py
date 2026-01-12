@@ -616,8 +616,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         return response
 
     def action_config(self, request, config_id=None):
-        from django_smartbase_admin.models import SBAdminListViewConfiguration
-
         config_id = config_id if config_id != "None" else None
 
         config_name = request.POST.get(CONFIG_NAME, None)
@@ -625,32 +623,19 @@ class SBAdminBaseListView(SBAdminBaseView):
             config_name = urllib.parse.unquote(config_name)
         updated_configuration = None
         if request.request_data.request_method == "POST":
-            config_params = {}
-            if config_id:
-                config_params["id"] = config_id
-            elif config_name:
-                config_params["name"] = config_name
-            if config_params:
-                (
-                    updated_configuration,
-                    created,
-                ) = SBAdminListViewConfiguration.objects.update_or_create(
-                    user_id=request.request_data.user.id,
-                    **config_params,
-                    defaults={
-                        "url_params": request.request_data.request_post.get(
-                            URL_PARAMS_NAME
-                        ),
-                        "view": self.get_id(),
-                        "action": None,
-                        "modifier": None,
-                    },
-                )
+            updated_configuration = SBAdminUserConfigurationService.create_or_update_saved_view(
+                request,
+                view_id=self.get_id(),
+                config_id=config_id,
+                config_name=config_name,
+                url_params=request.request_data.request_post.get(URL_PARAMS_NAME),
+            )
         if request.request_data.request_method == "DELETE":
-            if config_id:
-                SBAdminListViewConfiguration.objects.by_user_id(
-                    request.request_data.user.id
-                ).by_id(config_id).by_view_action_modifier(view=self.get_id()).delete()
+            SBAdminUserConfigurationService.delete_saved_view(
+                request,
+                view_id=self.get_id(),
+                config_id=config_id,
+            )
 
         redirect_to = self.get_redirect_url_from_request(request, updated_configuration)
 
@@ -767,15 +752,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         return views
 
     def get_config_data(self, request) -> dict[str, list[dict[str, Any]]]:
-        from django_smartbase_admin.models import SBAdminListViewConfiguration
-
-        current_views = list(
-            SBAdminListViewConfiguration.objects.by_user_id(
-                request.request_data.user.id
-            )
-            .by_view_action_modifier(view=self.get_id())
-            .values()
-        )
+        current_views = SBAdminUserConfigurationService.get_saved_views(request, view_id=self.get_id())
         for view in current_views:
             view["detail_url"] = self.get_config_url(request, view["id"])
         config_views = self.get_base_config(request)
