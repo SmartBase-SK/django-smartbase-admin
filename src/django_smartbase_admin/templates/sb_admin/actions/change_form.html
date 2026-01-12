@@ -126,19 +126,68 @@
               id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="flex flex-col{% if sbadmin_is_modal %} min-h-0{% else %} detail-view-form flex-grow w-full max-w-1180 mx-auto{% endif %}" novalidate>
         <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
             {% csrf_token %}
-            {% if errors %}
+            {% if errors or adminform.form.errors %}
                 <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
                     <div class="flex">
                         <svg class="w-20 h-20 mr-12 text-negative">
                             <use xlink:href="#Close-one"></use>
                         </svg>
                         <h5 class="font-semibold">
-                            {% blocktrans count errors|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                            {% if adminform.form.errors %}
+                                {% blocktrans count adminform.form.errors.items|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                            {% else %}
+                                {% blocktrans count errors|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                            {% endif %}
                         </h5>
                     </div>
                 </div>
-                {{ adminform.form.non_field_errors }}
+                {% if adminform.form.non_field_errors %}
+                    <ul class="errorlist mb-24">
+                        {% for error in adminform.form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if adminform.form.errors %}
+                    <ul class="errorlist mb-24">
+                        {% for field_name, error_list in adminform.form.errors.items %}
+                            {% if field_name != '__all__' %}
+                                {% for error in error_list %}
+                                    <li>
+                                        {% with field=adminform.form|get_item:field_name %}
+                                            {% if field and field.label %}
+                                                <strong>{{ field.label }}:</strong>
+                                            {% else %}
+                                                <strong>{{ field_name }}:</strong>
+                                            {% endif %}
+                                        {% endwith %}
+                                        {{ error }}
+                                    </li>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                {% endif %}
             {% endif %}
+            {% for inline_admin_formset in inline_admin_formsets %}
+                {% if inline_admin_formset.formset.non_form_errors %}
+                    <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+                        <div class="flex">
+                            <svg class="w-20 h-20 mr-12 text-negative">
+                                <use xlink:href="#Close-one"></use>
+                            </svg>
+                            <div>
+                                <h5 class="font-semibold mb-8">{{ inline_admin_formset.opts.verbose_name_plural|default:inline_admin_formset.opts.verbose_name }}</h5>
+                                <ul class="errorlist">
+                                    {% for error in inline_admin_formset.formset.non_form_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
             {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
             {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
             {% if save_on_top %}{% block submit_buttons_top %}{% submit_row %}{% endblock %}{% endif %}
