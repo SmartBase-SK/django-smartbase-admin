@@ -310,6 +310,69 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 - Override `restrict_queryset` on `SBAdminRoleConfiguration` subclass to call your restriction function
 - Import `apply_model_restrictions` directly in filter widgets and subqueries: `apply_model_restrictions(Model.objects.all())`
 
+### User-Based Queryset Filtering (Thread-Local Request)
+
+For user-based filtering (e.g., restricting data by user permissions or tenant), use `SBAdminThreadLocalService` to access the current request when it's not passed directly. This is useful when `apply_model_restrictions` is called from filter widgets or subqueries where request isn't available as a parameter.
+
+```python
+# myapp/queryset_restrictions.py
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+
+from myapp.models import MyModel, RelatedModel
+
+
+def _get_current_request(request=None):
+    """Get request from parameter or thread-local storage."""
+    if request is not None:
+        return request
+    try:
+        return SBAdminThreadLocalService.get_request()
+    except LookupError:
+        return None
+
+
+def apply_model_restrictions(qs, request=None):
+    """Apply global queryset restrictions based on queryset's model.
+
+    For models requiring user-based filtering:
+    - admin users: see all records
+    - restricted users: see only records matching their allowed scope
+    - no request available: return empty queryset (fail-safe)
+    """
+    if qs.model == MyModel:
+        current_request = _get_current_request(request)
+        if current_request is None:
+            return qs.none()  # Fail-safe: no access without request
+
+        user = getattr(current_request, "user", None)
+        if user is None:
+            return qs.none()  # Fail-safe: no access without user
+
+        qs = qs.filter(is_active=True)
+        # Example: filter by user's allowed tenants/sites
+        allowed_scope = getattr(user, "allowed_scope", None)
+        if allowed_scope is not None:
+            qs = qs.filter(tenant__in=allowed_scope)
+    elif qs.model == RelatedModel:
+        qs = qs.filter(is_hidden=False).order_by("name")
+    return qs
+```
+
+```python
+# myapp/sbadmin_config.py
+class MyRoleConfiguration(SBAdminRoleConfiguration):
+    def restrict_queryset(self, qs, model, request, request_data, global_filter=True, global_filter_data_map=None):
+        """Apply global queryset restrictions, passing request for user-based filtering."""
+        return apply_model_restrictions(qs, request=request)
+```
+
+**Key points:**
+- `SBAdminThreadLocalService.get_request()` returns the current request stored in thread-local/context-var storage
+- Raises `LookupError` if no request is set (e.g., outside of a request context)
+- **Fail-safe pattern**: Return `qs.none()` when request or user is unavailable to prevent data leakage
+- Pass `request` explicitly from `restrict_queryset` when available; the function falls back to thread-local when called from filter widgets or subqueries
+- User object should have properties like `allowed_scope` that return filtering criteria (or `None` for full access)
+
 ---
 
 ## Filter Widgets
