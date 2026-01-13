@@ -88,6 +88,7 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
             context={
                 "readonly_content": conditional_escape(result_repr),
                 "field_label": self.field.get("label"),
+                "field_label_suffix": self.form.label_suffix,
             },
         )
 

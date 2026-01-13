@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
-from django.http import HttpResponse, Http404, JsonResponse
+from django.http import HttpResponse, Http404, JsonResponse, HttpRequest
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -60,11 +60,12 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 
 class SBAdminBaseView(object):
-    menu_label = None
     global_filter_data_map = None
     field_cache = None
     sbadmin_detail_actions = None
-    add_label = None
+    menu_label: str | None = None
+    add_label: str | None = None
+    change_label: str | None = None
     delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
 
     def init_view_static(self, configuration, model, admin_site):
@@ -222,8 +223,15 @@ class SBAdminBaseView(object):
             "color_scheme_form": color_scheme_form,
         }
 
-    def get_add_label(self, request, object_id: int | str | None = None):
+    def get_add_label(
+        self, request: HttpRequest, object_id: str | None = None
+    ) -> str | None:
         return self.add_label
+
+    def get_change_label(
+        self, request: HttpRequest, object_id: str | None = None
+    ) -> str | None:
+        return self.change_label
 
     def get_global_context(
         self, request, object_id: int | str | None = None
@@ -233,6 +241,7 @@ class SBAdminBaseView(object):
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
             "add_label": self.get_add_label(request, object_id),
+            "change_label": self.get_change_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
