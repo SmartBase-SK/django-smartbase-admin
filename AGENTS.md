@@ -4,6 +4,72 @@ This document provides key patterns and gotchas for developers and AI assistants
 
 ---
 
+## Table of Contents
+
+| Section | What it covers |
+|---------|----------------|
+| [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
+| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods |
+| [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
+| [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
+| [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `list_filter` setup |
+| [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
+| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
+| [Common Errors](#common-errors) | Frequent errors and solutions |
+| [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
+| [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
+| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config` |
+| [Logo Customization](#logo-customization) | Override logo via static files |
+| [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
+
+**Quick lookup:**
+- **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
+- **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
+- **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **N+1 query issues?** → [Performance Optimization](#performance-optimization)
+- **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
+
+---
+
+## Demo Schema Reference
+
+Examples throughout this document use a consistent CMS-style schema:
+
+```python
+# blog/models.py
+class Author(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    is_active = models.BooleanField(default=True)
+
+class Category(models.Model):
+    name = models.CharField(max_length=100)
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE)
+
+class Tag(models.Model):
+    name = models.CharField(max_length=50)
+
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    status = models.CharField(max_length=20)  # draft, published, archived
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class ArticleTag(models.Model):
+    """M2M junction table for Article <-> Tag."""
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="article_tags")
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+
+class Comment(models.Model):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+---
+
 ## SBAdminField - List Display Columns
 
 ### Basic Usage
@@ -11,10 +77,10 @@ This document provides key patterns and gotchas for developers and AI assistants
 ```python
 from django_smartbase_admin.engine.field import SBAdminField
 
-class MyModelAdmin(SBAdmin):
+class ArticleAdmin(SBAdmin):
     sbadmin_list_display = (
-        "field_name",  # Simple field reference
-        SBAdminField(name="custom_field", ...),  # Custom field with options
+        "title",  # Simple field reference
+        SBAdminField(name="status_display", ...),  # Custom field with options
     )
 ```
 
@@ -37,20 +103,20 @@ class MyModelAdmin(SBAdmin):
 Define a method on your admin class with the same name as the `SBAdminField.name`:
 
 ```python
-class MyModelAdmin(SBAdmin):
-    def formatted_status(self, obj_id, value, **additional_data):
+class ArticleAdmin(SBAdmin):
+    def status_display(self, obj_id, value, **additional_data):
         """
         Auto-discovered method (name matches SBAdminField.name).
         Receives: self, obj_id, annotated value, supporting_annotates as kwargs.
         """
-        extra = additional_data.get("extra_data")
-        return f"{value} - {extra}"
+        category_name = additional_data.get("category_name_val")
+        return f"{value} - {category_name}"
     
     sbadmin_list_display = (
         SBAdminField(
-            name="formatted_status",  # Same as method name - auto-discovered
+            name="status_display",  # Same as method name - auto-discovered
             annotate=F("status"),
-            supporting_annotates={"extra_data": F("other_field")},
+            supporting_annotates={"category_name_val": F("category__name")},
         ),
     )
 ```
@@ -82,16 +148,16 @@ supporting_annotates={"created_at_val": F("created_at")}
 ```python
 # ❌ BAD - Causes "QuerySet.annotate() received non-expression(s)" error
 supporting_annotates={
-    "work_ids_data": "work_ids",
-    "tag_ids_data": "tag_ids",
+    "author_name": "author__name",
+    "category_name": "category__name",
 }
 
 # ✅ GOOD - Use F() expressions
 from django.db.models import F
 
 supporting_annotates={
-    "work_ids_data": F("work_ids"),
-    "tag_ids_data": F("tag_ids"),
+    "author_name_val": F("author__name"),
+    "category_name_val": F("category__name"),
 }
 ```
 
@@ -103,15 +169,16 @@ When using `Concat`, `Coalesce`, or `Case`, always specify `output_field`:
 
 ```python
 # ❌ BAD - FieldError: Expression contains mixed types
-Concat(F("first_name"), Value(" "), F("last_name"))
+Concat(F("author__name"), Value(" <"), F("author__email"), Value(">"))
 
 # ✅ GOOD - Explicit output_field on all parts
 from django.db.models import TextField
 
 Concat(
-    Coalesce(F("first_name"), Value(""), output_field=TextField()),
-    Value(" ", output_field=TextField()),
-    Coalesce(F("last_name"), Value(""), output_field=TextField()),
+    Coalesce(F("author__name"), Value(""), output_field=TextField()),
+    Value(" <", output_field=TextField()),
+    Coalesce(F("author__email"), Value(""), output_field=TextField()),
+    Value(">", output_field=TextField()),
     output_field=TextField(),
 )
 ```
@@ -136,14 +203,14 @@ INSTALLED_APPS = [
     "widget_tweaks",
     "ckeditor",
     "ckeditor_uploader",
-    "myapp",  # Your app with model admins - BEFORE django_smartbase_admin
+    "blog",  # Your app with model admins - BEFORE django_smartbase_admin
     "django_smartbase_admin",  # MUST be last (or after apps with model admins)
 ]
 ```
 
 ### Required Setup
 
-1. **Settings**: `SB_ADMIN_CONFIGURATION = "myapp.sbadmin_config.SBAdminConfiguration"`
+1. **Settings**: `SB_ADMIN_CONFIGURATION = "blog.sbadmin_config.SBAdminConfiguration"`
 2. **URLs**: Include `sb_admin_site.urls`
 3. **Config Class**: Implement `get_configuration_for_roles`
 
@@ -156,7 +223,7 @@ _role_config = SBAdminRoleConfiguration(
     default_view=SBAdminMenuItem(view_id="dashboard"),
     menu_items=[
         SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
-        SBAdminMenuItem(label="My Model", icon="icon-name", view_id="myapp_mymodel"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
     ],
     registered_views=[
         SBAdminDashboardView(widgets=[], title="Dashboard"),
@@ -168,13 +235,13 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
         return _role_config
 ```
 
-**Note**: Use `registered_views` with `SBAdminDashboardView` to register custom views. Model admin views (like `myapp_mymodel`) are automatically discovered from the admin site registry when `django_smartbase_admin` loads (which is why the INSTALLED_APPS ordering matters).
+**Note**: Use `registered_views` with `SBAdminDashboardView` to register custom views. Model admin views (like `blog_article`) are automatically discovered from the admin site registry when `django_smartbase_admin` loads (which is why the INSTALLED_APPS ordering matters).
 
 ### Menu Item View IDs
 
 Format: `{app_label}_{model_name}` (lowercase)
 
-Example: `myapp.models.Product` → `view_id="myapp_product"`
+Example: `blog.models.Article` → `view_id="blog_article"`
 
 ### Menu Item Icons
 
@@ -211,9 +278,9 @@ Upload-one, User-business, View-grid-list, Write, Zoom-in, Zoom-out
 Example:
 ```python
 SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
-SBAdminMenuItem(label="Users", icon="User-business", view_id="myapp_user"),
-SBAdminMenuItem(label="Products", icon="Box", view_id="myapp_product"),
-SBAdminMenuItem(label="Settings", icon="Setting-config", view_id="myapp_settings"),
+SBAdminMenuItem(label="Authors", icon="User-business", view_id="blog_author"),
+SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+SBAdminMenuItem(label="Settings", icon="Setting-config", view_id="blog_settings"),
 ```
 
 ### Nested Menu Items (sub_items)
@@ -229,17 +296,17 @@ _role_config = SBAdminRoleConfiguration(
             label="Content",
             icon="Box",
             sub_items=[
-                SBAdminMenuItem(label="Articles", view_id="myapp_article"),
-                SBAdminMenuItem(label="Categories", view_id="myapp_category"),
-                SBAdminMenuItem(label="Tags", view_id="myapp_tag"),
+                SBAdminMenuItem(label="Articles", view_id="blog_article"),
+                SBAdminMenuItem(label="Categories", view_id="blog_category"),
+                SBAdminMenuItem(label="Tags", view_id="blog_tag"),
             ],
         ),
         SBAdminMenuItem(
-            label="Users",
+            label="People",
             icon="User-business",
             sub_items=[
-                SBAdminMenuItem(label="All Users", view_id="myapp_user"),
-                SBAdminMenuItem(label="Groups", view_id="auth_group"),
+                SBAdminMenuItem(label="Authors", view_id="blog_author"),
+                SBAdminMenuItem(label="Comments", view_id="blog_comment"),
             ],
         ),
     ],
@@ -259,27 +326,27 @@ _role_config = SBAdminRoleConfiguration(
 Override `restrict_queryset` on `SBAdminRoleConfiguration` to apply global filters for specific models across all views. For reusable filtering logic, extract it to a separate module:
 
 ```python
-# myapp/queryset_restrictions.py
-from myapp.models import MyModel, RelatedModel
+# blog/queryset_restrictions.py
+from blog.models import Article, Author
 
 def apply_model_restrictions(qs):
     """Apply global queryset restrictions based on queryset's model."""
-    if qs.model == MyModel:
+    if qs.model == Article:
         qs = qs.filter(status__in=["published", "draft"])
-    elif qs.model == RelatedModel:
-        qs = qs.filter(is_hidden=False)
+    elif qs.model == Author:
+        qs = qs.filter(is_active=True)
     return qs
 ```
 
 ```python
-# myapp/sbadmin_config.py
+# blog/sbadmin_config.py
 from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
 from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
 
-from myapp.queryset_restrictions import apply_model_restrictions
+from blog.queryset_restrictions import apply_model_restrictions
 
-class MyRoleConfiguration(SBAdminRoleConfiguration):
+class BlogRoleConfiguration(SBAdminRoleConfiguration):
     """Role configuration with queryset restrictions."""
 
     def restrict_queryset(self, qs, model, request, request_data, global_filter=True, global_filter_data_map=None):
@@ -287,11 +354,11 @@ class MyRoleConfiguration(SBAdminRoleConfiguration):
         return apply_model_restrictions(qs)
 
 
-_role_config = MyRoleConfiguration(
+_role_config = BlogRoleConfiguration(
     default_view=SBAdminMenuItem(view_id="dashboard"),
     menu_items=[
         SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
-        SBAdminMenuItem(label="My Model", icon="icon-name", view_id="myapp_mymodel"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
     ],
     registered_views=[
         SBAdminDashboardView(widgets=[], title="Dashboard"),
@@ -308,17 +375,17 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 - Extract restriction logic to a separate module (e.g., `queryset_restrictions.py`) to avoid circular imports
 - Use `qs.model` to check the model type - simpler than passing model as a separate parameter
 - Override `restrict_queryset` on `SBAdminRoleConfiguration` subclass to call your restriction function
-- Import `apply_model_restrictions` directly in filter widgets and subqueries: `apply_model_restrictions(Model.objects.all())`
+- Import `apply_model_restrictions` directly in filter widgets and subqueries: `apply_model_restrictions(Article.objects.all())`
 
 ### User-Based Queryset Filtering (Thread-Local Request)
 
 For user-based filtering (e.g., restricting data by user permissions or tenant), use `SBAdminThreadLocalService` to access the current request when it's not passed directly. This is useful when `apply_model_restrictions` is called from filter widgets or subqueries where request isn't available as a parameter.
 
 ```python
-# myapp/queryset_restrictions.py
+# blog/queryset_restrictions.py
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 
-from myapp.models import MyModel, RelatedModel
+from blog.models import Article, Author
 
 
 def _get_current_request(request=None):
@@ -339,7 +406,7 @@ def apply_model_restrictions(qs, request=None):
     - restricted users: see only records matching their allowed scope
     - no request available: return empty queryset (fail-safe)
     """
-    if qs.model == MyModel:
+    if qs.model == Article:
         current_request = _get_current_request(request)
         if current_request is None:
             return qs.none()  # Fail-safe: no access without request
@@ -348,19 +415,19 @@ def apply_model_restrictions(qs, request=None):
         if user is None:
             return qs.none()  # Fail-safe: no access without user
 
-        qs = qs.filter(is_active=True)
-        # Example: filter by user's allowed tenants/sites
-        allowed_scope = getattr(user, "allowed_scope", None)
-        if allowed_scope is not None:
-            qs = qs.filter(tenant__in=allowed_scope)
-    elif qs.model == RelatedModel:
-        qs = qs.filter(is_hidden=False).order_by("name")
+        qs = qs.filter(status__in=["published", "draft"])
+        # Example: filter by user's allowed categories
+        allowed_categories = getattr(user, "allowed_categories", None)
+        if allowed_categories is not None:
+            qs = qs.filter(category__in=allowed_categories)
+    elif qs.model == Author:
+        qs = qs.filter(is_active=True).order_by("name")
     return qs
 ```
 
 ```python
-# myapp/sbadmin_config.py
-class MyRoleConfiguration(SBAdminRoleConfiguration):
+# blog/sbadmin_config.py
+class BlogRoleConfiguration(SBAdminRoleConfiguration):
     def restrict_queryset(self, qs, model, request, request_data, global_filter=True, global_filter_data_map=None):
         """Apply global queryset restrictions, passing request for user-based filtering."""
         return apply_model_restrictions(qs, request=request)
@@ -371,7 +438,7 @@ class MyRoleConfiguration(SBAdminRoleConfiguration):
 - Raises `LookupError` if no request is set (e.g., outside of a request context)
 - **Fail-safe pattern**: Return `qs.none()` when request or user is unavailable to prevent data leakage
 - Pass `request` explicitly from `restrict_queryset` when available; the function falls back to thread-local when called from filter widgets or subqueries
-- User object should have properties like `allowed_scope` that return filtering criteria (or `None` for full access)
+- User object should have properties like `allowed_categories` that return filtering criteria (or `None` for full access)
 
 ---
 
@@ -404,46 +471,48 @@ class NonEmptyValuesFilter(FromValuesAutocompleteWidget):
 
 ### Complex Filter with filter_query_lambda
 
-For filtering via related models (e.g., filtering parent by child relationship), use `AutocompleteFilterWidget` with `filter_query_lambda`:
+For filtering via related models (e.g., filtering articles by selecting tags), use `AutocompleteFilterWidget` with `filter_query_lambda`:
 
 ```python
 from django.db.models import Q
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
 
-class RelatedModelFilterWidget(AutocompleteFilterWidget):
-    """Filter parent model by selecting related child model items."""
+from blog.models import Tag, ArticleTag
+
+class TagFilterWidget(AutocompleteFilterWidget):
+    """Filter articles by selecting tags."""
 
     def __init__(self):
         super().__init__(
-            model=ChildModel,
+            model=Tag,
             multiselect=True,
             value_field="id",
             label_lambda=lambda request, item: item.name,
-            filter_query_lambda=self._filter_by_related,
+            filter_query_lambda=self._filter_by_tags,
         )
 
-    def _filter_by_related(self, request, selected_ids):
+    def _filter_by_tags(self, request, selected_ids):
         if not selected_ids:
             return Q()
-        # Query the junction/relation table to find parent IDs
-        parent_ids = RelationModel.objects.filter(
-            child_id__in=selected_ids
-        ).values_list("parent_id", flat=True)
-        return Q(id__in=parent_ids)
+        # Query the junction table to find article IDs
+        article_ids = ArticleTag.objects.filter(
+            tag_id__in=selected_ids
+        ).values_list("article_id", flat=True)
+        return Q(id__in=article_ids)
 
     def get_queryset(self, request=None):
-        return ChildModel.objects.filter(is_active=True).order_by("name")
+        return Tag.objects.all().order_by("name")
 ```
 
 Use in SBAdminField:
 
 ```python
 SBAdminField(
-    name="display_field",
-    title="Display",
+    name="tags_display",
+    title="Tags",
     annotate=Value("", output_field=TextField()),
-    filter_field="relation__child",  # For list_filter reference
-    filter_widget=RelatedModelFilterWidget(),
+    filter_field="article_tags__tag",
+    filter_widget=TagFilterWidget(),
 ),
 ```
 
@@ -455,25 +524,25 @@ To add a filter that doesn't appear as a visible column, use `list_visible=False
 sbadmin_list_display = (
     # Visible column with filter
     SBAdminField(
-        name="categories_display",
-        title="Categories",
-        filter_field="items__category",
+        name="category_display",
+        title="Category",
+        filter_field="category",
         filter_widget=CategoryFilterWidget(),
     ),
     # Filter only - no column shown
     SBAdminField(
-        name="labels_filter",
-        title="Labels",
+        name="author_filter",
+        title="Author",
         annotate=Value("", output_field=TextField()),
-        filter_field="items__label",
-        filter_widget=LabelFilterWidget(),
+        filter_field="author",
+        filter_widget=AuthorFilterWidget(),
         list_visible=False,  # Hidden from columns, visible in filter panel
     ),
 )
 
 list_filter = (
-    "items__category",  # Shows in filter panel
-    "items__label",     # Shows in filter panel (even though column is hidden)
+    "category",  # Shows in filter panel
+    "author",    # Shows in filter panel (even though column is hidden)
 )
 ```
 
@@ -488,9 +557,11 @@ from django.contrib import admin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.admin_base import SBAdmin
 
-@admin.register(MyModel, site=sb_admin_site)
-class MyModelAdmin(SBAdmin):
-    model = MyModel
+from blog.models import Article
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
     sbadmin_list_display = (...)
     list_filter = (...)
     search_fields = (...)
@@ -502,18 +573,18 @@ class MyModelAdmin(SBAdmin):
 
 ```python
 sbadmin_list_display = (
-    "username",
+    "title",
     SBAdminField(name="status", filter_field="status"),
-    SBAdminField(name="manager_name", filter_field="manager__email"),  # Related field
-    SBAdminField(name="computed", filter_disabled=True),  # No filter
+    SBAdminField(name="author_name", filter_field="author__email"),  # Related field
+    SBAdminField(name="comment_count", filter_disabled=True),  # No filter
 )
 
 # list_filter should match filter_field values (not SBAdminField names)
 list_filter = (
-    "username",
+    "title",
     "status", 
-    "manager__email",  # Use filter_field value for related lookups
-    # "computed" excluded - has filter_disabled=True
+    "author__email",  # Use filter_field value for related lookups
+    # "comment_count" excluded - has filter_disabled=True
 )
 
 ---
@@ -536,49 +607,41 @@ from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.actions import SBAdminFormViewAction
 from django_smartbase_admin.engine.modal_view import ListActionModalView
 
-from myapp.models import RelatedModel
+from blog.models import Category
 
 
-class MyActionForm(SBAdminBaseFormInit, forms.Form):
+class AssignCategoryForm(SBAdminBaseFormInit, forms.Form):
     """Form with SBAdminBaseFormInit mixin for modal integration."""
-    option = forms.ChoiceField(choices=[("a", "Option A"), ("b", "Option B")])
-    # For autocomplete multiselect - model restrictions applied automatically via restrict_queryset
-    items = forms.ModelMultipleChoiceField(
-        label=_("Items"),
-        queryset=RelatedModel.objects.all(),
-        required=False,
+    category = forms.ModelChoiceField(
+        label=_("Category"),
+        queryset=Category.objects.all(),
         widget=SBAdminAutocompleteWidget(
-            model=RelatedModel,
-            multiselect=True,
-            label_lambda=lambda request, item: str(item),
-            # filter_search_lambda returns Q object for additional filtering
-            # Use for dependent dropdowns (forward) or custom search filtering
-            filter_search_lambda=lambda request, search_term, forward_data: Q(category=forward_data.get("category")),
+            model=Category,
+            multiselect=False,
+            label_lambda=lambda request, item: item.name,
         ),
     )
 
 
-class MyActionView(ListActionModalView):
-    form_class = MyActionForm
-    modal_title = _("My Action")
+class AssignCategoryView(ListActionModalView):
+    form_class = AssignCategoryForm
+    modal_title = _("Assign Category")
 
     def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
         """Called with the selected rows queryset after form validation."""
-        option = form.cleaned_data["option"]
-        for obj in selection_queryset:
-            # Process each selected object
-            pass
+        category = form.cleaned_data["category"]
+        selection_queryset.update(category=category)
 
 
-class MyModelAdmin(SBAdmin):
+class ArticleAdmin(SBAdmin):
     def get_sbadmin_list_selection_actions(self, request):
         """Override to define custom selection actions."""
         return [
             SBAdminFormViewAction(
-                target_view=MyActionView,
-                title=_("My Action"),
+                target_view=AssignCategoryView,
+                title=_("Assign Category"),
                 view=self,
-                action_id="my_action",
+                action_id="assign_category",
                 open_in_modal=True,
             ),
         ]
@@ -600,11 +663,11 @@ Django SmartBase Admin uses Django's messages framework with HTMX out-of-band sw
 
 **Error handling** - Display errors in the modal form:
 ```python
-class MyActionView(ListActionModalView):
+class AssignCategoryView(ListActionModalView):
     def process_form_valid(self, request, form):
         try:
             return super().process_form_valid(request, form)
-        except MyCustomError as e:
+        except ValidationError as e:
             form.add_error(None, str(e))  # Add as non-field error
             return self.form_invalid(form)  # Re-render modal with error
 ```
@@ -619,14 +682,14 @@ from django.template.loader import render_to_string
 from django_htmx.http import trigger_client_event
 from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
 
-class MyActionView(ListActionModalView):
-    success_message = _("Action completed successfully.")
+class AssignCategoryView(ListActionModalView):
+    success_message = _("Category assigned successfully.")
 
     def process_form_valid(self, request, form):
         try:
             selection_queryset = self.get_selection_queryset(request, form)
             self.process_form_valid_list_selection_queryset(request, form, selection_queryset)
-        except MyCustomError as e:
+        except ValidationError as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
 
@@ -671,7 +734,7 @@ from django_smartbase_admin.engine.field_formatter import (
 
 ### Array Badge Formatters
 
-Display lists as styled badge pills (great for tags, queues, categories):
+Display lists as styled badge pills (great for tags, categories):
 
 ```python
 from django_smartbase_admin.engine.field_formatter import (
@@ -681,17 +744,17 @@ from django_smartbase_admin.engine.field_formatter import (
                                              #           [Tag3]
 )
 
-class MyAdmin(SBAdmin):
+class ArticleAdmin(SBAdmin):
     def tags_display(self, obj_id, value, **additional_data):
-        tags = ["Tag1", "Tag2", "Tag3"]
-        # Use newline_separated_array_badge_formatter for vertical layout
-        return newline_separated_array_badge_formatter(obj_id, tags)
+        tag_names = additional_data.get("tag_names_arr") or []
+        return newline_separated_array_badge_formatter(obj_id, tag_names)
     
     sbadmin_list_display = (
         SBAdminField(
             name="tags_display",
             title="Tags",
             annotate=Value("", output_field=TextField()),
+            supporting_annotates={"tag_names_arr": get_tag_names_subquery()},
             filter_disabled=True,
         ),
     )
@@ -705,7 +768,7 @@ Use `format_array` directly for custom badge colors:
 from django_smartbase_admin.engine.field_formatter import format_array, BadgeType
 
 # BadgeType options: SUCCESS (green), WARNING (yellow), ERROR (red), NOTICE (default)
-format_array(["item1", "item2"], badge_type=BadgeType.SUCCESS)
+format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
 
 ---
@@ -718,31 +781,33 @@ Use `Subquery` and `ArrayAgg` in `supporting_annotates` to fetch related data in
 
 ```python
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import DateTimeField, OuterRef, Q, Subquery, TextField, Value
-from django.db.models.functions import Coalesce, Concat
+from django.db.models import DateTimeField, OuterRef, Subquery, TextField, Value
+from django.db.models.functions import Coalesce
 
-# Subquery for scalar value (e.g., get related datetime field)
-def get_latest_event_subquery() -> Subquery:
+from blog.models import ArticleTag, Comment
+
+# Subquery for scalar value (e.g., get latest comment time)
+def get_latest_comment_subquery() -> Subquery:
     return Subquery(
-        Event.objects.filter(user_id=OuterRef("pk"))
+        Comment.objects.filter(article_id=OuterRef("pk"))
         .order_by("-created_at")
         .values("created_at")[:1],
         output_field=DateTimeField(),
     )
 
-# Subquery for array aggregation (e.g., get list of related names)
+# Subquery for array aggregation (e.g., get list of tag names)
 def get_tag_names_subquery() -> Subquery:
     return Subquery(
-        UserTag.objects.filter(user_id=OuterRef("pk"))
-        .values("user_id")
+        ArticleTag.objects.filter(article_id=OuterRef("pk"))
+        .values("article_id")
         .annotate(names=ArrayAgg("tag__name", distinct=True))
         .values("names")[:1]
     )
 
-class MyAdmin(SBAdmin):
-    def event_time_display(self, obj_id, value, **additional_data):
-        event_time = additional_data.get("latest_event_val")
-        return event_time.strftime("%Y-%m-%d") if event_time else "-"
+class ArticleAdmin(SBAdmin):
+    def latest_comment_display(self, obj_id, value, **additional_data):
+        comment_time = additional_data.get("latest_comment_val")
+        return comment_time.strftime("%Y-%m-%d") if comment_time else "-"
     
     def tags_display(self, obj_id, value, **additional_data):
         tag_names = additional_data.get("tag_names_arr") or []
@@ -753,11 +818,11 @@ class MyAdmin(SBAdmin):
     
     sbadmin_list_display = (
         SBAdminField(
-            name="event_time_display",
-            title="Last Event",
+            name="latest_comment_display",
+            title="Last Comment",
             annotate=Value("", output_field=TextField()),
             supporting_annotates={
-                "latest_event_val": get_latest_event_subquery(),
+                "latest_comment_val": get_latest_comment_subquery(),
             },
             filter_disabled=True,
         ),
@@ -784,7 +849,7 @@ class MyAdmin(SBAdmin):
 Control initial rows displayed with `list_per_page`:
 
 ```python
-class MyAdmin(SBAdmin):
+class ArticleAdmin(SBAdmin):
     list_per_page = 20  # Show 20 rows initially
 ```
 
@@ -808,16 +873,18 @@ Use `SBAdminTableInline` instead of Django's `admin.TabularInline` for inlines i
 ```python
 from django_smartbase_admin.admin.admin_base import SBAdminTableInline
 
-class MyInline(SBAdminTableInline):
-    model = MyRelatedModel
-    extra = 0
-    verbose_name = _("Related Item")
-    verbose_name_plural = _("Related Items")
+from blog.models import ArticleTag
 
-@admin.register(MyModel, site=sb_admin_site)
-class MyModelAdmin(SBAdmin):
-    model = MyModel
-    inlines = [MyInline]
+class ArticleTagInline(SBAdminTableInline):
+    model = ArticleTag
+    extra = 0
+    verbose_name = _("Tag")
+    verbose_name_plural = _("Tags")
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    inlines = [ArticleTagInline]
 ```
 
 **Available inline classes:**
@@ -852,29 +919,29 @@ Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autoco
 
 ```python
 # label_lambda - Format display label
-def my_label(request, item) -> str:
-    return f"{item.field1} / {item.field2}"
+def author_label(request, item) -> str:
+    return f"{item.name} <{item.email}>"
 
 # value_lambda - Extract value (default uses primary key)
-def my_value(request, item) -> any:
+def author_value(request, item) -> any:
     return item.pk
 
 # search_query_lambda - Define searchable fields
-def my_search(request, qs, model, search_term, language_code) -> QuerySet:
+def author_search(request, qs, model, search_term, language_code) -> QuerySet:
     if not search_term:
         return qs
-    return qs.filter(Q(field1__icontains=search_term) | Q(field2__icontains=search_term))
+    return qs.filter(Q(name__icontains=search_term) | Q(email__icontains=search_term))
 
 # filter_search_lambda - Pre-filter based on forward data (dependent dropdowns)
-def my_filter(request, search_term, forward_data) -> Q:
-    parent_id = forward_data.get("parent_field")
+def category_filter(request, search_term, forward_data) -> Q:
+    parent_id = forward_data.get("parent_category")
     if parent_id:
         return Q(parent_id=parent_id)
     return Q()
 
 # filter_query_lambda - How selection filters main list (filter widgets only)
-def my_filter_query(request, selected_ids) -> Q:
-    return Q(related_field__in=selected_ids)
+def author_filter_query(request, selected_ids) -> Q:
+    return Q(author_id__in=selected_ids)
 ```
 
 ### Example
@@ -887,28 +954,28 @@ from django.db.models import Q
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 
-from myapp.models import MyModel
+from blog.models import Author
 
 
-def my_model_label(request, item):
-    return f"{item.category} / {item.name}"
+def author_label(request, item):
+    return f"{item.name} <{item.email}>"
 
 
-def my_model_search(request, qs, model, search_term, language_code):
+def author_search(request, qs, model, search_term, language_code):
     if not search_term:
         return qs
-    return qs.filter(Q(category__icontains=search_term) | Q(name__icontains=search_term))
+    return qs.filter(Q(name__icontains=search_term) | Q(email__icontains=search_term))
 
 
-class MyRoleConfiguration(SBAdminRoleConfiguration):
+class BlogRoleConfiguration(SBAdminRoleConfiguration):
     def get_autocomplete_widget(self, view, request, form_field, db_field, model, multiselect=False):
-        if model == MyModel:
+        if model == Author:
             return SBAdminAutocompleteWidget(
                 form_field,
                 model=model,
                 multiselect=multiselect,
-                label_lambda=my_model_label,
-                search_query_lambda=my_model_search,
+                label_lambda=author_label,
+                search_query_lambda=author_search,
             )
         return super().get_autocomplete_widget(view, request, form_field, db_field, model, multiselect)
 ```
@@ -916,14 +983,14 @@ class MyRoleConfiguration(SBAdminRoleConfiguration):
 ### Example: Dependent Dropdown with Forward
 
 ```python
-# In a form, make "city" dropdown depend on selected "country"
-city = forms.ModelChoiceField(
-    queryset=City.objects.all(),
+# In a form, make "subcategory" dropdown depend on selected "category"
+subcategory = forms.ModelChoiceField(
+    queryset=Category.objects.all(),
     widget=SBAdminAutocompleteWidget(
-        model=City,
+        model=Category,
         multiselect=False,
-        forward=["country"],  # Forward country field value
-        filter_search_lambda=lambda req, term, fwd: Q(country_id=fwd.get("country")) if fwd.get("country") else Q(),
+        forward=["category"],  # Forward category field value
+        filter_search_lambda=lambda req, term, fwd: Q(parent_id=fwd.get("category")) if fwd.get("category") else Q(),
     ),
 )
 ```
@@ -934,6 +1001,56 @@ city = forms.ModelChoiceField(
 - `search_query_lambda` defines WHICH fields to search
 - Global config does NOT apply to manually-created widgets - pass lambdas directly
 
+### Subclassing for Computed Label Values
+
+When `label_lambda` needs a computed value (like a count from related tables), subclass `SBAdminAutocompleteWidget` and override `get_queryset` to add the annotation:
+
+```python
+from django.db.models import Count, OuterRef, Subquery
+from django.db.models.functions import Coalesce
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Category, Article
+
+
+class CategoryAutocompleteWidget(SBAdminAutocompleteWidget):
+    """Autocomplete widget with article count annotation."""
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        article_count_subquery = Subquery(
+            Article.objects.filter(category=OuterRef("pk"))
+            .values("category")
+            .annotate(count=Count("id"))
+            .values("count")
+        )
+        return qs.annotate(
+            article_count=Coalesce(article_count_subquery, 0)
+        )
+
+
+# Usage in form
+class ArticleForm(SBAdminBaseFormInit, forms.Form):
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.all(),
+        widget=CategoryAutocompleteWidget(
+            model=Category,
+            multiselect=False,
+            label_lambda=lambda request, item: f"{item.name} ({item.article_count} articles)",
+        ),
+    )
+```
+
+**Why subclass instead of annotating the form field queryset?**
+- The autocomplete widget fetches its own data via `get_queryset()` - it does NOT use the form field's queryset
+- The form field queryset is only used for validation and `cleaned_data`
+- Annotations in the widget's `get_queryset` are available to `label_lambda`
+
+**Why use Subquery instead of Count?**
+- Multiple `Count()` aggregates on related tables create Cartesian products
+- Example: `Count("articles") + Count("children")` with 2 articles and 2 children returns 8 instead of 4
+- Separate `Subquery` annotations avoid this by calculating each count independently
+
 ---
 
 ## Pre-filtered List Views (sbadmin_list_view_config)
@@ -943,19 +1060,19 @@ Use `sbadmin_list_view_config` to define pre-filtered view tabs that appear at t
 ### Usage
 
 ```python
-class MyModelAdmin(SBAdmin):
+class ArticleAdmin(SBAdmin):
     sbadmin_list_view_config = [
         {
-            "name": "Active only",
-            "url_params": {"filterData": {"status": "ACTIVE"}},
+            "name": "Published",
+            "url_params": {"filterData": {"status": "published"}},
         },
         {
-            "name": "Pending",
-            "url_params": {"filterData": {"status": "PENDING", "is_reviewed": "false"}},
+            "name": "Drafts",
+            "url_params": {"filterData": {"status": "draft"}},
         },
     ]
     
-    list_filter = ("status", "is_reviewed")
+    list_filter = ("status",)
 ```
 
 ### Structure
@@ -983,3 +1100,66 @@ Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
 
+---
+
+## Contributing to This Document
+
+When adding new information to this document, follow these guidelines:
+
+### Use the Demo Schema
+
+All examples must use models from the [Demo Schema Reference](#demo-schema-reference):
+- `Article`, `Category`, `Tag`, `Author`, `Comment`, `ArticleTag`
+- App name: `blog`
+- Admin classes: `ArticleAdmin`, `CategoryAdmin`, etc.
+- View IDs: `blog_article`, `blog_category`, etc.
+
+If the demo schema doesn't cover your use case, extend it in the Demo Schema section first.
+
+### Structure for New Sections
+
+```markdown
+## Section Title
+
+Brief explanation of what this covers and when to use it.
+
+### Subsection (if needed)
+
+Code example:
+
+```python
+# Complete, runnable example using demo schema
+```
+
+**Key points:**
+- Important gotcha or tip
+- Another key point
+```
+
+### Checklist Before Adding
+
+- [ ] Uses demo schema models (Article, Category, Tag, Author, Comment)
+- [ ] Code examples are complete and runnable (not fragments)
+- [ ] Added entry to Table of Contents with brief description
+- [ ] No generic names like `MyModel`, `RelatedModel`, `SomeField`
+- [ ] Includes "Key points" or gotchas if there are non-obvious behaviors
+- [ ] Shows both ❌ BAD and ✅ GOOD patterns for common mistakes
+
+### Naming Conventions
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Admin class | `{Model}Admin` | `ArticleAdmin` |
+| Form class | `{Action}Form` | `AssignCategoryForm` |
+| View class | `{Action}View` | `AssignCategoryView` |
+| Filter widget | `{Model}FilterWidget` | `TagFilterWidget` |
+| Autocomplete widget | `{Model}AutocompleteWidget` | `CategoryAutocompleteWidget` |
+| Lambda functions | `{model}_{purpose}` | `author_label`, `author_search` |
+| Annotation keys | `{field}_val` or `{field}_arr` | `author_name_val`, `tag_names_arr` |
+
+### What NOT to Add
+
+- Implementation details that change frequently
+- Workarounds for bugs (fix the bug instead)
+- Features not yet released
+- Duplicate information already covered elsewhere
