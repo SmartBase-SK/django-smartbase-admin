@@ -25,14 +25,26 @@ class SBAdminConfigurationService(object):
 class SBAdminUserConfigurationService(object):
     @classmethod
     def get_user_config(cls, request):
-        if not request.user:
-            return None
-        from django_smartbase_admin.models import SBAdminUserConfiguration
+        """Delegate to the configuration class's get_user_config method."""
+        configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
+        return configuration_class.get_user_config(request)
 
-        user_config, created = SBAdminUserConfiguration.objects.get_or_create(
-            defaults={
-                "color_scheme": request.request_data.configuration.default_color_scheme
-            },
-            user_id=request.user.id,
+    @classmethod
+    def get_saved_views(cls, request, view_id):
+        """Delegate to the configuration class's get_saved_views method."""
+        configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
+        return configuration_class.get_saved_views(request, view_id)
+
+    @classmethod
+    def create_or_update_saved_view(cls, request, view_id, config_id, config_name, url_params):
+        """Delegate to the configuration class's create_or_update_saved_view method."""
+        configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
+        return configuration_class.create_or_update_saved_view(
+            request, view_id, config_id, config_name, url_params
         )
-        return user_config
+
+    @classmethod
+    def delete_saved_view(cls, request, view_id, config_id):
+        """Delegate to the configuration class's delete_saved_view method."""
+        configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
+        return configuration_class.delete_saved_view(request, view_id, config_id)

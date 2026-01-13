@@ -64,10 +64,13 @@ class SBAdminViewService(object):
         else:
             filter_data_processed = {}
             for filter_key, filter_value in filter_data.items():
-                filter_data_processed[filter_key] = cls.json_dumps_and_replace(
-                    filter_value
-                )
-        return filter_data_processed
+                if isinstance(filter_value, str):
+                    filter_data_processed[filter_key] = filter_value
+                else:
+                    filter_data_processed[filter_key] = cls.json_dumps_and_replace(
+                        filter_value
+                    )
+            return filter_data_processed
 
     @classmethod
     def build_list_params_url(cls, view_id, filter_data=None, filter_version=None):
