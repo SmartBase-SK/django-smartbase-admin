@@ -28,7 +28,7 @@
                                     {% for list_action in content_context.list_actions %}
                                         {% if not list_action.sub_actions %}
                                             <li>
-                                                {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="dropdown-menu-link items-center" %}
+                                                {% include list_action.template with action=list_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link items-center" %}
                                             </li>
                                         {% endif %}
                                     {% endfor %}
