@@ -36,7 +36,9 @@ class SBAdminUserConfigurationService(object):
         return configuration_class.get_saved_views(request, view_id)
 
     @classmethod
-    def create_or_update_saved_view(cls, request, view_id, config_id, config_name, url_params):
+    def create_or_update_saved_view(
+        cls, request, view_id, config_id, config_name, url_params
+    ):
         """Delegate to the configuration class's create_or_update_saved_view method."""
         configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
         return configuration_class.create_or_update_saved_view(

@@ -54,7 +54,9 @@ class SBAdminConfigurationBase(object):
         if not request.user or request.user.is_anonymous:
             return None
         user_config, _ = SBAdminUserConfiguration.objects.get_or_create(
-            defaults={"color_scheme": request.request_data.configuration.default_color_scheme},
+            defaults={
+                "color_scheme": request.request_data.configuration.default_color_scheme
+            },
             user_id=request.user.id,
         )
         return user_config
@@ -89,7 +91,9 @@ class SBAdminConfigurationBase(object):
         )
 
     @classmethod
-    def create_or_update_saved_view(cls, request, view_id, config_id, config_name, url_params):
+    def create_or_update_saved_view(
+        cls, request, view_id, config_id, config_name, url_params
+    ):
         """
         Create or update a saved view for the current user.
 

@@ -632,12 +632,14 @@ class SBAdminBaseListView(SBAdminBaseView):
             config_name = urllib.parse.unquote(config_name)
         updated_configuration = None
         if request.request_data.request_method == "POST":
-            updated_configuration = SBAdminUserConfigurationService.create_or_update_saved_view(
-                request,
-                view_id=self.get_id(),
-                config_id=config_id,
-                config_name=config_name,
-                url_params=request.request_data.request_post.get(URL_PARAMS_NAME),
+            updated_configuration = (
+                SBAdminUserConfigurationService.create_or_update_saved_view(
+                    request,
+                    view_id=self.get_id(),
+                    config_id=config_id,
+                    config_name=config_name,
+                    url_params=request.request_data.request_post.get(URL_PARAMS_NAME),
+                )
             )
         if request.request_data.request_method == "DELETE":
             SBAdminUserConfigurationService.delete_saved_view(
@@ -761,7 +763,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         return views
 
     def get_config_data(self, request) -> dict[str, list[dict[str, Any]]]:
-        current_views = SBAdminUserConfigurationService.get_saved_views(request, view_id=self.get_id())
+        current_views = SBAdminUserConfigurationService.get_saved_views(
+            request, view_id=self.get_id()
+        )
         for view in current_views:
             view["detail_url"] = self.get_config_url(request, view["id"])
         config_views = self.get_base_config(request)
