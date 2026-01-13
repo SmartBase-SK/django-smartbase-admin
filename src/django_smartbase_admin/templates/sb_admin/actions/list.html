@@ -70,14 +70,14 @@
                                 <ul>
                                     {% for list_sub_action in list_action.sub_actions %}
                                         <li>
-                                            {% include "sb_admin/actions/partials/action_link.html" with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
+                                            {% include list_action.template with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
                                         </li>
                                     {% endfor %}
                                 </ul>
                             </div>
                         {% else %}
                             <li class="max-sm:hidden">
-                                {% include "sb_admin/actions/partials/action_link.html" with action=list_action view_id=view_id extra_classes="btn btn-empty" %}
+                                {% include list_action.template with action=list_action view_id=view_id extra_classes="btn btn-empty" %}
                             </li>
                         {% endif %}
                     {% endfor %}
