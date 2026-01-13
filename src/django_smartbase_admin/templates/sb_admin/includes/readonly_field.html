@@ -2,7 +2,9 @@
 
 <div class="w-full">
     {% if field_label %}
-        <label class="inline-flex text-dark-900 text-14 leading-18 font-medium mb-8">{{ field_label }}:</label>
+        <label class="inline-flex text-dark-900 text-14 leading-18 font-medium mb-8">
+            {{ field_label }}{{ field_label_suffix }}
+        </label>
     {% endif %}
     <div class="text-14 w-full break-all">
         {{ readonly_content }}

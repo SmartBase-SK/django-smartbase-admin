@@ -11,6 +11,7 @@ class SBAdminCustomAction(object):
     no_params = False
     open_in_modal = False
     open_in_new_tab = False
+    template = None
 
     def __init__(
         self,
@@ -26,6 +27,7 @@ class SBAdminCustomAction(object):
         sub_actions=None,
         icon=None,
         open_in_new_tab=None,
+        template=None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -40,6 +42,7 @@ class SBAdminCustomAction(object):
         self.sub_actions = sub_actions
         self.icon = icon
         self.open_in_new_tab = open_in_new_tab
+        self.template = template or "sb_admin/actions/partials/action_link.html"
         self.resolve_url()
 
     def resolve_url(self):

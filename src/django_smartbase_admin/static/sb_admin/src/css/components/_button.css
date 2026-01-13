@@ -40,6 +40,12 @@
             @apply bg-light border-dark-100 shadow-none text-dark;
             cursor: not-allowed;
         }
+
+        .loader,
+        .loader:after {
+            width: 20px;
+            height: 20px;
+        }
     }
 
     .btn-primary {

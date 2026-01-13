@@ -61,7 +61,7 @@ def array_badge_formatter(object_id, value_list):
 
 
 def newline_separated_array_badge_formatter(object_id, value_list):
-    return format_array(value_list, separator="<br>")
+    return mark_safe(f'<div>{format_array(value_list, separator="<br>")}</div>')
 
 
 def rich_text_formatter(object_id, value):

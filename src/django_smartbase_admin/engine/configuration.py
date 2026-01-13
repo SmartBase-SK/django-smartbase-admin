@@ -9,7 +9,11 @@ from django_smartbase_admin.engine.const import (
     FilterVersions,
     Action,
 )
-from django_smartbase_admin.models import ColorScheme
+from django_smartbase_admin.models import (
+    ColorScheme,
+    SBAdminListViewConfiguration,
+    SBAdminUserConfiguration,
+)
 from django_smartbase_admin.utils import to_list, is_modal
 
 
@@ -22,6 +26,145 @@ class SBAdminConfigurationBase(object):
 
     def get_configuration_for_roles(self, user_roles):
         raise NotImplementedError
+
+    # User configuration hooks - override these methods to customize user identification
+    # (e.g., use email instead of user_id for OAuth/external auth scenarios)
+
+    @classmethod
+    def get_user_config(cls, request):
+        """
+        Get or create user configuration (e.g., color scheme preferences).
+
+        Override this method to customize user identification. Default uses user_id.
+
+        Example for email-based users::
+
+            @classmethod
+            def get_user_config(cls, request):
+                from myapp.models import MyUserConfig
+                email = getattr(request.user, "email", None)
+                if not email:
+                    return MyUserConfig(email="anonymous", color_scheme=ColorScheme.AUTO.value)
+                config, _ = MyUserConfig.objects.get_or_create(
+                    email=email,
+                    defaults={"color_scheme": request.request_data.configuration.default_color_scheme},
+                )
+                return config
+        """
+        if not request.user or request.user.is_anonymous:
+            return None
+        user_config, _ = SBAdminUserConfiguration.objects.get_or_create(
+            defaults={
+                "color_scheme": request.request_data.configuration.default_color_scheme
+            },
+            user_id=request.user.id,
+        )
+        return user_config
+
+    @classmethod
+    def get_saved_views(cls, request, view_id):
+        """
+        Get saved views for the current user and view.
+
+        Override this method to customize user identification. Default uses user_id.
+        Returns a list of dicts with keys: id, name, url_params, view (view_id).
+
+        Example for email-based users::
+
+            @classmethod
+            def get_saved_views(cls, request, view_id):
+                from myapp.models import MySavedView
+                email = getattr(request.user, "email", None)
+                if not email:
+                    return []
+                return list(
+                    MySavedView.objects.filter(email=email, view_id=view_id)
+                    .values("id", "name", "config", "view_id")
+                )
+        """
+        if not request.user or request.user.is_anonymous:
+            return []
+        return list(
+            SBAdminListViewConfiguration.objects.by_user_id(request.user.id)
+            .by_view_action_modifier(view=view_id)
+            .values()
+        )
+
+    @classmethod
+    def create_or_update_saved_view(
+        cls, request, view_id, config_id, config_name, url_params
+    ):
+        """
+        Create or update a saved view for the current user.
+
+        Override this method to customize user identification. Default uses user_id.
+        Returns the created/updated saved view object.
+
+        Example for email-based users::
+
+            @classmethod
+            def create_or_update_saved_view(cls, request, view_id, config_id, config_name, url_params):
+                from myapp.models import MySavedView
+                email = getattr(request.user, "email", None)
+                if not email:
+                    return None
+                config_params = {}
+                if config_id:
+                    config_params["id"] = config_id
+                if config_name:
+                    config_params["name"] = config_name
+                saved_view, _ = MySavedView.objects.update_or_create(
+                    email=email,
+                    **config_params,
+                    defaults={"config": {"url_params": url_params}, "view_id": view_id},
+                )
+                return saved_view
+        """
+        if not request.user or request.user.is_anonymous:
+            return None
+        config_params = {}
+        if config_id:
+            config_params["id"] = config_id
+        elif config_name:
+            config_params["name"] = config_name
+        if not config_params:
+            return None
+        saved_view, _ = SBAdminListViewConfiguration.objects.update_or_create(
+            user_id=request.user.id,
+            **config_params,
+            defaults={
+                "url_params": url_params,
+                "view": view_id,
+                "action": None,
+                "modifier": None,
+            },
+        )
+        return saved_view
+
+    @classmethod
+    def delete_saved_view(cls, request, view_id, config_id):
+        """
+        Delete a saved view for the current user.
+
+        Override this method to customize user identification. Default uses user_id.
+
+        Example for email-based users::
+
+            @classmethod
+            def delete_saved_view(cls, request, view_id, config_id):
+                from myapp.models import MySavedView
+                email = getattr(request.user, "email", None)
+                if not email or not config_id:
+                    return
+                MySavedView.objects.filter(
+                    email=email, id=config_id, view_id=view_id
+                ).delete()
+        """
+        if not request.user or request.user.is_anonymous or not config_id:
+            return
+        SBAdminListViewConfiguration.objects.by_user_id(request.user.id).by_id(
+            config_id
+        ).by_view_action_modifier(view=view_id).delete()
 
 
 class Singleton(type):

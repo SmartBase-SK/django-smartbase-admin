@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
-from django.http import HttpResponse, Http404, JsonResponse
+from django.http import HttpResponse, Http404, JsonResponse, HttpRequest
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -60,11 +60,12 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 
 class SBAdminBaseView(object):
-    menu_label = None
     global_filter_data_map = None
     field_cache = None
     sbadmin_detail_actions = None
-    add_label = None
+    menu_label: str | None = None
+    add_label: str | None = None
+    change_label: str | None = None
     delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
 
     def init_view_static(self, configuration, model, admin_site):
@@ -222,8 +223,15 @@ class SBAdminBaseView(object):
             "color_scheme_form": color_scheme_form,
         }
 
-    def get_add_label(self, request, object_id: int | str | None = None):
+    def get_add_label(
+        self, request: HttpRequest, object_id: str | None = None
+    ) -> str | None:
         return self.add_label
+
+    def get_change_label(
+        self, request: HttpRequest, object_id: str | None = None
+    ) -> str | None:
+        return self.change_label
 
     def get_global_context(
         self, request, object_id: int | str | None = None
@@ -233,6 +241,7 @@ class SBAdminBaseView(object):
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
             "add_label": self.get_add_label(request, object_id),
+            "change_label": self.get_change_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
@@ -616,8 +625,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         return response
 
     def action_config(self, request, config_id=None):
-        from django_smartbase_admin.models import SBAdminListViewConfiguration
-
         config_id = config_id if config_id != "None" else None
 
         config_name = request.POST.get(CONFIG_NAME, None)
@@ -625,32 +632,21 @@ class SBAdminBaseListView(SBAdminBaseView):
             config_name = urllib.parse.unquote(config_name)
         updated_configuration = None
         if request.request_data.request_method == "POST":
-            config_params = {}
-            if config_id:
-                config_params["id"] = config_id
-            elif config_name:
-                config_params["name"] = config_name
-            if config_params:
-                (
-                    updated_configuration,
-                    created,
-                ) = SBAdminListViewConfiguration.objects.update_or_create(
-                    user_id=request.request_data.user.id,
-                    **config_params,
-                    defaults={
-                        "url_params": request.request_data.request_post.get(
-                            URL_PARAMS_NAME
-                        ),
-                        "view": self.get_id(),
-                        "action": None,
-                        "modifier": None,
-                    },
+            updated_configuration = (
+                SBAdminUserConfigurationService.create_or_update_saved_view(
+                    request,
+                    view_id=self.get_id(),
+                    config_id=config_id,
+                    config_name=config_name,
+                    url_params=request.request_data.request_post.get(URL_PARAMS_NAME),
                 )
+            )
         if request.request_data.request_method == "DELETE":
-            if config_id:
-                SBAdminListViewConfiguration.objects.by_user_id(
-                    request.request_data.user.id
-                ).by_id(config_id).by_view_action_modifier(view=self.get_id()).delete()
+            SBAdminUserConfigurationService.delete_saved_view(
+                request,
+                view_id=self.get_id(),
+                config_id=config_id,
+            )
 
         redirect_to = self.get_redirect_url_from_request(request, updated_configuration)
 
@@ -767,14 +763,8 @@ class SBAdminBaseListView(SBAdminBaseView):
         return views
 
     def get_config_data(self, request) -> dict[str, list[dict[str, Any]]]:
-        from django_smartbase_admin.models import SBAdminListViewConfiguration
-
-        current_views = list(
-            SBAdminListViewConfiguration.objects.by_user_id(
-                request.request_data.user.id
-            )
-            .by_view_action_modifier(view=self.get_id())
-            .values()
+        current_views = SBAdminUserConfigurationService.get_saved_views(
+            request, view_id=self.get_id()
         )
         for view in current_views:
             view["detail_url"] = self.get_config_url(request, view["id"])

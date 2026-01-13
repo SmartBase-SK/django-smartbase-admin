@@ -71,6 +71,12 @@
         &:focus {
             @apply text-primary;
         }
+
+        .loader,
+        .loader:after {
+            width: 20px;
+            height: 20px;
+        }
     }
 
     .btn[data-bs-toggle="dropdown"] {
