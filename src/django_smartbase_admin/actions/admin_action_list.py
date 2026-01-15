@@ -427,6 +427,11 @@ class SBAdminListAction(SBAdminAction):
                     data: row.get(data, None)
                     for data in self.view.sbadmin_list_display_data
                 }
+            # Include supporting_annotates values in additional_data
+            for field in visible_columns:
+                if field.supporting_annotates:
+                    for key in field.supporting_annotates.keys():
+                        additional_data[key] = row.get(key, None)
             for field_key, value in row.items():
                 if field_key in field_key_field_map:
                     field = field_key_field_map[field_key]
