@@ -11,7 +11,12 @@ from django.contrib.admin.widgets import (
     ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
-from django.core.exceptions import ValidationError, ImproperlyConfigured
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+    ValidationError,
+)
+from django.db.models import ForeignKey, OneToOneField
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.formats import get_format
@@ -359,13 +364,19 @@ class SBAdminAutocompleteWidget(
     form = None
     field_name = None
     initialised = None
+    allow_add = None
+    create_value_field = None
     default_create_data = None
+    forward_to_create = None
     reload_on_save = None
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
         self.reload_on_save = kwargs.pop("reload_on_save", False)
+        self.allow_add = kwargs.pop("allow_add", None)
+        self.create_value_field = kwargs.pop("create_value_field", None)
+        self.forward_to_create = kwargs.pop("forward_to_create", [])
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
         if self.multiselect and self.allow_add:
@@ -595,6 +606,34 @@ class SBAdminAutocompleteWidget(
 
         return forward_data
 
+    def get_forward_data_to_create(self, request, forward_data):
+        forward_data_to_create = {}
+        for field_name in self.forward_to_create:
+            value = forward_data.get(field_name)
+            if value is None:
+                continue
+            # If forwarding a FK value from the parent form (e.g. for dependent dropdowns),
+            # store it under `<field>_id` so `Model(**kwargs)` accepts the raw PK.
+            store_key = field_name
+            form_model = getattr(getattr(self, "form", None), "model", None)
+            if form_model is not None:
+                try:
+                    form_model_field = form_model._meta.get_field(field_name)
+                except FieldDoesNotExist:
+                    form_model_field = None
+                if isinstance(form_model_field, (ForeignKey, OneToOneField)):
+                    store_key = form_model_field.attname
+
+            forward_data_to_create[store_key] = self.parse_value_from_input(
+                request, value
+            )
+            if not self.is_multiselect():
+                forward_data_to_create[store_key] = next(
+                    iter(forward_data_to_create[store_key]), None
+                )
+
+        return forward_data_to_create
+
     def value_from_datadict(self, data, files, name):
         input_value = super().value_from_datadict(data, files, name)
         threadsafe_request = SBAdminThreadLocalService.get_request()
@@ -630,7 +669,11 @@ class SBAdminAutocompleteWidget(
                 )
                 self.form_field.queryset = qs
                 parsed_value = self.validate(
-                    parsed_value, qs, threadsafe_request, parsed_is_create
+                    parsed_value,
+                    qs,
+                    threadsafe_request,
+                    forward_data,
+                    parsed_is_create,
                 )
 
         return parsed_value
@@ -638,14 +681,18 @@ class SBAdminAutocompleteWidget(
     def should_create_new_obj(self):
         return self.allow_add and self.create_value_field
 
-    def create_new_obj(self, value, queryset, is_create):
+    def create_new_obj(self, value, queryset, request, forward_data):
         if isinstance(value, list):
             # TODO: multiselect creation
             return self.form_field.to_python(value)
         else:
+            forward_data_to_create = self.get_forward_data_to_create(
+                request, forward_data
+            )
             data_to_create = {
                 self.create_value_field: value,
                 **self.default_create_data,
+                **forward_data_to_create,
             }
             new_obj = queryset.model.objects.create(**data_to_create)
             try:
@@ -658,12 +705,12 @@ class SBAdminAutocompleteWidget(
                     params={"value": value},
                 )
 
-    def validate(self, value, queryset, request, is_create=False):
+    def validate(self, value, queryset, request, forward_data, is_create=False):
         is_create_value = (
             True in is_create if isinstance(is_create, list) else is_create
         )
         if is_create_value and self.should_create_new_obj():
-            new_object = self.create_new_obj(value, queryset, is_create)
+            new_object = self.create_new_obj(value, queryset, request, forward_data)
             request.request_data.additional_data[self.REQUEST_CREATED_DATA_KEY] = (
                 request.request_data.additional_data.get(
                     self.REQUEST_CREATED_DATA_KEY, {}

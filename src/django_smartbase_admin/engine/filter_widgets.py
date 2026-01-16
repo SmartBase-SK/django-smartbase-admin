@@ -515,10 +515,8 @@ class AutocompleteFilterWidget(
         value_lambda=None,
         multiselect=None,
         forward=None,
-        allow_add=None,
         hide_clear_button=None,
         search_query_lambda=None,
-        create_value_field=None,
         **kwargs,
     ) -> None:
         super().__init__(template_name, default_value, **kwargs)
@@ -534,8 +532,6 @@ class AutocompleteFilterWidget(
         self.multiselect = multiselect if multiselect is not None else self.multiselect
         self.multiselect = self.multiselect if self.multiselect is not None else True
         self.forward = forward or self.forward
-        self.allow_add = allow_add or self.allow_add
-        self.create_value_field = create_value_field or self.create_value_field
         self.hide_clear_button = (
             hide_clear_button
             if hide_clear_button is not None
