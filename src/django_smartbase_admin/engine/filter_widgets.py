@@ -492,7 +492,6 @@ class AutocompleteFilterWidget(
     forward = None
     label_lambda = None
     value_lambda = None
-    allow_add = False
     hide_clear_button = False
     search_query_lambda = None
     create_value_field = None
