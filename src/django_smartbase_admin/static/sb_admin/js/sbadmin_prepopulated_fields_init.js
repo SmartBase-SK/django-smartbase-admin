@@ -18,6 +18,7 @@
         return true;
     }
 
+    window.init_prepopulate = init_prepopulate;
     init_prepopulate(document);
 }
 

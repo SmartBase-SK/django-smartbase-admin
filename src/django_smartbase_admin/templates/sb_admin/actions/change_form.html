@@ -20,6 +20,7 @@
             data-model-name="{{ opts.model_name }}"
         {% endif %}>
     </script>
+    <script src="{% static 'sb_admin/js/sbadmin_prepopulated_fields_init.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -281,6 +282,10 @@
             {% endif %}
         </form>
         {% sb_admin_prepopulated_fields_init %}
-        <script src="{% static 'sb_admin/js/sbadmin_prepopulated_fields_init.js' %}"></script>
+        {% if sbadmin_is_modal %}
+            <script>
+                init_prepopulate(document.getElementById("modal-content"));
+            </script>
+        {% endif %}
     {% endblock %}
 {% endblock %}
