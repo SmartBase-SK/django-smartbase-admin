@@ -50,6 +50,36 @@ def get_item(dictionary, key):
     return dictionary.get(key, None) if dictionary else None
 
 
+@register.simple_tag(takes_context=True)
+def sb_admin_prepopulated_fields_init(context):
+    adminform = context.get("adminform")
+    if not adminform:
+        return ""
+
+    data = []
+    for f in adminform.prepopulated_fields:
+        bf = f["field"]
+        deps = f["dependencies"]
+        data.append(
+            {
+                "id": f"#{bf.id_for_label}",
+                "name": bf.name,
+                "dependency_ids": [f"#{d.id_for_label}" for d in deps],
+                "dependency_list": [d.name for d in deps],
+                "maxLength": getattr(bf.field, "max_length", None) or 50,
+                "allowUnicode": bool(getattr(bf.field, "allow_unicode", False)),
+            }
+        )
+
+    opts = context.get("opts")
+    element_id = (
+        f"sbadmin_prepopulated_fields_{opts.app_label}_{opts.model_name}"
+        if opts
+        else "sbadmin_prepopulated_fields"
+    )
+    return mark_safe(get_json_script(data, element_id))
+
+
 @register.tag(name="submit_row")
 def submit_row_tag(parser, token):
     return InclusionSBAdminNode(
