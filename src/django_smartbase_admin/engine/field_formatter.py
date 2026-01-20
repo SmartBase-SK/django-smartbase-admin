@@ -1,9 +1,10 @@
 from enum import Enum
 
 from django.template.defaultfilters import date, time
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
 
 
 class BadgeType(Enum):
@@ -39,21 +40,24 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
 
 def boolean_formatter(object_id, value):
     if value:
-        return mark_safe(
-            f'<span class="badge badge-simple badge-positive">{_("Yes")}</span>'
+        return format_html(
+            '<span class="badge badge-simple badge-positive">{}</span>', _("Yes")
         )
-    return mark_safe(f'<span class="badge badge-simple badge-neutral">{_("No")}</span>')
+    return format_html('<span class="badge badge-simple badge-neutral">{}</span>', _("No"))
 
 
 def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOTICE):
-    result = ""
     if not value_list:
-        return result
-    for value in value_list:
-        if not value:
-            continue
-        result += f'<span class="badge badge-simple badge-{badge_type.value} mr-4">{value}</span>{separator}'
-    return mark_safe(result)
+        return ""
+
+    # `separator` is intended to be an internal constant (e.g. "" or "<br>").
+    # We mark it safe so HTML separators render as HTML rather than being escaped.
+    sep = mark_safe(separator) if separator else ""
+    return format_html_join(
+        sep,
+        '<span class="badge badge-simple badge-{} mr-4">{}</span>',
+        ((badge_type.value, value) for value in value_list if value),
+    )
 
 
 def array_badge_formatter(object_id, value_list):
@@ -61,14 +65,20 @@ def array_badge_formatter(object_id, value_list):
 
 
 def newline_separated_array_badge_formatter(object_id, value_list):
-    return mark_safe(f'<div>{format_array(value_list, separator="<br>")}</div>')
+    return format_html(
+        "<div>{}</div>", format_array(value_list, separator="<br>")
+    )
 
 
 def rich_text_formatter(object_id, value):
-    return mark_safe(
-        f'<div style="max-width: 500px; white-space: normal;">{value}</div>'
+    # Intentionally renders HTML (e.g. from a rich text editor field).
+    return format_html(
+        '<div style="max-width: 500px; white-space: normal;">{}</div>',
+        mark_safe(value) if value else "",
     )
 
 
 def link_formatter(object_id, value):
-    return mark_safe(f'<a href="{value}">{value}</a>')
+    if not value:
+        return ""
+    return format_html('<a href="{0}">{0}</a>', value)
