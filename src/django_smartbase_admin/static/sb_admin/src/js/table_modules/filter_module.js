@@ -56,6 +56,9 @@ export class FilterModule extends SBAdminTableModule {
         const dropdownButton = valueElem.closest('button')
         if (valueElem.innerHTML) {
             dropdownButton.classList.remove('empty')
+            if (dropdownButton?.dataset?.sbadminCloseOnChange === '1') {
+                window.bootstrap5?.Dropdown?.getInstance(dropdownButton)?.hide()
+            }
             return
         }
         dropdownButton.classList.add('empty')
