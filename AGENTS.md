@@ -913,6 +913,8 @@ Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autoco
 | `filter_query_lambda` | callable | `(request, selected_values) -> Q` - How selected values filter the main list (for filter widgets only) |
 | `forward` | list[str] | Field names to forward to `filter_search_lambda` for dependent dropdowns |
 | `allow_add` | bool | Allow creating new items inline (default: `False`, not supported with multiselect) |
+| `create_value_field` | str | When `allow_add=True`, create a new model instance using the typed value as this field (e.g. `"name"`). Required to enable creation. |
+| `forward_to_create` | list[str] | When creating a new value, also copy selected `forward` fields into the new object (useful for dependent dropdowns / setting FK like `parent`). |
 | `hide_clear_button` | bool | Hide the clear/reset button (default: `False`) |
 
 ### Lambda Signatures
@@ -994,6 +996,58 @@ subcategory = forms.ModelChoiceField(
     ),
 )
 ```
+
+### Example: Create on the fly with create_value_field + forward_to_create
+
+Use this when you want “type to search” **and** the ability to create a missing value from the input. Creation is enabled only when:
+- `allow_add=True`
+- `create_value_field` is set
+- widget is **not** multiselect (creation is currently not supported for multiselect)
+
+```python
+from django import forms
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Category
+
+
+class CreateCategoryInlineForm(SBAdminBaseFormInit, forms.Form):
+    # NOTE: used by SBAdminAutocompleteWidget to detect FK fields and store them as `<field>_id` on create
+    model = Category
+
+    parent = forms.ModelChoiceField(
+        label="Parent category",
+        required=False,
+        queryset=Category.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Category,
+            multiselect=False,
+            label_lambda=lambda request, item: item.name,
+        ),
+    )
+
+    category = forms.ModelChoiceField(
+        label="Category",
+        queryset=Category.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Category,
+            multiselect=False,
+            allow_add=True,
+            create_value_field="name",          # new Category(name="<typed>")
+            forward=["parent"],                 # makes `parent` available in `forward_data`
+            forward_to_create=["parent"],       # new Category(parent_id=<selected parent>)
+            label_lambda=lambda request, item: item.name,
+            filter_search_lambda=lambda req, term, fwd: Q(parent_id=fwd.get("parent")) if fwd.get("parent") else Q(),
+        ),
+    )
+```
+
+**Key points (creation):**
+- `forward_to_create` pulls values from the widget’s `forward` data, so the field must also be present in `forward=[...]`.
+- For FK fields, SBAdmin will try to store forwarded values under `<field>_id` during creation (so `Model.objects.create(**data)` accepts raw PKs). This requires the form to expose the model via `form.model` (see `model = Category` above).
 
 **Key points:**
 - `search_query_lambda` should search the same fields shown in `label_lambda` for intuitive UX
