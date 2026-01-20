@@ -43,7 +43,9 @@ def boolean_formatter(object_id, value):
         return format_html(
             '<span class="badge badge-simple badge-positive">{}</span>', _("Yes")
         )
-    return format_html('<span class="badge badge-simple badge-neutral">{}</span>', _("No"))
+    return format_html(
+        '<span class="badge badge-simple badge-neutral">{}</span>', _("No")
+    )
 
 
 def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOTICE):
@@ -65,9 +67,7 @@ def array_badge_formatter(object_id, value_list):
 
 
 def newline_separated_array_badge_formatter(object_id, value_list):
-    return format_html(
-        "<div>{}</div>", format_array(value_list, separator="<br>")
-    )
+    return format_html("<div>{}</div>", format_array(value_list, separator="<br>"))
 
 
 def rich_text_formatter(object_id, value):
