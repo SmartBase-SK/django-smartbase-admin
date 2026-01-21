@@ -17,12 +17,8 @@ export default class Autocomplete {
             const choiceElementsInline = document.querySelectorAll(`#${event.target.id} [data-autocomplete-data-id]`)
             choiceElementsInline.forEach((choiceInput) => {
                 choiceInput.setAttribute('data-autocomplete-data-id', choiceInput.getAttribute('data-autocomplete-data-id').replace('__prefix__', totalFormsCount))
-                this.initAutocomplete(choiceInput, totalFormsCount)
             })
-            this.handleDynamiclyAddedAutocomplete(event.target)
-        })
-        document.body.addEventListener('SBModalShown', () => {
-            this.handleDynamiclyAddedAutocomplete(document.getElementById('sb-admin-modal'))
+            this.handleDynamiclyAddedAutocomplete(event.target, totalFormsCount)
         })
         this.handleDynamiclyAddedAutocomplete(document)
         document.body.addEventListener('sbadmin:modal-change-form-response', (event) => {
@@ -31,10 +27,10 @@ export default class Autocomplete {
         })
     }
 
-    handleDynamiclyAddedAutocomplete(el) {
+    handleDynamiclyAddedAutocomplete(el, totalFormsCount) {
         const choiceElements = el.querySelectorAll('.js-autocomplete')
         choiceElements.forEach((choiceInput) => {
-            this.initAutocomplete(choiceInput)
+            this.initAutocomplete(choiceInput, totalFormsCount)
         })
         el.querySelectorAll('.js-autocomplete-detail').forEach(item => {
             filterInputValueChangedUtil(item)
@@ -45,6 +41,10 @@ export default class Autocomplete {
     }
 
     initAutocomplete(choiceInput, totalFormsCount = null) {
+        if (choiceInput.closest('.choices')) {
+            console.warn('Attempted to initialize already initialized autocomplete!', choiceInput)
+            return
+        }
         const dataEl = document.getElementById(choiceInput.dataset.autocompleteDataId)
         const autocompleteData = JSON.parse(dataEl.textContent)
         let inputElId = autocompleteData.input_id
