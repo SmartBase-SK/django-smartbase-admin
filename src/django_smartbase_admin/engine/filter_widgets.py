@@ -75,6 +75,11 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     default_label = None
     filter_query_lambda = None
     exclude_null_operators = False
+    # If True, the filter dropdown closes after the filter value changes (frontend behavior).
+    # Useful for single-step filters; set to False for widgets where users typically make multiple
+    # changes before closing the dropdown.
+    close_dropdown_on_change = False
+    allow_clear = True
 
     def __init__(
         self,
@@ -83,6 +88,8 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         default_label=None,
         filter_query_lambda=None,
         exclude_null_operators=None,
+        close_dropdown_on_change=None,
+        allow_clear=None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -93,6 +100,10 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         self.exclude_null_operators = (
             exclude_null_operators or self.exclude_null_operators
         )
+        if close_dropdown_on_change is not None:
+            self.close_dropdown_on_change = close_dropdown_on_change
+        if allow_clear is not None:
+            self.allow_clear = allow_clear
 
     def init_filter_widget_static(self, field, view, configuration):
         self.field = field
@@ -124,7 +135,9 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         return original_query
 
     def to_json(self):
-        return {"input_id": self.input_id}
+        return {
+            "input_id": self.input_id,
+        }
 
     def get_default_value(self):
         return self.default_value
@@ -162,6 +175,7 @@ class SBAdminFilterWidget(JSONSerializableMixin):
 
 class StringFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/string_field.html"
+    close_dropdown_on_change = True
 
     def get_advanced_filter_operators(self):
         return STRING_ATTRIBUTES
@@ -178,6 +192,29 @@ class StringFilterWidget(SBAdminFilterWidget):
 
 class BooleanFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/boolean_field.html"
+    choices = None
+    close_dropdown_on_change = True
+
+    def __init__(
+        self,
+        template_name=None,
+        default_value=None,
+        default_label=None,
+        filter_query_lambda=None,
+        exclude_null_operators=None,
+        close_dropdown_on_change=None,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            template_name,
+            default_value,
+            default_label,
+            filter_query_lambda,
+            exclude_null_operators,
+            close_dropdown_on_change,
+            **kwargs,
+        )
+        self.choices = ((True, _("Yes")), (False, _("No")))
 
     def parse_value_from_input(self, request, filter_value):
         input_value = super().parse_value_from_input(request, filter_value)
@@ -201,6 +238,7 @@ class BooleanFilterWidget(SBAdminFilterWidget):
 class ChoiceFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/choice_field.html"
     choices = None
+    close_dropdown_on_change = True
 
     def __init__(
         self,
@@ -236,6 +274,7 @@ class ChoiceFilterWidget(SBAdminFilterWidget):
 
 class RadioChoiceFilterWidget(ChoiceFilterWidget):
     template_name = "sb_admin/filter_widgets/radio_choice_field.html"
+    close_dropdown_on_change = True
 
 
 class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
@@ -243,6 +282,7 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
     enable_select_all = False
     select_all_keyword = None
     select_all_label = None
+    close_dropdown_on_change = False
 
     def __init__(
         self,

@@ -429,6 +429,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                 filter_widget=RadioChoiceFilterWidget(
                     choices=self.DateResolutionsOptions.choices,
                     default_value=self.default_date_resolution,
+                    allow_clear=False,
                 ),
             ),
             SBAdminField(
@@ -437,6 +438,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                 filter_widget=RadioChoiceFilterWidget(
                     choices=self.CompareOptions.choices,
                     default_value=self.CompareOptions.values[0],
+                    allow_clear=False,
                 ),
             ),
         ]

@@ -516,6 +516,56 @@ SBAdminField(
 ),
 ```
 
+### Filter Widget Behavior Parameters
+
+Control filter dropdown behavior with `close_dropdown_on_change` and `allow_clear`:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `close_dropdown_on_change` | bool | `False` | If `True`, the filter dropdown closes automatically after the filter value changes. Useful for single-step filters like boolean or simple text inputs. Set to `False` for widgets where users typically make multiple changes before closing (e.g., multiselect autocomplete). |
+| `allow_clear` | bool | `True` | If `True`, shows a "Clear" button in the filter dropdown to reset the filter value. Set to `False` to hide the clear button. |
+
+**Examples:**
+
+```python
+from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
+
+# Single-step filter - closes dropdown after selection
+class StatusFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Article,
+            multiselect=False,
+            close_dropdown_on_change=True,  # Close after selecting status
+            allow_clear=True,
+        )
+
+# Multi-step filter - keep dropdown open for multiple selections
+class TagFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Tag,
+            multiselect=True,
+            close_dropdown_on_change=False,  # Keep open for multiple tag selections
+            allow_clear=True,
+        )
+
+# Filter without clear button
+class RequiredCategoryFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Category,
+            multiselect=False,
+            close_dropdown_on_change=True,
+            allow_clear=False,  # Hide clear button - category is required
+        )
+```
+
+**Key points:**
+- Built-in widgets like `StringFilterWidget` and `BooleanFilterWidget` default to `close_dropdown_on_change=True` for better UX
+- `AutocompleteFilterWidget` defaults to `close_dropdown_on_change=False` to allow multiple selections
+- The clear button is automatically hidden for required form fields (controlled by `form_field.required`)
+
 ### Filter-Only Fields (No Column)
 
 To add a filter that doesn't appear as a visible column, use `list_visible=False`:
