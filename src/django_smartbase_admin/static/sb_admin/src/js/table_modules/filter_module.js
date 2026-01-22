@@ -44,6 +44,12 @@ export class FilterModule extends SBAdminTableModule {
         return document.querySelector(`#${this.table.viewId}-${field}`)
     }
 
+    hideDropdown(dropdownButton) {
+        if (dropdownButton?.dataset?.sbadminCloseOnChange === '1') {
+            window.bootstrap5?.Dropdown?.getInstance(dropdownButton)?.hide()
+        }
+    }
+
     filterInputValueChanged(field) {
         const valueElem = filterInputValueChangedUtil(field)
         if (!valueElem) {
@@ -54,11 +60,9 @@ export class FilterModule extends SBAdminTableModule {
 
     changeFilterButtonState(valueElem) {
         const dropdownButton = valueElem.closest('button')
+        this.hideDropdown(dropdownButton)
         if (valueElem.innerHTML) {
             dropdownButton.classList.remove('empty')
-            if (dropdownButton?.dataset?.sbadminCloseOnChange === '1') {
-                window.bootstrap5?.Dropdown?.getInstance(dropdownButton)?.hide()
-            }
             return
         }
         dropdownButton.classList.add('empty')

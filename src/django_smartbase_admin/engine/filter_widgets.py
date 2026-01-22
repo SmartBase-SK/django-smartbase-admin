@@ -79,6 +79,7 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     # Useful for single-step filters; set to False for widgets where users typically make multiple
     # changes before closing the dropdown.
     close_dropdown_on_change = False
+    allow_clear = True
 
     def __init__(
         self,
@@ -88,6 +89,7 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         filter_query_lambda=None,
         exclude_null_operators=None,
         close_dropdown_on_change=None,
+        allow_clear=None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -100,6 +102,8 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         )
         if close_dropdown_on_change is not None:
             self.close_dropdown_on_change = close_dropdown_on_change
+        if allow_clear is not None:
+            self.allow_clear = allow_clear
 
     def init_filter_widget_static(self, field, view, configuration):
         self.field = field
@@ -188,7 +192,29 @@ class StringFilterWidget(SBAdminFilterWidget):
 
 class BooleanFilterWidget(SBAdminFilterWidget):
     template_name = "sb_admin/filter_widgets/boolean_field.html"
+    choices = None
     close_dropdown_on_change = True
+
+    def __init__(
+        self,
+        template_name=None,
+        default_value=None,
+        default_label=None,
+        filter_query_lambda=None,
+        exclude_null_operators=None,
+        close_dropdown_on_change=None,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            template_name,
+            default_value,
+            default_label,
+            filter_query_lambda,
+            exclude_null_operators,
+            close_dropdown_on_change,
+            **kwargs,
+        )
+        self.choices = ((True, _("Yes")), (False, _("No")))
 
     def parse_value_from_input(self, request, filter_value):
         input_value = super().parse_value_from_input(request, filter_value)

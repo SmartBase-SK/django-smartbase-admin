@@ -30,6 +30,7 @@ import Autocomplete from "./autocomplete"
 import ChoicesJS from "./choices"
 import {setCookie, setDropdownLabel} from "./utils"
 import Multiselect from "./multiselect"
+import Radio from "./radio"
 
 class Main {
     constructor() {
@@ -162,6 +163,7 @@ class Main {
         this.datepicker = new Datepicker(target)
         this.range = new Range(null, null, target)
         this.multiselect = new Multiselect(null, null, target)
+        this.radio = new Radio(null, target)
     }
 
     handleLocationHashFromTabs() {
