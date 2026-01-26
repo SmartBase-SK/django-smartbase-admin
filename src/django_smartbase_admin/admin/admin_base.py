@@ -1064,7 +1064,7 @@ class SBAdminInline(
 
     def register_autocomplete_views(self, request) -> None:
         super().register_autocomplete_views(request)
-        form_class = self.get_formset(request, None).form
+        form_class = self.get_formset(request, self.model()).form
         self.initialize_form_class(form_class, request)
         form_class()
 
