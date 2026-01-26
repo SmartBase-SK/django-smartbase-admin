@@ -9,7 +9,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | Section | What it covers |
 |---------|----------------|
 | [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
-| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods |
+| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `list_filter` setup |
@@ -29,6 +29,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
+- **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
 
 ---
 
@@ -182,6 +183,70 @@ Concat(
     output_field=TextField(),
 )
 ```
+
+### Ordering with Computed SBAdminField
+
+**Problem:** You have a computed field in `sbadmin_list_display` (with `annotate=`) and want to use it in the `ordering` attribute:
+
+```python
+from django.db.models import Case, TextField, Value, When
+
+from blog.models import Article
+
+# ❌ BAD - causes FieldError on detail/change page
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status_display",
+            title="Status",
+            annotate=Case(
+                When(status="published", then=Value("Published")),
+                When(status="draft", then=Value("Draft")),
+                default=Value("Other"),
+                output_field=TextField(),
+            ),
+        ),
+    )
+    ordering = ("status_display", "-created_at")  # Fails on detail page!
+```
+
+**Why it fails:** Django's `ordering` attribute is applied via `get_queryset()` which is called for BOTH list and detail views. The computed annotation only exists in the list view context (via `sbadmin_list_display`). When loading the detail/change page, Django tries to resolve `status_display` as a database field but it doesn't exist.
+
+**Solution:** Override `get_list_ordering()` which is only used for the list view:
+
+```python
+from django.db.models import Case, TextField, Value, When
+
+from blog.models import Article
+
+# ✅ GOOD - get_list_ordering is only called for list view
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status_display",
+            title="Status",
+            annotate=Case(
+                When(status="published", then=Value("Published")),
+                When(status="draft", then=Value("Draft")),
+                default=Value("Other"),
+                output_field=TextField(),
+            ),
+        ),
+    )
+    # No class-level `ordering` attribute!
+
+    def get_list_ordering(self, request):
+        """Define ordering for list view - can use computed fields."""
+        return ("status_display", "-created_at")
+```
+
+**Key points:**
+- SBAdmin uses `get_list_ordering()` for list view ordering (not Django's `get_ordering()`)
+- `get_list_ordering()` is only called for the list view, so computed fields from `sbadmin_list_display` are available
+- No need to check for detail/change pages - this method is list-view specific
+- For simple ordering without computed fields, you can still use the `ordering` class attribute
 
 ---
 
@@ -453,8 +518,10 @@ class BlogRoleConfiguration(SBAdminRoleConfiguration):
 | `DateFilterWidget` | Date/DateTime fields |
 | `AutocompleteFilterWidget` | ForeignKey/M2M fields |
 | `FromValuesAutocompleteWidget` | Filter from distinct values |
-| `ChoiceFilterWidget` | Static choices |
-| `MultipleChoiceFilterWidget` | Multiple selection |
+| `ChoiceFilterWidget` | Static choices (single selection) |
+| `MultipleChoiceFilterWidget` | Static choices (multiple selection) |
+
+> **Recommendation:** Prefer `MultipleChoiceFilterWidget` over `ChoiceFilterWidget` for choice-based filters. It provides a better UX and gives users more flexibility to select multiple values at once.
 
 ### Custom Filter Widget Example
 
@@ -913,6 +980,7 @@ class ArticleAdmin(SBAdmin):
 | "The annotation 'X' conflicts with a field" | `supporting_annotates` key matches model field | Rename annotation key |
 | "Expression contains mixed types" | Missing `output_field` in expression | Add `output_field=TextField()` to all parts |
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
+| "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
 
 ---
 
@@ -1155,6 +1223,123 @@ class ArticleForm(SBAdminBaseFormInit, forms.Form):
 - Example: `Count("articles") + Count("children")` with 2 articles and 2 children returns 8 instead of 4
 - Separate `Subquery` annotations avoid this by calculating each count independently
 
+### Autocomplete for Text Field Values (Not ForeignKey)
+
+When you need an autocomplete that stores a text value (not a ForeignKey), use `SBAdminAutocompleteWidget` with `label_lambda` and `value_lambda` to return text instead of the model's pk.
+
+#### Simple Inline Approach (No Distinct)
+
+When duplicates in the dropdown are acceptable (or the source field is already unique), use lambdas directly:
+
+```python
+from django import forms
+from django.contrib import admin
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Article, Author
+
+
+class ArticleForm(SBAdminBaseForm):
+    """Form with author name autocomplete storing text value."""
+
+    author_name = forms.CharField(
+        label="Author Name",
+        required=False,
+        widget=SBAdminAutocompleteWidget(
+            model=Author,
+            multiselect=False,
+            label_lambda=lambda req, item: item.name,
+            value_lambda=lambda req, item: item.name,
+            filter_search_lambda=lambda req, search, fwd: Q(is_active=True),
+        ),
+    )
+
+    class Meta:
+        model = Article
+        fields = "__all__"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    form = ArticleForm
+```
+
+#### Subclass Approach (With Distinct or Custom Lookup)
+
+Use this when there's no direct model relationship - you're storing a text value (not a FK) but want autocomplete suggestions from another model's field. The subclass tells the widget how to look up and display values from a field that isn't the primary key:
+
+```python
+from django import forms
+from django.contrib import admin
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Article, Author
+
+
+class AuthorEmailAutocompleteWidget(SBAdminAutocompleteWidget):
+    """Autocomplete widget for distinct author emails."""
+
+    def get_queryset(self, request=None):
+        return (
+            Author.objects.exclude(email__exact="")
+            .exclude(email__isnull=True)
+            .order_by("email")
+            .distinct("email")
+        )
+
+    def get_value_field(self):
+        return "email"  # Field to look up existing values (not pk)
+
+    def get_label(self, request, item):
+        return item.email
+
+    def get_value(self, request, item):
+        return item.email
+
+
+class ArticleForm(SBAdminBaseForm):
+    """Form with author email autocomplete from distinct Author emails."""
+
+    author_email = forms.CharField(
+        label="Author Email",
+        required=False,
+        widget=AuthorEmailAutocompleteWidget(model=Author, multiselect=False),
+    )
+
+    class Meta:
+        model = Article
+        fields = "__all__"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    form = ArticleForm
+```
+
+**When to use each approach:**
+
+| Approach | Use When |
+|----------|----------|
+| Inline lambdas | Source field values are unique, duplicates are acceptable, editing existing values not needed |
+| Subclass | No FK relationship, need `.distinct()`, or need to look up existing values when editing (requires `get_value_field()`) |
+
+**Key points:**
+- Form field is `CharField` (not `ModelChoiceField`) since we're storing a text value
+- Form must inherit from `SBAdminBaseForm` for proper widget initialization
+- `label_lambda` and `value_lambda` return text field value instead of model's pk
+- **Critical:** Override `get_value_field()` to return the text field name - this is used to look up existing values when editing (default is `"id"` which fails for text values)
+- Use `multiselect=False` for single selection
+- `filter_search_lambda` only returns a `Q` object - cannot apply `.distinct()`
+
 ---
 
 ## Pre-filtered List Views (sbadmin_list_view_config)
@@ -1186,11 +1371,80 @@ class ArticleAdmin(SBAdmin):
 | `name` | str | **Required**. Tab label shown in the UI |
 | `url_params` | dict | **Required**. Contains `filterData` with filter key-value pairs |
 
-### Filter Data Keys
+### Filter Data for Named Tabs
 
 The keys in `filterData` should match:
 - Model field names for direct fields
 - `filter_field` value from `SBAdminField` for custom filter fields
+
+**Value format in `filterData` depends on the filter widget type used by the field:**
+
+| Filter Widget | Value Format in `filterData` | Example |
+|---------------|------------------------------|---------|
+| `ChoiceFilterWidget` | String | `"published"` |
+| `MultipleChoiceFilterWidget` | **Array** of objects with `value` and `label` | `[{"value": "published", "label": "Published"}]` |
+
+**Example: Pre-filtered tabs with MultipleChoiceFilterWidget:**
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status",
+            filter_widget=MultipleChoiceFilterWidget(choices=[
+                ("published", "Published"),
+                ("draft", "Draft"),
+                ("archived", "Archived"),
+            ]),
+        ),
+    )
+    
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",  # Must be array even for single value
+            "url_params": {"filterData": {"status": [{"value": "published", "label": "Published"}]}},
+        },
+        {
+            "name": "Active",  # Multiple values in array
+            "url_params": {"filterData": {"status": [
+                {"value": "published", "label": "Published"},
+                {"value": "draft", "label": "Draft"},
+            ]}},
+        },
+    ]
+    
+    list_filter = ("status",)
+```
+
+> **Note:** `MultipleChoiceFilterWidget` values must always be an array (even for single selections) because the JavaScript uses `.map()` to parse the values.
+
+### Displaying All Filters in Named Tabs
+
+When switching to a named tab, only filters specified in `filterData` are shown in the filter bar above the table. To display all filter widgets (even those without values), include them with empty string (`""`):
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="status", filter_widget=MultipleChoiceFilterWidget(choices=[...])),
+        SBAdminField(name="category", filter_widget=FromValuesAutocompleteWidget()),
+        SBAdminField(name="author", filter_widget=AutocompleteFilterWidget(model=Author)),
+    )
+    
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",
+            "url_params": {"filterData": {
+                "status": [{"value": "published", "label": "Published"}],
+                "category": "",  # Display filter widget (empty)
+                "author": "",    # Display filter widget (empty)
+            }},
+        },
+    ]
+    
+    list_filter = ("status", "category", "author")
+```
+
+> **Note:** The automatic "All" tab already displays all `list_filter` fields. For custom tabs, you must explicitly include each filter you want visible in the filter bar.
 
 An "All" tab is automatically added as the first tab.
 
