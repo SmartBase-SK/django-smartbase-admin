@@ -227,12 +227,6 @@ class SBAdminViewService(object):
                 else:
                     visible_fields.append(field.field)
                 field_annotates.update(field.get_field_annotates(values))
-            elif field.supporting_annotates:
-                # Include supporting_annotates explicitly requested in values
-                # (e.g., via sbadmin_list_display_data) even if the parent field is hidden
-                for key, value in field.supporting_annotates.items():
-                    if key in values:
-                        field_annotates[key] = value
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         for (
             translation_model,

@@ -9,7 +9,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | Section | What it covers |
 |---------|----------------|
 | [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
-| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields |
+| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `list_filter` setup |
@@ -25,6 +25,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 
 **Quick lookup:**
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
+- **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
@@ -247,6 +248,63 @@ class ArticleAdmin(SBAdmin):
 - `get_list_ordering()` is only called for the list view, so computed fields from `sbadmin_list_display` are available
 - No need to check for detail/change pages - this method is list-view specific
 - For simple ordering without computed fields, you can still use the `ordering` class attribute
+
+### sbadmin_list_display_data - Extra Data Fields
+
+Use `sbadmin_list_display_data` to ensure data is **always fetched**, even when the user hides a column that provides it.
+
+**Problem**: Column A provides data via `supporting_annotates`. Column B needs that data. User hides Column A → data is no longer fetched → Column B breaks.
+
+**Solution**: List the data in `sbadmin_list_display_data` to ensure it's always available.
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="author_display",  # User CAN hide this column
+            title="Author",
+            annotate=F("author__name"),
+            supporting_annotates={
+                "author_id_val": F("author_id"),
+            },
+        ),
+        SBAdminField(
+            name="author_link",  # This column needs author_id_val
+            title="Profile",
+            annotate=Value("", output_field=TextField()),
+        ),
+    )
+
+    # Ensure author_id_val is ALWAYS fetched, even if "Author" column is hidden
+    sbadmin_list_display_data = ("author_id_val",)
+
+    def author_link(self, obj_id, value, **additional_data):
+        author_id = additional_data.get("author_id_val")
+        return format_html('<a href="/authors/{}">View</a>', author_id)
+```
+
+**Key points:**
+- Use when **another column depends on data** from a column that can be hidden
+- Use for **model fields** needed in formatters (e.g., `author_id` for links)
+- Use for **hidden data-only fields** defined with `list_visible=False`
+- `supporting_annotates` are only fetched when their parent column is visible - use this to force fetch
+
+For data-only fields (hidden columns with annotations), define the field and reference it:
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="computed_score",
+            annotate=F("views") + F("comments_count"),
+            list_visible=False,  # Hidden column
+        ),
+        # ... other visible columns
+    )
+
+    # Reference the hidden field to include it in the queryset
+    sbadmin_list_display_data = ("computed_score",)
+```
 
 ---
 
