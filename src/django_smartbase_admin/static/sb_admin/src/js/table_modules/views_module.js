@@ -8,6 +8,20 @@ export class ViewsModule extends SBAdminTableModule {
         return true
     }
 
+    // Recursively sort object keys for consistent JSON.stringify output
+    sortObjectKeys(obj) {
+        if (obj === null || typeof obj !== 'object') {
+            return obj
+        }
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.sortObjectKeys(item))
+        }
+        return Object.keys(obj).sort().reduce((sorted, key) => {
+            sorted[key] = this.sortObjectKeys(obj[key])
+            return sorted
+        }, {})
+    }
+
     filterParamsForCompare(params) {
         this.COMPARE_IGNORE_KEYS.forEach(key_to_remove => {
             unset(params, key_to_remove)
@@ -15,12 +29,18 @@ export class ViewsModule extends SBAdminTableModule {
         return params
     }
 
+    // Get normalized JSON string for comparison (sorted keys)
+    normalizeForCompare(params) {
+        return JSON.stringify(this.sortObjectKeys(this.filterParamsForCompare(params)))
+    }
+
     refreshViewButtons() {
-        const urlParamsString = JSON.stringify(this.filterParamsForCompare(JSON.parse(this.table.getUrlParamsStringForSave())))
-        const searchParams = decodeURI(urlParamsString)
+        const urlParams = JSON.parse(this.table.getUrlParamsStringForSave())
+        const urlParamsNormalized = this.normalizeForCompare(urlParams)
+        const searchParams = decodeURI(JSON.stringify(this.filterParamsForCompare(urlParams)))
         let saveButton = document.getElementById('save-view-modal-button')
         this.selectedViewParams = this.table.getAllParamsFromUrl()[this.table.viewId]
-        let selectedParams = JSON.stringify(this.filterParamsForCompare(this.selectedViewParams))
+        const selectedParamsNormalized = this.normalizeForCompare(this.selectedViewParams)
 
         let selectedView = null
         if (saveButton) {
@@ -31,9 +51,10 @@ export class ViewsModule extends SBAdminTableModule {
             if(!item.dataset.params) {
                 return
             }
-            const itemParams = JSON.stringify(this.filterParamsForCompare(JSON.parse(item.dataset.params)))
-            const sameAsUrlParams = (itemParams === searchParams)
-            const sameAsSelectedParams = selectedParams === itemParams
+            const itemParamsNormalized = this.normalizeForCompare(JSON.parse(item.dataset.params))
+            // Fast string comparison with sorted keys
+            const sameAsUrlParams = (itemParamsNormalized === urlParamsNormalized)
+            const sameAsSelectedParams = (selectedParamsNormalized === itemParamsNormalized)
             item.classList.remove("active")
             item.classList.remove("changed")
 
