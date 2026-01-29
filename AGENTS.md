@@ -12,7 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `list_filter` setup |
+| [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -21,6 +21,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
+| [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -738,29 +739,77 @@ from blog.models import Article
 class ArticleAdmin(SBAdmin):
     model = Article
     sbadmin_list_display = (...)
-    list_filter = (...)
+    sbadmin_list_filter = (...)  # Preferred for SBAdminField names
     search_fields = (...)
 ```
 
-### Default Visible Filters
+### Default Visible Filters: sbadmin_list_filter vs list_filter
 
-`list_filter` controls which column filters are visible by default. Include field names or the `filter_field` value from `SBAdminField`:
+Use `sbadmin_list_filter` to specify which filters are visible by default. This attribute accepts `SBAdminField` `name` values directly, making it the preferred choice when using computed/annotated fields.
+
+**When to use each:**
+
+| Attribute | Use When | Accepts |
+|-----------|----------|---------|
+| `sbadmin_list_filter` | You have `SBAdminField` with `annotate=` or custom `filter_widget` | SBAdminField `name` values |
+| `list_filter` | All filters are simple model fields | Model field names or `filter_field` values |
+
+```python
+# ❌ BAD - Django's list_filter fails validation on annotated fields
+sbadmin_list_display = (
+    SBAdminField(
+        name="status_display",  # Computed annotation, NOT a model field
+        annotate=Case(...),
+        filter_widget=MultipleChoiceFilterWidget(...),
+    ),
+    SBAdminField(
+        name="tags_display",  # Computed annotation
+        annotate=get_tag_names_subquery(),
+        filter_widget=AutocompleteFilterWidget(...),
+    ),
+)
+
+list_filter = (
+    "status_display",  # ❌ Fails: admin.E116 - not a model field
+    "tags_display",    # ❌ Fails: admin.E116 - not a model field
+)
+```
+
+```python
+# ✅ GOOD - sbadmin_list_filter accepts SBAdminField names
+sbadmin_list_display = (
+    SBAdminField(
+        name="status_display",
+        annotate=Case(...),
+        filter_widget=MultipleChoiceFilterWidget(...),
+    ),
+    SBAdminField(
+        name="tags_display",
+        annotate=get_tag_names_subquery(),
+        filter_widget=AutocompleteFilterWidget(...),
+    ),
+)
+
+sbadmin_list_filter = (
+    "status_display",  # ✅ Works: matches SBAdminField name
+    "tags_display",    # ✅ Works: matches SBAdminField name
+)
+```
+
+**For simple model fields**, both work:
 
 ```python
 sbadmin_list_display = (
     "title",
     SBAdminField(name="status", filter_field="status"),
-    SBAdminField(name="author_name", filter_field="author__email"),  # Related field
-    SBAdminField(name="comment_count", filter_disabled=True),  # No filter
+    SBAdminField(name="author_name", filter_field="author__email"),
+    SBAdminField(name="comment_count", filter_disabled=True),
 )
 
-# list_filter should match filter_field values (not SBAdminField names)
-list_filter = (
-    "title",
-    "status", 
-    "author__email",  # Use filter_field value for related lookups
-    # "comment_count" excluded - has filter_disabled=True
-)
+# Either works for model fields:
+sbadmin_list_filter = ("title", "status", "author_name")
+# OR
+list_filter = ("title", "status", "author__email")
 
 ---
 
@@ -1039,6 +1088,7 @@ class ArticleAdmin(SBAdmin):
 | "Expression contains mixed types" | Missing `output_field` in expression | Add `output_field=TextField()` to all parts |
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
 | "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
+| "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
 
 ---
 
@@ -1515,6 +1565,46 @@ An "All" tab is automatically added as the first tab.
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
+
+---
+
+## SBAdmin Attribute Reference
+
+Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdmin` and related classes.
+
+### List View Attributes (SBAdmin)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_list_display` | tuple | Define columns using `SBAdminField` or field names |
+| `sbadmin_list_display_data` | tuple | Field names always fetched (even if column hidden) |
+| `sbadmin_list_filter` | tuple | Default visible filters - accepts `SBAdminField` names |
+| `sbadmin_list_view_config` | list[dict] | Pre-filtered view tabs configuration |
+| `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
+| `sbadmin_list_actions` | list | List-level actions (not selection-based) |
+| `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
+| `sbadmin_xlsx_options` | dict | Excel export configuration options |
+| `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
+
+### Detail/Change View Attributes (SBAdmin)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
+| `sbadmin_tabs` | list | Organize form fields into tabs |
+| `sbadmin_detail_actions` | list | Actions shown on detail/change page |
+| `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
+| `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
+
+### Inline Attributes (SBAdminTableInline/SBAdminStackedInline)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_fake_inlines` | list | Additional inline classes to include |
+| `sbadmin_sortable_field_options` | list | Field names for inline row ordering (default: `["order_by"]`) |
+| `sbadmin_inline_list_actions` | list | Actions available for inline rows |
+
+**Source:** `django_smartbase_admin/engine/admin_base_view.py`, `django_smartbase_admin/admin/admin_base.py`
 
 ---
 
