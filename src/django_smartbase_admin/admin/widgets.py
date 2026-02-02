@@ -11,6 +11,7 @@ from django.contrib.admin.widgets import (
     ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
+from django.contrib.postgres.forms import RangeWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
@@ -41,7 +42,7 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
-from django_smartbase_admin.utils import is_modal
+from django_smartbase_admin.utils import is_modal, convert_django_to_flatpickr_format
 
 try:
     # Django >= 5.0
@@ -261,7 +262,9 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
                 "flatpickrOptions": {
                     "dateFormat": "Y-m-d",
                     "altInput": True,
-                    "altFormat": get_format("SHORT_DATE_FORMAT"),
+                    "altFormat": convert_django_to_flatpickr_format(
+                        get_format("SHORT_DATE_FORMAT")
+                    ),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -286,9 +289,30 @@ class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
 class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
     template_name = "sb_admin/widgets/datetime.html"
 
-    def __init__(self, form_field=None, attrs=None):
+    def __init__(self, form_field=None, attrs=None, format=None):
         super().__init__(
-            form_field, attrs={"class": "input js-datetimepicker", **(attrs or {})}
+            form_field,
+            format="%Y-%m-%d %H:%M",
+            attrs={
+                "class": "input js-datetimepicker",
+                "data-sbadmin-datepicker": self.get_data(),
+                "placeholder": get_datetime_placeholder()["date"],
+                **(attrs or {}),
+            },
+        )
+
+    def get_data(self):
+        return json.dumps(
+            {
+                "flatpickrOptions": {
+                    "dateFormat": "Y-m-d H:i",
+                    "altInput": True,
+                    "altFormat": convert_django_to_flatpickr_format(
+                        get_format("SHORT_DATETIME_FORMAT")
+                    ),
+                },
+            },
+            cls=SBAdminJSONEncoder,
         )
 
 
@@ -965,3 +989,13 @@ class SBAdminTreeWidget(SBAdminTreeWidgetMixin, SBAdminAutocompleteWidget):
             if input_value in children_ids:
                 raise ValidationError(_("Cannot set parent to it's own child"))
         return parsed_value
+
+
+class SBAdminDateTimeRangeWidget(SBAdminBaseWidget, RangeWidget):
+    template_name = "sb_admin/widgets/multiwidget.html"
+
+    def __init__(self, form_field=None, attrs=None):
+        super().__init__(
+            form_field,
+            base_widget=SBAdminDateTimeWidget(),
+        )
