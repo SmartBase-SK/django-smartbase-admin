@@ -71,7 +71,7 @@ except ImportError:
 
 postrgres_enabled = None
 try:
-    from django.contrib.postgres.forms import SimpleArrayField
+    from django.contrib.postgres.forms import SimpleArrayField, DateTimeRangeField
 
     postrgres_enabled = True
 except ImportError:
@@ -118,6 +118,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminMultipleChoiceInlineWidget,
     SBAdminColorWidget,
     SBAdminFilerFileWidget,
+    SBAdminDateTimeRangeWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -177,6 +178,7 @@ class SBAdminFormFieldWidgetsMixin:
     }
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
+        formfield_widgets[DateTimeRangeField] = SBAdminDateTimeRangeWidget
     if django_cms_attributes:
         formfield_widgets[AttributesFormField] = SBAdminAttributesWidget
     if color_field_enabled:
