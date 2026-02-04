@@ -358,8 +358,82 @@ class SBAdminBaseListView(SBAdminBaseView):
     def is_reorder_available(self, request) -> str | None:
         return self.sbadmin_list_reorder_field
 
+    def is_mp_node_model(self) -> bool:
+        """Check if the model is a django-treebeard MP_Node instance and uses path-based reordering."""
+        if self.sbadmin_list_reorder_field != "path":
+            return False
+        try:
+            from treebeard.mp_tree import MP_Node
+
+            return issubclass(self.model, MP_Node)
+        except ImportError:
+            return False
+
     def action_table_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
+        if self.is_mp_node_model():
+            return self.action_table_reorder_mp_node(request, modifier)
+        return self.action_table_reorder_default(request, modifier)
+
+    def action_table_reorder_mp_node(self, request, modifier) -> JsonResponse:
+        """
+        Reorder MP_Node (django-treebeard) instances using the move() method.
+        This handles tree-based models where the path field cannot be directly modified.
+
+        First fixes all nodes with depth > 1 by making them roots at their current
+        position, then performs the reorder operation on the now-flat list.
+        """
+        qs = self.get_queryset(request)
+        pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
+        current_row_id = json.loads(request.POST.get("currentRowId", ""))
+        replaced_row_id = json.loads(request.POST.get("replacedRowId", ""))
+
+        # Fetch all objects once and build lookup dict
+        ordered_objects = list(qs.order_by(*self.get_list_ordering(request)))
+        objects_by_pk = {getattr(obj, pk_field): obj for obj in ordered_objects}
+
+        # First pass: fix all non-root nodes (depth > 1) by making them roots
+        last_root = None
+        first_root = next((obj for obj in ordered_objects if obj.depth == 1), None)
+        fixed_non_roots = False
+
+        for obj in ordered_objects:
+            if obj.depth == 1:
+                last_root = obj
+            elif obj.depth > 1:
+                fixed_non_roots = True
+                if last_root:
+                    obj.move(last_root, "right")
+                    # This node is now a root, update last_root
+                    last_root = obj
+                elif first_root:
+                    # No root before this node - place before first existing root
+                    obj.move(first_root, "left")
+                    last_root = obj
+
+        # Refresh ordered objects only if non-roots were fixed
+        if fixed_non_roots:
+            ordered_objects = list(qs.order_by(*self.get_list_ordering(request)))
+            objects_by_pk = {getattr(obj, pk_field): obj for obj in ordered_objects}
+
+        # Get the node being moved
+        current_node = objects_by_pk[current_row_id]
+
+        # Simple reordering - all nodes are now roots (depth=1)
+        if not replaced_row_id:
+            # Moving to the end
+            last_node = ordered_objects[-1]
+            if getattr(last_node, pk_field) != current_row_id:
+                current_node.move(last_node, "right")
+        else:
+            # Moving before the replaced_row_id
+            target_node = objects_by_pk[replaced_row_id]
+            current_node.move(target_node, "left")
+
+        return JsonResponse({"message": request.POST})
+
+    def action_table_reorder_default(self, request, modifier) -> JsonResponse:
+        """Default reorder logic for models with simple numeric ordering fields."""
         qs = self.get_queryset(request)
         pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
         old_order = dict(
