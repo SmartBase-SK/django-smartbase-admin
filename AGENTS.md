@@ -19,7 +19,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
-| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config` |
+| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
@@ -32,6 +32,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
 - **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
+- **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
 
 ---
 
@@ -1557,6 +1558,90 @@ class ArticleAdmin(SBAdmin):
 An "All" tab is automatically added as the first tab.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
+
+### Building Pre-filtered URLs Programmatically
+
+Use `SBAdminViewService.build_list_params_url()` to generate URLs with pre-applied filters from Python code (e.g., for redirects or links between admin pages).
+
+```python
+from django.urls import reverse
+from django_smartbase_admin.services.views import SBAdminViewService
+
+# View ID follows pattern: {app_label}_{model_name}
+VIEW_ID = "blog_article"
+
+# Filter data format depends on the filter widget type
+filter_data = {
+    # AutocompleteFilterWidget: array of {value, label}
+    "category": [
+        {"value": 5, "label": "Technology"},
+    ],
+    # MultipleChoiceFilterWidget: array of {value, label}
+    "status": [
+        {"value": "published", "label": "Published"},
+        {"value": "draft", "label": "Draft"},
+    ],
+}
+
+# Build the URL
+base_url = reverse("sb_admin:blog_article_changelist")
+params_str = SBAdminViewService.build_list_params_url(VIEW_ID, filter_data)
+full_url = f"{base_url}?{params_str}"
+```
+
+**Filter Data Format by Widget Type:**
+
+| Widget | Format | Example |
+|--------|--------|---------|
+| `AutocompleteFilterWidget` | `[{"value": ..., "label": ...}]` | `[{"value": 5, "label": "Tech"}]` |
+| `MultipleChoiceFilterWidget` | `[{"value": ..., "label": ...}]` | `[{"value": "draft", "label": "Draft"}]` |
+| `ChoiceFilterWidget` | String | `"published"` |
+| `BooleanFilterWidget` | Boolean | `True` or `False` |
+| `StringFilterWidget` | String | `"search term"` |
+| `DateFilterWidget` | String (ISO format) | `"2024-01-15"` |
+
+**Example: Link from Comment to filtered Article list**
+
+```python
+# blog/admin.py
+from django.shortcuts import redirect
+from django.urls import reverse
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.services.views import SBAdminViewService
+
+from blog.models import Article, Comment
+
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    
+    def response_change(self, request, obj):
+        """After saving a comment, redirect to article list filtered by author."""
+        if "_view_author_articles" in request.POST:
+            author = obj.article.author
+            
+            # Build filter with {value, label} format for AutocompleteFilterWidget
+            filter_data = {
+                "author": [
+                    {"value": author.pk, "label": author.name},
+                ],
+            }
+            
+            view_id = "blog_article"
+            base_url = reverse("sb_admin:blog_article_changelist")
+            params_str = SBAdminViewService.build_list_params_url(view_id, filter_data)
+            
+            return redirect(f"{base_url}?{params_str}")
+        
+        return super().response_change(request, obj)
+```
+
+**Key points:**
+- View ID format: `{app_label}_{model_name}` (lowercase, underscore-separated)
+- `AutocompleteFilterWidget` and `MultipleChoiceFilterWidget` **require** array format with `value` and `label` keys
+- The `label` is displayed in the filter UI; `value` is used for the actual query
+- Use `reverse("sb_admin:{app_label}_{model_name}_changelist")` to get the base URL
+
+**Source:** `django_smartbase_admin/services/views.py` - `SBAdminViewService.build_list_params_url`
 
 ---
 
