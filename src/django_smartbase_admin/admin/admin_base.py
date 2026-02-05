@@ -93,6 +93,14 @@ try:
 except ImportError:
     pass
 
+cms_enabled = None
+try:
+    from cms.forms.fields import PageSelectFormField
+
+    cms_enabled = True
+except ImportError:
+    pass
+
 from django_smartbase_admin.admin.widgets import (
     SBAdminTextInputWidget,
     SBAdminTextareaWidget,
@@ -119,6 +127,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminColorWidget,
     SBAdminFilerFileWidget,
     SBAdminDateTimeRangeWidget,
+    SBAdminPageSelectWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -183,6 +192,8 @@ class SBAdminFormFieldWidgetsMixin:
         formfield_widgets[AttributesFormField] = SBAdminAttributesWidget
     if color_field_enabled:
         db_field_widgets[ColorField] = SBAdminColorWidget
+    if cms_enabled:
+        formfield_widgets[PageSelectFormField] = SBAdminPageSelectWidget
 
     django_widget_to_widget = {
         forms.PasswordInput: SBAdminPasswordInputWidget,
