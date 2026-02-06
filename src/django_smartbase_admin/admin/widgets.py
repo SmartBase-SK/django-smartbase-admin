@@ -999,3 +999,25 @@ class SBAdminDateTimeRangeWidget(SBAdminBaseWidget, RangeWidget):
             form_field,
             base_widget=SBAdminDateTimeWidget(),
         )
+
+
+try:
+    from cms.forms.widgets import PageSelectWidget
+
+    class SBAdminPageSelectWidget(SBAdminBaseWidget, PageSelectWidget):
+        template_name = "sb_admin/widgets/pageselectwidget.html"
+
+        def __init__(self, form_field=None, attrs=None):
+            self.form_field = form_field
+            if attrs is not None:
+                self.attrs = attrs.copy()
+            else:
+                self.attrs = {}
+            self.choices = []
+            super(PageSelectWidget, self).__init__(
+                (SBAdminSelectWidget, SBAdminSelectWidget, SBAdminSelectWidget),
+                attrs={"class": "input", **(self.attrs or {})},
+            )
+
+except ImportError:
+    pass
