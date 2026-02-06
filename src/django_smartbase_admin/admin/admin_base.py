@@ -127,7 +127,6 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminColorWidget,
     SBAdminFilerFileWidget,
     SBAdminDateTimeRangeWidget,
-    SBAdminPageSelectWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -193,6 +192,8 @@ class SBAdminFormFieldWidgetsMixin:
     if color_field_enabled:
         db_field_widgets[ColorField] = SBAdminColorWidget
     if cms_enabled:
+        from django_smartbase_admin.admin.widgets import SBAdminPageSelectWidget
+
         formfield_widgets[PageSelectFormField] = SBAdminPageSelectWidget
 
     django_widget_to_widget = {
