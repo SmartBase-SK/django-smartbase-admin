@@ -10,7 +10,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 |---------|----------------|
 | [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
-| [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
+| [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
@@ -20,6 +20,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
+| [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
@@ -33,6 +34,8 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
 - **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
+- **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
+- **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 
 ---
 
@@ -564,6 +567,170 @@ class BlogRoleConfiguration(SBAdminRoleConfiguration):
 - **Fail-safe pattern**: Return `qs.none()` when request or user is unavailable to prevent data leakage
 - Pass `request` explicitly from `restrict_queryset` when available; the function falls back to thread-local when called from filter widgets or subqueries
 - User object should have properties like `allowed_categories` that return filtering criteria (or `None` for full access)
+
+### Custom Permission System (`has_permission`)
+
+By default, `SBAdminRoleConfiguration.has_permission()` uses Django's built-in model permissions (`user.has_perm("app.view_model")`, etc.). If your project uses a different permission system (e.g., external IAM, JWT claims, session-based permissions), you can override `has_permission()` on your role configuration subclass to replace this behavior globally.
+
+**How the permission chain works:**
+
+Every permission check in SBAdmin flows through the role configuration:
+
+```
+SBAdminBaseView.has_permission()
+    → SBAdminViewService.has_permission()
+        → SBAdminRoleConfiguration.has_permission()   ← override this
+```
+
+This covers **all** SBAdmin-routed views: admin list/detail views, inlines, autocomplete widgets, and custom actions. By overriding `has_permission()` on the configuration, you get a single entry point for your custom permission logic. Since SBAdmin uses a fully custom menu (via `SBAdminMenuItem`), Django's admin index page is not used, so `has_module_permission()` does not need to be overridden.
+
+**Example — session-based permissions:**
+
+```python
+# myapp/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+PERM_ADMIN = "admin"
+PERM_ACCESS = "access"
+
+# Map model names to required permissions (beyond PERM_ACCESS)
+MODEL_PERMISSIONS = {
+    "article": [],                  # Only PERM_ACCESS needed
+    "comment": ["moderator"],       # Needs PERM_ACCESS + moderator
+}
+DEFAULT_PERMISSIONS = ["editor"]    # Fallback for unlisted models
+
+
+def _get_session_permissions(request) -> set[str]:
+    """Get permissions from session (populated at login by your auth backend)."""
+    return set(request.session.get("permissions", []))
+
+
+def has_model_permission(request, model_name: str) -> bool:
+    """Check if user has permission to access a specific model."""
+    permissions = _get_session_permissions(request)
+
+    if PERM_ADMIN in permissions:
+        return True  # Admin bypasses all checks
+
+    if PERM_ACCESS not in permissions:
+        return False  # No base access
+
+    additional = MODEL_PERMISSIONS.get(model_name.lower(), DEFAULT_PERMISSIONS)
+    if not additional:
+        return True  # Only PERM_ACCESS required
+    return any(perm in permissions for perm in additional)
+
+
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    """Role configuration with custom permission system."""
+
+    def has_permission(
+        self, request, request_data, view, model=None, obj=None, permission=None
+    ):
+        """Replace Django model permissions with custom session-based permissions.
+
+        This is called for all permission checks routed through SBAdmin:
+        admin views, inlines, autocomplete widgets, and custom actions.
+        """
+        if not request.user.is_authenticated:
+            return False
+        if model:
+            return has_model_permission(request, model._meta.model_name)
+        return True
+
+
+_role_config = AppRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+    ],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+**Key points:**
+- Override `has_permission()` on your `SBAdminRoleConfiguration` subclass — this is the **single central hook** for all permission checks (views, inlines, autocomplete widgets, actions)
+- The method signature is: `has_permission(self, request, request_data, view, model=None, obj=None, permission=None)`
+- SBAdmin uses a custom menu (`SBAdminMenuItem`), so Django's `has_module_permission()` is irrelevant — you do **not** need to override it
+- Inlines (`SBAdminTableInline`, `SBAdminStackedInline`) don't need permission overrides — their checks go through the configuration's `has_permission()`
+- The default implementation checks `request.user.has_perm()` — your override completely replaces this, so Django model permissions are not consulted at all
+
+### `SBAdminRoleConfiguration` — Overridable Methods Summary
+
+`SBAdminRoleConfiguration` is the central place to customize SBAdmin behavior. All overrides go on a single subclass:
+
+| Method | Purpose | Documented in |
+|--------|---------|---------------|
+| `has_permission()` | Replace Django model permissions with custom system | [Custom Permission System](#custom-permission-system-has_permission) |
+| `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
+| `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
+
+**Typical subclass combining all three:**
+
+```python
+# myapp/sbadmin_config.py
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from myapp.models import Author
+from myapp.permissions import has_model_permission
+from myapp.queryset_restrictions import apply_model_restrictions, author_label, author_search
+
+
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    """Role configuration with custom permissions, queryset restrictions, and autocomplete widgets."""
+
+    def has_permission(self, request, request_data, view, model=None, obj=None, permission=None):
+        if not request.user.is_authenticated:
+            return False
+        if model:
+            return has_model_permission(request, model._meta.model_name)
+        return True
+
+    def restrict_queryset(self, qs, model, request, request_data, global_filter=True, global_filter_data_map=None):
+        return apply_model_restrictions(qs, request=request)
+
+    def get_autocomplete_widget(self, view, request, form_field, db_field, model, multiselect=False):
+        if model == Author:
+            return SBAdminAutocompleteWidget(
+                form_field,
+                model=model,
+                multiselect=multiselect,
+                label_lambda=author_label,
+                search_query_lambda=author_search,
+            )
+        return super().get_autocomplete_widget(view, request, form_field, db_field, model, multiselect)
+
+
+_role_config = AppRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+    ],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
 
 ---
 
@@ -1124,7 +1291,7 @@ class ArticleAdmin(SBAdmin):
 
 ## Global Autocomplete Widget Customization
 
-Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autocomplete widgets globally. This applies to all auto-generated admin form fields including inlines.
+Override `get_autocomplete_widget` on your `SBAdminRoleConfiguration` subclass to customize autocomplete widgets globally. This applies to all auto-generated admin form fields including inlines.
 
 ### Parameters
 
@@ -1642,6 +1809,153 @@ class CommentAdmin(SBAdmin):
 - Use `reverse("sb_admin:{app_label}_{model_name}_changelist")` to get the base URL
 
 **Source:** `django_smartbase_admin/services/views.py` - `SBAdminViewService.build_list_params_url`
+
+---
+
+## Detail View Layout (Sidebar)
+
+The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
+
+### Using `DETAIL_STRUCTURE_RIGHT_CLASS`
+
+Add the `DETAIL_STRUCTURE_RIGHT_CLASS` to a fieldset's `classes` to place it in the right sidebar:
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    readonly_fields = ["created_at", "updated_at", "word_count"]
+    
+    sbadmin_fieldsets = [
+        # Main content (left/center)
+        (
+            "Content",
+            {
+                "fields": ["title", "body", "category"],
+            },
+        ),
+        # Sidebar (right)
+        (
+            "Metadata",
+            {
+                "fields": ["author", "status", "created_at", "updated_at"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            "Statistics",
+            {
+                "fields": ["word_count"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+    ]
+```
+
+### Custom HTML Fields in Sidebar
+
+For rich content like formatted cards, create readonly methods that return HTML. Use `short_description` to set a clean label:
+
+```python
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    readonly_fields = ["title", "body", "category", "status_card"]
+    
+    sbadmin_fieldsets = [
+        (
+            "Content",
+            {
+                "fields": ["title", "body", "category"],
+            },
+        ),
+        (
+            None,  # No header for this fieldset
+            {
+                "fields": ["status_card"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+    ]
+    
+    def status_card(self, obj):
+        """Render a status card as HTML."""
+        if not obj:
+            return "-"
+        
+        color = {"draft": "warning", "published": "success", "archived": "secondary"}.get(obj.status, "info")
+        
+        return mark_safe(
+            f'<div class="card">'
+            f'<div class="card-header fw-bold">{_("Status")}</div>'
+            f'<div class="card-body">'
+            f'<span class="badge bg-{color}">{escape(obj.status)}</span>'
+            f'</div></div>'
+        )
+    status_card.short_description = _("Status")  # Sets the field label
+```
+
+### Hiding Labels (Optional)
+
+The `short_description` sets a reasonable label (e.g., "Status:"). If you want to hide labels entirely for custom HTML fields, override the template:
+
+```html
+{# templates/sb_admin/blog/article/change_form.html #}
+{% extends "sb_admin/actions/change_form.html" %}
+
+{% block js_init %}
+{{ block.super }}
+<style>
+    /* Hide labels for custom HTML fields */
+    label[for="id_status_card"] {
+        display: none;
+    }
+</style>
+{% endblock %}
+```
+
+Then set `change_form_template` in your admin:
+
+```python
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    change_form_template = "sb_admin/blog/article/change_form.html"
+    # ... rest of config
+```
+
+**Note:** This is optional — the default label from `short_description` is usually sufficient.
+
+### Combining with Collapse
+
+Sidebar fieldsets can also be collapsible:
+
+```python
+sbadmin_fieldsets = [
+    # ... main content ...
+    (
+        "Advanced Options",
+        {
+            "fields": ["seo_title", "seo_description"],
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS, "collapse"],
+        },
+    ),
+]
+```
+
+**Key points:**
+- Fieldsets are rendered in order - put main content fieldsets first, then sidebar fieldsets
+- Use `None` as fieldset title to hide the header entirely
+- Import `DETAIL_STRUCTURE_RIGHT_CLASS` from `django_smartbase_admin.engine.const`
+- Custom HTML fields need `mark_safe()` and should escape user content with `escape()`
+- Sidebar is hidden in modal views (only shown in full page detail view)
+
+**Source:** `django_smartbase_admin/engine/const.py`, `django_smartbase_admin/templates/sb_admin/actions/change_form.html`
 
 ---
 
