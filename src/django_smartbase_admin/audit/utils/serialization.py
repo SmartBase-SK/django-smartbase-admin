@@ -6,6 +6,23 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.forms.models import model_to_dict
 
+_encoder = DjangoJSONEncoder()
+
+
+def _json_safe(value):
+    """Convert a value to a JSON-serializable form.
+
+    Primitives and containers pass through (already JSON-native).
+    DjangoJSONEncoder.default() handles datetime, date, time, Decimal, UUID, etc.
+    Falls back to str() for anything else (ImageFieldFile, FieldFile, ...).
+    """
+    if isinstance(value, (str, int, float, bool, list, dict, type(None))):
+        return value
+    try:
+        return _encoder.default(value)
+    except (TypeError, ValueError):
+        return str(value)
+
 
 def serialize_instance(
     instance: models.Model, fields: list[str] | None = None, include_display: bool = False
@@ -29,12 +46,8 @@ def serialize_instance(
     # Use Django's model_to_dict which handles FKs and M2Ms
     data = model_to_dict(instance, fields=fields)
     
-    # Ensure all values are JSON-safe using DjangoJSONEncoder
-    encoder = DjangoJSONEncoder()
-    data = {
-        k: encoder.default(v) if not isinstance(v, (str, int, float, bool, list, dict, type(None))) else v
-        for k, v in data.items()
-    }
+    # Ensure all values are JSON-safe
+    data = {k: _json_safe(v) for k, v in data.items()}
     
     if not include_display:
         return data
