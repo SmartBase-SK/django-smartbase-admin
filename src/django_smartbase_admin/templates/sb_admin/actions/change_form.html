@@ -76,10 +76,12 @@
                                             {% endfor %}
                                         {% endif %}
 
+                                        {% if show_history_button|default_if_none:True %}
                                         <li>
                                             {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
                                             <a href="{% add_preserved_filters history_url %}" class="dropdown-menu-link">{% trans "History" %}</a>
                                         </li>
+                                        {% endif %}
                                     {% endblock %}
                                 </ul>
                             </div>
@@ -87,10 +89,12 @@
 
 
                         {% block actions %}
+                            {% if show_history_button|default_if_none:True %}
                             <li class="max-sm:hidden">
                                 {% url opts|admin_urlname:'history' original.pk|admin_urlquote as history_url %}
                                 <a href="{% add_preserved_filters history_url %}" class="btn btn-empty">{% trans "History" %}</a>
                             </li>
+                            {% endif %}
 
                             {% if detail_actions %}
                                 {% for action in detail_actions %}

@@ -23,6 +23,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
+| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history mixin, programmatic URLs |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -36,6 +37,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
+- **Audit trail / change history?** → [Audit Logging](#audit-logging)
 
 ---
 
@@ -2011,6 +2013,153 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_inline_list_actions` | list | Actions available for inline rows |
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py`, `django_smartbase_admin/admin/admin_base.py`
+
+---
+
+## Audit Logging
+
+Built-in optional app that automatically tracks all admin operations (create, update, delete, bulk) with field-level diffs, object snapshots, and request grouping. Works by patching Django's `Model.save()`, `Model.delete()`, `QuerySet.update()`, `QuerySet.delete()`, `QuerySet.bulk_create()`, and `QuerySet.bulk_update()` — only active inside SBAdmin request context.
+
+### Installation
+
+1. Add to `INSTALLED_APPS` (after `django_smartbase_admin`):
+
+```python
+INSTALLED_APPS = [
+    # your apps...
+    "django_smartbase_admin",
+    "django_smartbase_admin.audit",
+]
+```
+
+2. Run migrations:
+
+```bash
+python manage.py migrate
+```
+
+3. Add to your menu in `sbadmin_config.py`:
+
+```python
+from django_smartbase_admin.services.views import SBAdminViewService
+from django_smartbase_admin.audit.models import AdminAuditLog
+
+_role_config = SBAdminRoleConfiguration(
+    menu_items=[
+        # ... other menu items ...
+        SBAdminMenuItem(
+            label="Audit Log",
+            icon="Time",
+            view_id=SBAdminViewService.get_model_path(AdminAuditLog),
+        ),
+    ],
+    # ...
+)
+```
+
+The admin view is auto-registered by the audit app — no `@admin.register` needed.
+
+### What Gets Recorded
+
+Each `AdminAuditLog` entry contains:
+
+| Field | Description |
+|-------|-------------|
+| `timestamp` | When the change happened |
+| `user` | Who made the change |
+| `request_id` | UUID grouping all changes from the same request |
+| `content_type` + `object_id` | The changed object |
+| `object_repr` | String representation of the object |
+| `action_type` | `create`, `update`, `delete`, `bulk_create`, `bulk_update`, `bulk_delete` |
+| `snapshot_before` | Full object state before the change (JSON) |
+| `changes` | Field-level diffs: `{"field": {"old": ..., "new": ..., "old_display": ..., "new_display": ...}}` |
+| `parent_content_type` + `parent_object_id` | Parent object context (for inline edits) |
+| `affected_objects` | FK targets referenced in changes (JSON array) |
+| `is_bulk` / `bulk_count` | Whether it was a bulk operation and how many items |
+
+### Skipping Models and Fields
+
+By default, the audit app skips `admin.LogEntry`, `sessions.Session`, and `contenttypes.ContentType`. It also skips `auto_now` / `auto_now_add` fields and `last_login` on `auth.User`.
+
+Add project-specific skip rules in `settings.py`:
+
+```python
+# Skip entire models from auditing
+SB_ADMIN_AUDIT_SKIP_MODELS = {
+    ("blog", "comment"),  # (app_label, model_name) tuples
+}
+
+# Skip specific fields per model
+SB_ADMIN_AUDIT_SKIP_FIELDS = {
+    ("blog", "article"): {"internal_score", "cache_key"},
+}
+```
+
+### History Mixin — Redirect History Button
+
+Replace Django's default history view with a redirect to the audit log filtered for that object:
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.audit.views import AuditHistoryMixin
+
+from blog.models import Article
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(AuditHistoryMixin, SBAdmin):
+    # AuditHistoryMixin must come BEFORE SBAdmin
+    pass
+```
+
+When a user clicks "History" on an Article detail page, they are redirected to the audit log filtered to show all changes for that specific article (including inline/related changes).
+
+### Programmatic Audit URLs
+
+Generate audit history URLs from Python code (e.g., for links or redirects):
+
+```python
+from django_smartbase_admin.audit.views import get_audit_history_url
+
+# Get URL to audit history for a specific object
+article = Article.objects.get(pk=42)
+url = get_audit_history_url(article)
+# Returns: /sb-admin/sb_admin_audit/adminauditlog/?params=...
+```
+
+### How Auditing Works
+
+The audit app patches Django's ORM methods at startup (`AppConfig.ready()`):
+
+| Method | What it captures |
+|--------|-----------------|
+| `Model.save()` | Create (new object) or update (existing object) with full diff |
+| `Model.delete()` | Delete with full snapshot before |
+| `QuerySet.update()` | Single update (with diff) or bulk update (with aggregated changes) |
+| `QuerySet.delete()` | Single delete or bulk delete |
+| `QuerySet.bulk_create()` | Bulk create with count and IDs |
+| `QuerySet.bulk_update()` | Bulk update with aggregated before/after |
+
+**Key behaviors:**
+- Only audits inside SBAdmin request context (uses `SBAdminThreadLocalService`)
+- Never audits the `AdminAuditLog` model itself (prevents infinite recursion)
+- Uses database savepoints so audit failures never break the main transaction
+- Groups all changes in a single request via `request_id` (stored on the request object)
+- Auto-detects parent context from SBAdmin's `request_data` (for inline edits)
+- Captures FK display values (`old_display`, `new_display`) for human-readable diffs
+- M2M changes are tracked via the through/junction table (create/delete on junction rows)
+
+### Access Control
+
+The audit log follows a pattern similar to Django's built-in "Recent actions":
+
+- **Superusers** see all audit entries
+- **Non-superusers** see only their own entries in the global list view
+- **Object-specific history** (when `object_history` filter is active, e.g. via `AuditHistoryMixin` redirect) shows all entries for that object regardless of who made the change — the user already had access to the object to get there
+
+This is implemented in `AdminAuditLogAdmin.get_queryset()`. Projects can further restrict access by:
+- Not adding the audit log `SBAdminMenuItem` for non-admin roles
+- Overriding `has_permission` in the role configuration to deny access to the `AdminAuditLog` model
+- Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog`
 
 ---
 
