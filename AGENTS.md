@@ -1303,7 +1303,7 @@ Override `get_autocomplete_widget` on your `SBAdminRoleConfiguration` subclass t
 | `value_lambda` | callable | `(request, item) -> any` - Extract value from item (default: primary key) |
 | `value_field` | str | Field name to use as value (alternative to `value_lambda`) |
 | `search_query_lambda` | callable | `(request, qs, model, search_term, lang_code) -> QuerySet` - Define which fields to search. Default searches all CharField/TextField |
-| `filter_search_lambda` | callable | `(request, search_term, forward_data) -> Q` - Pre-filter queryset before search. Use for dependent dropdowns with `forward` |
+| `filter_search_lambda` | callable | `(request, search_term, forward_data) -> Q` - Pre-filter queryset before search. Use for dependent dropdowns (with `forward`) or general filtering (e.g., limit to items with related data) |
 | `filter_query_lambda` | callable | `(request, selected_values) -> Q` - How selected values filter the main list (for filter widgets only) |
 | `forward` | list[str] | Field names to forward to `filter_search_lambda` for dependent dropdowns |
 | `allow_add` | bool | Allow creating new items inline (default: `False`, not supported with multiselect) |
@@ -1328,12 +1328,19 @@ def author_search(request, qs, model, search_term, language_code) -> QuerySet:
         return qs
     return qs.filter(Q(name__icontains=search_term) | Q(email__icontains=search_term))
 
-# filter_search_lambda - Pre-filter based on forward data (dependent dropdowns)
-def category_filter(request, search_term, forward_data) -> Q:
+# filter_search_lambda - Pre-filter queryset before search
+# Use case 1: Dependent dropdowns (filter based on another field's value)
+def subcategory_filter(request, search_term, forward_data) -> Q:
     parent_id = forward_data.get("parent_category")
     if parent_id:
         return Q(parent_id=parent_id)
     return Q()
+
+# Use case 2: General filtering (limit to items with related data)
+def content_type_filter(request, search_term, forward_data) -> Q:
+    # Only show content types that have audit logs
+    ct_ids = AuditLog.objects.values_list("content_type", flat=True).distinct()
+    return Q(pk__in=ct_ids)
 
 # filter_query_lambda - How selection filters main list (filter widgets only)
 def author_filter_query(request, selected_ids) -> Q:
@@ -1445,7 +1452,7 @@ class CreateCategoryInlineForm(SBAdminBaseFormInit, forms.Form):
 
 **Key points:**
 - `search_query_lambda` should search the same fields shown in `label_lambda` for intuitive UX
-- `filter_search_lambda` runs BEFORE search - use for dependent dropdowns
+- `filter_search_lambda` runs BEFORE search - use for dependent dropdowns OR general pre-filtering (e.g., limit to items with related data)
 - `search_query_lambda` defines WHICH fields to search
 - Global config does NOT apply to manually-created widgets - pass lambdas directly
 
@@ -1614,7 +1621,7 @@ class ArticleAdmin(SBAdmin):
 - `label_lambda` and `value_lambda` return text field value instead of model's pk
 - **Critical:** Override `get_value_field()` to return the text field name - this is used to look up existing values when editing (default is `"id"` which fails for text values)
 - Use `multiselect=False` for single selection
-- `filter_search_lambda` only returns a `Q` object - cannot apply `.distinct()`
+- `filter_search_lambda` returns a `Q` object - for `.distinct()` or complex queryset changes, subclass the widget and override `get_queryset()`
 
 ---
 
