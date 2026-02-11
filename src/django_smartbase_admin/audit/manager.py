@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
-from django.db import connection, models
+from django.db import models, transaction
 
 from django_smartbase_admin.audit.utils.serialization import serialize_instance
 from django_smartbase_admin.audit.utils.diff import compute_diff, compute_bulk_diff, compute_bulk_snapshot
@@ -231,60 +231,60 @@ def _create_audit_log(
     bulk_count: int = 0,
     affected_objects: list | None = None,
 ):
-    """Create an audit log entry. Uses savepoint to not break main transaction."""
+    """Create an audit log entry. Uses transaction.atomic() to not break main transaction."""
     from django_smartbase_admin.audit.models import AdminAuditLog
 
-    # Wrap everything in a savepoint so any DB error (ContentType lookup,
+    # Wrap everything in transaction.atomic() so any DB error (ContentType lookup,
     # _extract_fk_affected, _get_parent_context, or the INSERT itself)
     # is isolated and does not poison the outer transaction.
-    sid = connection.savepoint()
+    # NOTE: bare connection.savepoint_rollback() does NOT clear needs_rollback,
+    # but transaction.atomic().__exit__ does — this is critical for correctness.
     try:
-        # Get user from request (same source as _get_request_id)
-        user = None
-        try:
-            from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
-            request = SBAdminThreadLocalService.get_request()
-            if request and hasattr(request, "user") and request.user.is_authenticated:
-                user = request.user
-        except Exception:
-            pass
+        with transaction.atomic():
+            # Get user from request (same source as _get_request_id)
+            user = None
+            try:
+                from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+                request = SBAdminThreadLocalService.get_request()
+                if request and hasattr(request, "user") and request.user.is_authenticated:
+                    user = request.user
+            except Exception:
+                pass
 
-        content_type = ContentType.objects.get_for_model(model)
+            content_type = ContentType.objects.get_for_model(model)
 
-        audit_kwargs = {
-            "user": user,
-            "request_id": _get_request_id(),
-            "content_type": content_type,
-            "object_id": str(object_id) if object_id else "",
-            "object_repr": object_repr[:255] if object_repr else "",
-            "action_type": action_type,
-            "snapshot_before": snapshot_before or {},
-            "changes": changes or {},
-            "is_bulk": is_bulk,
-            "bulk_count": bulk_count,
-        }
+            audit_kwargs = {
+                "user": user,
+                "request_id": _get_request_id(),
+                "content_type": content_type,
+                "object_id": str(object_id) if object_id else "",
+                "object_repr": object_repr[:255] if object_repr else "",
+                "action_type": action_type,
+                "snapshot_before": snapshot_before or {},
+                "changes": changes or {},
+                "is_bulk": is_bulk,
+                "bulk_count": bulk_count,
+            }
 
-        # Use explicitly passed affected objects, or auto-detect from FK changes
-        if affected_objects:
-            audit_kwargs["affected_objects"] = affected_objects
-        elif changes:
-            # Auto-detect affected FK objects from changes
-            affected = _extract_fk_affected(model, changes)
-            if affected:
-                audit_kwargs["affected_objects"] = affected
+            # Use explicitly passed affected objects, or auto-detect from FK changes
+            if affected_objects:
+                audit_kwargs["affected_objects"] = affected_objects
+            elif changes:
+                # Auto-detect affected FK objects from changes
+                affected = _extract_fk_affected(model, changes)
+                if affected:
+                    audit_kwargs["affected_objects"] = affected
 
-        # Auto-detect parent context from SBAdmin request_data
-        parent_model, parent_id, parent_repr = _get_parent_context()
-        if parent_model and parent_model != model:  # Don't set parent if editing the model itself
-            audit_kwargs["parent_content_type"] = ContentType.objects.get_for_model(parent_model)
-            audit_kwargs["parent_object_id"] = parent_id
-            audit_kwargs["parent_object_repr"] = parent_repr
+            # Auto-detect parent context from SBAdmin request_data
+            parent_model, parent_id, parent_repr = _get_parent_context()
+            if parent_model and parent_model != model:  # Don't set parent if editing the model itself
+                audit_kwargs["parent_content_type"] = ContentType.objects.get_for_model(parent_model)
+                audit_kwargs["parent_object_id"] = parent_id
+                audit_kwargs["parent_object_repr"] = parent_repr
 
-        AdminAuditLog.objects.create(**audit_kwargs)
-        connection.savepoint_commit(sid)
+            AdminAuditLog.objects.create(**audit_kwargs)
 
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.exception("Audit: Failed to create audit log for %s %s", action_type, model.__name__)
 
 
@@ -295,24 +295,22 @@ def audited_qs_update(self, **kwargs):
     if not _should_audit_model(model):
         return _original_qs_update(self, **kwargs)
 
-    # Capture objects before update — in savepoint so failures don't poison the transaction
+    # Capture objects before update — in atomic block so failures don't poison the transaction
     pks = []
     objects_before = []
     displays_before = []
-    sid = connection.savepoint()
     try:
-        pks = list(self.values_list("pk", flat=True))
-        if len(pks) == 1:
-            objs = list(self.model._default_manager.filter(pk__in=pks))
-            for obj in objs:
-                data, display = serialize_instance(obj, include_display=True)
-                objects_before.append(data)
-                displays_before.append(display)
-        else:
-            objects_before = [serialize_instance(obj) for obj in self.model._default_manager.filter(pk__in=pks)]
-        connection.savepoint_commit(sid)
+        with transaction.atomic():
+            pks = list(self.values_list("pk", flat=True))
+            if len(pks) == 1:
+                objs = list(self.model._default_manager.filter(pk__in=pks))
+                for obj in objs:
+                    data, display = serialize_instance(obj, include_display=True)
+                    objects_before.append(data)
+                    displays_before.append(display)
+            else:
+                objects_before = [serialize_instance(obj) for obj in self.model._default_manager.filter(pk__in=pks)]
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.debug("Audit: Could not capture objects before qs.update() for %s", model.__name__, exc_info=True)
         pks = []
         objects_before = []
@@ -331,19 +329,17 @@ def audited_qs_update(self, **kwargs):
             before = objects_before[0] if objects_before else {}
             display_before = displays_before[0] if displays_before else {}
 
-            # Capture "after" state — in savepoint so a DB failure doesn't poison the transaction
+            # Capture "after" state — in atomic block so a DB failure doesn't poison the transaction
             obj = None
             after = {}
             display_after = {}
-            sid = connection.savepoint()
             try:
-                obj = model._default_manager.get(pk=pk)
-                after, display_after = serialize_instance(obj, include_display=True)
-                connection.savepoint_commit(sid)
+                with transaction.atomic():
+                    obj = model._default_manager.get(pk=pk)
+                    after, display_after = serialize_instance(obj, include_display=True)
             except model.DoesNotExist:
-                connection.savepoint_commit(sid)
+                pass
             except Exception:
-                connection.savepoint_rollback(sid)
                 logger.debug("Audit: Could not capture after state for qs.update() %s", model.__name__, exc_info=True)
 
             if obj is not None:
@@ -392,19 +388,17 @@ def audited_qs_delete(self):
     if not _should_audit_model(model):
         return _original_qs_delete(self)
 
-    # Capture objects before delete — in savepoint
+    # Capture objects before delete — in atomic block
     pks = []
     objects_before = []
-    sid = connection.savepoint()
     try:
-        for obj in self.all():
-            pks.append(str(obj.pk))
-            data = serialize_instance(obj)
-            data["__repr__"] = str(obj)[:255]
-            objects_before.append(data)
-        connection.savepoint_commit(sid)
+        with transaction.atomic():
+            for obj in self.all():
+                pks.append(str(obj.pk))
+                data = serialize_instance(obj)
+                data["__repr__"] = str(obj)[:255]
+                objects_before.append(data)
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.debug("Audit: Could not capture objects before qs.delete() for %s", model.__name__, exc_info=True)
         pks = []
         objects_before = []
@@ -492,16 +486,14 @@ def audited_qs_bulk_update(self, objs, fields, *args, **kwargs):
     auto_fields = _get_skip_fields(model)
     meaningful_fields = [f for f in fields if f not in auto_fields]
 
-    # Capture objects before update — in savepoint
+    # Capture objects before update — in atomic block
     pks = []
     objects_before = []
-    sid = connection.savepoint()
     try:
-        pks = [obj.pk for obj in objs]
-        objects_before = [serialize_instance(obj) for obj in model._default_manager.filter(pk__in=pks)]
-        connection.savepoint_commit(sid)
+        with transaction.atomic():
+            pks = [obj.pk for obj in objs]
+            objects_before = [serialize_instance(obj) for obj in model._default_manager.filter(pk__in=pks)]
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.debug("Audit: Could not capture objects before bulk_update for %s", model.__name__, exc_info=True)
         pks = []
         objects_before = []
@@ -547,33 +539,29 @@ def audited_model_save(self, *args, **kwargs):
         return _original_model_save(self, *args, **kwargs)
 
     # Detect create vs update by checking if object exists in DB
-    # Wrapped in savepoint so a failure here doesn't poison the atomic block
+    # Wrapped in atomic block so a failure here doesn't poison the outer transaction
     before = {}
     display_before = {}
     is_create = True
     if self.pk is not None:
-        sid = connection.savepoint()
         try:
-            old_instance = model._default_manager.get(pk=self.pk)
-            before, display_before = serialize_instance(old_instance, include_display=True)
-            is_create = False
-            connection.savepoint_commit(sid)
+            with transaction.atomic():
+                old_instance = model._default_manager.get(pk=self.pk)
+                before, display_before = serialize_instance(old_instance, include_display=True)
+                is_create = False
         except model.DoesNotExist:
-            connection.savepoint_commit(sid)
+            pass  # Object doesn't exist yet, it's a create
         except Exception:
-            connection.savepoint_rollback(sid)
             logger.debug("Audit: Could not capture before state for %s.save()", model.__name__, exc_info=True)
 
     # Perform the save
     result = _original_model_save(self, *args, **kwargs)
 
-    # Post-save: capture "after" state — in savepoint so FK display queries can't poison the transaction
-    sid = connection.savepoint()
+    # Post-save: capture "after" state — in atomic block so FK display queries can't poison the transaction
     try:
-        after, display_after = serialize_instance(self, include_display=True)
-        connection.savepoint_commit(sid)
+        with transaction.atomic():
+            after, display_after = serialize_instance(self, include_display=True)
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.debug("Audit: Could not capture after state for %s.save()", model.__name__, exc_info=True)
         return result
 
@@ -626,17 +614,15 @@ def audited_model_delete(self, *args, **kwargs):
     if not _should_audit_model(model):
         return _original_model_delete(self, *args, **kwargs)
 
-    # Capture before state — in savepoint so str(self) FK lookups can't poison the transaction
+    # Capture before state — in atomic block so str(self) FK lookups can't poison the transaction
     before = {}
     obj_repr = ""
     pk = str(self.pk) if self.pk is not None else ""
-    sid = connection.savepoint()
     try:
-        before = serialize_instance(self)
-        obj_repr = str(self)[:255]
-        connection.savepoint_commit(sid)
+        with transaction.atomic():
+            before = serialize_instance(self)
+            obj_repr = str(self)[:255]
     except Exception:
-        connection.savepoint_rollback(sid)
         logger.debug("Audit: Could not capture object before delete for %s", model.__name__, exc_info=True)
 
     # Perform the delete

@@ -16,8 +16,12 @@ def _json_safe(value):
     DjangoJSONEncoder.default() handles datetime, date, time, Decimal, UUID, etc.
     Falls back to str() for anything else (ImageFieldFile, FieldFile, ...).
     """
-    if isinstance(value, (str, int, float, bool, list, dict, type(None))):
+    if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
     try:
         return _encoder.default(value)
     except (TypeError, ValueError):
