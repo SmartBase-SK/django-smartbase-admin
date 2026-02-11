@@ -4,6 +4,8 @@ Computes differences between before and after states.
 """
 from typing import Any
 
+from django_smartbase_admin.audit.utils.serialization import _json_safe
+
 
 def compute_diff(
     before: dict[str, Any],
@@ -94,7 +96,7 @@ def compute_bulk_diff(
 
         if by_old:
             changes[field_name] = {
-                "new": new_value,
+                "new": _json_safe(new_value),
                 "by_old": by_old,
             }
 
