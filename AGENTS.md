@@ -23,7 +23,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
-| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history mixin, programmatic URLs |
+| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -2095,21 +2095,9 @@ SB_ADMIN_AUDIT_SKIP_FIELDS = {
 }
 ```
 
-### History Mixin — Redirect History Button
+### History Button — Automatic Redirect
 
-Replace Django's default history view with a redirect to the audit log filtered for that object:
-
-```python
-from django_smartbase_admin.admin.admin_base import SBAdmin
-from django_smartbase_admin.audit.views import AuditHistoryMixin
-
-from blog.models import Article
-
-@admin.register(Article, site=sb_admin_site)
-class ArticleAdmin(AuditHistoryMixin, SBAdmin):
-    # AuditHistoryMixin must come BEFORE SBAdmin
-    pass
-```
+When `django_smartbase_admin.audit` is in `INSTALLED_APPS`, the "History" button on any detail page **automatically** redirects to the audit log filtered for that object. No mixin or per-model configuration is needed — it's built into `SBAdmin.history_view()`.
 
 When a user clicks "History" on an Article detail page, they are redirected to the audit log filtered to show all changes for that specific article (including inline/related changes).
 
@@ -2142,7 +2130,7 @@ The audit app patches Django's ORM methods at startup (`AppConfig.ready()`):
 **Key behaviors:**
 - Only audits inside SBAdmin request context (uses `SBAdminThreadLocalService`)
 - Never audits the `AdminAuditLog` model itself (prevents infinite recursion)
-- Uses database savepoints so audit failures never break the main transaction
+- Uses `transaction.atomic()` so audit failures never break the main transaction
 - Groups all changes in a single request via `request_id` (stored on the request object)
 - Auto-detects parent context from SBAdmin's `request_data` (for inline edits)
 - Captures FK display values (`old_display`, `new_display`) for human-readable diffs
@@ -2154,7 +2142,7 @@ The audit log follows a pattern similar to Django's built-in "Recent actions":
 
 - **Superusers** see all audit entries
 - **Non-superusers** see only their own entries in the global list view
-- **Object-specific history** (when `object_history` filter is active, e.g. via `AuditHistoryMixin` redirect) shows all entries for that object regardless of who made the change — the user already had access to the object to get there
+- **Object-specific history** (when `object_history` filter is active, e.g. via the History button redirect) shows all entries for that object regardless of who made the change — the user already had access to the object to get there
 
 This is implemented in `AdminAuditLogAdmin.get_queryset()`. Projects can further restrict access by:
 - Not adding the audit log `SBAdminMenuItem` for non-admin roles
