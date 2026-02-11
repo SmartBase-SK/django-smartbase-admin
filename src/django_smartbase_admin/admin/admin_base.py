@@ -50,7 +50,6 @@ from nested_admin.nested import (
 )
 
 from django_smartbase_admin.audit.views import (
-    AuditHistoryMixin,
     redirect_to_audit_history,
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
