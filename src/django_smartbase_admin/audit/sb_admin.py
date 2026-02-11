@@ -2,6 +2,7 @@
 SBAdmin registration for AdminAuditLog.
 Provides rich filtering and history browsing.
 """
+
 import json
 from pprint import pformat
 
@@ -44,19 +45,20 @@ def _user_filter(request, search_term, forward_data):
 class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
     """
     Filter for viewing all changes related to a specific object.
-    
+
     Uses the MultipleChoice template to display nicely with value/label format.
     Applies OR filtering across:
     - Direct changes (content_type + object_id)
     - Parent context (parent_content_type + parent_object_id)
     - Affected objects (affected_objects JSON contains)
-    
+
     Value format: [{"value": "10:3", "label": "user_config.queuebundle #3"}]
     The value encodes content_type_id:object_id
     """
+
     template_name = "sb_admin/filter_widgets/multiple_choice_field.html"
     close_dropdown_on_change = False
-    
+
     def __init__(self):
         super().__init__(
             filter_query_lambda=self._filter_by_object_history,
@@ -69,10 +71,10 @@ class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
     def parse_filter_value(value):
         """
         Parse a single filter value into content_type_id and object_id.
-        
+
         Args:
             value: String in format "content_type_id:object_id"
-            
+
         Returns:
             Tuple of (content_type_id, object_id) or (None, None) if invalid.
         """
@@ -90,39 +92,46 @@ class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
         """Build OR query for object history."""
         if not parsed_values:
             return Q()
-        
+
         q = Q()
         for value in parsed_values:
             content_type_id, object_id = self.parse_filter_value(value)
             if content_type_id is None:
                 continue
-            
+
             # Get content type label for JSON query
             try:
                 ct = ContentType.objects.get(pk=content_type_id)
                 ct_label = f"{ct.app_label}.{ct.model}"
             except ContentType.DoesNotExist:
                 continue
-            
+
             # Try to convert object_id to int for JSON lookup
             try:
                 obj_pk = int(object_id)
             except (ValueError, TypeError):
                 obj_pk = object_id
-            
+
             # OR filter: direct changes, parent context, or affected (JSON contains)
             q |= (
                 Q(content_type_id=content_type_id, object_id=str(object_id))
-                | Q(parent_content_type_id=content_type_id, parent_object_id=str(object_id))
+                | Q(
+                    parent_content_type_id=content_type_id,
+                    parent_object_id=str(object_id),
+                )
                 | Q(affected_objects__contains=[{"ct": ct_label, "id": obj_pk}])
             )
-        
+
         return q if q else Q()
 
 
 ACTION_COLORS = {
-    "create": "success", "update": "info", "delete": "danger",
-    "bulk_create": "success", "bulk_update": "info", "bulk_delete": "danger",
+    "create": "success",
+    "update": "info",
+    "delete": "danger",
+    "bulk_create": "success",
+    "bulk_update": "info",
+    "bulk_delete": "danger",
 }
 
 
@@ -169,7 +178,9 @@ class AdminAuditLogAdmin(SBAdmin):
             title="Action",
             annotate=F("action_type"),
             filter_field="action_type",
-            filter_widget=MultipleChoiceFilterWidget(choices=AdminAuditLog.ActionType.choices, multiselect=True),
+            filter_widget=MultipleChoiceFilterWidget(
+                choices=AdminAuditLog.ActionType.choices, multiselect=True
+            ),
         ),
         SBAdminField(
             name="model_display",
@@ -243,7 +254,12 @@ class AdminAuditLogAdmin(SBAdmin):
         (
             None,
             {
-                "fields": ["summary_html", "changes_html", "affected_html", "related_changes_html"],
+                "fields": [
+                    "summary_html",
+                    "changes_html",
+                    "affected_html",
+                    "related_changes_html",
+                ],
             },
         ),
         # Sidebar - key metadata
@@ -303,7 +319,9 @@ class AdminAuditLogAdmin(SBAdmin):
         """
         # Return cached value if already parsed
         if hasattr(request, "request_data"):
-            cached = request.request_data.additional_data.get(self._OBJECT_HISTORY_FILTER_CACHE_KEY)
+            cached = request.request_data.additional_data.get(
+                self._OBJECT_HISTORY_FILTER_CACHE_KEY
+            )
             if cached is not None:
                 return cached
 
@@ -314,9 +332,13 @@ class AdminAuditLogAdmin(SBAdmin):
             if raw_value:
                 filter_widget = self._get_object_history_widget()
                 if filter_widget:
-                    parsed_values = filter_widget.parse_value_from_input(request, raw_value)
+                    parsed_values = filter_widget.parse_value_from_input(
+                        request, raw_value
+                    )
                     if parsed_values and len(parsed_values) > 0:
-                        ct_id, obj_id = ObjectHistoryFilterWidget.parse_filter_value(parsed_values[0])
+                        ct_id, obj_id = ObjectHistoryFilterWidget.parse_filter_value(
+                            parsed_values[0]
+                        )
                         if ct_id is not None:
                             result = (ct_id, obj_id)
         except Exception:
@@ -324,7 +346,9 @@ class AdminAuditLogAdmin(SBAdmin):
 
         # Cache on request so action_list_json and summary_display can reuse
         if hasattr(request, "request_data"):
-            request.request_data.additional_data[self._OBJECT_HISTORY_FILTER_CACHE_KEY] = result
+            request.request_data.additional_data[
+                self._OBJECT_HISTORY_FILTER_CACHE_KEY
+            ] = result
         return result
 
     def get_change_view_context(self, request, object_id):
@@ -348,8 +372,12 @@ class AdminAuditLogAdmin(SBAdmin):
             return {
                 "field_name": field_name,
                 "type": "changed",
-                "old_val": change.get("old_display") or change.get("old") or _("(empty)"),
-                "new_val": change.get("new_display") or change.get("new") or _("(empty)"),
+                "old_val": change.get("old_display")
+                or change.get("old")
+                or _("(empty)"),
+                "new_val": change.get("new_display")
+                or change.get("new")
+                or _("(empty)"),
             }
         if "by_old" in change:
             return {
@@ -384,12 +412,14 @@ class AdminAuditLogAdmin(SBAdmin):
                 rows.append(self._change_to_row(field_name, change))
             else:
                 str_val = str(value) if value is not None else ""
-                rows.append({
-                    "field_name": field_name,
-                    "type": "unchanged",
-                    "value": str_val if str_val != "" else _("(empty)"),
-                    "is_long": len(str_val) > 80 or "\n" in str_val,
-                })
+                rows.append(
+                    {
+                        "field_name": field_name,
+                        "type": "unchanged",
+                        "value": str_val if str_val != "" else _("(empty)"),
+                        "is_long": len(str_val) > 80 or "\n" in str_val,
+                    }
+                )
 
         # Add any changes not in snapshot (e.g. new fields on create)
         for field_name, change in changes.items():
@@ -399,11 +429,17 @@ class AdminAuditLogAdmin(SBAdmin):
         if not rows and not obj.is_bulk:
             return "-"
 
-        return mark_safe(render_to_string("sb_admin/audit/changes.html", {
-            "is_bulk": obj.is_bulk,
-            "bulk_count": obj.bulk_count,
-            "rows": rows,
-        }))
+        return mark_safe(
+            render_to_string(
+                "sb_admin/audit/changes.html",
+                {
+                    "is_bulk": obj.is_bulk,
+                    "bulk_count": obj.bulk_count,
+                    "rows": rows,
+                },
+            )
+        )
+
     changes_html.short_description = _("Changes")
 
     def affected_html(self, obj):
@@ -415,7 +451,9 @@ class AdminAuditLogAdmin(SBAdmin):
         by_type = {}
         for item in obj.affected_objects:
             ct = item.get("ct", "unknown")
-            model_name = ct.split(".")[-1].replace("_", " ").title() if "." in ct else ct
+            model_name = (
+                ct.split(".")[-1].replace("_", " ").title() if "." in ct else ct
+            )
             by_type.setdefault(model_name, []).append(item)
 
         sections = []
@@ -428,15 +466,23 @@ class AdminAuditLogAdmin(SBAdmin):
                     badges.append(f"{repr_str} (#{obj_id})")
                 else:
                     badges.append(f"#{obj_id}")
-            sections.append({
-                "model_name": model_name,
-                "badges": badges,
-                "extra_count": len(items) - 25 if len(items) > 25 else 0,
-            })
+            sections.append(
+                {
+                    "model_name": model_name,
+                    "badges": badges,
+                    "extra_count": len(items) - 25 if len(items) > 25 else 0,
+                }
+            )
 
-        return mark_safe(render_to_string("sb_admin/audit/affected.html", {
-            "sections": sections,
-        }))
+        return mark_safe(
+            render_to_string(
+                "sb_admin/audit/affected.html",
+                {
+                    "sections": sections,
+                },
+            )
+        )
+
     affected_html.short_description = _("Affected Objects")
 
     def related_changes_html(self, obj):
@@ -444,9 +490,12 @@ class AdminAuditLogAdmin(SBAdmin):
         if not obj or not obj.request_id:
             return ""
 
-        qs = AdminAuditLog.objects.filter(
-            request_id=obj.request_id
-        ).exclude(pk=obj.pk).select_related("content_type").order_by("timestamp")
+        qs = (
+            AdminAuditLog.objects.filter(request_id=obj.request_id)
+            .exclude(pk=obj.pk)
+            .select_related("content_type")
+            .order_by("timestamp")
+        )
         total = qs.count()
         if not total:
             return ""
@@ -461,19 +510,31 @@ class AdminAuditLogAdmin(SBAdmin):
                 url = reverse(f"sb_admin:{_get_audit_view_id()}_change", args=[log.pk])
             except Exception:
                 pass
-            rows.append({
-                "color": ACTION_COLORS.get(log.action_type, "secondary"),
-                "label": action_labels.get(log.action_type, log.action_type),
-                "model_name": f"{log.content_type.app_label}.{log.content_type.model}" if log.content_type else "-",
-                "url": url,
-                "obj_repr": log.object_repr or log.object_id or "-",
-            })
+            rows.append(
+                {
+                    "color": ACTION_COLORS.get(log.action_type, "secondary"),
+                    "label": action_labels.get(log.action_type, log.action_type),
+                    "model_name": (
+                        f"{log.content_type.app_label}.{log.content_type.model}"
+                        if log.content_type
+                        else "-"
+                    ),
+                    "url": url,
+                    "obj_repr": log.object_repr or log.object_id or "-",
+                }
+            )
 
-        return mark_safe(render_to_string("sb_admin/audit/related_changes.html", {
-            "total": total,
-            "rows": rows,
-            "extra_count": total - 20 if total > 20 else 0,
-        }))
+        return mark_safe(
+            render_to_string(
+                "sb_admin/audit/related_changes.html",
+                {
+                    "total": total,
+                    "rows": rows,
+                    "extra_count": total - 20 if total > 20 else 0,
+                },
+            )
+        )
+
     related_changes_html.short_description = _("Related Changes")
 
     _OBJECT_HISTORY_FILTER_CACHE_KEY = "_audit_object_history_filter"
@@ -481,6 +542,7 @@ class AdminAuditLogAdmin(SBAdmin):
     def action_list_json(self, request, modifier, page_size=None):
         """Override to ensure object_history filter is cached before processing rows."""
         from django.http import JsonResponse
+
         # Ensure filter is parsed and cached (may already be done by get_queryset)
         self._parse_and_cache_object_history_filter(request)
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
@@ -490,21 +552,28 @@ class AdminAuditLogAdmin(SBAdmin):
     def _get_object_history_widget(self):
         """Get the ObjectHistoryFilterWidget instance from sbadmin_list_display."""
         for field in self.sbadmin_list_display:
-            if field.filter_field == "object_history" and isinstance(field.filter_widget, ObjectHistoryFilterWidget):
+            if field.filter_field == "object_history" and isinstance(
+                field.filter_widget, ObjectHistoryFilterWidget
+            ):
                 return field.filter_widget
         return None
 
     def _get_object_history_filter(self):
         """Get cached object_history filter value.
-        
+
         Returns tuple (content_type_id, object_id) or None if not filtered.
         Cached by _parse_and_cache_object_history_filter (called from get_queryset / action_list_json).
         """
         try:
-            from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+            from django_smartbase_admin.services.thread_local import (
+                SBAdminThreadLocalService,
+            )
+
             request = SBAdminThreadLocalService.get_request()
             if request and hasattr(request, "request_data"):
-                return request.request_data.additional_data.get(self._OBJECT_HISTORY_FILTER_CACHE_KEY)
+                return request.request_data.additional_data.get(
+                    self._OBJECT_HISTORY_FILTER_CACHE_KEY
+                )
         except Exception:
             pass
         return None
@@ -517,8 +586,18 @@ class AdminAuditLogAdmin(SBAdmin):
         return str(ct_id) == str(filter_obj[0]) and str(obj_id) == str(filter_obj[1])
 
     @staticmethod
-    def _build_summary(action, model, obj_repr, is_bulk, bulk_count, changes,
-                       parent_model="", parent_repr="", hide_obj=False, hide_parent=False):
+    def _build_summary(
+        action,
+        model,
+        obj_repr,
+        is_bulk,
+        bulk_count,
+        changes,
+        parent_model="",
+        parent_repr="",
+        hide_obj=False,
+        hide_parent=False,
+    ):
         """Build summary message and parent context string.
 
         Returns:
@@ -561,8 +640,16 @@ class AdminAuditLogAdmin(SBAdmin):
             changes=additional_data.get("summary_changes") or {},
             parent_model=additional_data.get("summary_parent_model") or "",
             parent_repr=escape(additional_data.get("summary_parent_repr") or ""),
-            hide_obj=self._filter_matches(filter_obj, additional_data.get("summary_ct_id"), additional_data.get("summary_obj_id")),
-            hide_parent=self._filter_matches(filter_obj, additional_data.get("summary_parent_ct_id"), additional_data.get("summary_parent_obj_id")),
+            hide_obj=self._filter_matches(
+                filter_obj,
+                additional_data.get("summary_ct_id"),
+                additional_data.get("summary_obj_id"),
+            ),
+            hide_parent=self._filter_matches(
+                filter_obj,
+                additional_data.get("summary_parent_ct_id"),
+                additional_data.get("summary_parent_obj_id"),
+            ),
         )
 
         lines = [f"<div>{msg}</div>"]
@@ -578,20 +665,32 @@ class AdminAuditLogAdmin(SBAdmin):
 
         msg, parent_context = self._build_summary(
             action=obj.action_type,
-            model=obj.content_type.model.replace("_", " ") if obj.content_type else "object",
+            model=(
+                obj.content_type.model.replace("_", " ")
+                if obj.content_type
+                else "object"
+            ),
             obj_repr=obj.object_repr or f"#{obj.object_id}",
             is_bulk=obj.is_bulk,
             bulk_count=obj.bulk_count or 0,
             changes=obj.changes,
-            parent_model=obj.parent_content_type.model if obj.parent_content_type else "",
+            parent_model=(
+                obj.parent_content_type.model if obj.parent_content_type else ""
+            ),
             parent_repr=obj.parent_object_repr or "",
         )
 
-        return mark_safe(render_to_string("sb_admin/audit/summary.html", {
-            "message": msg,
-            "color": ACTION_COLORS.get(obj.action_type, "secondary"),
-            "parent_context": parent_context,
-        }))
+        return mark_safe(
+            render_to_string(
+                "sb_admin/audit/summary.html",
+                {
+                    "message": msg,
+                    "color": ACTION_COLORS.get(obj.action_type, "secondary"),
+                    "parent_context": parent_context,
+                },
+            )
+        )
+
     summary_html.short_description = _("Summary")
 
     def user_display(self, obj_id, value, **additional_data):

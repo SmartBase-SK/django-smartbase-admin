@@ -82,4 +82,6 @@ class AdminAuditLog(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.timestamp} - {self.user} - {self.action_type} - {self.object_repr}"
+        return (
+            f"{self.timestamp} - {self.user} - {self.action_type} - {self.object_repr}"
+        )

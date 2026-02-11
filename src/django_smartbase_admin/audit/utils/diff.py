@@ -2,6 +2,7 @@
 Diff utilities for audit logging.
 Computes differences between before and after states.
 """
+
 from typing import Any
 
 from django_smartbase_admin.audit.utils.serialization import _json_safe
@@ -15,13 +16,13 @@ def compute_diff(
 ) -> dict[str, dict[str, Any]]:
     """
     Compute the difference between two dictionaries.
-    
+
     Args:
         before: Dictionary of field values before the change.
         after: Dictionary of field values after the change.
         display_before: Optional dictionary of display values for before state.
         display_after: Optional dictionary of display values for after state.
-    
+
     Returns:
         Dictionary with changed fields as keys, containing:
         - old: The old value
@@ -66,14 +67,14 @@ def compute_bulk_diff(
 ) -> dict[str, dict[str, Any]]:
     """
     Compute a compressed diff for bulk update operations.
-    
+
     Groups objects by their old values for each changed field.
-    
+
     Args:
         objects_before: List of dictionaries representing objects before update.
         update_values: Dictionary of fields being updated with their new values.
         id_field: The field name for object IDs.
-    
+
     Returns:
         Dictionary with changed fields as keys, containing:
         - new: The new value being set
@@ -109,13 +110,13 @@ def compute_bulk_snapshot(
 ) -> dict[str, dict[str, Any]]:
     """
     Compute a compressed snapshot for bulk operations.
-    
+
     For each field, stores unique values and which objects had them.
-    
+
     Args:
         objects_before: List of dictionaries representing objects.
         fields: List of field names to include in snapshot.
-    
+
     Returns:
         Dictionary with field names as keys, containing:
         - unique_values: List of unique values for this field
@@ -131,10 +132,7 @@ def compute_bulk_snapshot(
                 value = tuple(value)
             values_set.add(value)
 
-        unique_values = [
-            list(v) if isinstance(v, tuple) else v
-            for v in values_set
-        ]
+        unique_values = [list(v) if isinstance(v, tuple) else v for v in values_set]
 
         snapshot[field_name] = {
             "unique_values": unique_values,
