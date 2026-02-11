@@ -19,6 +19,7 @@ Built to **speed up development** of internal tools and admin panels — beautif
 - Beautiful modern UI (Tailwind CSS)
 - Responsive & mobile-friendly
 - End-user ready for building SaaS or similar projects with global queryset configuration
+- Built-in audit logging — automatically tracks all admin create, update, and delete operations with full change history, snapshots, and request grouping
 <img alt="image" src="https://github.com/user-attachments/assets/ebbcacea-9052-409e-99bb-9f9e0804bbc5" />
 <img alt="image" src="https://github.com/user-attachments/assets/8003df6a-e035-4c8f-8e90-0e710818d33e" />
 <img alt="image" src="https://github.com/user-attachments/assets/29e116de-a8c6-4f22-8485-3e0eba5ed564" />
@@ -118,6 +119,12 @@ MIDDLEWARE = [
     'django.middleware.locale.LocaleMiddleware',
 ]
 ```
+
+## 🔍 Audit Logging
+
+Built-in optional audit app that automatically tracks all admin create, update, delete, and bulk operations with field-level diffs, snapshots, and request grouping. Just add `"django_smartbase_admin.audit"` to `INSTALLED_APPS` and run migrations.
+
+See [AGENTS.md — Audit Logging](./AGENTS.md#audit-logging) for setup and configuration.
 
 ## 🤖 AI/Developer Reference
 

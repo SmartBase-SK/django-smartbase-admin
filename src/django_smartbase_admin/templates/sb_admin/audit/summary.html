@@ -1,0 +1,7 @@
+{% load i18n %}
+<div style="padding:12px 16px; border-radius:6px; background:{% if color == 'success' %}#f0fdf4{% elif color == 'danger' %}#fef2f2{% elif color == 'info' %}#eff6ff{% else %}#f9fafb{% endif %}; color:{% if color == 'success' %}#166534{% elif color == 'danger' %}#991b1b{% elif color == 'info' %}#1e40af{% else %}#374151{% endif %};">
+    <strong>{{ message }}</strong>
+    {% if parent_context %}
+        <div style="color:#6b7280; font-size:12px; margin-top:4px;">&#8627; {{ parent_context }}</div>
+    {% endif %}
+</div>
