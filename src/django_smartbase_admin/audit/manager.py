@@ -2,6 +2,7 @@
 QuerySet hooks for comprehensive audit logging.
 Patches Django's QuerySet methods to intercept database operations.
 """
+
 import logging
 import uuid
 from typing import Any
@@ -10,7 +11,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 
 from django_smartbase_admin.audit.utils.serialization import serialize_instance
-from django_smartbase_admin.audit.utils.diff import compute_diff, compute_bulk_diff, compute_bulk_snapshot
+from django_smartbase_admin.audit.utils.diff import (
+    compute_diff,
+    compute_bulk_diff,
+    compute_bulk_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +43,10 @@ _hooks_installed = False
 def _is_in_admin_context() -> bool:
     """Check if we're in an SBAdmin request context."""
     try:
-        from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
         request = SBAdminThreadLocalService.get_request()
         return request is not None
     except Exception:
@@ -56,6 +64,7 @@ def _should_audit_model(model) -> bool:
 
     # Never audit the audit log itself to prevent infinite recursion
     from django_smartbase_admin.audit.models import AdminAuditLog
+
     if model == AdminAuditLog:
         return False
 
@@ -64,6 +73,7 @@ def _should_audit_model(model) -> bool:
     if model_key in SKIP_MODELS:
         return False
     from django.conf import settings
+
     if model_key in getattr(settings, "SB_ADMIN_AUDIT_SKIP_MODELS", ()):
         return False
 
@@ -86,9 +96,9 @@ def _get_skip_fields(model) -> set[str]:
 
     # Add auto_now and auto_now_add fields
     for field in model._meta.get_fields():
-        if hasattr(field, 'auto_now') and field.auto_now:
+        if hasattr(field, "auto_now") and field.auto_now:
             skip_fields.add(field.name)
-        if hasattr(field, 'auto_now_add') and field.auto_now_add:
+        if hasattr(field, "auto_now_add") and field.auto_now_add:
             skip_fields.add(field.name)
 
     return skip_fields
@@ -106,21 +116,21 @@ def _extract_fk_affected(model, changes: dict) -> list[dict]:
     Returns list of {"ct": "app.model", "id": pk, "repr": "..."} for all FK changes.
     """
     from django.db.models import ForeignKey
-    
+
     affected = []
-    
+
     for field_name, change in changes.items():
         try:
             field = model._meta.get_field(field_name)
         except Exception:
             continue
-        
+
         if not isinstance(field, ForeignKey):
             continue
-        
+
         related_model = field.related_model
         ct_label = f"{related_model._meta.app_label}.{related_model._meta.model_name}"
-        
+
         # Get old and new values
         if isinstance(change, dict):
             old_val = change.get("old")
@@ -132,17 +142,17 @@ def _extract_fk_affected(model, changes: dict) -> list[dict]:
             new_val = change
             old_repr = None
             new_repr = None
-        
+
         # Add old value if present
         if old_val:
             obj_repr = old_repr or _get_object_repr(related_model, old_val)
             affected.append({"ct": ct_label, "id": int(old_val), "repr": obj_repr})
-        
+
         # Add new value if present and different
         if new_val and new_val != old_val:
             obj_repr = new_repr or _get_object_repr(related_model, new_val)
             affected.append({"ct": ct_label, "id": int(new_val), "repr": obj_repr})
-    
+
     return affected
 
 
@@ -158,18 +168,21 @@ def _get_object_repr(model, pk) -> str:
 def _get_request_id() -> uuid.UUID | None:
     """
     Get or create a request_id to group changes from the same request.
-    
+
     Stores the request_id directly on the request object, so it's automatically
     scoped to the request lifecycle and cleaned up when the request ends.
     """
     try:
-        from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
         request = SBAdminThreadLocalService.get_request()
         if request is None:
             return None
-        
+
         # Store/retrieve request_id directly on the request object
-        if not hasattr(request, '_audit_request_id'):
+        if not hasattr(request, "_audit_request_id"):
             request._audit_request_id = uuid.uuid4()
         return request._audit_request_id
     except Exception:
@@ -182,40 +195,42 @@ def _get_parent_context() -> tuple[type | None, str, str]:
     Returns (parent_model, parent_object_id, parent_object_repr) or (None, "", "").
     """
     try:
-        from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
-        
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
         request = SBAdminThreadLocalService.get_request()
         if request is None:
             return None, "", ""
-        
+
         request_data = getattr(request, "request_data", None)
         if request_data is None:
             return None, "", ""
-        
+
         # Get the view being edited (e.g., "user_config_queuebundle")
         selected_view = getattr(request_data, "selected_view", None)
         if selected_view is None:
             return None, "", ""
-        
+
         # Get the model from the view
         parent_model = getattr(selected_view, "model", None)
         if parent_model is None:
             return None, "", ""
-        
+
         # Get the object_id being edited
         object_id = getattr(request_data, "object_id", None)
         if not object_id:
             return None, "", ""
-        
+
         # Try to get the object repr
         try:
             parent_obj = parent_model._default_manager.get(pk=object_id)
             parent_repr = str(parent_obj)[:255]
         except Exception:
             parent_repr = f"{parent_model.__name__} #{object_id}"
-        
+
         return parent_model, str(object_id), parent_repr
-        
+
     except Exception:
         return None, "", ""
 
@@ -244,9 +259,16 @@ def _create_audit_log(
             # Get user from request (same source as _get_request_id)
             user = None
             try:
-                from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+                from django_smartbase_admin.services.thread_local import (
+                    SBAdminThreadLocalService,
+                )
+
                 request = SBAdminThreadLocalService.get_request()
-                if request and hasattr(request, "user") and request.user.is_authenticated:
+                if (
+                    request
+                    and hasattr(request, "user")
+                    and request.user.is_authenticated
+                ):
                     user = request.user
             except Exception:
                 pass
@@ -277,15 +299,21 @@ def _create_audit_log(
 
             # Auto-detect parent context from SBAdmin request_data
             parent_model, parent_id, parent_repr = _get_parent_context()
-            if parent_model and parent_model != model:  # Don't set parent if editing the model itself
-                audit_kwargs["parent_content_type"] = ContentType.objects.get_for_model(parent_model)
+            if (
+                parent_model and parent_model != model
+            ):  # Don't set parent if editing the model itself
+                audit_kwargs["parent_content_type"] = ContentType.objects.get_for_model(
+                    parent_model
+                )
                 audit_kwargs["parent_object_id"] = parent_id
                 audit_kwargs["parent_object_repr"] = parent_repr
 
             AdminAuditLog.objects.create(**audit_kwargs)
 
     except Exception:
-        logger.exception("Audit: Failed to create audit log for %s %s", action_type, model.__name__)
+        logger.exception(
+            "Audit: Failed to create audit log for %s %s", action_type, model.__name__
+        )
 
 
 def audited_qs_update(self, **kwargs):
@@ -309,9 +337,16 @@ def audited_qs_update(self, **kwargs):
                     objects_before.append(data)
                     displays_before.append(display)
             else:
-                objects_before = [serialize_instance(obj) for obj in self.model._default_manager.filter(pk__in=pks)]
+                objects_before = [
+                    serialize_instance(obj)
+                    for obj in self.model._default_manager.filter(pk__in=pks)
+                ]
     except Exception:
-        logger.debug("Audit: Could not capture objects before qs.update() for %s", model.__name__, exc_info=True)
+        logger.debug(
+            "Audit: Could not capture objects before qs.update() for %s",
+            model.__name__,
+            exc_info=True,
+        )
         pks = []
         objects_before = []
         displays_before = []
@@ -340,7 +375,11 @@ def audited_qs_update(self, **kwargs):
             except model.DoesNotExist:
                 pass
             except Exception:
-                logger.debug("Audit: Could not capture after state for qs.update() %s", model.__name__, exc_info=True)
+                logger.debug(
+                    "Audit: Could not capture after state for qs.update() %s",
+                    model.__name__,
+                    exc_info=True,
+                )
 
             if obj is not None:
                 changes = compute_diff(before, after, display_before, display_after)
@@ -399,7 +438,11 @@ def audited_qs_delete(self):
                 data["__repr__"] = str(obj)[:255]
                 objects_before.append(data)
     except Exception:
-        logger.debug("Audit: Could not capture objects before qs.delete() for %s", model.__name__, exc_info=True)
+        logger.debug(
+            "Audit: Could not capture objects before qs.delete() for %s",
+            model.__name__,
+            exc_info=True,
+        )
         pks = []
         objects_before = []
 
@@ -428,10 +471,12 @@ def audited_qs_delete(self):
             deleted_info = []
             for obj_data in objects_before:
                 obj_repr = obj_data.pop("__repr__", "")
-                deleted_info.append({
-                    "id": obj_data.get("id"),
-                    "repr": obj_repr,
-                })
+                deleted_info.append(
+                    {
+                        "id": obj_data.get("id"),
+                        "repr": obj_repr,
+                    }
+                )
 
             _create_audit_log(
                 action_type="bulk_delete",
@@ -452,10 +497,10 @@ def audited_qs_delete(self):
 def audited_qs_bulk_create(self, objs, *args, **kwargs):
     """Audited version of QuerySet.bulk_create()."""
     model = self.model
-    
+
     # Perform the bulk create first
     result = _original_qs_bulk_create(self, objs, *args, **kwargs)
-    
+
     if not _should_audit_model(model):
         return result
 
@@ -492,9 +537,16 @@ def audited_qs_bulk_update(self, objs, fields, *args, **kwargs):
     try:
         with transaction.atomic():
             pks = [obj.pk for obj in objs]
-            objects_before = [serialize_instance(obj) for obj in model._default_manager.filter(pk__in=pks)]
+            objects_before = [
+                serialize_instance(obj)
+                for obj in model._default_manager.filter(pk__in=pks)
+            ]
     except Exception:
-        logger.debug("Audit: Could not capture objects before bulk_update for %s", model.__name__, exc_info=True)
+        logger.debug(
+            "Audit: Could not capture objects before bulk_update for %s",
+            model.__name__,
+            exc_info=True,
+        )
         pks = []
         objects_before = []
 
@@ -547,12 +599,18 @@ def audited_model_save(self, *args, **kwargs):
         try:
             with transaction.atomic():
                 old_instance = model._default_manager.get(pk=self.pk)
-                before, display_before = serialize_instance(old_instance, include_display=True)
+                before, display_before = serialize_instance(
+                    old_instance, include_display=True
+                )
                 is_create = False
         except model.DoesNotExist:
             pass  # Object doesn't exist yet, it's a create
         except Exception:
-            logger.debug("Audit: Could not capture before state for %s.save()", model.__name__, exc_info=True)
+            logger.debug(
+                "Audit: Could not capture before state for %s.save()",
+                model.__name__,
+                exc_info=True,
+            )
 
     # Perform the save
     result = _original_model_save(self, *args, **kwargs)
@@ -562,7 +620,11 @@ def audited_model_save(self, *args, **kwargs):
         with transaction.atomic():
             after, display_after = serialize_instance(self, include_display=True)
     except Exception:
-        logger.debug("Audit: Could not capture after state for %s.save()", model.__name__, exc_info=True)
+        logger.debug(
+            "Audit: Could not capture after state for %s.save()",
+            model.__name__,
+            exc_info=True,
+        )
         return result
 
     # Diff computation (pure Python) + _create_audit_log (has its own savepoint)
@@ -610,7 +672,7 @@ def audited_model_save(self, *args, **kwargs):
 def audited_model_delete(self, *args, **kwargs):
     """Audited version of Model.delete()."""
     model = self.__class__
-    
+
     if not _should_audit_model(model):
         return _original_model_delete(self, *args, **kwargs)
 
@@ -623,7 +685,11 @@ def audited_model_delete(self, *args, **kwargs):
             before = serialize_instance(self)
             obj_repr = str(self)[:255]
     except Exception:
-        logger.debug("Audit: Could not capture object before delete for %s", model.__name__, exc_info=True)
+        logger.debug(
+            "Audit: Could not capture object before delete for %s",
+            model.__name__,
+            exc_info=True,
+        )
 
     # Perform the delete
     result = _original_model_delete(self, *args, **kwargs)
@@ -646,7 +712,7 @@ def audited_model_delete(self, *args, **kwargs):
 def install_manager_hooks():
     """
     Install the QuerySet and Model hooks for audit logging.
-    
+
     Hooks:
     - Model.save() - handles create and update for single objects
     - Model.delete() - handles single deletes
@@ -654,11 +720,11 @@ def install_manager_hooks():
     - QuerySet.delete() - handles bulk deletes (bypasses Model.delete)
     - QuerySet.bulk_create() - handles bulk creates (bypasses Model.save)
     - QuerySet.bulk_update() - handles bulk updates (bypasses Model.save)
-    
+
     M2M changes are audited via the through model (create/delete on the junction table).
-    
+
     Note: QuerySet.create() is NOT hooked because it calls Model.save() internally.
-    
+
     This must be called in AppConfig.ready().
     """
     global _original_qs_update, _original_qs_delete

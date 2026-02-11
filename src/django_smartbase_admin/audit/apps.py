@@ -2,6 +2,7 @@
 AppConfig for the audit app.
 Installs hooks when Django is ready.
 """
+
 from django.apps import AppConfig
 
 
