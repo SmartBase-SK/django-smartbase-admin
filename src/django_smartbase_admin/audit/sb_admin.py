@@ -128,10 +128,10 @@ class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
 ACTION_COLORS = {
     "create": "success",
     "update": "info",
-    "delete": "danger",
+    "delete": "negative",
     "bulk_create": "success",
     "bulk_update": "info",
-    "bulk_delete": "danger",
+    "bulk_delete": "negative",
 }
 
 
@@ -700,10 +700,14 @@ class AdminAuditLogAdmin(SBAdmin):
     def action_type_display(self, obj_id, value, **additional_data):
         color = ACTION_COLORS.get(value, "secondary")
         label = dict(AdminAuditLog.ActionType.choices).get(value, value)
-        return mark_safe(f'<span class="badge bg-{color}">{label}</span>')
+        return mark_safe(
+            f'<span class="badge badge-simple badge-{color}">{label}</span>'
+        )
 
     def bulk_info(self, obj_id, value, **additional_data):
         if value:
             count = additional_data.get("bulk_count_val", 0)
-            return mark_safe(f'<span class="badge bg-warning">{count} items</span>')
+            return mark_safe(
+                f'<span class="badge badge-simple badge-warning">{count} items</span>'
+            )
         return "-"
