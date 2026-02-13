@@ -1,70 +1,78 @@
 {% load i18n %}
 {% if is_bulk %}
-<div style="padding:10px 14px; margin-bottom:16px; border-radius:6px; background:#fef3c7; color:#92400e; font-size:13px;">
-    <strong>{% trans "Bulk operation" %}:</strong> {{ bulk_count }} {% trans "items affected" %}
-</div>
+    <div class="alert flex items-center gap-8 text-14 leading-18 font-medium bg-warning-50 text-warning-900 mb-16">
+        <svg class="w-20 h-20 shrink-0"><use xlink:href="#Attention"></use></svg>
+        <span><strong>{% trans "Bulk operation" %}:</strong> {{ bulk_count }} {% trans "items affected" %}</span>
+    </div>
 {% endif %}
 
 {% if rows %}
-<table style="width:100%; border-collapse:collapse;">
-    <thead>
-        <tr style="border-bottom:2px solid #e5e7eb;">
-            <th style="text-align:left; padding:8px 12px; font-size:12px; color:#6b7280; font-weight:600; width:25%;">{% trans "Field" %}</th>
-            <th style="text-align:left; padding:8px 12px; font-size:12px; color:#6b7280; font-weight:600;">{% trans "Value" %}</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        {% if row.type == "changed" %}
-        <tr style="border-bottom:1px solid #f3f4f6; background:#fefce8;">
-            <td style="padding:10px 12px; font-weight:500; color:#374151; font-size:13px; vertical-align:top; white-space:nowrap;">
-                {{ row.field_name }} <span style="color:#ca8a04;" title="{% trans 'Changed' %}">&#9998;</span>
-            </td>
-            <td style="padding:10px 12px; font-size:13px; vertical-align:top;">
-                <span style="color:#dc2626; text-decoration:line-through; opacity:0.7;">{{ row.old_val }}</span>
-                <span style="color:#9ca3af; margin:0 6px;">&#8594;</span>
-                <span style="color:#16a34a; font-weight:500;">{{ row.new_val }}</span>
-            </td>
-        </tr>
-        {% elif row.type == "bulk" %}
-        <tr style="border-bottom:1px solid #f3f4f6; background:#fefce8;">
-            <td style="padding:10px 12px; font-weight:500; color:#374151; font-size:13px; vertical-align:top; white-space:nowrap;">
-                {{ row.field_name }} <span style="color:#ca8a04;" title="{% trans 'Changed' %}">&#9998;</span>
-            </td>
-            <td style="padding:10px 12px; font-size:13px; vertical-align:top;">
-                {% for group in row.groups %}
-                    <span style="color:#dc2626; text-decoration:line-through;">{{ group.old_val }}</span>
-                    <span style="color:#9ca3af; font-size:11px;">({{ group.count }}x)</span>
-                    {% if not forloop.last %}<br>{% endif %}
-                {% endfor %}
-                <br><span style="color:#9ca3af;">&#8594;</span>
-                <span style="color:#16a34a; font-weight:500;">{{ row.new_val }}</span>
-            </td>
-        </tr>
-        {% elif row.type == "raw" %}
-        <tr style="border-bottom:1px solid #f3f4f6; background:#fefce8;">
-            <td style="padding:10px 12px; font-weight:500; color:#374151; font-size:13px; vertical-align:top; white-space:nowrap;">
-                {{ row.field_name }} <span style="color:#ca8a04;" title="{% trans 'Changed' %}">&#9998;</span>
-            </td>
-            <td style="padding:10px 12px;">
-                <pre style="margin:0; font-size:12px; color:#4b5563; background:#f9fafb; padding:8px; border-radius:4px; overflow:auto; max-height:120px;">{{ row.raw }}</pre>
-            </td>
-        </tr>
-        {% else %}
-        <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:10px 12px; font-weight:500; color:#374151; font-size:13px; vertical-align:top; white-space:nowrap;">{{ row.field_name }}</td>
-            <td style="padding:10px 12px; font-size:13px; color:#6b7280; vertical-align:top;">
-                {% if row.is_long %}
-                    <pre style="margin:0; font-size:12px; color:#6b7280; background:#f9fafb; padding:8px; border-radius:4px; overflow:auto; max-height:150px; white-space:pre-wrap;">{{ row.value }}</pre>
+    <div class="-mx-24">
+        <table class="table in-card w-full">
+            <thead>
+                <tr class="border-b border-dark-200">
+                    <th class="w-36"></th>
+                    <th style="width:25%;">{% trans "Field" %}</th>
+                    <th>{% trans "Value" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% if row.type == "changed" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        <span>{{ row.old_val }}</span>
+                        <svg class="w-16 h-16 shrink-0"><use xlink:href="#Right-small"></use></svg>
+                        <span>{{ row.new_val }}</span>
+                    </td>
+                </tr>
+                {% elif row.type == "bulk" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        {% for group in row.groups %}
+                            <span>{{ group.old_val }}</span>
+                            <span>({{ group.count }}x)</span>
+                            {% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                        <br><span>&#8594;</span>
+                        <span>{{ row.new_val }}</span>
+                    </td>
+                </tr>
+                {% elif row.type == "raw" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        <pre>{{ row.raw }}</pre>
+                    </td>
+                </tr>
                 {% else %}
-                    {{ row.value }}
+                <tr>
+                    <td></td>
+                    <td>{{ row.field_name }}</td>
+                    <td>
+                        {% if row.is_long %}
+                            <pre>{{ row.value }}</pre>
+                        {% else %}
+                            {{ row.value }}
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endif %}
-            </td>
-        </tr>
-        {% endif %}
-        {% endfor %}
-    </tbody>
-</table>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% else %}
-    <p style="color:#9ca3af; font-size:13px;">{% trans "No changes recorded." %}</p>
+    <p>{% trans "No changes recorded." %}</p>
 {% endif %}

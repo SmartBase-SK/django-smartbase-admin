@@ -1,18 +1,22 @@
 {% load i18n %}
 {% if sections %}
     {% for section in sections %}
-    <div style="{% if not forloop.last %}margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #f3f4f6;{% endif %}">
-        <div style="font-size:12px; color:#6b7280; margin-bottom:6px; font-weight:600;">{{ section.model_name }}</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">
-            {% for badge in section.badges %}
-                <span style="display:inline-block; padding:2px 8px; border-radius:4px; background:#f3f4f6; color:#374151; font-size:12px;">{{ badge }}</span>
-            {% endfor %}
-            {% if section.extra_count %}
-                <span style="display:inline-block; padding:2px 8px; border-radius:4px; background:#f3f4f6; color:#9ca3af; font-size:12px;">+{{ section.extra_count }} {% trans "more" %}</span>
-            {% endif %}
+        <div>
+            <div class="font-medium text-14 mb-4">{{ section.model_name }}</div>
+            <div class="flex flex-wrap gap-4">
+                {% for badge in section.badges %}
+                    <span class="badge badge-simple">{{ badge }}</span>
+                {% endfor %}
+                {% if section.extra_count %}
+                    <span>+{{ section.extra_count }} {% trans "more" %}</span>
+                {% endif %}
+            </div>
         </div>
-    </div>
+
+        {% if not forloop.last %}
+            <hr class="my-8">
+        {% endif %}
     {% endfor %}
 {% else %}
-    <p style="color:#9ca3af; font-size:13px;">{% trans "No other affected objects." %}</p>
+    <p>{% trans "No other affected objects." %}</p>
 {% endif %}
