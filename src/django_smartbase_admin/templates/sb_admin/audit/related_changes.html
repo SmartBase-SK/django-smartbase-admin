@@ -1,34 +1,40 @@
 {% load i18n %}
 {% if rows %}
-<table style="width:100%; border-collapse:collapse;">
-    <thead>
-        <tr style="border-bottom:2px solid #e5e7eb;">
-            <th style="text-align:left; padding:8px 12px; font-size:12px; color:#6b7280; font-weight:600; width:100px;">{% trans "Action" %}</th>
-            <th style="text-align:left; padding:8px 12px; font-size:12px; color:#6b7280; font-weight:600; width:30%;">{% trans "Model" %}</th>
-            <th style="text-align:left; padding:8px 12px; font-size:12px; color:#6b7280; font-weight:600;">{% trans "Object" %}</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:8px 12px; vertical-align:top;">
-                <span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; color:white; background:{% if row.color == 'success' %}#16a34a{% elif row.color == 'danger' %}#dc2626{% elif row.color == 'info' %}#2563eb{% else %}#6b7280{% endif %};">{{ row.label }}</span>
-            </td>
-            <td style="padding:8px 12px; font-size:12px; color:#6b7280; vertical-align:top;">{{ row.model_name }}</td>
-            <td style="padding:8px 12px; font-size:13px; color:#1f2937; vertical-align:top;">
-                {% if row.url %}
-                    <a href="{{ row.url }}" style="color:#2563eb; text-decoration:none;">{{ row.obj_repr }}</a>
-                {% else %}
-                    {{ row.obj_repr }}
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="-mx-24">
+    <table class="table in-card w-full">
+        <thead>
+            <tr>
+                <th style="width:128px;">{% trans "Action" %}</th>
+                <th style="width:30%;">{% trans "Model" %}</th>
+                <th>{% trans "Object" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    <span class="badge badge-simple badge-{{ row.color }}">{{ row.label }}</span>
+                </td>
+                <td>{{ row.model_name }}</td>
+                <td>
+                    {% if row.url %}
+                        <a href="{{ row.url }}" class="link inline-flex items-center gap-4">
+                            {{ row.obj_repr }}
+                            <svg class="w-16 h-16 shrink-0"><use xlink:href="#Right-small"></use></svg>
+                        </a>
+                    {% else %}
+                        {{ row.obj_repr }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
 {% if extra_count %}
-    <div style="color:#9ca3af; font-size:12px; padding:8px 12px;">+{{ extra_count }} {% trans "more" %}</div>
+    <div class="p-8 text-14">+{{ extra_count }} {% trans "more" %}</div>
 {% endif %}
 {% else %}
-    <p style="color:#9ca3af; font-size:13px;">{% trans "No related changes in this request." %}</p>
+    <p>{% trans "No related changes in this request." %}</p>
 {% endif %}

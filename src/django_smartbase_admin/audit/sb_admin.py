@@ -127,11 +127,20 @@ class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
 
 ACTION_COLORS = {
     "create": "success",
-    "update": "info",
-    "delete": "danger",
+    "update": "notice",
+    "delete": "negative",
     "bulk_create": "success",
-    "bulk_update": "info",
-    "bulk_delete": "danger",
+    "bulk_update": "notice",
+    "bulk_delete": "negative",
+}
+
+ACTION_ICONS = {
+    "create": "Check-one",
+    "update": "Edit",
+    "delete": "Close-one",
+    "bulk_create": "Check-one",
+    "bulk_update": "Edit",
+    "bulk_delete": "Close-one",
 }
 
 
@@ -445,7 +454,11 @@ class AdminAuditLogAdmin(SBAdmin):
     def affected_html(self, obj):
         """Render affected objects as formatted HTML for detail view."""
         if not obj or not obj.affected_objects:
-            return ""
+            return mark_safe(
+                render_to_string(
+                    "sb_admin/audit/affected.html",
+                )
+            )
 
         # Group by content type
         by_type = {}
@@ -686,6 +699,7 @@ class AdminAuditLogAdmin(SBAdmin):
                 {
                     "message": msg,
                     "color": ACTION_COLORS.get(obj.action_type, "secondary"),
+                    "icon": ACTION_ICONS.get(obj.action_type, ""),
                     "parent_context": parent_context,
                 },
             )
@@ -700,10 +714,14 @@ class AdminAuditLogAdmin(SBAdmin):
     def action_type_display(self, obj_id, value, **additional_data):
         color = ACTION_COLORS.get(value, "secondary")
         label = dict(AdminAuditLog.ActionType.choices).get(value, value)
-        return mark_safe(f'<span class="badge bg-{color}">{label}</span>')
+        return mark_safe(
+            f'<span class="badge badge-simple badge-{color}">{label}</span>'
+        )
 
     def bulk_info(self, obj_id, value, **additional_data):
         if value:
             count = additional_data.get("bulk_count_val", 0)
-            return mark_safe(f'<span class="badge bg-warning">{count} items</span>')
+            return mark_safe(
+                f'<span class="badge badge-simple badge-warning">{count} items</span>'
+            )
         return "-"
