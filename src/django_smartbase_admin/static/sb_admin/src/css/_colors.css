@@ -84,6 +84,14 @@
     --color-bg: var(--color-dark-100);
     --color-bg-elevated: var(--color-light);
     --color-bg-input: var(--color-light);
+
+    /* Select2 variables mapped to admin design tokens */
+    --body-bg: var(--color-bg-elevated);
+    --body-fg: var(--color-dark-900);
+    --border-color: var(--color-dark-300);
+    --selected-bg: var(--color-dark-100);
+    --darkened-bg: var(--color-bg-input);
+    --selected-row: var(--color-primary-100);
 }
 
 .dark-style {
@@ -172,6 +180,14 @@
     --color-bg: #111827;
     --color-bg-elevated: #1F2937;
     --color-bg-input: #2B3645;
+
+    /* Select2 variables mapped to admin design tokens (dark) */
+    --body-bg: var(--color-bg-elevated);
+    --body-fg: var(--color-dark-900);
+    --border-color: var(--color-dark-300);
+    --selected-bg: var(--color-dark-200);
+    --darkened-bg: var(--color-bg-input);
+    --selected-row: var(--color-primary-600);
 
     /* filler colors */
     --dca-white: #111827;
