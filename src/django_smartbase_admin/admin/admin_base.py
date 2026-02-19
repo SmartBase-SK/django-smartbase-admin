@@ -914,6 +914,23 @@ class SBAdmin(
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
 
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        if context.get("sbadmin_is_modal"):
+            media = context["media"]
+            media_json = {
+                "js": list(getattr(media, "_js", [])),
+                "css": {
+                    medium: list(paths)
+                    for medium, paths in getattr(media, "_css", {}).items()
+                },
+            }
+            context["media_json"] = media_json
+        return super().render_change_form(
+            request, context, add=add, change=change, form_url=form_url, obj=obj
+        )
+
     def history_view(self, request, object_id, extra_context=None):
         try:
             "The 'history' admin view for this model."

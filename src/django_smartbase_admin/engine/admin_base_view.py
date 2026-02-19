@@ -259,6 +259,7 @@ class SBAdminBaseView(object):
                     "TABLE_UPDATE_ROW_DATA_EVENT_NAME": TABLE_UPDATE_ROW_DATA_EVENT_NAME,
                     "SELECT_ALL_KEYWORD": SELECT_ALL_KEYWORD,
                     "SUPPORTED_FILE_TYPE_ICONS": SUPPORTED_FILE_TYPE_ICONS,
+                    "STATIC_URL": settings.STATIC_URL,
                     "STATIC_BASE_PATH": f"{settings.STATIC_URL}sb_admin",
                 }
             ),
