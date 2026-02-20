@@ -309,6 +309,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_filter = None
     sbadmin_xlsx_options = None
     sbadmin_table_history_enabled = True
+    sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
     search_field_placeholder = _("Search...")
     filters_version = None
@@ -540,6 +541,26 @@ class SBAdminBaseListView(SBAdminBaseView):
                     no_params=True,
                 ),
             ]
+        if (
+            self.sbadmin_list_history_enabled
+            and "django_smartbase_admin.audit" in settings.INSTALLED_APPS
+        ):
+            try:
+                from django_smartbase_admin.audit.views import (
+                    get_audit_model_history_url,
+                )
+
+                url = get_audit_model_history_url(self.model)
+                list_actions = [
+                    *list_actions,
+                    SBAdminCustomAction(
+                        title=_("History"),
+                        url=url,
+                        no_params=True,
+                    ),
+                ]
+            except Exception:
+                pass
         return list_actions
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:

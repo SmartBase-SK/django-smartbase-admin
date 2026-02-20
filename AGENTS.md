@@ -24,6 +24,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
+| [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -2095,23 +2096,44 @@ SB_ADMIN_AUDIT_SKIP_FIELDS = {
 }
 ```
 
-### History Button — Automatic Redirect
+### History Button — Detail View (Object History)
 
 When `django_smartbase_admin.audit` is in `INSTALLED_APPS`, the "History" button on any detail page **automatically** redirects to the audit log filtered for that object. No mixin or per-model configuration is needed — it's built into `SBAdmin.history_view()`.
 
 When a user clicks "History" on an Article detail page, they are redirected to the audit log filtered to show all changes for that specific article (including inline/related changes).
+
+### History Button — List View (Model History)
+
+When `django_smartbase_admin.audit` is in `INSTALLED_APPS`, a "History" button **automatically** appears on every model's list view. Clicking it redirects to the audit log filtered by that model's content type, showing all changes for that model.
+
+**Disabling for specific models:**
+
+Set `sbadmin_list_history_enabled = False` on any admin class to hide the History button from its list view:
+
+```python
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    sbadmin_list_history_enabled = False  # No History button on list view
+```
+
+The audit log admin itself automatically disables this to avoid circular navigation.
 
 ### Programmatic Audit URLs
 
 Generate audit history URLs from Python code (e.g., for links or redirects):
 
 ```python
-from django_smartbase_admin.audit.views import get_audit_history_url
+from django_smartbase_admin.audit.views import get_audit_history_url, get_audit_model_history_url
 
 # Get URL to audit history for a specific object
 article = Article.objects.get(pk=42)
 url = get_audit_history_url(article)
 # Returns: /sb-admin/sb_admin_audit/adminauditlog/?params=...
+
+# Get URL to audit history for an entire model
+from blog.models import Article
+url = get_audit_model_history_url(Article)
+# Returns: /sb-admin/sb_admin_audit/adminauditlog/?params=... (filtered by content_type)
 ```
 
 ### How Auditing Works
@@ -2138,16 +2160,89 @@ The audit app patches Django's ORM methods at startup (`AppConfig.ready()`):
 
 ### Access Control
 
-The audit log follows a pattern similar to Django's built-in "Recent actions":
+The audit log access control is implemented in `AdminAuditLogAdmin.get_queryset()` and `_apply_restricted_queryset_for_filters()`. The full logic flow:
 
-- **Superusers** see all audit entries
-- **Non-superusers** see only their own entries in the global list view
-- **Object-specific history** (when `object_history` filter is active, e.g. via the History button redirect) shows all entries for that object regardless of who made the change — the user already had access to the object to get there
+**Step 1 — User-based filtering (`get_queryset`):**
 
-This is implemented in `AdminAuditLogAdmin.get_queryset()`. Projects can further restrict access by:
+| User type | No filter active (global view) | `object_history` filter active | `content_type` filter active |
+|-----------|-------------------------------|-------------------------------|------------------------------|
+| **Superuser** | All entries | All entries | All entries |
+| **Non-superuser** | Own entries only (`user=request.user`) | All users' entries (filter skipped) | Own entries only (`user=request.user`) |
+
+**Step 2 — Restricted queryset permissions (`_apply_restricted_queryset_for_filters`):**
+
+Applies **after** Step 1, for **all users** (including superusers). When `content_type` or `object_history` filters are active:
+
+1. Collects content type IDs from active `object_history` and/or `content_type` filters
+2. For each content type, calls `SBAdminViewService.get_restricted_queryset()` on the target model — this invokes the project's `restrict_queryset` from `SBAdminRoleConfiguration`
+3. Filters audit entries so only entries with `object_id` in the restricted queryset are shown
+4. Entries for non-filtered content types (e.g., parent context, affected objects in the same audit view) are **not** restricted
+5. If the model class is unknown or restriction fails → entries for that content type are **excluded** (fail-closed)
+
+**Result by scenario:**
+
+| User type | Global view | Object history (History button on detail) | Model history (History button on list) |
+|-----------|------------|------------------------------------------|---------------------------------------|
+| **Superuser** | All entries | Entries for that object, restricted by `restrict_queryset` | Entries for that model, restricted by `restrict_queryset` |
+| **Non-superuser** | Own entries only | All users' entries for that object, restricted by `restrict_queryset` | Own entries for that model, restricted by `restrict_queryset` |
+
+**Example:** If `restrict_queryset` limits `Article` to published articles only, a non-superuser clicking "History" on the Article list view will see only their own audit entries for published articles — not drafts, and not other users' entries.
+
+Projects can further restrict access by:
 - Not adding the audit log `SBAdminMenuItem` for non-admin roles
 - Overriding `has_permission` in the role configuration to deny access to the `AdminAuditLog` model
-- Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog`
+- Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog` itself
+
+---
+
+## Testing
+
+### Setup
+
+Tests use SQLite in-memory and Django's built-in `auth.User` / `Group` models — no external database required.
+
+Install test dependencies into the project virtualenv:
+
+```bash
+source .venv/bin/activate
+pip install -e .
+```
+
+The virtualenv already has all runtime dependencies. No extra test-only packages are needed — tests use `unittest` and Django's built-in test runner.
+
+### Running Tests
+
+```bash
+source .venv/bin/activate
+
+# All tests
+python runtests.py
+
+# Audit tests only
+python runtests.py django_smartbase_admin.audit.tests
+
+# Specific test class
+python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.TestAdminCRUD
+
+# Specific test method
+python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.TestAdminCRUD.test_create_logs_new_values
+```
+
+### Test Structure
+
+| File | What it tests |
+|------|---------------|
+| `src/django_smartbase_admin/audit/tests/test_diff.py` | Unit tests for `compute_diff`, `compute_bulk_diff`, `compute_bulk_snapshot` |
+| `src/django_smartbase_admin/audit/tests/test_audit_integration.py` | Integration tests for audit logging (CRUD, bulk ops, inlines, M2M, request grouping) |
+| `tests/settings.py` | Minimal Django settings for standalone test runs |
+| `runtests.py` | Test runner entry point |
+
+### Adding New Tests
+
+1. Place test files in `src/django_smartbase_admin/audit/tests/`
+2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
+3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
+4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
 
 ---
 

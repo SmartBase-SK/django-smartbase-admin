@@ -8,8 +8,8 @@ from pprint import pformat
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import F, Q, TextField, Value
-from django.db.models.functions import Coalesce, Concat
+from django.db.models import F, Q, Subquery, TextField, Value
+from django.db.models.functions import Cast, Coalesce, Concat
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import escape
@@ -19,6 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     AutocompleteParseMixin,
@@ -146,6 +147,8 @@ ACTION_ICONS = {
 
 class AdminAuditLogAdmin(SBAdmin):
     """SBAdmin for viewing audit logs."""
+
+    sbadmin_list_history_enabled = False
 
     sbadmin_list_display = (
         SBAdminField(name="timestamp", title="Time", filter_disabled=True),
@@ -311,12 +314,21 @@ class AdminAuditLogAdmin(SBAdmin):
 
     def get_queryset(self, request=None):
         qs = super().get_queryset(request)
-        if request and hasattr(request, "user") and not request.user.is_superuser:
-            # Non-superusers only see their own entries in the global view.
-            # When object_history filter is active (viewing a specific object's history),
-            # show all entries — the user already had access to that object.
-            if not self._parse_and_cache_object_history_filter(request):
-                qs = qs.filter(user=request.user)
+        if request and hasattr(request, "user"):
+            # Parse and cache object_history filter for ALL users — the cached
+            # value is needed by _apply_restricted_queryset_for_filters below
+            # and by action_list_json for summary display.
+            has_object_history = self._parse_and_cache_object_history_filter(request)
+            if not request.user.is_superuser:
+                # Non-superusers only see their own entries in the global view.
+                # When object_history filter is active (viewing a specific
+                # object's history), show all entries — the user already had
+                # access to that object.
+                if not has_object_history:
+                    qs = qs.filter(user=request.user)
+        # Apply restricted queryset permissions for filtered content types
+        if request and hasattr(request, "request_data"):
+            qs = self._apply_restricted_queryset_for_filters(request, qs)
         return qs
 
     def _parse_and_cache_object_history_filter(self, request):
@@ -359,6 +371,85 @@ class AdminAuditLogAdmin(SBAdmin):
                 self._OBJECT_HISTORY_FILTER_CACHE_KEY
             ] = result
         return result
+
+    def _parse_content_type_filter(self, request):
+        """Parse content_type filter from request data.
+
+        Returns list of content_type IDs (as ints) or None.
+        """
+        try:
+            action = self.sbadmin_list_action_class(self, request)
+            raw_value = action.filter_data.get("content_type")
+            if raw_value:
+                for field in self.sbadmin_list_display:
+                    if (
+                        getattr(field, "filter_field", None) == "content_type"
+                        and field.filter_widget
+                    ):
+                        parsed = field.filter_widget.parse_value_from_input(
+                            request, raw_value
+                        )
+                        return [int(v) for v in parsed if v] if parsed else None
+        except Exception:
+            pass
+        return None
+
+    def _apply_restricted_queryset_for_filters(self, request, qs):
+        """Apply restricted queryset permissions when filtered by model or object.
+
+        When the audit log is filtered by content_type or object_history, restricts
+        entries to only those for objects the user has access to via restrict_queryset.
+        """
+        content_type_ids = set()
+
+        # Collect from object_history filter
+        obj_filter = self._get_object_history_filter()
+        if obj_filter:
+            content_type_ids.add(obj_filter[0])
+
+        # Collect from content_type filter
+        ct_filter_ids = self._parse_content_type_filter(request)
+        if ct_filter_ids:
+            content_type_ids.update(ct_filter_ids)
+
+        if not content_type_ids:
+            return qs
+
+        # For each filtered content type, restrict to accessible objects
+        restriction_q = Q()
+        for ct_id in content_type_ids:
+            try:
+                ct = ContentType.objects.get(pk=ct_id)
+                model_class = ct.model_class()
+                if not model_class:
+                    continue
+
+                restricted_qs = SBAdminViewService.get_restricted_queryset(
+                    model_class, request, request.request_data
+                )
+                # Cast PK to text to match the TextField object_id
+                allowed_ids = restricted_qs.annotate(
+                    _pk_str=Cast("pk", output_field=TextField())
+                ).values("_pk_str")
+
+                restriction_q |= Q(
+                    content_type_id=ct_id,
+                    object_id__in=Subquery(allowed_ids),
+                )
+            except Exception:
+                pass
+
+        if restriction_q:
+            # Allow entries for non-filtered content types (e.g. parent/affected context)
+            other_ct_q = ~Q(content_type_id__in=content_type_ids)
+            qs = qs.filter(restriction_q | other_ct_q)
+        else:
+            # No valid restrictions could be built for any filtered content type
+            # (unknown models or exceptions). Exclude all entries for these content
+            # types to prevent data leakage (fail-closed).
+            qs = qs.exclude(content_type_id__in=content_type_ids)
+
+        return qs
 
     def get_change_view_context(self, request, object_id):
         ctx = super().get_change_view_context(request, object_id)
