@@ -181,7 +181,7 @@ def _get_request_id() -> uuid.UUID | None:
             return None
 
         # Store/retrieve request_id directly on the request object
-        if not hasattr(request, "_audit_request_id"):
+        if getattr(request, "_audit_request_id", None) is None:
             request._audit_request_id = uuid.uuid4()
         return request._audit_request_id
     except Exception:
