@@ -283,10 +283,7 @@ class SBAdminBaseView(object):
         if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
             value = field.xlsx_options.python_formatter(obj_id, value)
         elif field.python_formatter:
-            try:
-                value = field.python_formatter(obj_id, value, **additional_data)
-            except TypeError:
-                value = field.python_formatter(obj_id, value)
+            value = field.python_formatter(obj_id, value)
         return value
 
 

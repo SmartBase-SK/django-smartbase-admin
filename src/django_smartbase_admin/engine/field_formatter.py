@@ -88,8 +88,8 @@ def link_formatter(object_id, value):
 def view_on_site_link_formatter(object_id, value, **kwargs):
     """
     Format cell value (e.g. object name) with an icon link that redirects to the
-    object on the frontend. Link points to view_on_site_from_list; redirect runs
-    only on click (no per-row query). Expects sbadmin_view_id and sbadmin_view_on_site
+    object on the frontend. Link points to view_on_site_from_list.
+    Expects sbadmin_view_id and sbadmin_view_on_site
     in kwargs (from additional_data in list action).
     """
     view_id = kwargs.get("sbadmin_view_id")

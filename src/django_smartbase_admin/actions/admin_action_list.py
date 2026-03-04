@@ -427,10 +427,6 @@ class SBAdminListAction(SBAdminAction):
                     data: row.get(data, None)
                     for data in self.view.sbadmin_list_display_data
                 }
-            additional_data["sbadmin_view_id"] = self.view.get_id()
-            additional_data["sbadmin_view_on_site"] = getattr(
-                self.view, "view_on_site", True
-            )
             # Include supporting_annotates values in additional_data
             for field in visible_columns:
                 if field.supporting_annotates:
