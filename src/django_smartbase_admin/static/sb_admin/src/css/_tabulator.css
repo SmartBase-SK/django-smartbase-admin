@@ -395,11 +395,28 @@
     @apply transition-colors;
 }
 
+.tabulator-row .sb-product-name-with-fe-link {
+    @apply inline-flex items-center gap-20;
+}
+
+.tabulator-row .sb-product-fe-link {
+    @apply max-sm:hidden inline-flex flex-shrink-0 flex-center;
+    @apply md:opacity-0 transition-opacity duration-150;
+}
+
+.sb-product-fe-link:focus {
+    @apply md:opacity-100;
+}
+
 .tabulator-row.tabulator-selectable:hover {
     cursor: pointer;
     @apply bg-primary-50;
     >.tabulator-frozen:before {
         @apply bg-primary-50;
+    }
+
+    .sb-product-fe-link {
+        @apply md:opacity-100;
     }
 }
 

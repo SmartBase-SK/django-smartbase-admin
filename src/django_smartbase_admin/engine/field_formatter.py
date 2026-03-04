@@ -82,3 +82,35 @@ def link_formatter(object_id, value):
     if not value:
         return ""
     return format_html('<a href="{0}">{0}</a>', value)
+
+
+def view_on_site_link_formatter(object_id, value, admin=None, **kwargs):
+    """
+    Format cell value (e.g. object name) with an icon link to the object on the
+    frontend. Uses admin.get_sbadmin_view_on_site_url(object_id=object_id).
+    Admin is passed via additional_data by the list action.
+    """
+    if admin is None:
+        return value or ""
+    url = admin.get_sbadmin_view_on_site_url(object_id=object_id)
+    if not url:
+        return value or ""
+    view_on_site = _("View on site")
+    icon_svg = (
+        '<svg class="w-20 h-20 inline-block align-middle text-dark-subdued hover:text-dark">'
+        '<use xlink:href="#Preview-open"></use>'
+        "</svg>"
+    )
+    link = format_html(
+        '<a href="{}" target="_blank" rel="noopener noreferrer" class="sb-product-fe-link" '
+        'aria-label="{}" onclick="event.stopPropagation()" data-bs-toggle="tooltip" '
+        'data-bs-placement="top" data-bs-title="{}">{}</a>',
+        url,
+        view_on_site,
+        view_on_site,
+        mark_safe(icon_svg),
+    )
+    return format_html(
+        '<span class="sb-product-name-with-fe-link">{}</span>',
+        format_html("{} {}", value or "", link),
+    )

@@ -561,6 +561,23 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         }
         self.all_base_fields_form = modelform_factory(self.model, **params)
 
+    def get_sbadmin_view_on_site_url(self, object_id=None, obj=None):
+        if object_id:
+            if not self.view_on_site:
+                return None
+
+            return reverse(
+                "admin:view_on_site",
+                kwargs={
+                    "content_type_id": get_content_type_for_model(self.model).pk,
+                    "object_id": object_id,
+                },
+                current_app=self.admin_site.name,
+            )
+        if obj:
+            return self.get_view_on_site_url(obj)
+        return None
+
 
 class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
     def get_menu_view_url(self, request) -> str:
@@ -578,6 +595,21 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request))
         return super().changelist_view(request, extra_context)
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        """Add sbadmin_has_absolute_url / sbadmin_absolute_url for e.g. filer image_change_form.html."""
+        view_on_site_url = self.get_sbadmin_view_on_site_url(object_id=None, obj=obj)
+        context.update(
+            {
+                "sbadmin_has_absolute_url": view_on_site_url is not None,
+                "sbadmin_absolute_url": view_on_site_url,
+            }
+        )
+        return super().render_change_form(
+            request, context, add=add, change=change, form_url=form_url, obj=obj
+        )
 
     def get_action_url(self, action, modifier="template") -> str:
         return reverse(
@@ -726,23 +758,6 @@ class SBAdmin(
     request_data = None
     menu_label = None
     sbadmin_is_generic_model = False
-
-    def get_sbadmin_view_on_site_url(self, object_id=None, obj=None):
-        if object_id:
-            if not self.view_on_site:
-                return None
-
-            return reverse(
-                "admin:view_on_site",
-                kwargs={
-                    "content_type_id": get_content_type_for_model(self.model).pk,
-                    "object_id": object_id,
-                },
-                current_app=self.admin_site.name,
-            )
-        if obj:
-            return self.get_view_on_site_url(obj)
-        return None
 
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):

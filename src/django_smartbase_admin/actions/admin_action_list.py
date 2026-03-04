@@ -427,6 +427,7 @@ class SBAdminListAction(SBAdminAction):
                     data: row.get(data, None)
                     for data in self.view.sbadmin_list_display_data
                 }
+            additional_data["admin"] = self.view
             # Include supporting_annotates values in additional_data
             for field in visible_columns:
                 if field.supporting_annotates:
