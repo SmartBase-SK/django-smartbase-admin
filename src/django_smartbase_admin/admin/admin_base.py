@@ -727,6 +727,23 @@ class SBAdmin(
     menu_label = None
     sbadmin_is_generic_model = False
 
+    def get_sbadmin_view_on_site_url(self, object_id=None, obj=None):
+        if object_id:
+            if not self.view_on_site:
+                return None
+
+            return reverse(
+                "admin:view_on_site",
+                kwargs={
+                    "content_type_id": get_content_type_for_model(self.model).pk,
+                    "object_id": object_id,
+                },
+                current_app=self.admin_site.name,
+            )
+        if obj:
+            return self.get_view_on_site_url(obj)
+        return None
+
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
             # update inline_instance parent_instance on formset when creating new object
@@ -927,6 +944,14 @@ class SBAdmin(
                 },
             }
             context["media_json"] = media_json
+
+        view_on_site_url = self.get_sbadmin_view_on_site_url(object_id=None, obj=obj)
+        context.update(
+            {
+                "sbadmin_has_absolute_url": view_on_site_url is not None,
+                "sbadmin_absolute_url": view_on_site_url,
+            }
+        )
         return super().render_change_form(
             request, context, add=add, change=change, form_url=form_url, obj=obj
         )
