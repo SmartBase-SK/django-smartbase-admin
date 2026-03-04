@@ -1,6 +1,7 @@
 from enum import Enum
 
 from django.template.defaultfilters import date, time
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -86,15 +87,16 @@ def link_formatter(object_id, value):
 
 def view_on_site_link_formatter(object_id, value, admin=None, **kwargs):
     """
-    Format cell value (e.g. object name) with an icon link to the object on the
-    frontend. Uses admin.get_sbadmin_view_on_site_url(object_id=object_id).
-    Admin is passed via additional_data by the list action.
+    Format cell value (e.g. object name) with an icon link that redirects to the
+    object on the frontend. Link points to view_on_site_from_list; redirect runs
+    only on click (no per-row query). Admin is passed via additional_data.
     """
-    if admin is None:
+    if admin is None or not getattr(admin, "view_on_site", True):
         return value or ""
-    url = admin.get_sbadmin_view_on_site_url(object_id=object_id)
-    if not url:
-        return value or ""
+    url = reverse(
+        "sb_admin:view_on_site_from_list",
+        kwargs={"view": admin.get_id(), "object_id": object_id},
+    )
     view_on_site = _("View on site")
     icon_svg = (
         '<svg class="w-20 h-20 inline-block align-middle text-dark-subdued hover:text-dark">'
