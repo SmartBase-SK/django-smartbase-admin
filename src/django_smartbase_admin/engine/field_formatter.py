@@ -85,17 +85,19 @@ def link_formatter(object_id, value):
     return format_html('<a href="{0}">{0}</a>', value)
 
 
-def view_on_site_link_formatter(object_id, value, admin=None, **kwargs):
+def view_on_site_link_formatter(object_id, value, **kwargs):
     """
     Format cell value (e.g. object name) with an icon link that redirects to the
     object on the frontend. Link points to view_on_site_from_list; redirect runs
-    only on click (no per-row query). Admin is passed via additional_data.
+    only on click (no per-row query). Expects sbadmin_view_id and sbadmin_view_on_site
+    in kwargs (from additional_data in list action).
     """
-    if admin is None or not getattr(admin, "view_on_site", True):
+    view_id = kwargs.get("sbadmin_view_id")
+    if not view_id or not kwargs.get("sbadmin_view_on_site", True):
         return value or ""
     url = reverse(
         "sb_admin:view_on_site_from_list",
-        kwargs={"view": admin.get_id(), "object_id": object_id},
+        kwargs={"view": view_id, "object_id": object_id},
     )
     view_on_site = _("View on site")
     icon_svg = (
