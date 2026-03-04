@@ -33,9 +33,9 @@
     {% if change and not is_popup %}
         <ul class="object-tools">
             <li><a href="{% url history_url object_id %}" class="historylink">{% translate "History" %}</a></li>
-            {% if sbadmin_has_absolute_url %}
-                <li><a href="{{ sbadmin_absolute_url }}" class="viewsitelink">{% translate "View on site" %}</a></li>
-            {% endif %}
+            {% if has_absolute_url %}
+                <li><a href="../../../r/{{ content_type_id }}/{{ object_id }}/" class="viewsitelink">{% translate "View on site" %}</a></li>
+            {% endif%}
         </ul>
     {% endif %}
     {% include "admin/filer/tools/detail_info.html" %}
