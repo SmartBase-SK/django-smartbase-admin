@@ -243,7 +243,7 @@ class SBAdminListAction(SBAdminAction):
             field_name = field[1:] if field.startswith("-") else field
             order_by_fields_names.add(field_name)
         for field in self.column_fields:
-            if field.name in order_by_fields_names:
+            if field.field in order_by_fields_names:
                 order_by_fields.append(field)
         return order_by_fields
 
