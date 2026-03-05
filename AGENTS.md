@@ -15,7 +15,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
-| [View on Site link in list](#view-on-site-link-in-list) | List column with “View on site” icon, redirect view, `view_on_site_link_formatter`, `get_view_on_site_url` |
+| [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
@@ -744,8 +744,7 @@ You can show a “View on site” icon next to a list column value (e.g. article
 
 ### Enabling the link
 
-1. **Implement `get_view_on_site_url` on your admin**  
-   It should return the frontend URL for the given object, or `None` to hide the link for that row.
+Use an **admin method** (a column whose name matches a method on the admin). The method calls `view_on_site_link_formatter` and passes `sbadmin_view_id` and `sbadmin_view_on_site`; the formatter cannot be used as `python_formatter` because the list action does not inject these kwargs into `additional_data`.
 
 ```python
 from django.contrib import admin
@@ -760,12 +759,6 @@ from blog.models import Article
 
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    def get_view_on_site_url(self, obj):
-        """Return frontend URL for this article, or None to hide the link."""
-        if not obj or not obj.slug:
-            return None
-        return f"/articles/{obj.slug}/"
-
     def get_title_with_view_on_site(self, object_id, value, **kwargs):
         """Column: title + View on site icon. Pass view id and flag for the formatter."""
         return view_on_site_link_formatter(
@@ -785,24 +778,21 @@ class ArticleAdmin(SBAdmin):
     )
 ```
 
-2. **Redirect view and URL**  
-   The framework provides `ViewOnSiteRedirectView` and registers:
+**Redirect view and URL**  
+The framework provides `ViewOnSiteRedirectView`:
 
-   - Path: `view-on-site/<str:view>/<int:object_id>/`
-   - URL name: `sb_admin:view_on_site_redirect`  
-   The view resolves the admin from the `view` id, loads the object, calls `get_view_on_site_url(obj)`, and redirects. If the URL is `None`, it returns 404.
+- Path: `view-on-site/<str:view>/<int:object_id>/`
+- URL name: `sb_admin:view_on_site_redirect`  
 
-3. **Formatter and kwargs**  
-   `view_on_site_link_formatter(object_id, value, **kwargs)` in `django_smartbase_admin.engine.field_formatter` expects in `kwargs`:
+The view resolves the admin from the `view` id, loads the object, calls `get_view_on_site_url(obj)`, and redirects. If the URL is `None`, it returns 404.
 
-   - `sbadmin_view_id`: the list view id (e.g. `blog_article`), used to build the redirect URL.
-   - `sbadmin_view_on_site`: optional, default `True`; if falsy, the formatter returns only the value (no icon/link).
+**Formatter kwargs**  
+`view_on_site_link_formatter(object_id, value, **kwargs)` expects:
 
-   When you use the formatter **inside an admin method** (as above), pass these explicitly. When you use it as a column’s `python_formatter`, they must be present in `additional_data` for each row (the list action does not inject them by default; using an admin method that calls the formatter is the typical approach).
+- `sbadmin_view_id`: the list view id (e.g. `blog_article`), used to build the redirect URL.
+- `sbadmin_view_on_site`: optional, default `True`; if falsy, the formatter returns only the value (no icon/link).
 
-### Using as python_formatter only
-
-If you use `view_on_site_link_formatter` as `python_formatter` on an `SBAdminField`, you must ensure `sbadmin_view_id` and (if needed) `sbadmin_view_on_site` are in `additional_data`. That usually means either using an admin method (as in the example above) or including them via `sbadmin_list_display_data` and injecting their values when building the list data. The admin-method approach is simpler and recommended.
+Because these are not passed to `python_formatter`’s `additional_data`, you must use an admin method that calls the formatter with these kwargs explicitly.
 
 ### CSS classes
 
@@ -820,13 +810,12 @@ Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on s
 | Redirect view | `ViewOnSiteRedirectView` in `views/view_on_site_redirect_view.py` |
 | URL name | `sb_admin:view_on_site_redirect` (kwargs: `view`, `object_id`) |
 | Formatter | `view_on_site_link_formatter` in `engine/field_formatter.py` |
-| Admin hook | `get_view_on_site_url(self, obj)` on your `SBAdmin` subclass |
+| URL for redirect | `get_view_on_site_url(self, obj)` — already on every admin. |
 | CSS | `.view-on-site-cell`, `.view-on-site-link` in `_tabulator.css` |
 
 **Key points:**
-- No extra query per row: the list only renders a link to the redirect URL; the redirect view runs once on click and then calls `get_view_on_site_url(obj)`.
-- Implement `get_view_on_site_url(obj)` and return the frontend URL or `None`.
-- Prefer an admin method that calls `view_on_site_link_formatter(..., sbadmin_view_id=self.get_id(), sbadmin_view_on_site=True)` so the formatter receives the required kwargs.
+- The list only renders a link to the redirect URL; the redirect runs once on click and then calls `get_view_on_site_url(obj)`.
+- Use an admin method (not `python_formatter`) so you can pass `sbadmin_view_id` and `sbadmin_view_on_site` to the formatter.
 
 ---
 
