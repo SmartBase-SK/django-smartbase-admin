@@ -95,6 +95,9 @@ class SBAdminBaseView(object):
         return self.has_permission(request, obj, "delete")
 
     def has_permission_for_action(self, request, action: SBAdminCustomAction) -> bool:
+        if getattr(action, "action_id", None) == Action.BULK_DELETE.value:
+            if not self.has_delete_permission(request):
+                return False
         return self.has_permission(
             request=request,
             obj=None,
