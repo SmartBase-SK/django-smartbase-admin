@@ -315,9 +315,8 @@ class SBAdminListAction(SBAdminAction):
                 values.extend(field.supporting_annotates.keys())
         if self.view.sbadmin_list_display_data:
             values.extend(self.view.sbadmin_list_display_data)
-        values.extend(
-            [field.field for field in self.get_order_by_fields_from_request()]
-        )
+        # Include fields required by active filters, ordering, and search, even if hidden
+        values.extend([field.field for field in self.get_filter_fields_from_request()])
         return values
 
     def get_search_results(self, request, queryset, search_term):
