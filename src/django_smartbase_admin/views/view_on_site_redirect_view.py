@@ -5,7 +5,7 @@ from django.views import View
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 
 
-class ViewOnSiteFromListView(View):
+class ViewOnSiteRedirectView(View):
     """
     GET view: expects URL kwargs view and object_id.
     Resolves the admin from configuration, calls get_view_on_site_url(object_id),

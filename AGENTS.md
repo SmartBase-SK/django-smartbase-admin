@@ -15,6 +15,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [View on Site link in list](#view-on-site-link-in-list) | List column with “View on site” icon, redirect view, `view_on_site_link_formatter`, `get_view_on_site_url` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
@@ -38,6 +39,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 
 ---
 
@@ -733,6 +735,98 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
     def get_configuration_for_roles(self, user_roles):
         return _role_config
 ```
+
+---
+
+## View on Site link in list
+
+You can show a “View on site” icon next to a list column value (e.g. article title) that opens the object’s frontend URL in a new tab. The link goes through a **redirect view**: no per-row database or URL lookup is done when rendering the list; the redirect runs only when the user clicks the icon.
+
+### Enabling the link
+
+1. **Implement `get_view_on_site_url` on your admin**  
+   It should return the frontend URL for the given object, or `None` to hide the link for that row.
+
+```python
+from django.contrib import admin
+from django.db.models import F
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import view_on_site_link_formatter
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_view_on_site_url(self, obj):
+        """Return frontend URL for this article, or None to hide the link."""
+        if not obj or not obj.slug:
+            return None
+        return f"/articles/{obj.slug}/"
+
+    def get_title_with_view_on_site(self, object_id, value, **kwargs):
+        """Column: title + View on site icon. Pass view id and flag for the formatter."""
+        return view_on_site_link_formatter(
+            object_id,
+            value,
+            sbadmin_view_id=self.get_id(),
+            sbadmin_view_on_site=True,
+        )
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="get_title_with_view_on_site",
+            title="Title",
+            annotate=F("title"),
+        ),
+        # ... other columns
+    )
+```
+
+2. **Redirect view and URL**  
+   The framework provides `ViewOnSiteRedirectView` and registers:
+
+   - Path: `view-on-site/<str:view>/<int:object_id>/`
+   - URL name: `sb_admin:view_on_site_redirect`  
+   The view resolves the admin from the `view` id, loads the object, calls `get_view_on_site_url(obj)`, and redirects. If the URL is `None`, it returns 404.
+
+3. **Formatter and kwargs**  
+   `view_on_site_link_formatter(object_id, value, **kwargs)` in `django_smartbase_admin.engine.field_formatter` expects in `kwargs`:
+
+   - `sbadmin_view_id`: the list view id (e.g. `blog_article`), used to build the redirect URL.
+   - `sbadmin_view_on_site`: optional, default `True`; if falsy, the formatter returns only the value (no icon/link).
+
+   When you use the formatter **inside an admin method** (as above), pass these explicitly. When you use it as a column’s `python_formatter`, they must be present in `additional_data` for each row (the list action does not inject them by default; using an admin method that calls the formatter is the typical approach).
+
+### Using as python_formatter only
+
+If you use `view_on_site_link_formatter` as `python_formatter` on an `SBAdminField`, you must ensure `sbadmin_view_id` and (if needed) `sbadmin_view_on_site` are in `additional_data`. That usually means either using an admin method (as in the example above) or including them via `sbadmin_list_display_data` and injecting their values when building the list data. The admin-method approach is simpler and recommended.
+
+### CSS classes
+
+The formatter outputs:
+
+- **Wrapper:** `view-on-site-cell` — flex container for the value + link.
+- **Link:** `view-on-site-link` — the “View on site” anchor (icon, tooltip, opens in new tab).
+
+Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on small screens and fades in on row hover (or when the link has focus).
+
+### Summary
+
+| Piece | Location / name |
+|-------|------------------|
+| Redirect view | `ViewOnSiteRedirectView` in `views/view_on_site_redirect_view.py` |
+| URL name | `sb_admin:view_on_site_redirect` (kwargs: `view`, `object_id`) |
+| Formatter | `view_on_site_link_formatter` in `engine/field_formatter.py` |
+| Admin hook | `get_view_on_site_url(self, obj)` on your `SBAdmin` subclass |
+| CSS | `.view-on-site-cell`, `.view-on-site-link` in `_tabulator.css` |
+
+**Key points:**
+- No extra query per row: the list only renders a link to the redirect URL; the redirect view runs once on click and then calls `get_view_on_site_url(obj)`.
+- Implement `get_view_on_site_url(obj)` and return the frontend URL or `None`.
+- Prefer an admin method that calls `view_on_site_link_formatter(..., sbadmin_view_id=self.get_id(), sbadmin_view_on_site=True)` so the formatter receives the required kwargs.
 
 ---
 

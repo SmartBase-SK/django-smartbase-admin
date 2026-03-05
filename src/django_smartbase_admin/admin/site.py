@@ -101,8 +101,8 @@ class SBAdminSite(admin.AdminSite):
             PasswordChangeDoneView,
         )
         from django_smartbase_admin.views.user_config_view import ColorSchemeView
-        from django_smartbase_admin.views.view_on_site_from_list_view import (
-            ViewOnSiteFromListView,
+        from django_smartbase_admin.views.view_on_site_redirect_view import (
+            ViewOnSiteRedirectView,
         )
 
         urls = [
@@ -188,8 +188,8 @@ class SBAdminSite(admin.AdminSite):
                 ),
                 path(
                     "view-on-site/<str:view>/<int:object_id>/",
-                    self.admin_view(ViewOnSiteFromListView.as_view()),
-                    name="view_on_site_from_list",
+                    self.admin_view(ViewOnSiteRedirectView.as_view()),
+                    name="view_on_site_redirect",
                 ),
                 path(
                     "<str:view>/<str:action>/<str:modifier>",
