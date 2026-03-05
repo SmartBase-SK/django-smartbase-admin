@@ -142,7 +142,7 @@ class SBAdminBaseView(object):
         if not self.has_view_or_change_permission(request):
             raise PermissionDenied
 
-    def get_field_map(self, request):
+    def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.field_cache
 
     def init_fields_cache(self, fields_source, configuration, force=False):
@@ -434,7 +434,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 form.view = self
                 form()
 
-    def get_list_display(self, request) -> list[str] | list:
+    def get_list_display(self, request) -> list[str]:
         return [
             getattr(field, "name", field)
             for field in self.get_sbadmin_list_display(request)

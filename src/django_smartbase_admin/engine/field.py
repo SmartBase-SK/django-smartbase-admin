@@ -104,7 +104,7 @@ class SBAdminField(JSONSerializableMixin):
 
     def __init__(
         self,
-        name,
+        name: str,
         title=None,
         model_field=None,
         view_method=None,

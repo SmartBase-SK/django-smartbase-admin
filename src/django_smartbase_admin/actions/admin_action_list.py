@@ -1,9 +1,8 @@
-from __future__ import annotations
 import json
 import math
 from typing import Any, TYPE_CHECKING
 
-from django.db.models import Q
+from django.db.models import Q, Field
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -104,11 +103,11 @@ class SBAdminListAction(SBAdminAction):
         self.tabulator_definition = tabulator_definition
         self.list_actions = list_actions
 
-    def get_columns(self):
+    def get_columns(self) -> list[str]:
         return self.view.get_list_display(self.threadsafe_request)
 
-    def init_column_fields(self):
-        column_fields = []
+    def init_column_fields(self) -> None:
+        column_fields: list["SBAdminField"] = []
         field_map = self.view.get_field_map(self.threadsafe_request)
         for column in self.get_columns():
             field = field_map.get(column, None)
@@ -225,7 +224,7 @@ class SBAdminListAction(SBAdminAction):
         )
         return context_data
 
-    def get_order_by_from_request(self):
+    def get_order_by_from_request(self) -> list[str]:
         order_by = []
         for sort in self.table_params.get("sort", []):
             order_by.append(f"{'-' if sort['dir'] == 'desc' else ''}{sort['field']}")
@@ -235,7 +234,7 @@ class SBAdminListAction(SBAdminAction):
             ]
         return order_by
 
-    def get_order_by_fields_from_request(self):
+    def get_order_by_fields_from_request(self) -> list["SBAdminField"]:
         order_by = self.get_order_by_from_request()
         order_by_fields = []
         order_by_fields_names = set()
@@ -243,7 +242,7 @@ class SBAdminListAction(SBAdminAction):
             field_name = field[1:] if field.startswith("-") else field
             order_by_fields_names.add(field_name)
         for field in self.column_fields:
-            if field.name in order_by_fields_names:
+            if field.field in order_by_fields_names:
                 order_by_fields.append(field)
         return order_by_fields
 
@@ -262,8 +261,8 @@ class SBAdminListAction(SBAdminAction):
                 search_fields.append(field)
         return search_fields
 
-    def get_filter_fields_from_request(self):
-        filter_fields = list(
+    def get_filter_fields_from_request(self) -> list["SBAdminField"]:
+        filter_fields: list["SBAdminField"] = list(
             SBAdminViewService.get_filter_fields_and_values_from_request(
                 self.threadsafe_request,
                 self.column_fields,
@@ -292,7 +291,7 @@ class SBAdminListAction(SBAdminAction):
             **self.get_annotates(visible_fields)
         )
 
-    def get_visible_column_fields(self) -> list[SBAdminField]:
+    def get_visible_column_fields(self) -> list["SBAdminField"]:
         columns_data_dict = self.columns_data.get(COLUMNS_DATA_COLUMNS_NAME, {})
         return [
             field
@@ -302,10 +301,10 @@ class SBAdminListAction(SBAdminAction):
             )[COLUMNS_DATA_VISIBLE_NAME]
         ]
 
-    def get_pk_field(self):
+    def get_pk_field(self) -> Field:
         return SBAdminViewService.get_pk_field_for_model(self.view.model)
 
-    def get_data_queryset_values(self):
+    def get_data_queryset_values(self) -> list[str]:
         values = [self.get_pk_field().name]
         visible_column_fields = self.get_visible_column_fields()
         values.extend([field.field for field in visible_column_fields])
@@ -315,9 +314,8 @@ class SBAdminListAction(SBAdminAction):
                 values.extend(field.supporting_annotates.keys())
         if self.view.sbadmin_list_display_data:
             values.extend(self.view.sbadmin_list_display_data)
-        values.extend(
-            [field.field for field in self.get_order_by_fields_from_request()]
-        )
+        # Include fields required by active filters, ordering, and search, even if hidden
+        values.extend([field.field for field in self.get_filter_fields_from_request()])
         return values
 
     def get_search_results(self, request, queryset, search_term):
@@ -416,7 +414,7 @@ class SBAdminListAction(SBAdminAction):
 
     def process_final_data(self, final_data: list[dict[str, Any]]) -> None:
         visible_columns = self.get_visible_column_fields()
-        field_key_field_map: dict[str, SBAdminField] = {
+        field_key_field_map: dict[str, "SBAdminField"] = {
             field.field: field for field in visible_columns
         }
         for row in final_data:
