@@ -15,6 +15,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
@@ -39,6 +40,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 
 ---
 
@@ -734,6 +736,87 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
     def get_configuration_for_roles(self, user_roles):
         return _role_config
 ```
+
+---
+
+## View on Site link in list
+
+You can show a “View on site” icon next to a list column value (e.g. article title) that opens the object’s frontend URL in a new tab. The link goes through a **redirect view**: no per-row database or URL lookup is done when rendering the list; the redirect runs only when the user clicks the icon.
+
+### Enabling the link
+
+Use an **admin method** (a column whose name matches a method on the admin). The method calls `view_on_site_link_formatter` and passes `sbadmin_view_id` and `sbadmin_view_on_site`; the formatter cannot be used as `python_formatter` because the list action does not inject these kwargs into `additional_data`.
+
+```python
+from django.contrib import admin
+from django.db.models import F
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import view_on_site_link_formatter
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_title_with_view_on_site(self, object_id, value, **kwargs):
+        """Column: title + View on site icon. Pass view id and flag for the formatter."""
+        return view_on_site_link_formatter(
+            object_id,
+            value,
+            sbadmin_view_id=self.get_id(),
+            sbadmin_view_on_site=True,
+        )
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="get_title_with_view_on_site",
+            title="Title",
+            annotate=F("title"),
+        ),
+        # ... other columns
+    )
+```
+
+**Redirect view and URL**  
+The framework provides `ViewOnSiteRedirectView`:
+
+- Path: `view-on-site/<str:view>/<int:object_id>/`
+- URL name: `sb_admin:view_on_site_redirect`  
+
+The view resolves the admin from the `view` id, loads the object, calls `get_view_on_site_url(obj)`, and redirects. If the URL is `None`, it returns 404.
+
+**Formatter kwargs**  
+`view_on_site_link_formatter(object_id, value, **kwargs)` expects:
+
+- `sbadmin_view_id`: the list view id (e.g. `blog_article`), used to build the redirect URL.
+- `sbadmin_view_on_site`: optional, default `True`; if falsy, the formatter returns only the value (no icon/link).
+
+Because these are not passed to `python_formatter`’s `additional_data`, you must use an admin method that calls the formatter with these kwargs explicitly.
+
+### CSS classes
+
+The formatter outputs:
+
+- **Wrapper:** `view-on-site-cell` — flex container for the value + link.
+- **Link:** `view-on-site-link` — the “View on site” anchor (icon, tooltip, opens in new tab).
+
+Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on small screens and fades in on row hover (or when the link has focus).
+
+### Summary
+
+| Piece | Location / name |
+|-------|------------------|
+| Redirect view | `ViewOnSiteRedirectView` in `views/view_on_site_redirect_view.py` |
+| URL name | `sb_admin:view_on_site_redirect` (kwargs: `view`, `object_id`) |
+| Formatter | `view_on_site_link_formatter` in `engine/field_formatter.py` |
+| URL for redirect | `get_view_on_site_url(self, obj)` — already on every admin. |
+| CSS | `.view-on-site-cell`, `.view-on-site-link` in `_tabulator.css` |
+
+**Key points:**
+- The list only renders a link to the redirect URL; the redirect runs once on click and then calls `get_view_on_site_url(obj)`.
+- Use an admin method (not `python_formatter`) so you can pass `sbadmin_view_id` and `sbadmin_view_on_site` to the formatter.
 
 ---
 
