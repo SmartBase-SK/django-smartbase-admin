@@ -51,6 +51,34 @@ def get_audit_history_url(obj) -> str:
     return f"{base_url}?{params_str}"
 
 
+def get_audit_model_history_url(model_class) -> str:
+    """
+    Get the URL to view audit history for all changes to a model type.
+
+    Args:
+        model_class: The Django model class.
+
+    Returns:
+        URL string to the audit log admin filtered for this model's content type.
+    """
+    content_type = ContentType.objects.get_for_model(model_class)
+    view_id = _get_audit_view_id()
+
+    filter_data = {
+        "content_type": [
+            {
+                "value": content_type.pk,
+                "label": f"{content_type.app_label}.{content_type.model}",
+            }
+        ],
+    }
+
+    base_url = reverse(f"sb_admin:{view_id}_changelist")
+    params_str = SBAdminViewService.build_list_params_url(view_id, filter_data)
+
+    return f"{base_url}?{params_str}"
+
+
 def redirect_to_audit_history(request, obj):
     """
     Redirect to the audit history view for an object.
@@ -58,4 +86,14 @@ def redirect_to_audit_history(request, obj):
     This can be used as a replacement for the standard Django history view.
     """
     url = get_audit_history_url(obj)
+    return redirect(url)
+
+
+def redirect_to_audit_model_history(request, model_class):
+    """
+    Redirect to the audit history view for all changes to a model type.
+
+    This can be used to show the full history of a model from the list view.
+    """
+    url = get_audit_model_history_url(model_class)
     return redirect(url)

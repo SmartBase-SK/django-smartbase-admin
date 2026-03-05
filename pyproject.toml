@@ -38,6 +38,10 @@ django-htmx = "^1.17.3"
 # required for django-filer
 setuptools = "^67.0.0"
 
+[tool.poetry.group.dev.dependencies]
+# No extra test packages needed — tests use unittest and Django's built-in
+# test runner. This group exists so `poetry install --with dev` is explicit.
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -7,7 +7,6 @@ import logging
 import uuid
 from typing import Any
 
-from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 
 from django_smartbase_admin.audit.utils.serialization import serialize_instance
@@ -182,7 +181,7 @@ def _get_request_id() -> uuid.UUID | None:
             return None
 
         # Store/retrieve request_id directly on the request object
-        if not hasattr(request, "_audit_request_id"):
+        if getattr(request, "_audit_request_id", None) is None:
             request._audit_request_id = uuid.uuid4()
         return request._audit_request_id
     except Exception:
@@ -256,6 +255,8 @@ def _create_audit_log(
     # but transaction.atomic().__exit__ does — this is critical for correctness.
     try:
         with transaction.atomic():
+            from django.contrib.contenttypes.models import ContentType
+
             # Get user from request (same source as _get_request_id)
             user = None
             try:
@@ -314,6 +315,35 @@ def _create_audit_log(
         logger.exception(
             "Audit: Failed to create audit log for %s %s", action_type, model.__name__
         )
+
+
+def create_audit_log(
+    action_type: str,
+    model,
+    object_id: str = "",
+    object_repr: str = "",
+    snapshot_before: dict | None = None,
+    changes: dict | None = None,
+    is_bulk: bool = False,
+    bulk_count: int = 0,
+    affected_objects: list | None = None,
+):
+    """Public API to manually create an audit log entry.
+
+    Use this for operations that bypass the ORM (e.g. external API calls).
+    Same signature as the internal _create_audit_log.
+    """
+    _create_audit_log(
+        action_type=action_type,
+        model=model,
+        object_id=object_id,
+        object_repr=object_repr,
+        snapshot_before=snapshot_before,
+        changes=changes,
+        is_bulk=is_bulk,
+        bulk_count=bulk_count,
+        affected_objects=affected_objects,
+    )
 
 
 def audited_qs_update(self, **kwargs):
