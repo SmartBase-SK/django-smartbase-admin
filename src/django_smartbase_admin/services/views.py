@@ -1,6 +1,7 @@
 import json
 import pickle
 import urllib
+from typing import Any, TYPE_CHECKING
 
 from django.db.models import Q, FilteredRelation, F
 from django.shortcuts import redirect
@@ -17,6 +18,9 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
+
+if TYPE_CHECKING:
+    from django_smartbase_admin.engine.field import SBAdminField
 
 
 class SBAdminViewService(object):
@@ -175,7 +179,7 @@ class SBAdminViewService(object):
         return qs
 
     @classmethod
-    def filter_value_empty(cls, filter_value):
+    def filter_value_empty(cls, filter_value: Any) -> bool:
         return (
             filter_value is None
             or filter_value == ""
@@ -183,20 +187,23 @@ class SBAdminViewService(object):
         )
 
     @classmethod
-    def get_cache_key_for_user(cls, request_data):
+    def get_cache_key_for_user(cls, request_data) -> str:
         return f"{request_data.user.id}_{pickle.dumps(request_data.global_filter)}_{pickle.dumps(request_data.request_get)}_{pickle.dumps(request_data.request_post)}"
 
     @classmethod
     def get_filter_fields_and_values_from_request(
-        cls, request, available_filters, filter_data
-    ):
+        cls,
+        request,
+        available_filters: list["SBAdminField"],
+        filter_data: dict[str, Any],
+    ) -> dict["SBAdminField", Any]:
         filter_fields_and_value = {}
         for field in available_filters:
             filter_value = filter_data.get(field.filter_field, None)
             if filter_value is not None:
                 try:
                     filter_value = json.loads(filter_value)
-                except:
+                except Exception:
                     pass
             if not cls.filter_value_empty(filter_value):
                 filter_fields_and_value[field] = filter_value
