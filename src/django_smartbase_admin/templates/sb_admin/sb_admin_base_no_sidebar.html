@@ -8,7 +8,7 @@
     <meta name="robots" content="nofollow"/>
     <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0">
 
-    <title>{% block title %}SBAdmin{% endblock %}</title>
+    <title>{% block title %}{{ admin_title }}{% endblock %}</title>
 
     {% block icons %}
         <link rel="apple-touch-icon" sizes="180x180" href="{% static 'sb_admin/favicon/apple-touch-icon.png' %}">

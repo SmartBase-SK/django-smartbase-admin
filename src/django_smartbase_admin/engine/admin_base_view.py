@@ -95,6 +95,9 @@ class SBAdminBaseView(object):
         return self.has_permission(request, obj, "delete")
 
     def has_permission_for_action(self, request, action: SBAdminCustomAction) -> bool:
+        if getattr(action, "action_id", None) == Action.BULK_DELETE.value:
+            if not self.has_delete_permission(request):
+                return False
         return self.has_permission(
             request=request,
             obj=None,
@@ -142,7 +145,7 @@ class SBAdminBaseView(object):
         if not self.has_view_or_change_permission(request):
             raise PermissionDenied
 
-    def get_field_map(self, request):
+    def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.field_cache
 
     def init_fields_cache(self, fields_source, configuration, force=False):
@@ -240,6 +243,7 @@ class SBAdminBaseView(object):
             "view_id": self.get_id(),
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
+            "admin_title": request.request_data.configuration.get_admin_title(),
             "add_label": self.get_add_label(request, object_id),
             "change_label": self.get_change_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
@@ -258,6 +262,7 @@ class SBAdminBaseView(object):
                     "TABLE_UPDATE_ROW_DATA_EVENT_NAME": TABLE_UPDATE_ROW_DATA_EVENT_NAME,
                     "SELECT_ALL_KEYWORD": SELECT_ALL_KEYWORD,
                     "SUPPORTED_FILE_TYPE_ICONS": SUPPORTED_FILE_TYPE_ICONS,
+                    "STATIC_URL": settings.STATIC_URL,
                     "STATIC_BASE_PATH": f"{settings.STATIC_URL}sb_admin",
                 }
             ),
@@ -307,6 +312,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_filter = None
     sbadmin_xlsx_options = None
     sbadmin_table_history_enabled = True
+    sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
     search_field_placeholder = _("Search...")
     filters_version = None
@@ -431,7 +437,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 form.view = self
                 form()
 
-    def get_list_display(self, request) -> list[str] | list:
+    def get_list_display(self, request) -> list[str]:
         return [
             getattr(field, "name", field)
             for field in self.get_sbadmin_list_display(request)
@@ -538,6 +544,26 @@ class SBAdminBaseListView(SBAdminBaseView):
                     no_params=True,
                 ),
             ]
+        if (
+            self.sbadmin_list_history_enabled
+            and "django_smartbase_admin.audit" in settings.INSTALLED_APPS
+        ):
+            try:
+                from django_smartbase_admin.audit.views import (
+                    get_audit_model_history_url,
+                )
+
+                url = get_audit_model_history_url(self.model)
+                list_actions = [
+                    *list_actions,
+                    SBAdminCustomAction(
+                        title=_("History"),
+                        url=url,
+                        no_params=True,
+                    ),
+                ]
+            except Exception:
+                pass
         return list_actions
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:

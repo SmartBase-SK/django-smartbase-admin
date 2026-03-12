@@ -1,0 +1,78 @@
+{% load i18n %}
+{% if is_bulk %}
+    <div class="alert flex items-center gap-8 text-14 leading-18 font-medium bg-warning-50 text-warning-900 mb-16">
+        <svg class="w-20 h-20 shrink-0"><use xlink:href="#Attention"></use></svg>
+        <span><strong>{% trans "Bulk operation" %}:</strong> {{ bulk_count }} {% trans "items affected" %}</span>
+    </div>
+{% endif %}
+
+{% if rows %}
+    <div class="-mx-24">
+        <table class="table in-card w-full">
+            <thead>
+                <tr class="border-b border-dark-200">
+                    <th class="w-36"></th>
+                    <th style="width:25%;">{% trans "Field" %}</th>
+                    <th>{% trans "Value" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% if row.type == "changed" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        <span>{{ row.old_val }}</span>
+                        <svg class="w-16 h-16 shrink-0"><use xlink:href="#Right-small"></use></svg>
+                        <span>{{ row.new_val }}</span>
+                    </td>
+                </tr>
+                {% elif row.type == "bulk" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        {% for group in row.groups %}
+                            <span>{{ group.old_val }}</span>
+                            <span>({{ group.count }}x)</span>
+                            {% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                        <br><span>&#8594;</span>
+                        <span>{{ row.new_val }}</span>
+                    </td>
+                </tr>
+                {% elif row.type == "raw" %}
+                <tr class="highlight">
+                    <td><svg class="w-20 h-20 shrink-0"><use xlink:href="#Edit"></use></svg></td>
+                    <td>
+                        {{ row.field_name }}
+                    </td>
+                    <td>
+                        <pre>{{ row.raw }}</pre>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td></td>
+                    <td>{{ row.field_name }}</td>
+                    <td>
+                        {% if row.is_long %}
+                            <pre>{{ row.value }}</pre>
+                        {% else %}
+                            {{ row.value }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>{% trans "No changes recorded." %}</p>
+{% endif %}

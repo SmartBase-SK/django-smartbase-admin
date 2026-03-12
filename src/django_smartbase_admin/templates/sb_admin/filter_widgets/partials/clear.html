@@ -1,5 +1,5 @@
 {% load i18n %}
-
+{% if filter_field.filter_widget.allow_clear %}
 <div class="relative px-12 py-8 flex">
     {% if not all_filters_visible %}
         <button type="button"
@@ -19,3 +19,4 @@
             {% trans 'Clear' %}
         </button>
 </div>
+{% endif %}

@@ -8,6 +8,7 @@
             <button
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
+                    {% if filter_field.filter_widget.close_dropdown_on_change %}data-sbadmin-close-on-change="1"{% endif %}
                     class="js-filter-dropdown-button empty {% if default_button %}btn{% else %}filter-dropdown-button{% endif %}">
                 <span>
                    {{ filter_field.title|capfirst }}: <span

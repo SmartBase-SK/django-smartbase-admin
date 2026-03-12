@@ -74,7 +74,6 @@
                                         {% if inline_admin_formset.has_change_permission %}{% trans "Change" %}{% else %}{% trans "View" %}{% endif %}
                                     </a>
                                 {% endif %}
-                                {% if inline_admin_form.show_url %}<a href="{{ inline_admin_form.absolute_url }}" class="ml-8">{% trans "View on site" %}</a>{% endif %}
                                 <div class="ml-8 flex items-center gap-8">
                                     {% if inline_admin_formset.formset.can_delete %}
                                         {% if inline_admin_form.original %}
@@ -90,8 +89,15 @@
                                             <span><a class="inline-deletelink djn-remove-handler {{ inline_admin_formset.handler_classes|join:" " }}" href="javascript:void(0)">{% trans 'Delete' %}</a></span>
                                         {% endif %}
                                     {% endif %}
+                                    {% if inline_admin_form.show_url %}
+                                        <a href="{{ inline_admin_form.absolute_url }}" class="btn btn-empty btn-icon" title="{% trans "View on site" %}" target="_blank">
+                                            <svg class="w-20 h-20 text-dark-400">
+                                                <use xlink:href="#Preview-open"></use>
+                                            </svg>
+                                        </a>
+                                    {% endif %}
                                     <div class="w-2 bg-dark-200 self-stretch"></div>
-                                    <button type="button" class="btn btn-empty js-collapse-stacked-inline" aria-expanded="{{ context_data.default_collapsed|yesno:"false,true" }}">
+                                    <button type="button" class="btn btn-empty btn-icon js-collapse-stacked-inline" aria-expanded="{{ context_data.default_collapsed|yesno:"false,true" }}">
                                         <svg class="w-20 h-20 text-dark-400">
                                             <use xlink:href="#Down"></use>
                                         </svg>
@@ -109,7 +115,7 @@
 
                     <div class="collapse flex flex-col {% if not context_data.default_collapsed %}show{% endif %}">
                         {% for fieldset in inline_admin_form %}
-                            <div class="pt-0 pb-24 px-24 stacked-row{% if not forloop.first %} border-t border-dark-200{% endif %}">
+                            <div class="pb-24 px-24 stacked-row{% if not forloop.first %} pt-24 border-t border-dark-200{% else %} pt-0{% endif %}">
                                 {% include inline_admin_formset.opts.fieldset_template %}
                             </div>
                         {% endfor %}

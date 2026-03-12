@@ -1,0 +1,22 @@
+{% load i18n %}
+{% if sections %}
+    {% for section in sections %}
+        <div>
+            <div class="font-medium text-14 mb-4">{{ section.model_name }}</div>
+            <div class="flex flex-wrap gap-4">
+                {% for badge in section.badges %}
+                    <span class="badge badge-simple">{{ badge }}</span>
+                {% endfor %}
+                {% if section.extra_count %}
+                    <span>+{{ section.extra_count }} {% trans "more" %}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not forloop.last %}
+            <hr class="my-8">
+        {% endif %}
+    {% endfor %}
+{% else %}
+    <p>{% trans "No other affected objects." %}</p>
+{% endif %}

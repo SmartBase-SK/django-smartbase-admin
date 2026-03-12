@@ -1,0 +1,7 @@
+{% load i18n %}
+
+<div class="alert flex flex-wrap items-center gap-8 text-14 leading-18 font-medium bg-{{ color }}-50 text-{{ color }}-900">
+    {% if icon %}<svg class="w-20 h-20 shrink-0"><use xlink:href="#{{ icon }}"></use></svg>{% endif %}
+    <span>{{ message }}</span>
+    {% if parent_context %}<span class="text-12 w-full">{{ parent_context }}</span>{% endif %}
+</div>

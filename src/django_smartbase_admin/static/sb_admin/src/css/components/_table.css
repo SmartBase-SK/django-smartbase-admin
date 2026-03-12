@@ -1,0 +1,33 @@
+@layer components {
+    .table {
+        border-collapse:collapse;
+        th {
+            @apply text-left text-14 p-8 bg-dark-50 text-dark-600 font-normal;
+        }
+        tr {
+            @apply border-b border-dark-200;
+            &.highlight {
+                @apply bg-primary-50;
+                td {
+                    @apply font-medium;
+                }
+            }
+        }
+        td {
+            @apply text-left text-14 p-8 text-dark-600 font-normal;
+        }
+        pre {
+            @apply overflow-auto max-h-96;
+        }
+        &.in-card {
+            td:first-child,
+            th:first-child {
+                @apply pl-32;
+            }
+            td:last-child,
+            th:last-child {
+                @apply pr-32;
+            }
+        }
+    }
+}

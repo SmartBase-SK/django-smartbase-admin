@@ -9,26 +9,38 @@ This document provides key patterns and gotchas for developers and AI assistants
 | Section | What it covers |
 |---------|----------------|
 | [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
-| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods |
-| [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions |
+| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
+| [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `list_filter` setup |
+| [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
-| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config` |
+| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
+| [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
+| [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
+| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
+| [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
+- **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
+- **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
+- **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
+- **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
+- **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
+- **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 
 ---
 
@@ -181,6 +193,127 @@ Concat(
     Value(">", output_field=TextField()),
     output_field=TextField(),
 )
+```
+
+### Ordering with Computed SBAdminField
+
+**Problem:** You have a computed field in `sbadmin_list_display` (with `annotate=`) and want to use it in the `ordering` attribute:
+
+```python
+from django.db.models import Case, TextField, Value, When
+
+from blog.models import Article
+
+# ❌ BAD - causes FieldError on detail/change page
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status_display",
+            title="Status",
+            annotate=Case(
+                When(status="published", then=Value("Published")),
+                When(status="draft", then=Value("Draft")),
+                default=Value("Other"),
+                output_field=TextField(),
+            ),
+        ),
+    )
+    ordering = ("status_display", "-created_at")  # Fails on detail page!
+```
+
+**Why it fails:** Django's `ordering` attribute is applied via `get_queryset()` which is called for BOTH list and detail views. The computed annotation only exists in the list view context (via `sbadmin_list_display`). When loading the detail/change page, Django tries to resolve `status_display` as a database field but it doesn't exist.
+
+**Solution:** Override `get_list_ordering()` which is only used for the list view:
+
+```python
+from django.db.models import Case, TextField, Value, When
+
+from blog.models import Article
+
+# ✅ GOOD - get_list_ordering is only called for list view
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status_display",
+            title="Status",
+            annotate=Case(
+                When(status="published", then=Value("Published")),
+                When(status="draft", then=Value("Draft")),
+                default=Value("Other"),
+                output_field=TextField(),
+            ),
+        ),
+    )
+    # No class-level `ordering` attribute!
+
+    def get_list_ordering(self, request):
+        """Define ordering for list view - can use computed fields."""
+        return ("status_display", "-created_at")
+```
+
+**Key points:**
+- SBAdmin uses `get_list_ordering()` for list view ordering (not Django's `get_ordering()`)
+- `get_list_ordering()` is only called for the list view, so computed fields from `sbadmin_list_display` are available
+- No need to check for detail/change pages - this method is list-view specific
+- For simple ordering without computed fields, you can still use the `ordering` class attribute
+
+### sbadmin_list_display_data - Extra Data Fields
+
+Use `sbadmin_list_display_data` to ensure data is **always fetched**, even when the user hides a column that provides it.
+
+**Problem**: Column A provides data via `supporting_annotates`. Column B needs that data. User hides Column A → data is no longer fetched → Column B breaks.
+
+**Solution**: List the data in `sbadmin_list_display_data` to ensure it's always available.
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="author_display",  # User CAN hide this column
+            title="Author",
+            annotate=F("author__name"),
+            supporting_annotates={
+                "author_id_val": F("author_id"),
+            },
+        ),
+        SBAdminField(
+            name="author_link",  # This column needs author_id_val
+            title="Profile",
+            annotate=Value("", output_field=TextField()),
+        ),
+    )
+
+    # Ensure author_id_val is ALWAYS fetched, even if "Author" column is hidden
+    sbadmin_list_display_data = ("author_id_val",)
+
+    def author_link(self, obj_id, value, **additional_data):
+        author_id = additional_data.get("author_id_val")
+        return format_html('<a href="/authors/{}">View</a>', author_id)
+```
+
+**Key points:**
+- Use when **another column depends on data** from a column that can be hidden
+- Use for **model fields** needed in formatters (e.g., `author_id` for links)
+- Use for **hidden data-only fields** defined with `list_visible=False`
+- `supporting_annotates` are only fetched when their parent column is visible - use this to force fetch
+
+For data-only fields (hidden columns with annotations), define the field and reference it:
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="computed_score",
+            annotate=F("views") + F("comments_count"),
+            list_visible=False,  # Hidden column
+        ),
+        # ... other visible columns
+    )
+
+    # Reference the hidden field to include it in the queryset
+    sbadmin_list_display_data = ("computed_score",)
 ```
 
 ---
@@ -440,6 +573,251 @@ class BlogRoleConfiguration(SBAdminRoleConfiguration):
 - Pass `request` explicitly from `restrict_queryset` when available; the function falls back to thread-local when called from filter widgets or subqueries
 - User object should have properties like `allowed_categories` that return filtering criteria (or `None` for full access)
 
+### Custom Permission System (`has_permission`)
+
+By default, `SBAdminRoleConfiguration.has_permission()` uses Django's built-in model permissions (`user.has_perm("app.view_model")`, etc.). If your project uses a different permission system (e.g., external IAM, JWT claims, session-based permissions), you can override `has_permission()` on your role configuration subclass to replace this behavior globally.
+
+**How the permission chain works:**
+
+Every permission check in SBAdmin flows through the role configuration:
+
+```
+SBAdminBaseView.has_permission()
+    → SBAdminViewService.has_permission()
+        → SBAdminRoleConfiguration.has_permission()   ← override this
+```
+
+This covers **all** SBAdmin-routed views: admin list/detail views, inlines, autocomplete widgets, and custom actions. By overriding `has_permission()` on the configuration, you get a single entry point for your custom permission logic. Since SBAdmin uses a fully custom menu (via `SBAdminMenuItem`), Django's admin index page is not used, so `has_module_permission()` does not need to be overridden.
+
+**Example — session-based permissions:**
+
+```python
+# myapp/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+PERM_ADMIN = "admin"
+PERM_ACCESS = "access"
+
+# Map model names to required permissions (beyond PERM_ACCESS)
+MODEL_PERMISSIONS = {
+    "article": [],                  # Only PERM_ACCESS needed
+    "comment": ["moderator"],       # Needs PERM_ACCESS + moderator
+}
+DEFAULT_PERMISSIONS = ["editor"]    # Fallback for unlisted models
+
+
+def _get_session_permissions(request) -> set[str]:
+    """Get permissions from session (populated at login by your auth backend)."""
+    return set(request.session.get("permissions", []))
+
+
+def has_model_permission(request, model_name: str) -> bool:
+    """Check if user has permission to access a specific model."""
+    permissions = _get_session_permissions(request)
+
+    if PERM_ADMIN in permissions:
+        return True  # Admin bypasses all checks
+
+    if PERM_ACCESS not in permissions:
+        return False  # No base access
+
+    additional = MODEL_PERMISSIONS.get(model_name.lower(), DEFAULT_PERMISSIONS)
+    if not additional:
+        return True  # Only PERM_ACCESS required
+    return any(perm in permissions for perm in additional)
+
+
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    """Role configuration with custom permission system."""
+
+    def has_permission(
+        self, request, request_data, view, model=None, obj=None, permission=None
+    ):
+        """Replace Django model permissions with custom session-based permissions.
+
+        This is called for all permission checks routed through SBAdmin:
+        admin views, inlines, autocomplete widgets, and custom actions.
+        """
+        if not request.user.is_authenticated:
+            return False
+        if model:
+            return has_model_permission(request, model._meta.model_name)
+        return True
+
+
+_role_config = AppRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+    ],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+**Key points:**
+- Override `has_permission()` on your `SBAdminRoleConfiguration` subclass — this is the **single central hook** for all permission checks (views, inlines, autocomplete widgets, actions)
+- The method signature is: `has_permission(self, request, request_data, view, model=None, obj=None, permission=None)`
+- SBAdmin uses a custom menu (`SBAdminMenuItem`), so Django's `has_module_permission()` is irrelevant — you do **not** need to override it
+- Inlines (`SBAdminTableInline`, `SBAdminStackedInline`) don't need permission overrides — their checks go through the configuration's `has_permission()`
+- The default implementation checks `request.user.has_perm()` — your override completely replaces this, so Django model permissions are not consulted at all
+
+### `SBAdminRoleConfiguration` — Overridable Methods Summary
+
+`SBAdminRoleConfiguration` is the central place to customize SBAdmin behavior. All overrides go on a single subclass:
+
+| Method | Purpose | Documented in |
+|--------|---------|---------------|
+| `has_permission()` | Replace Django model permissions with custom system | [Custom Permission System](#custom-permission-system-has_permission) |
+| `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
+| `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
+
+**Typical subclass combining all three:**
+
+```python
+# myapp/sbadmin_config.py
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from myapp.models import Author
+from myapp.permissions import has_model_permission
+from myapp.queryset_restrictions import apply_model_restrictions, author_label, author_search
+
+
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    """Role configuration with custom permissions, queryset restrictions, and autocomplete widgets."""
+
+    def has_permission(self, request, request_data, view, model=None, obj=None, permission=None):
+        if not request.user.is_authenticated:
+            return False
+        if model:
+            return has_model_permission(request, model._meta.model_name)
+        return True
+
+    def restrict_queryset(self, qs, model, request, request_data, global_filter=True, global_filter_data_map=None):
+        return apply_model_restrictions(qs, request=request)
+
+    def get_autocomplete_widget(self, view, request, form_field, db_field, model, multiselect=False):
+        if model == Author:
+            return SBAdminAutocompleteWidget(
+                form_field,
+                model=model,
+                multiselect=multiselect,
+                label_lambda=author_label,
+                search_query_lambda=author_search,
+            )
+        return super().get_autocomplete_widget(view, request, form_field, db_field, model, multiselect)
+
+
+_role_config = AppRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+    ],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+---
+
+## View on Site link in list
+
+You can show a “View on site” icon next to a list column value (e.g. article title) that opens the object’s frontend URL in a new tab. The link goes through a **redirect view**: no per-row database or URL lookup is done when rendering the list; the redirect runs only when the user clicks the icon.
+
+### Enabling the link
+
+Use an **admin method** (a column whose name matches a method on the admin). The method calls `view_on_site_link_formatter` and passes `sbadmin_view_id` and `sbadmin_view_on_site`; the formatter cannot be used as `python_formatter` because the list action does not inject these kwargs into `additional_data`.
+
+```python
+from django.contrib import admin
+from django.db.models import F
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import view_on_site_link_formatter
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_title_with_view_on_site(self, object_id, value, **kwargs):
+        """Column: title + View on site icon. Pass view id and flag for the formatter."""
+        return view_on_site_link_formatter(
+            object_id,
+            value,
+            sbadmin_view_id=self.get_id(),
+            sbadmin_view_on_site=True,
+        )
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="get_title_with_view_on_site",
+            title="Title",
+            annotate=F("title"),
+        ),
+        # ... other columns
+    )
+```
+
+**Redirect view and URL**  
+The framework provides `ViewOnSiteRedirectView`:
+
+- Path: `view-on-site/<str:view>/<int:object_id>/`
+- URL name: `sb_admin:view_on_site_redirect`  
+
+The view resolves the admin from the `view` id, loads the object, calls `get_view_on_site_url(obj)`, and redirects. If the URL is `None`, it returns 404.
+
+**Formatter kwargs**  
+`view_on_site_link_formatter(object_id, value, **kwargs)` expects:
+
+- `sbadmin_view_id`: the list view id (e.g. `blog_article`), used to build the redirect URL.
+- `sbadmin_view_on_site`: optional, default `True`; if falsy, the formatter returns only the value (no icon/link).
+
+Because these are not passed to `python_formatter`’s `additional_data`, you must use an admin method that calls the formatter with these kwargs explicitly.
+
+### CSS classes
+
+The formatter outputs:
+
+- **Wrapper:** `view-on-site-cell` — flex container for the value + link.
+- **Link:** `view-on-site-link` — the “View on site” anchor (icon, tooltip, opens in new tab).
+
+Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on small screens and fades in on row hover (or when the link has focus).
+
+### Summary
+
+| Piece | Location / name |
+|-------|------------------|
+| Redirect view | `ViewOnSiteRedirectView` in `views/view_on_site_redirect_view.py` |
+| URL name | `sb_admin:view_on_site_redirect` (kwargs: `view`, `object_id`) |
+| Formatter | `view_on_site_link_formatter` in `engine/field_formatter.py` |
+| URL for redirect | `get_view_on_site_url(self, obj)` — already on every admin. |
+| CSS | `.view-on-site-cell`, `.view-on-site-link` in `_tabulator.css` |
+
+**Key points:**
+- The list only renders a link to the redirect URL; the redirect runs once on click and then calls `get_view_on_site_url(obj)`.
+- Use an admin method (not `python_formatter`) so you can pass `sbadmin_view_id` and `sbadmin_view_on_site` to the formatter.
+
 ---
 
 ## Filter Widgets
@@ -453,8 +831,10 @@ class BlogRoleConfiguration(SBAdminRoleConfiguration):
 | `DateFilterWidget` | Date/DateTime fields |
 | `AutocompleteFilterWidget` | ForeignKey/M2M fields |
 | `FromValuesAutocompleteWidget` | Filter from distinct values |
-| `ChoiceFilterWidget` | Static choices |
-| `MultipleChoiceFilterWidget` | Multiple selection |
+| `ChoiceFilterWidget` | Static choices (single selection) |
+| `MultipleChoiceFilterWidget` | Static choices (multiple selection) |
+
+> **Recommendation:** Prefer `MultipleChoiceFilterWidget` over `ChoiceFilterWidget` for choice-based filters. It provides a better UX and gives users more flexibility to select multiple values at once.
 
 ### Custom Filter Widget Example
 
@@ -516,6 +896,56 @@ SBAdminField(
 ),
 ```
 
+### Filter Widget Behavior Parameters
+
+Control filter dropdown behavior with `close_dropdown_on_change` and `allow_clear`:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `close_dropdown_on_change` | bool | `False` | If `True`, the filter dropdown closes automatically after the filter value changes. Useful for single-step filters like boolean or simple text inputs. Set to `False` for widgets where users typically make multiple changes before closing (e.g., multiselect autocomplete). |
+| `allow_clear` | bool | `True` | If `True`, shows a "Clear" button in the filter dropdown to reset the filter value. Set to `False` to hide the clear button. |
+
+**Examples:**
+
+```python
+from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
+
+# Single-step filter - closes dropdown after selection
+class StatusFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Article,
+            multiselect=False,
+            close_dropdown_on_change=True,  # Close after selecting status
+            allow_clear=True,
+        )
+
+# Multi-step filter - keep dropdown open for multiple selections
+class TagFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Tag,
+            multiselect=True,
+            close_dropdown_on_change=False,  # Keep open for multiple tag selections
+            allow_clear=True,
+        )
+
+# Filter without clear button
+class RequiredCategoryFilterWidget(AutocompleteFilterWidget):
+    def __init__(self):
+        super().__init__(
+            model=Category,
+            multiselect=False,
+            close_dropdown_on_change=True,
+            allow_clear=False,  # Hide clear button - category is required
+        )
+```
+
+**Key points:**
+- Built-in widgets like `StringFilterWidget` and `BooleanFilterWidget` default to `close_dropdown_on_change=True` for better UX
+- `AutocompleteFilterWidget` defaults to `close_dropdown_on_change=False` to allow multiple selections
+- The clear button is automatically hidden for required form fields (controlled by `form_field.required`)
+
 ### Filter-Only Fields (No Column)
 
 To add a filter that doesn't appear as a visible column, use `list_visible=False`:
@@ -563,29 +993,77 @@ from blog.models import Article
 class ArticleAdmin(SBAdmin):
     model = Article
     sbadmin_list_display = (...)
-    list_filter = (...)
+    sbadmin_list_filter = (...)  # Preferred for SBAdminField names
     search_fields = (...)
 ```
 
-### Default Visible Filters
+### Default Visible Filters: sbadmin_list_filter vs list_filter
 
-`list_filter` controls which column filters are visible by default. Include field names or the `filter_field` value from `SBAdminField`:
+Use `sbadmin_list_filter` to specify which filters are visible by default. This attribute accepts `SBAdminField` `name` values directly, making it the preferred choice when using computed/annotated fields.
+
+**When to use each:**
+
+| Attribute | Use When | Accepts |
+|-----------|----------|---------|
+| `sbadmin_list_filter` | You have `SBAdminField` with `annotate=` or custom `filter_widget` | SBAdminField `name` values |
+| `list_filter` | All filters are simple model fields | Model field names or `filter_field` values |
+
+```python
+# ❌ BAD - Django's list_filter fails validation on annotated fields
+sbadmin_list_display = (
+    SBAdminField(
+        name="status_display",  # Computed annotation, NOT a model field
+        annotate=Case(...),
+        filter_widget=MultipleChoiceFilterWidget(...),
+    ),
+    SBAdminField(
+        name="tags_display",  # Computed annotation
+        annotate=get_tag_names_subquery(),
+        filter_widget=AutocompleteFilterWidget(...),
+    ),
+)
+
+list_filter = (
+    "status_display",  # ❌ Fails: admin.E116 - not a model field
+    "tags_display",    # ❌ Fails: admin.E116 - not a model field
+)
+```
+
+```python
+# ✅ GOOD - sbadmin_list_filter accepts SBAdminField names
+sbadmin_list_display = (
+    SBAdminField(
+        name="status_display",
+        annotate=Case(...),
+        filter_widget=MultipleChoiceFilterWidget(...),
+    ),
+    SBAdminField(
+        name="tags_display",
+        annotate=get_tag_names_subquery(),
+        filter_widget=AutocompleteFilterWidget(...),
+    ),
+)
+
+sbadmin_list_filter = (
+    "status_display",  # ✅ Works: matches SBAdminField name
+    "tags_display",    # ✅ Works: matches SBAdminField name
+)
+```
+
+**For simple model fields**, both work:
 
 ```python
 sbadmin_list_display = (
     "title",
     SBAdminField(name="status", filter_field="status"),
-    SBAdminField(name="author_name", filter_field="author__email"),  # Related field
-    SBAdminField(name="comment_count", filter_disabled=True),  # No filter
+    SBAdminField(name="author_name", filter_field="author__email"),
+    SBAdminField(name="comment_count", filter_disabled=True),
 )
 
-# list_filter should match filter_field values (not SBAdminField names)
-list_filter = (
-    "title",
-    "status", 
-    "author__email",  # Use filter_field value for related lookups
-    # "comment_count" excluded - has filter_disabled=True
-)
+# Either works for model fields:
+sbadmin_list_filter = ("title", "status", "author_name")
+# OR
+list_filter = ("title", "status", "author__email")
 
 ---
 
@@ -863,6 +1341,8 @@ class ArticleAdmin(SBAdmin):
 | "The annotation 'X' conflicts with a field" | `supporting_annotates` key matches model field | Rename annotation key |
 | "Expression contains mixed types" | Missing `output_field` in expression | Add `output_field=TextField()` to all parts |
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
+| "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
+| "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
 
 ---
 
@@ -897,7 +1377,7 @@ class ArticleAdmin(SBAdmin):
 
 ## Global Autocomplete Widget Customization
 
-Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autocomplete widgets globally. This applies to all auto-generated admin form fields including inlines.
+Override `get_autocomplete_widget` on your `SBAdminRoleConfiguration` subclass to customize autocomplete widgets globally. This applies to all auto-generated admin form fields including inlines.
 
 ### Parameters
 
@@ -909,7 +1389,7 @@ Override `get_autocomplete_widget` in `SBAdminConfiguration` to customize autoco
 | `value_lambda` | callable | `(request, item) -> any` - Extract value from item (default: primary key) |
 | `value_field` | str | Field name to use as value (alternative to `value_lambda`) |
 | `search_query_lambda` | callable | `(request, qs, model, search_term, lang_code) -> QuerySet` - Define which fields to search. Default searches all CharField/TextField |
-| `filter_search_lambda` | callable | `(request, search_term, forward_data) -> Q` - Pre-filter queryset before search. Use for dependent dropdowns with `forward` |
+| `filter_search_lambda` | callable | `(request, search_term, forward_data) -> Q` - Pre-filter queryset before search. Use for dependent dropdowns (with `forward`) or general filtering (e.g., limit to items with related data) |
 | `filter_query_lambda` | callable | `(request, selected_values) -> Q` - How selected values filter the main list (for filter widgets only) |
 | `forward` | list[str] | Field names to forward to `filter_search_lambda` for dependent dropdowns |
 | `allow_add` | bool | Allow creating new items inline (default: `False`, not supported with multiselect) |
@@ -934,12 +1414,19 @@ def author_search(request, qs, model, search_term, language_code) -> QuerySet:
         return qs
     return qs.filter(Q(name__icontains=search_term) | Q(email__icontains=search_term))
 
-# filter_search_lambda - Pre-filter based on forward data (dependent dropdowns)
-def category_filter(request, search_term, forward_data) -> Q:
+# filter_search_lambda - Pre-filter queryset before search
+# Use case 1: Dependent dropdowns (filter based on another field's value)
+def subcategory_filter(request, search_term, forward_data) -> Q:
     parent_id = forward_data.get("parent_category")
     if parent_id:
         return Q(parent_id=parent_id)
     return Q()
+
+# Use case 2: General filtering (limit to items with related data)
+def content_type_filter(request, search_term, forward_data) -> Q:
+    # Only show content types that have audit logs
+    ct_ids = AuditLog.objects.values_list("content_type", flat=True).distinct()
+    return Q(pk__in=ct_ids)
 
 # filter_query_lambda - How selection filters main list (filter widgets only)
 def author_filter_query(request, selected_ids) -> Q:
@@ -1051,7 +1538,7 @@ class CreateCategoryInlineForm(SBAdminBaseFormInit, forms.Form):
 
 **Key points:**
 - `search_query_lambda` should search the same fields shown in `label_lambda` for intuitive UX
-- `filter_search_lambda` runs BEFORE search - use for dependent dropdowns
+- `filter_search_lambda` runs BEFORE search - use for dependent dropdowns OR general pre-filtering (e.g., limit to items with related data)
 - `search_query_lambda` defines WHICH fields to search
 - Global config does NOT apply to manually-created widgets - pass lambdas directly
 
@@ -1105,6 +1592,123 @@ class ArticleForm(SBAdminBaseFormInit, forms.Form):
 - Example: `Count("articles") + Count("children")` with 2 articles and 2 children returns 8 instead of 4
 - Separate `Subquery` annotations avoid this by calculating each count independently
 
+### Autocomplete for Text Field Values (Not ForeignKey)
+
+When you need an autocomplete that stores a text value (not a ForeignKey), use `SBAdminAutocompleteWidget` with `label_lambda` and `value_lambda` to return text instead of the model's pk.
+
+#### Simple Inline Approach (No Distinct)
+
+When duplicates in the dropdown are acceptable (or the source field is already unique), use lambdas directly:
+
+```python
+from django import forms
+from django.contrib import admin
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Article, Author
+
+
+class ArticleForm(SBAdminBaseForm):
+    """Form with author name autocomplete storing text value."""
+
+    author_name = forms.CharField(
+        label="Author Name",
+        required=False,
+        widget=SBAdminAutocompleteWidget(
+            model=Author,
+            multiselect=False,
+            label_lambda=lambda req, item: item.name,
+            value_lambda=lambda req, item: item.name,
+            filter_search_lambda=lambda req, search, fwd: Q(is_active=True),
+        ),
+    )
+
+    class Meta:
+        model = Article
+        fields = "__all__"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    form = ArticleForm
+```
+
+#### Subclass Approach (With Distinct or Custom Lookup)
+
+Use this when there's no direct model relationship - you're storing a text value (not a FK) but want autocomplete suggestions from another model's field. The subclass tells the widget how to look up and display values from a field that isn't the primary key:
+
+```python
+from django import forms
+from django.contrib import admin
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+
+from blog.models import Article, Author
+
+
+class AuthorEmailAutocompleteWidget(SBAdminAutocompleteWidget):
+    """Autocomplete widget for distinct author emails."""
+
+    def get_queryset(self, request=None):
+        return (
+            Author.objects.exclude(email__exact="")
+            .exclude(email__isnull=True)
+            .order_by("email")
+            .distinct("email")
+        )
+
+    def get_value_field(self):
+        return "email"  # Field to look up existing values (not pk)
+
+    def get_label(self, request, item):
+        return item.email
+
+    def get_value(self, request, item):
+        return item.email
+
+
+class ArticleForm(SBAdminBaseForm):
+    """Form with author email autocomplete from distinct Author emails."""
+
+    author_email = forms.CharField(
+        label="Author Email",
+        required=False,
+        widget=AuthorEmailAutocompleteWidget(model=Author, multiselect=False),
+    )
+
+    class Meta:
+        model = Article
+        fields = "__all__"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    form = ArticleForm
+```
+
+**When to use each approach:**
+
+| Approach | Use When |
+|----------|----------|
+| Inline lambdas | Source field values are unique, duplicates are acceptable, editing existing values not needed |
+| Subclass | No FK relationship, need `.distinct()`, or need to look up existing values when editing (requires `get_value_field()`) |
+
+**Key points:**
+- Form field is `CharField` (not `ModelChoiceField`) since we're storing a text value
+- Form must inherit from `SBAdminBaseForm` for proper widget initialization
+- `label_lambda` and `value_lambda` return text field value instead of model's pk
+- **Critical:** Override `get_value_field()` to return the text field name - this is used to look up existing values when editing (default is `"id"` which fails for text values)
+- Use `multiselect=False` for single selection
+- `filter_search_lambda` returns a `Q` object - for `.distinct()` or complex queryset changes, subclass the widget and override `get_queryset()`
+
 ---
 
 ## Pre-filtered List Views (sbadmin_list_view_config)
@@ -1136,15 +1740,315 @@ class ArticleAdmin(SBAdmin):
 | `name` | str | **Required**. Tab label shown in the UI |
 | `url_params` | dict | **Required**. Contains `filterData` with filter key-value pairs |
 
-### Filter Data Keys
+### Filter Data for Named Tabs
 
 The keys in `filterData` should match:
 - Model field names for direct fields
 - `filter_field` value from `SBAdminField` for custom filter fields
 
+**Value format in `filterData` depends on the filter widget type used by the field:**
+
+| Filter Widget | Value Format in `filterData` | Example |
+|---------------|------------------------------|---------|
+| `ChoiceFilterWidget` | String | `"published"` |
+| `MultipleChoiceFilterWidget` | **Array** of objects with `value` and `label` | `[{"value": "published", "label": "Published"}]` |
+
+**Example: Pre-filtered tabs with MultipleChoiceFilterWidget:**
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status",
+            filter_widget=MultipleChoiceFilterWidget(choices=[
+                ("published", "Published"),
+                ("draft", "Draft"),
+                ("archived", "Archived"),
+            ]),
+        ),
+    )
+    
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",  # Must be array even for single value
+            "url_params": {"filterData": {"status": [{"value": "published", "label": "Published"}]}},
+        },
+        {
+            "name": "Active",  # Multiple values in array
+            "url_params": {"filterData": {"status": [
+                {"value": "published", "label": "Published"},
+                {"value": "draft", "label": "Draft"},
+            ]}},
+        },
+    ]
+    
+    list_filter = ("status",)
+```
+
+> **Note:** `MultipleChoiceFilterWidget` values must always be an array (even for single selections) because the JavaScript uses `.map()` to parse the values.
+
+### Displaying All Filters in Named Tabs
+
+When switching to a named tab, only filters specified in `filterData` are shown in the filter bar above the table. To display all filter widgets (even those without values), include them with empty string (`""`):
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="status", filter_widget=MultipleChoiceFilterWidget(choices=[...])),
+        SBAdminField(name="category", filter_widget=FromValuesAutocompleteWidget()),
+        SBAdminField(name="author", filter_widget=AutocompleteFilterWidget(model=Author)),
+    )
+    
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",
+            "url_params": {"filterData": {
+                "status": [{"value": "published", "label": "Published"}],
+                "category": "",  # Display filter widget (empty)
+                "author": "",    # Display filter widget (empty)
+            }},
+        },
+    ]
+    
+    list_filter = ("status", "category", "author")
+```
+
+> **Note:** The automatic "All" tab already displays all `list_filter` fields. For custom tabs, you must explicitly include each filter you want visible in the filter bar.
+
 An "All" tab is automatically added as the first tab.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
+
+### Building Pre-filtered URLs Programmatically
+
+Use `SBAdminViewService.build_list_params_url()` to generate URLs with pre-applied filters from Python code (e.g., for redirects or links between admin pages).
+
+```python
+from django.urls import reverse
+from django_smartbase_admin.services.views import SBAdminViewService
+
+# View ID follows pattern: {app_label}_{model_name}
+VIEW_ID = "blog_article"
+
+# Filter data format depends on the filter widget type
+filter_data = {
+    # AutocompleteFilterWidget: array of {value, label}
+    "category": [
+        {"value": 5, "label": "Technology"},
+    ],
+    # MultipleChoiceFilterWidget: array of {value, label}
+    "status": [
+        {"value": "published", "label": "Published"},
+        {"value": "draft", "label": "Draft"},
+    ],
+}
+
+# Build the URL
+base_url = reverse("sb_admin:blog_article_changelist")
+params_str = SBAdminViewService.build_list_params_url(VIEW_ID, filter_data)
+full_url = f"{base_url}?{params_str}"
+```
+
+**Filter Data Format by Widget Type:**
+
+| Widget | Format | Example |
+|--------|--------|---------|
+| `AutocompleteFilterWidget` | `[{"value": ..., "label": ...}]` | `[{"value": 5, "label": "Tech"}]` |
+| `MultipleChoiceFilterWidget` | `[{"value": ..., "label": ...}]` | `[{"value": "draft", "label": "Draft"}]` |
+| `ChoiceFilterWidget` | String | `"published"` |
+| `BooleanFilterWidget` | Boolean | `True` or `False` |
+| `StringFilterWidget` | String | `"search term"` |
+| `DateFilterWidget` | String (ISO format) | `"2024-01-15"` |
+
+**Example: Link from Comment to filtered Article list**
+
+```python
+# blog/admin.py
+from django.shortcuts import redirect
+from django.urls import reverse
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.services.views import SBAdminViewService
+
+from blog.models import Article, Comment
+
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    
+    def response_change(self, request, obj):
+        """After saving a comment, redirect to article list filtered by author."""
+        if "_view_author_articles" in request.POST:
+            author = obj.article.author
+            
+            # Build filter with {value, label} format for AutocompleteFilterWidget
+            filter_data = {
+                "author": [
+                    {"value": author.pk, "label": author.name},
+                ],
+            }
+            
+            view_id = "blog_article"
+            base_url = reverse("sb_admin:blog_article_changelist")
+            params_str = SBAdminViewService.build_list_params_url(view_id, filter_data)
+            
+            return redirect(f"{base_url}?{params_str}")
+        
+        return super().response_change(request, obj)
+```
+
+**Key points:**
+- View ID format: `{app_label}_{model_name}` (lowercase, underscore-separated)
+- `AutocompleteFilterWidget` and `MultipleChoiceFilterWidget` **require** array format with `value` and `label` keys
+- The `label` is displayed in the filter UI; `value` is used for the actual query
+- Use `reverse("sb_admin:{app_label}_{model_name}_changelist")` to get the base URL
+
+**Source:** `django_smartbase_admin/services/views.py` - `SBAdminViewService.build_list_params_url`
+
+---
+
+## Detail View Layout (Sidebar)
+
+The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
+
+### Using `DETAIL_STRUCTURE_RIGHT_CLASS`
+
+Add the `DETAIL_STRUCTURE_RIGHT_CLASS` to a fieldset's `classes` to place it in the right sidebar:
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    readonly_fields = ["created_at", "updated_at", "word_count"]
+    
+    sbadmin_fieldsets = [
+        # Main content (left/center)
+        (
+            "Content",
+            {
+                "fields": ["title", "body", "category"],
+            },
+        ),
+        # Sidebar (right)
+        (
+            "Metadata",
+            {
+                "fields": ["author", "status", "created_at", "updated_at"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            "Statistics",
+            {
+                "fields": ["word_count"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+    ]
+```
+
+### Custom HTML Fields in Sidebar
+
+For rich content like formatted cards, create readonly methods that return HTML. Use `short_description` to set a clean label:
+
+```python
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    readonly_fields = ["title", "body", "category", "status_card"]
+    
+    sbadmin_fieldsets = [
+        (
+            "Content",
+            {
+                "fields": ["title", "body", "category"],
+            },
+        ),
+        (
+            None,  # No header for this fieldset
+            {
+                "fields": ["status_card"],
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+    ]
+    
+    def status_card(self, obj):
+        """Render a status card as HTML."""
+        if not obj:
+            return "-"
+        
+        color = {"draft": "warning", "published": "success", "archived": "secondary"}.get(obj.status, "info")
+        
+        return mark_safe(
+            f'<div class="card">'
+            f'<div class="card-header fw-bold">{_("Status")}</div>'
+            f'<div class="card-body">'
+            f'<span class="badge bg-{color}">{escape(obj.status)}</span>'
+            f'</div></div>'
+        )
+    status_card.short_description = _("Status")  # Sets the field label
+```
+
+### Hiding Labels (Optional)
+
+The `short_description` sets a reasonable label (e.g., "Status:"). If you want to hide labels entirely for custom HTML fields, override the template:
+
+```html
+{# templates/sb_admin/blog/article/change_form.html #}
+{% extends "sb_admin/actions/change_form.html" %}
+
+{% block js_init %}
+{{ block.super }}
+<style>
+    /* Hide labels for custom HTML fields */
+    label[for="id_status_card"] {
+        display: none;
+    }
+</style>
+{% endblock %}
+```
+
+Then set `change_form_template` in your admin:
+
+```python
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    change_form_template = "sb_admin/blog/article/change_form.html"
+    # ... rest of config
+```
+
+**Note:** This is optional — the default label from `short_description` is usually sufficient.
+
+### Combining with Collapse
+
+Sidebar fieldsets can also be collapsible:
+
+```python
+sbadmin_fieldsets = [
+    # ... main content ...
+    (
+        "Advanced Options",
+        {
+            "fields": ["seo_title", "seo_description"],
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS, "collapse"],
+        },
+    ),
+]
+```
+
+**Key points:**
+- Fieldsets are rendered in order - put main content fieldsets first, then sidebar fieldsets
+- Use `None` as fieldset title to hide the header entirely
+- Import `DETAIL_STRUCTURE_RIGHT_CLASS` from `django_smartbase_admin.engine.const`
+- Custom HTML fields need `mark_safe()` and should escape user content with `escape()`
+- Sidebar is hidden in modal views (only shown in full page detail view)
+
+**Source:** `django_smartbase_admin/engine/const.py`, `django_smartbase_admin/templates/sb_admin/actions/change_form.html`
 
 ---
 
@@ -1153,6 +2057,275 @@ An "All" tab is automatically added as the first tab.
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
+
+---
+
+## SBAdmin Attribute Reference
+
+Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdmin` and related classes.
+
+### List View Attributes (SBAdmin)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_list_display` | tuple | Define columns using `SBAdminField` or field names |
+| `sbadmin_list_display_data` | tuple | Field names always fetched (even if column hidden) |
+| `sbadmin_list_filter` | tuple | Default visible filters - accepts `SBAdminField` names |
+| `sbadmin_list_view_config` | list[dict] | Pre-filtered view tabs configuration |
+| `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
+| `sbadmin_list_actions` | list | List-level actions (not selection-based) |
+| `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
+| `sbadmin_xlsx_options` | dict | Excel export configuration options |
+| `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
+
+### Detail/Change View Attributes (SBAdmin)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
+| `sbadmin_tabs` | list | Organize form fields into tabs |
+| `sbadmin_detail_actions` | list | Actions shown on detail/change page |
+| `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
+| `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
+
+### Inline Attributes (SBAdminTableInline/SBAdminStackedInline)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `sbadmin_fake_inlines` | list | Additional inline classes to include |
+| `sbadmin_sortable_field_options` | list | Field names for inline row ordering (default: `["order_by"]`) |
+| `sbadmin_inline_list_actions` | list | Actions available for inline rows |
+
+**Source:** `django_smartbase_admin/engine/admin_base_view.py`, `django_smartbase_admin/admin/admin_base.py`
+
+---
+
+## Audit Logging
+
+Built-in optional app that automatically tracks all admin operations (create, update, delete, bulk) with field-level diffs, object snapshots, and request grouping. Works by patching Django's `Model.save()`, `Model.delete()`, `QuerySet.update()`, `QuerySet.delete()`, `QuerySet.bulk_create()`, and `QuerySet.bulk_update()` — only active inside SBAdmin request context.
+
+### Installation
+
+1. Add to `INSTALLED_APPS` (after `django_smartbase_admin`):
+
+```python
+INSTALLED_APPS = [
+    # your apps...
+    "django_smartbase_admin",
+    "django_smartbase_admin.audit",
+]
+```
+
+2. Run migrations:
+
+```bash
+python manage.py migrate
+```
+
+3. Add to your menu in `sbadmin_config.py`:
+
+```python
+from django_smartbase_admin.services.views import SBAdminViewService
+from django_smartbase_admin.audit.models import AdminAuditLog
+
+_role_config = SBAdminRoleConfiguration(
+    menu_items=[
+        # ... other menu items ...
+        SBAdminMenuItem(
+            label="Audit Log",
+            icon="Time",
+            view_id=SBAdminViewService.get_model_path(AdminAuditLog),
+        ),
+    ],
+    # ...
+)
+```
+
+The admin view is auto-registered by the audit app — no `@admin.register` needed.
+
+### What Gets Recorded
+
+Each `AdminAuditLog` entry contains:
+
+| Field | Description |
+|-------|-------------|
+| `timestamp` | When the change happened |
+| `user` | Who made the change |
+| `request_id` | UUID grouping all changes from the same request |
+| `content_type` + `object_id` | The changed object |
+| `object_repr` | String representation of the object |
+| `action_type` | `create`, `update`, `delete`, `bulk_create`, `bulk_update`, `bulk_delete` |
+| `snapshot_before` | Full object state before the change (JSON) |
+| `changes` | Field-level diffs: `{"field": {"old": ..., "new": ..., "old_display": ..., "new_display": ...}}` |
+| `parent_content_type` + `parent_object_id` | Parent object context (for inline edits) |
+| `affected_objects` | FK targets referenced in changes (JSON array) |
+| `is_bulk` / `bulk_count` | Whether it was a bulk operation and how many items |
+
+### Skipping Models and Fields
+
+By default, the audit app skips `admin.LogEntry`, `sessions.Session`, and `contenttypes.ContentType`. It also skips `auto_now` / `auto_now_add` fields and `last_login` on `auth.User`.
+
+Add project-specific skip rules in `settings.py`:
+
+```python
+# Skip entire models from auditing
+SB_ADMIN_AUDIT_SKIP_MODELS = {
+    ("blog", "comment"),  # (app_label, model_name) tuples
+}
+
+# Skip specific fields per model
+SB_ADMIN_AUDIT_SKIP_FIELDS = {
+    ("blog", "article"): {"internal_score", "cache_key"},
+}
+```
+
+### History Button — Detail View (Object History)
+
+When `django_smartbase_admin.audit` is in `INSTALLED_APPS`, the "History" button on any detail page **automatically** redirects to the audit log filtered for that object. No mixin or per-model configuration is needed — it's built into `SBAdmin.history_view()`.
+
+When a user clicks "History" on an Article detail page, they are redirected to the audit log filtered to show all changes for that specific article (including inline/related changes).
+
+### History Button — List View (Model History)
+
+When `django_smartbase_admin.audit` is in `INSTALLED_APPS`, a "History" button **automatically** appears on every model's list view. Clicking it redirects to the audit log filtered by that model's content type, showing all changes for that model.
+
+**Disabling for specific models:**
+
+Set `sbadmin_list_history_enabled = False` on any admin class to hide the History button from its list view:
+
+```python
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    sbadmin_list_history_enabled = False  # No History button on list view
+```
+
+The audit log admin itself automatically disables this to avoid circular navigation.
+
+### Programmatic Audit URLs
+
+Generate audit history URLs from Python code (e.g., for links or redirects):
+
+```python
+from django_smartbase_admin.audit.views import get_audit_history_url, get_audit_model_history_url
+
+# Get URL to audit history for a specific object
+article = Article.objects.get(pk=42)
+url = get_audit_history_url(article)
+# Returns: /sb-admin/sb_admin_audit/adminauditlog/?params=...
+
+# Get URL to audit history for an entire model
+from blog.models import Article
+url = get_audit_model_history_url(Article)
+# Returns: /sb-admin/sb_admin_audit/adminauditlog/?params=... (filtered by content_type)
+```
+
+### How Auditing Works
+
+The audit app patches Django's ORM methods at startup (`AppConfig.ready()`):
+
+| Method | What it captures |
+|--------|-----------------|
+| `Model.save()` | Create (new object) or update (existing object) with full diff |
+| `Model.delete()` | Delete with full snapshot before |
+| `QuerySet.update()` | Single update (with diff) or bulk update (with aggregated changes) |
+| `QuerySet.delete()` | Single delete or bulk delete |
+| `QuerySet.bulk_create()` | Bulk create with count and IDs |
+| `QuerySet.bulk_update()` | Bulk update with aggregated before/after |
+
+**Key behaviors:**
+- Only audits inside SBAdmin request context (uses `SBAdminThreadLocalService`)
+- Never audits the `AdminAuditLog` model itself (prevents infinite recursion)
+- Uses `transaction.atomic()` so audit failures never break the main transaction
+- Groups all changes in a single request via `request_id` (stored on the request object)
+- Auto-detects parent context from SBAdmin's `request_data` (for inline edits)
+- Captures FK display values (`old_display`, `new_display`) for human-readable diffs
+- M2M changes are tracked via the through/junction table (create/delete on junction rows)
+
+### Access Control
+
+The audit log access control is implemented in `AdminAuditLogAdmin.get_queryset()` and `_apply_restricted_queryset_for_filters()`. The full logic flow:
+
+**Step 1 — User-based filtering (`get_queryset`):**
+
+| User type | No filter active (global view) | `object_history` filter active | `content_type` filter active |
+|-----------|-------------------------------|-------------------------------|------------------------------|
+| **Superuser** | All entries | All entries | All entries |
+| **Non-superuser** | Own entries only (`user=request.user`) | All users' entries (filter skipped) | Own entries only (`user=request.user`) |
+
+**Step 2 — Restricted queryset permissions (`_apply_restricted_queryset_for_filters`):**
+
+Applies **after** Step 1, for **all users** (including superusers). When `content_type` or `object_history` filters are active:
+
+1. Collects content type IDs from active `object_history` and/or `content_type` filters
+2. For each content type, calls `SBAdminViewService.get_restricted_queryset()` on the target model — this invokes the project's `restrict_queryset` from `SBAdminRoleConfiguration`
+3. Filters audit entries so only entries with `object_id` in the restricted queryset are shown
+4. Entries for non-filtered content types (e.g., parent context, affected objects in the same audit view) are **not** restricted
+5. If the model class is unknown or restriction fails → entries for that content type are **excluded** (fail-closed)
+
+**Result by scenario:**
+
+| User type | Global view | Object history (History button on detail) | Model history (History button on list) |
+|-----------|------------|------------------------------------------|---------------------------------------|
+| **Superuser** | All entries | Entries for that object, restricted by `restrict_queryset` | Entries for that model, restricted by `restrict_queryset` |
+| **Non-superuser** | Own entries only | All users' entries for that object, restricted by `restrict_queryset` | Own entries for that model, restricted by `restrict_queryset` |
+
+**Example:** If `restrict_queryset` limits `Article` to published articles only, a non-superuser clicking "History" on the Article list view will see only their own audit entries for published articles — not drafts, and not other users' entries.
+
+Projects can further restrict access by:
+- Not adding the audit log `SBAdminMenuItem` for non-admin roles
+- Overriding `has_permission` in the role configuration to deny access to the `AdminAuditLog` model
+- Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog` itself
+
+---
+
+## Testing
+
+### Setup
+
+Tests use SQLite in-memory and Django's built-in `auth.User` / `Group` models — no external database required.
+
+Install test dependencies into the project virtualenv:
+
+```bash
+source .venv/bin/activate
+pip install -e .
+```
+
+The virtualenv already has all runtime dependencies. No extra test-only packages are needed — tests use `unittest` and Django's built-in test runner.
+
+### Running Tests
+
+```bash
+source .venv/bin/activate
+
+# All tests
+python runtests.py
+
+# Audit tests only
+python runtests.py django_smartbase_admin.audit.tests
+
+# Specific test class
+python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.TestAdminCRUD
+
+# Specific test method
+python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.TestAdminCRUD.test_create_logs_new_values
+```
+
+### Test Structure
+
+| File | What it tests |
+|------|---------------|
+| `src/django_smartbase_admin/audit/tests/test_diff.py` | Unit tests for `compute_diff`, `compute_bulk_diff`, `compute_bulk_snapshot` |
+| `src/django_smartbase_admin/audit/tests/test_audit_integration.py` | Integration tests for audit logging (CRUD, bulk ops, inlines, M2M, request grouping) |
+| `tests/settings.py` | Minimal Django settings for standalone test runs |
+| `runtests.py` | Test runner entry point |
+
+### Adding New Tests
+
+1. Place test files in `src/django_smartbase_admin/audit/tests/`
+2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
+3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
+4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
 
 ---
 

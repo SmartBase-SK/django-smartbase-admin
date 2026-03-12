@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
@@ -48,6 +49,9 @@ from nested_admin.nested import (
     NestedGenericStackedInline,
 )
 
+from django_smartbase_admin.audit.views import (
+    redirect_to_audit_history,
+)
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import FormFieldsetMixin, is_modal
@@ -71,7 +75,7 @@ except ImportError:
 
 postrgres_enabled = None
 try:
-    from django.contrib.postgres.forms import SimpleArrayField
+    from django.contrib.postgres.forms import SimpleArrayField, DateTimeRangeField
 
     postrgres_enabled = True
 except ImportError:
@@ -90,6 +94,14 @@ try:
     from colorfield.fields import ColorField
 
     color_field_enabled = True
+except ImportError:
+    pass
+
+cms_enabled = None
+try:
+    from cms.forms.fields import PageSelectFormField
+
+    cms_enabled = True
 except ImportError:
     pass
 
@@ -118,6 +130,7 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminMultipleChoiceInlineWidget,
     SBAdminColorWidget,
     SBAdminFilerFileWidget,
+    SBAdminDateTimeRangeWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
@@ -177,10 +190,15 @@ class SBAdminFormFieldWidgetsMixin:
     }
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
+        formfield_widgets[DateTimeRangeField] = SBAdminDateTimeRangeWidget
     if django_cms_attributes:
         formfield_widgets[AttributesFormField] = SBAdminAttributesWidget
     if color_field_enabled:
         db_field_widgets[ColorField] = SBAdminColorWidget
+    if cms_enabled:
+        from django_smartbase_admin.admin.widgets import SBAdminPageSelectWidget
+
+        formfield_widgets[PageSelectFormField] = SBAdminPageSelectWidget
 
     django_widget_to_widget = {
         forms.PasswordInput: SBAdminPasswordInputWidget,
@@ -896,6 +914,23 @@ class SBAdmin(
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
 
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        if context.get("sbadmin_is_modal"):
+            media = context["media"]
+            media_json = {
+                "js": list(getattr(media, "_js", [])),
+                "css": {
+                    medium: list(paths)
+                    for medium, paths in getattr(media, "_css", {}).items()
+                },
+            }
+            context["media_json"] = media_json
+        return super().render_change_form(
+            request, context, add=add, change=change, form_url=form_url, obj=obj
+        )
+
     def history_view(self, request, object_id, extra_context=None):
         try:
             "The 'history' admin view for this model."
@@ -912,6 +947,9 @@ class SBAdmin(
 
             if not self.has_view_or_change_permission(request, obj):
                 raise PermissionDenied
+
+            if "django_smartbase_admin.audit" in settings.INSTALLED_APPS:
+                return redirect_to_audit_history(request, obj)
 
             # Then get the history for this object.
             app_label = self.opts.app_label
@@ -1064,7 +1102,7 @@ class SBAdminInline(
 
     def register_autocomplete_views(self, request) -> None:
         super().register_autocomplete_views(request)
-        form_class = self.get_formset(request, self.model()).form
+        form_class = self.get_formset(request, None).form
         self.initialize_form_class(form_class, request)
         form_class()
 

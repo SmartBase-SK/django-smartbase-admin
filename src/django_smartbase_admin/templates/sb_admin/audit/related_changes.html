@@ -1,0 +1,40 @@
+{% load i18n %}
+{% if rows %}
+<div class="-mx-24">
+    <table class="table in-card w-full">
+        <thead>
+            <tr>
+                <th style="width:128px;">{% trans "Action" %}</th>
+                <th style="width:30%;">{% trans "Model" %}</th>
+                <th>{% trans "Object" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    <span class="badge badge-simple badge-{{ row.color }}">{{ row.label }}</span>
+                </td>
+                <td>{{ row.model_name }}</td>
+                <td>
+                    {% if row.url %}
+                        <a href="{{ row.url }}" class="link inline-flex items-center gap-4">
+                            {{ row.obj_repr }}
+                            <svg class="w-16 h-16 shrink-0"><use xlink:href="#Right-small"></use></svg>
+                        </a>
+                    {% else %}
+                        {{ row.obj_repr }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if extra_count %}
+    <div class="p-8 text-14">+{{ extra_count }} {% trans "more" %}</div>
+{% endif %}
+{% else %}
+    <p>{% trans "No related changes in this request." %}</p>
+{% endif %}

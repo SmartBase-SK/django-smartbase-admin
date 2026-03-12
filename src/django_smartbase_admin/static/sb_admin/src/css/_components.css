@@ -5,6 +5,7 @@
 @import "components/_modal.css";
 @import "components/_tooltip.css";
 @import "components/_query-builder.css";
+@import "components/_table.css";
 
 @layer components {
     .card {
@@ -192,7 +193,8 @@
                 @apply hidden;
             }
         }
-        &-positive {
+        &-positive,
+        &-success {
             @apply text-success-700 bg-success-100;
         }
         &-warning {

@@ -340,12 +340,14 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
             sub_widget_data[sub_widget.get_id()] = sub_widget.get_data(
                 request, sub_widget_qs
             )
+        active_sub_widget = self.get_active_sub_widget(request)
+        dataset_label = active_sub_widget.title if active_sub_widget else self.name
         return_data = {
             "main": {
                 "labels": labels,
                 "datasets": [
                     {
-                        "label": self.name,
+                        "label": dataset_label,
                         "data": dataset_data,
                         **self.get_dataset_options(request),
                     }
@@ -429,6 +431,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                 filter_widget=RadioChoiceFilterWidget(
                     choices=self.DateResolutionsOptions.choices,
                     default_value=self.default_date_resolution,
+                    allow_clear=False,
                 ),
             ),
             SBAdminField(
@@ -437,6 +440,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                 filter_widget=RadioChoiceFilterWidget(
                     choices=self.CompareOptions.choices,
                     default_value=self.CompareOptions.values[0],
+                    allow_clear=False,
                 ),
             ),
         ]

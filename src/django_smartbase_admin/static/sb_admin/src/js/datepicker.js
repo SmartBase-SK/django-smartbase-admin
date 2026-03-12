@@ -147,7 +147,6 @@ export default class Datepicker {
             },
             '.js-datetimepicker': {
                 enableTime: true,
-                dateFormat: "d.m.Y H:i",
                 allowInput: true,
                 time_24hr: true,
                 plugins: [

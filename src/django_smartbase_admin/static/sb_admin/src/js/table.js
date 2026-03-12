@@ -114,10 +114,20 @@ class SBAdminTable {
         return Object.values(filterParams).some(val=>val)
     }
 
+    initTooltipsInTable() {
+        const tableEl = this.tabulator?.rowManager?.tableElement
+        if (!tableEl || !window.bootstrap5?.Tooltip) return
+        tableEl.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+            window.bootstrap5.Tooltip.getOrCreateInstance(el)
+        })
+    }
+
     loadFromUrlAfterInit() {
         window.htmx.process(this.tabulator.rowManager.tableElement)
+        this.initTooltipsInTable()
         this.tabulator.on("dataProcessed", (data) => {
             window.htmx.process(this.tabulator.rowManager.tableElement)
+            this.initTooltipsInTable()
             document.body.dispatchEvent(new CustomEvent('tableDataProcessed', {"detail": {"data": data, "isFiltered": this.isFiltered()}}))
         })
         this.callModuleAction('loadFromUrlAfterInit')

@@ -1,6 +1,7 @@
 from enum import Enum
 
 from django.template.defaultfilters import date, time
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -82,3 +83,38 @@ def link_formatter(object_id, value):
     if not value:
         return ""
     return format_html('<a href="{0}">{0}</a>', value)
+
+
+def view_on_site_link_formatter(object_id, value, **kwargs):
+    """
+    Format cell value (e.g. object name) with an icon link that redirects to the
+    object on the frontend. Link points to view_on_site_redirect.
+    Expects sbadmin_view_id and sbadmin_view_on_site
+    in kwargs (from additional_data in list action).
+    """
+    view_id = kwargs.get("sbadmin_view_id")
+    if not view_id or not kwargs.get("sbadmin_view_on_site", True):
+        return value or ""
+    url = reverse(
+        "sb_admin:view_on_site_redirect",
+        kwargs={"view": view_id, "object_id": object_id},
+    )
+    view_on_site = _("View on site")
+    icon_svg = (
+        '<svg class="w-20 h-20 flex-shrink-0">'
+        '<use xlink:href="#Preview-open"></use>'
+        "</svg>"
+    )
+    link = format_html(
+        '<a href="{}" target="_blank" rel="noopener noreferrer" class="view-on-site-link btn btn-empty" '
+        'aria-label="{}" onclick="event.stopPropagation()" data-bs-toggle="tooltip" '
+        'data-bs-placement="top" data-bs-title="{}">{}</a>',
+        url,
+        view_on_site,
+        view_on_site,
+        mark_safe(icon_svg),
+    )
+    return format_html(
+        '<span class="view-on-site-cell">{}</span>',
+        format_html("{} {}", value or "", link),
+    )
