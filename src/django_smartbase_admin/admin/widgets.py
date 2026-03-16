@@ -843,9 +843,8 @@ class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashW
     template_name = "sb_admin/widgets/read_only_password_hash.html"
 
 
-class SBAdminHiddenWidget(SBAdminBaseWidget, forms.Widget):
+class SBAdminHiddenWidget(SBAdminBaseWidget, forms.HiddenInput):
     template_name = "sb_admin/widgets/hidden.html"
-    input_type = "hidden"
 
 
 class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
