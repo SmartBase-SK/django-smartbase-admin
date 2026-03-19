@@ -696,6 +696,18 @@ class SBAdminInlineFormSetMixin:
 
         return super().get_default_prefix()
 
+    def save_new_objects(
+        self, extra_forms: Iterable | None = None, commit: bool = True
+    ):
+        is_change = getattr(self, "parent_change", True)
+        # Django considers extra inline forms with default-only values as unchanged.
+        # On parent add, for required singleton (min=max=1) mark the inline form
+        # as changed so the related inline object is created.
+        if extra_forms and not is_change and self.min_num == 1 and self.max_num == 1:
+            for form in extra_forms:
+                form.has_changed = lambda: True
+        return super().save_new_objects(extra_forms=extra_forms, commit=commit)
+
 
 class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
     pass
@@ -728,6 +740,7 @@ class SBAdmin(
     sbadmin_is_generic_model = False
 
     def save_formset(self, request, form, formset, change):
+        formset.parent_change = change
         if not change and hasattr(formset, "inline_instance"):
             # update inline_instance parent_instance on formset when creating new object
             formset.inline_instance.parent_instance = form.instance
