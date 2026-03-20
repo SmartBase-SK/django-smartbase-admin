@@ -23,6 +23,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
+| [django-filer templates (SBAdmin)](#django-filer-templates-sbadmin) | Bundled filer templates, `SBAdminThirdParty.change_view` + `get_change_view_context`, `filer_urls`, project `FileSBAdmin` pattern |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -41,6 +42,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
+- **django-filer / Back on File/Image detail, `SBAdminThirdParty` context?** → [django-filer templates (SBAdmin)](#django-filer-templates-sbadmin)
 
 ---
 
@@ -1343,6 +1345,9 @@ class ArticleAdmin(SBAdmin):
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
 | "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
 | "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
+| `NoReverseMatch` for `some_model_changelist` on `/sb-admin/...` | `{% url %}` passes `request.current_app` (`sb_admin`). Names that exist only on `django.contrib.admin.site` (e.g. django-constance) are not on SB Admin | Use `{% load sb_admin_tags %}` and `{% django_default_admin_url 'admin:app_model_changelist' %}` (or `reverse(..., current_app="admin")` in Python) for links to classic `/admin/...` |
+| Back button missing on a **third-party** model change (e.g. django-filer File/Image) | `SBAdminThirdParty.change_view` did not merge `get_change_view_context` / `get_global_context(request, object_id)` | Use a package version where `SBAdminThirdParty.change_view` merges both (see [django-filer templates (SBAdmin)](#django-filer-templates-sbadmin)); subclass `get_change_view_context` only to customize `back_url` |
+| `ImportError: cannot import name 'sb_admin_filer_directory_listing_url_for_file'` | Installed PyPI wheel is older than the codebase / wrong env | `pip install -e /path/to/django-smartbase-admin` or `uv pip install -e …` so the project uses the same sources as development |
 
 ---
 
@@ -2057,6 +2062,100 @@ sbadmin_fieldsets = [
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
+
+---
+
+## django-filer templates (SBAdmin)
+
+The package ships Django template overrides for **django-filer** so folder listings and image change views match SBAdmin (copy public URL, table actions, etc.). This section also documents **change-view context** for `SBAdminThirdParty` admins (required for the Back control) and the shared **`filer_urls`** helper used by filer widgets and project admins.
+
+> **Note (Contributing):** Integration docs here use **django-filer’s `File` / `Folder`** and project-side `FileSBAdmin`, not the [Demo Schema](#demo-schema-reference) blog models — same scope as any filer-specific template paths in the table below.
+
+### Template paths
+
+| Path | Role |
+|------|------|
+| `templates/admin/filer/folder/directory_listing.html` | Table layout folder view (includes table partial) |
+| `templates/admin/filer/folder/directory_table_list.html` | File rows: download / copy link / edit / delete |
+| `templates/admin/filer/folder/change_form.html`, `templates/admin/filer/change_form.html`, `templates/admin/filer/breadcrumbs.html` | Classic admin filer pages |
+| `templates/sb_admin/integrations/filer/folder_list.html` | SB shell for folder browser |
+| `templates/sb_admin/actions/change_form.html` | SB detail header Back link: needs `show_back_button`, `back_url`, optional `back_url_add_preserved_filters` |
+| `templates/sb_admin/integrations/filer/file_image_changelist.html` | File/Image changelist inside SB shell (`change_list_template` on `FileSBAdmin` / subclasses) |
+| `templates/sb_admin/integrations/filer/image_change_form.html`, `image_detail_panel.html` | Image preview change form |
+
+**Resolution order:** Django uses the first app in `INSTALLED_APPS` that provides a matching template path. Keep **`django_smartbase_admin` after your project apps** only if you intentionally override these in the project; otherwise list it so its templates win when you want the bundled Filer UI.
+
+**Folder listing rows:** `list_type_template` comes from filer’s `FILER_FOLDER_ADMIN_LIST_TYPE_SWITCHER_SETTINGS` (e.g. `admin/filer/folder/directory_table_list.html`).
+
+### `SBAdminThirdParty.change_view` and `get_change_view_context`
+
+`SBAdmin.change_view` merges **`get_change_view_context`**, **`get_global_context(request, object_id)`**, fieldsets/tabs, and previous/next before calling Django’s `change_view`. Third-party admins mixed with bundled UI must expose the same data to `change_form.html`.
+
+**`SBAdminThirdParty.change_view`** therefore:
+
+1. Updates `extra_context` with **`get_change_view_context(request, object_id)`** (subclasses can override).
+2. Updates with **`get_global_context(request, object_id)`** — not `get_global_context(request)` only, so change labels and detail actions receive the object id.
+
+The default **`{show_back_button, back_url}`** (changelist for the registered model) lives on **`SBAdminBaseView.get_change_view_context`**. Both **`SBAdmin`** (via `SBAdminBaseListView`) and **`SBAdminThirdParty`** inherit it; avoid duplicating that method on `SBAdmin`.
+
+**Key points:**
+
+- If **Back is missing** on a filer File/Image detail page, the usual cause is context never merged: see [Common Errors](#common-errors).
+- Custom **Back targets** (e.g. folder listing instead of file changelist) belong in **`get_change_view_context`**, not in a template tag only.
+
+**Source:** `django_smartbase_admin/admin/admin_base.py` (`SBAdminThirdParty`, `SBAdmin.change_view`), `django_smartbase_admin/engine/admin_base_view.py` (`get_change_view_context`, `get_global_context`).
+
+### `filer_urls` — directory listing for a `File`
+
+**`django_smartbase_admin.filer_urls.sb_admin_filer_directory_listing_url_for_file(file_obj)`** returns the SB Admin URL for the **directory listing** that contains that filer **`File`** (or **`Image`** subclass), using **`File.logical_folder`**: real folder, root browser, or **unsorted uploads** (`is_unsorted_uploads` on filer’s virtual folder). This matches the same cases classic filer uses in **`FileAdmin.response_change`** (`admin:filer-directory_listing` vs `admin:filer-directory_listing-unfiled_images`), but with the **`sb_admin:`** URL namespace.
+
+**`SBAdminFilerFileWidget`** imports this helper so raw-id / lookup “folder” links and the **Back** URL from **`FileSBAdmin`** stay consistent.
+
+**Key points:**
+
+- Prefer this helper over hand-written `reverse(...)` on **`folder_id` alone**, so **unsorted** files still resolve to **`filer-directory_listing-unfiled_images`**, not the file changelist or wrong view.
+- Import from **`django_smartbase_admin.filer_urls`** — not from `templatetags` or `widgets` — to avoid pulling CKEditor/widget deps where unnecessary.
+
+**Source:** `django_smartbase_admin/filer_urls.py`, `django_smartbase_admin/admin/widgets.py` (`SBAdminFilerFileWidget`).
+
+### Project pattern: `FileSBAdmin` Back to folder listing
+
+Register filer **`File`** / **`Image`** on **`sb_admin_site`** with **`SBAdminThirdParty`** + filer’s **`FileAdmin`** / **`ImageAdmin`** behavior. Override **`get_change_view_context`** so **Back** points at the folder browser (and disable preserved-filter rewriting if the URL is already complete):
+
+```python
+from django.contrib.admin.utils import unquote
+from django.http import Http404
+
+from django_smartbase_admin.admin.admin_base import SBAdminThirdParty
+from django_smartbase_admin.filer_urls import sb_admin_filer_directory_listing_url_for_file
+from filer.admin import FileAdmin
+from filer.models import File
+
+
+class FileSBAdmin(SBAdminThirdParty, FileAdmin):
+    def get_change_view_context(self, request, object_id):
+        ctx = super().get_change_view_context(request, object_id)
+        try:
+            obj = self.get_object(request, unquote(object_id))
+        except (self.model.DoesNotExist, Http404):
+            return ctx
+        ctx["back_url"] = sb_admin_filer_directory_listing_url_for_file(obj)
+        ctx["back_url_add_preserved_filters"] = False
+        return ctx
+```
+
+Use the same helper for **`Image`** subclasses that inherit this admin.
+
+### ❌ BAD / ✅ GOOD
+
+| ❌ BAD | ✅ GOOD |
+|--------|---------|
+| Only branch on **`file_obj.folder_id`** for Back URL and ignore filer’s **unsorted / `logical_folder`** semantics | Use **`sb_admin_filer_directory_listing_url_for_file(file_obj)`** (or the same rules as **`logical_folder`**) |
+| Rely on **`SBAdminThirdParty`** subclass **`get_change_view_context`** without ensuring **`change_view`** merges it (old or forked `admin_base`) | Ship/use **`SBAdminThirdParty.change_view`** that calls **`get_change_view_context`** and **`get_global_context(request, object_id)`** |
+
+**File/Image detail** does **not** use query-param **`sb_filer_back`** for that Back link; other `SBAdminThirdParty` admins may still use safe patterns for **`back_url`**. 
+
+**Python registration:** Subclasses such as **`FolderSBAdmin`** / **`FileSBAdmin`** / **`ImageSBAdmin`** (setting `directory_listing_template`, `change_form_template`, `change_list_template`, redirects from `admin:index` to `sb_admin:index`, etc.) live in the **project** — integration templates and **`filer_urls`** are bundled in this package.
 
 ---
 

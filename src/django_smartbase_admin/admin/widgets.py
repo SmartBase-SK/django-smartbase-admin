@@ -42,6 +42,9 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
+from django_smartbase_admin.filer_urls import (
+    sb_admin_filer_directory_listing_url_for_file,
+)
 from django_smartbase_admin.utils import is_modal, convert_django_to_flatpickr_format
 
 try:
@@ -785,13 +788,7 @@ class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         if value:
             try:
                 file_obj = File.objects.get(pk=value)
-                if file_obj.logical_folder.is_root:
-                    related_url = reverse("sb_admin:filer-directory_listing-root")
-                else:
-                    related_url = reverse(
-                        "sb_admin:filer-directory_listing",
-                        args=(file_obj.logical_folder.id,),
-                    )
+                related_url = sb_admin_filer_directory_listing_url_for_file(file_obj)
                 change_url = reverse(
                     "sb_admin:{}_{}_change".format(
                         file_obj._meta.app_label,

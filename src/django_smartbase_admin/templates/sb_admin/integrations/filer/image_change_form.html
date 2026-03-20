@@ -1,43 +1,108 @@
-{% extends list_base_template|default:"sb_admin/integrations/filer/filer_change_form.html" %}
-{% load i18n admin_modify static %}
+{% extends "sb_admin/actions/change_form.html" %}
+{% load static i18n admin_urls admin_modify filer_admin_tags sb_admin_tags %}
 
 {% block extrahead %}
     {{ block.super }}
-
-    {# upload stuff #}
-    <script type="text/javascript">
-        var __jQuery = django.jQuery;
-        window.jQuery = (__jQuery) ? __jQuery : window.jQuery || undefined;
-        window.$ = window.jQuery;
-    </script>
-    <script src="{% static 'filer/js/libs/class.min.js' %}"></script>
-    <script src="{% static 'filer/js/libs/jquery-ui.min.js' %}"></script>
-    <script src="{% static 'filer/js/libs/jquery.cookie.min.js' %}"></script>
-    <script src="{% static 'filer/js/libs/fileuploader.min.js' %}"></script>
-    <script src="{% static 'filer/js/libs/mediator.min.js' %}"></script>
-    <script src="{% static 'admin/js/admin/RelatedObjectLookups.js' %}"></script>
-    <script src="{% static 'filer/js/addons/popup_handling.js' %}"></script>
-    <script src="{% static 'filer/js/addons/focal-point.js' %}"></script>
-    <script src="{% static 'filer/js/addons/toggler.js' %}"></script>
-    <script src="{% static 'filer/js/base.js' %}"></script>
-    <script type="text/javascript">
-        var __jQuery;
-        var __$;
-        // reassign jQuery if jQuery is already loaded
-        __jQuery = (window.jQuery) ? window.jQuery.noConflict(true) : undefined;
-        __$ = __jQuery;
-    </script>
 {% endblock %}
 
-{% block object-tools %}
-    {% if change and not is_popup %}
-        <ul class="object-tools">
-            <li><a href="{% url history_url object_id %}" class="historylink">{% translate "History" %}</a></li>
-            {% if has_absolute_url %}
-                <li><a href="../../../r/{{ content_type_id }}/{{ object_id }}/" class="viewsitelink">{% translate "View on site" %}</a></li>
-            {% endif%}
-        </ul>
+{% block style_init %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static 'filer/css/admin_filer.css' %}">
+    {% icon_css_library %}
+    <style>
+        .filer-sb-image-preview .image-info.image-info-detail {
+            margin-top: 0;
+        }
+        .filer-sb-image-preview .image-preview-container img,
+        .filer-sb-image-preview .image-preview-container picture img {
+            max-width: min(100%, 560px);
+            height: auto;
+            display: block;
+            border-radius: 8px;
+        }
+    </style>
+{% endblock %}
+
+{% block form %}
+    <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
+          id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="flex flex-col{% if sbadmin_is_modal %} min-h-0{% else %} detail-view-form flex-grow w-full max-w-1180 mx-auto{% endif %}" novalidate>
+        <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
+            {% csrf_token %}
+            {% if errors %}
+                <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+                    <div class="flex">
+                        <svg class="w-20 h-20 mr-12 text-negative">
+                            <use xlink:href="#Close-one"></use>
+                        </svg>
+                        <h5 class="font-semibold">
+                            {% blocktrans count errors|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+                        </h5>
+                    </div>
+                </div>
+                {{ adminform.form.non_field_errors }}
+            {% endif %}
+            {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+            {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+
+            <div class="filer-sb-image-preview pt-20">
+                {% include "sb_admin/integrations/filer/image_detail_panel.html" %}
+            </div>
+
+            {% block admin_change_form_document_ready %}
+                <script type="text/javascript"
+                        id="django-admin-form-add-constants"
+                        src="{% static 'admin/js/change_form.js' %}"
+                    {% if adminform and add %}
+                        data-model-name="{{ opts.model_name }}"
+                    {% endif %}>
+                </script>
+            {% endblock %}
+        </div>
+        {% if sbadmin_is_modal %}
+            <div class="modal-footer">
+                {% if original %}
+                    {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
+                {% else %}
+                    {% url opts|admin_urlname:'add' as post_url %}
+                {% endif %}
+                {% if has_change_permission %}
+                    <button
+                            form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
+                            hx-post="{{ post_url }}"
+                            hx-target="#sb-admin-modal"
+                            hx-swap="innerHTML"
+                            hx-select="#modal-content"
+                            hx-encoding="multipart/form-data"
+                            hx-vals='{
+                                "sbadmin_is_modal": 1,
+                                "sb_admin_source_field": "{{ request.GET.sb_admin_source_field }}",
+                                "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
+                                "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field }}",
+                                "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk | default:"" }}",
+                                "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label }}"
+                            }'
+                            class="btn btn-primary flex-grow flex items-center justify-center">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Save"></use>
+                        </svg>
+                        {% trans 'Save' %}
+                    </button>
+                {% endif %}
+                <button type="button"
+                        class="btn flex-grow"
+                        data-bs-dismiss="modal" aria-label="Close">
+                    {% trans 'Close' %}
+                </button>
+            </div>
+        {% else %}
+            {# Sticky bar: other models show submit_row; image preview has no editable fields. #}
+            {% block action_bar %}{% endblock %}
+        {% endif %}
+    </form>
+    {% sb_admin_prepopulated_fields_init %}
+    {% if sbadmin_is_modal %}
+        <script>
+            init_prepopulate(document.getElementById("modal-content"));
+        </script>
     {% endif %}
-    {% include "admin/filer/tools/detail_info.html" %}
 {% endblock %}
-
