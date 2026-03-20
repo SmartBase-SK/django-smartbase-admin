@@ -696,17 +696,21 @@ class SBAdminInlineFormSetMixin:
 
         return super().get_default_prefix()
 
-    def save_new_objects(
-        self, extra_forms: Iterable | None = None, commit: bool = True
-    ):
+    def full_clean(self):
+        # Django treats inline forms with default-only values as unchanged and skips them.
+        # During parent creation, for required singleton inlines (min=max=1 with validate_min/max),
+        # we can safely mark such forms as changed so the related inline object can be created.
         is_change = getattr(self, "parent_change", True)
-        # Django considers extra inline forms with default-only values as unchanged.
-        # On parent add, for required singleton (min=max=1) mark the inline form
-        # as changed so the related inline object is created.
-        if extra_forms and not is_change and self.min_num == 1 and self.max_num == 1:
-            for form in extra_forms:
+        if (
+            not is_change
+            and self.min_num == 1
+            and self.max_num == 1
+            and self.validate_min
+            and self.validate_max
+        ):
+            for form in self.forms:
                 form.has_changed = lambda: True
-        return super().save_new_objects(extra_forms=extra_forms, commit=commit)
+        return super().full_clean()
 
 
 class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
@@ -740,7 +744,6 @@ class SBAdmin(
     sbadmin_is_generic_model = False
 
     def save_formset(self, request, form, formset, change):
-        formset.parent_change = change
         if not change and hasattr(formset, "inline_instance"):
             # update inline_instance parent_instance on formset when creating new object
             formset.inline_instance.parent_instance = form.instance
@@ -1069,6 +1072,8 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
     sb_admin_add_modal = False
+    validate_min = False
+    validate_max = False
 
     def get_instance_label(self, request, obj: Model | None = None) -> str | None:
         if obj:
@@ -1214,7 +1219,9 @@ class SBAdminInline(
 
     def get_formset(self, request, obj=None, **kwargs):
         self.initialize_all_base_fields_form(request)
+        kwargs.update(validate_min=self.validate_min, validate_max=self.validate_max)
         formset = super().get_formset(request, obj, **kwargs)
+        formset.parent_change = bool(obj)
         form_class = formset.form
         self.initialize_form_class(form_class, request)
         return formset
