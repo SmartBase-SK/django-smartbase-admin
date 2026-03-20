@@ -42,10 +42,11 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
-from django_smartbase_admin.filer_urls import (
+from django_smartbase_admin.utils import (
+    convert_django_to_flatpickr_format,
+    is_modal,
     sb_admin_filer_directory_listing_url_for_file,
 )
-from django_smartbase_admin.utils import is_modal, convert_django_to_flatpickr_format
 
 try:
     # Django >= 5.0
