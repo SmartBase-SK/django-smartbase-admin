@@ -696,6 +696,22 @@ class SBAdminInlineFormSetMixin:
 
         return super().get_default_prefix()
 
+    def full_clean(self):
+        # Django treats inline forms with default-only values as unchanged and skips them.
+        # During parent creation, for required singleton inlines (min=max=1 with validate_min/max),
+        # we can safely mark such forms as changed so the related inline object can be created.
+        is_change = getattr(self, "parent_change", True)
+        if (
+            not is_change
+            and self.min_num == 1
+            and self.max_num == 1
+            and self.validate_min
+            and self.validate_max
+        ):
+            for form in self.forms:
+                form.has_changed = lambda: True
+        return super().full_clean()
+
 
 class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
     pass
@@ -1056,6 +1072,8 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
     sb_admin_add_modal = False
+    validate_min = False
+    validate_max = False
 
     def get_instance_label(self, request, obj: Model | None = None) -> str | None:
         if obj:
@@ -1201,7 +1219,9 @@ class SBAdminInline(
 
     def get_formset(self, request, obj=None, **kwargs):
         self.initialize_all_base_fields_form(request)
+        kwargs.update(validate_min=self.validate_min, validate_max=self.validate_max)
         formset = super().get_formset(request, obj, **kwargs)
+        formset.parent_change = bool(obj)
         form_class = formset.form
         self.initialize_form_class(form_class, request)
         return formset
