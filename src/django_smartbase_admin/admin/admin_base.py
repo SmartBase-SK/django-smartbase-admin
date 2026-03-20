@@ -571,7 +571,8 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
-        extra_context.update(self.get_global_context(request))
+        extra_context.update(self.get_change_view_context(request, object_id))
+        extra_context.update(self.get_global_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
@@ -843,16 +844,6 @@ class SBAdmin(
 
     def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
         return Q()
-
-    def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
-        return {
-            "show_back_button": True,
-            "back_url": reverse(
-                "sb_admin:{}_{}_changelist".format(
-                    self.opts.app_label, self.opts.model_name
-                )
-            ),
-        }
 
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:

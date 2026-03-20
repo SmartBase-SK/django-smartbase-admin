@@ -5,6 +5,7 @@ from django import forms
 from django.conf import settings
 from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
+from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,24 @@ def is_modal(request):
 
     return request and (
         SBADMIN_IS_MODAL_VAR in request.GET or SBADMIN_IS_MODAL_VAR in request.POST
+    )
+
+
+def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
+    """
+    SB Admin URL for the django-filer directory listing that contains this File/Image.
+
+    Uses ``File.logical_folder`` (real folder, root browser, or Unsorted Uploads), same
+    basis as filer breadcrumbs and ``SBAdminFilerFileWidget`` folder links.
+    """
+    lf = file_obj.logical_folder
+    if getattr(lf, "is_unsorted_uploads", False):
+        return reverse("sb_admin:filer-directory_listing-unfiled_images")
+    if getattr(lf, "is_root", False):
+        return reverse("sb_admin:filer-directory_listing-root")
+    return reverse(
+        "sb_admin:filer-directory_listing",
+        kwargs={"folder_id": lf.id},
     )
 
 
