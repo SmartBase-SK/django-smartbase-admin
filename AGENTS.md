@@ -23,7 +23,6 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
-| [django-filer templates (SBAdmin)](#django-filer-templates-sbadmin) | Bundled `admin/filer/` and `sb_admin/integrations/filer/` overrides, `INSTALLED_APPS` order |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -1344,7 +1343,6 @@ class ArticleAdmin(SBAdmin):
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
 | "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
 | "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
-| `NoReverseMatch` for `some_model_changelist` on `/sb-admin/...` | `{% url %}` passes `request.current_app` (`sb_admin`). Names that exist only on `django.contrib.admin.site` (e.g. django-constance) are not on SB Admin | Use `{% load sb_admin_tags %}` and `{% django_default_admin_url 'admin:app_model_changelist' %}` (or `reverse(..., current_app="admin")` in Python) for links to classic `/admin/...` |
 
 ---
 
@@ -2059,27 +2057,6 @@ sbadmin_fieldsets = [
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
-
----
-
-## django-filer templates (SBAdmin)
-
-The package ships Django template overrides for **django-filer** so folder listings and image change views match SBAdmin (copy public URL, table actions, etc.).
-
-| Path | Role |
-|------|------|
-| `templates/admin/filer/folder/directory_listing.html` | Table layout folder view (includes table partial) |
-| `templates/admin/filer/folder/directory_table_list.html` | File rows: download / copy link / edit / delete |
-| `templates/admin/filer/folder/change_form.html`, `templates/admin/filer/change_form.html`, `templates/admin/filer/breadcrumbs.html` | Classic admin filer pages |
-| `templates/sb_admin/integrations/filer/folder_list.html` | SB shell for folder browser |
-| `templates/sb_admin/integrations/filer/file_image_changelist.html` | File/Image changelist inside SB shell (`change_list_template` on `FileSBAdmin` / subclasses) |
-| `templates/sb_admin/integrations/filer/image_change_form.html`, `image_detail_panel.html` | Image preview change form |
-
-**Resolution order:** Django uses the first app in `INSTALLED_APPS` that provides a matching template path. Keep **`django_smartbase_admin` after your project apps** only if you intentionally override these in the project; otherwise list it so its templates win when you want the bundled Filer UI.
-
-**Folder listing rows:** `list_type_template` comes from filer’s `FILER_FOLDER_ADMIN_LIST_TYPE_SWITCHER_SETTINGS` (e.g. `admin/filer/folder/directory_table_list.html`).
-
-**Python registration:** Subclasses such as `FolderSBAdmin` / `ImageSBAdmin` (setting `directory_listing_template`, `change_form_template`, etc.) live in the **project** — only templates are bundled here.
 
 ---
 
