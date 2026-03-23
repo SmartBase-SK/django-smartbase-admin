@@ -22,6 +22,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, default tab from menu, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
+| [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
@@ -42,6 +43,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Menu opens filtered tab?** → [Default Tab and Menu Link to Filtered View](#default-tab-and-menu-link-to-filtered-view)
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
+- **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
@@ -2328,6 +2330,155 @@ sbadmin_fieldsets = [
 
 ---
 
+## Detail View Tabs (`sbadmin_tabs`)
+
+Use `sbadmin_tabs` to organize fieldsets and inlines into separate tabs on the detail/change view. Without tabs, all fieldsets and inlines render on a single page. With tabs, users switch between logical groups.
+
+### Usage
+
+`sbadmin_tabs` is a **dict** where:
+- **Keys** are tab label strings (displayed as tab headers)
+- **Values** are lists of **fieldset names** and/or **inline classes**
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+from blog.models import Article, ArticleTag, Comment
+
+
+class ArticleTagInline(SBAdminTableInline):
+    model = ArticleTag
+    extra = 0
+    verbose_name = "Tag"
+    verbose_name_plural = "Tags"
+
+
+class CommentInline(SBAdminTableInline):
+    model = Comment
+    extra = 0
+    verbose_name = "Comment"
+    verbose_name_plural = "Comments"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    inlines = [ArticleTagInline, CommentInline]
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("title", "body", "category"),
+            },
+        ),
+        (
+            "Publishing",
+            {
+                "fields": ("author", "status"),
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            "SEO Settings",
+            {
+                "fields": ("seo_title", "seo_description"),
+            },
+        ),
+    )
+
+    sbadmin_tabs = {
+        "Content": [None, "Publishing", ArticleTagInline],
+        "Comments": [CommentInline],
+        "SEO": ["SEO Settings"],
+    }
+```
+
+### How Tab Keys Map to Content
+
+The template tag resolves each value in the list against two maps:
+
+| Value type | Matched against | Example |
+|------------|-----------------|---------|
+| Fieldset name (first element of fieldset tuple) | `{fieldset.name: fieldset}` | `None`, `"Publishing"`, `"SEO Settings"` |
+| Inline class | `{inline.opts.__class__: inline}` | `ArticleTagInline`, `CommentInline` |
+
+A fieldset with `None` as its name (no header) is referenced as `None` in the tabs dict.
+
+### Fieldset Names Must Be Unique
+
+Because fieldsets are looked up by name, each fieldset must have a **unique** first element. Two fieldsets both named `None` would conflict — only the last one would be found in the lookup.
+
+```python
+# ❌ BAD - Two fieldsets with the same name (None)
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    (None, {"fields": ("author", "status")}),
+)
+
+# ✅ GOOD - Give at least one a name
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    ("Status", {"fields": ("author", "status")}),
+)
+```
+
+### Default Behavior (No Tabs)
+
+When `sbadmin_tabs` is `None` (the default), all fieldsets and inlines render sequentially on a single page — no tab UI is shown.
+
+### Error Handling
+
+When a form has validation errors, the tab containing the error is automatically activated and highlighted so the user sees the problem immediately. If multiple tabs have errors, the first one with errors is shown.
+
+### Combining with Sidebar
+
+Tabs work with `DETAIL_STRUCTURE_RIGHT_CLASS`. A fieldset with the sidebar class renders in the right column **within its tab**:
+
+```python
+fieldsets = (
+    (
+        None,
+        {"fields": ("title", "body")},
+    ),
+    (
+        "Metadata",
+        {
+            "fields": ("author", "status", "created_at"),
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+        },
+    ),
+    (
+        "SEO Settings",
+        {"fields": ("seo_title", "seo_description")},
+    ),
+)
+
+sbadmin_tabs = {
+    "Content": [None, "Metadata", ArticleTagInline],
+    "SEO": ["SEO Settings"],
+}
+```
+
+In this example, the "Content" tab has a two-column layout (main fields on the left, metadata sidebar on the right, tags inline below), while the "SEO" tab is a simple single-column form.
+
+**Key points:**
+- `sbadmin_tabs` is a `dict`, not a list (the attribute reference table type is approximate)
+- Keys are tab labels (strings), values are lists of fieldset names and/or inline classes
+- Fieldsets are referenced by their **name** (first element of the tuple) — use `None` for unnamed fieldsets
+- Inlines are referenced by their **class** (e.g., `ArticleTagInline`), not by a string
+- Every fieldset and inline should appear in exactly one tab — items not listed in any tab are not rendered
+- The first tab is active by default (unless there are validation errors in another tab)
+- Works with `DETAIL_STRUCTURE_RIGHT_CLASS` for sidebar layout within a tab
+- Override `get_sbadmin_tabs(request, object_id)` for dynamic tab configuration
+
+**Source:** `django_smartbase_admin/admin/admin_base.py` — `SBAdmin.sbadmin_tabs`, `get_sbadmin_tabs()`, `get_tabs_context()`; `django_smartbase_admin/templatetags/sb_admin_tags.py` — `get_tabular_context()`
+
+---
+
 ## Logo Customization
 
 Override default logo by placing files in your static directory:
@@ -2359,7 +2510,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
-| `sbadmin_tabs` | list | Organize form fields into tabs |
+| `sbadmin_tabs` | dict | Organize fieldsets and inlines into tabs (see [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)) |
 | `sbadmin_detail_actions` | list | Actions shown on detail/change page |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
