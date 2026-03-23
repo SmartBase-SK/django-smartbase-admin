@@ -19,6 +19,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
+| [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add) | Why default-only singleton inlines can be skipped and how SBAdmin creates them during add |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
@@ -41,6 +42,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
+- **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 
 ---
 
@@ -78,6 +80,12 @@ class Comment(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+class ArticleMeta(models.Model):
+    """Singleton metadata row for each Article."""
+    article = models.OneToOneField(Article, on_delete=models.CASCADE, related_name="meta")
+    heading = models.CharField(max_length=200, default="Metadata")
+    description = models.TextField(blank=True, default="")
 ```
 
 ---
@@ -1372,6 +1380,75 @@ class ArticleAdmin(SBAdmin):
 - `SBAdminStackedInline` - Stacked layout (like `StackedInline`)
 - `SBAdminGenericTableInline` - For GenericForeignKey relations
 - `SBAdminGenericStackedInline` - Stacked GenericForeignKey
+
+## Validated Singleton Inline Creation on Add
+
+Django treats extra inline forms with default-only values as unchanged. For required singleton inlines, this may result in skipped creation unless the form is considered changed during validation.
+
+### Behavior in SBAdmin
+
+For parent **add** flow, SBAdmin supports validated singleton creation with:
+
+- `min_num = 1`
+- `max_num = 1`
+- `validate_min = True`
+- `validate_max = True`
+
+When these conditions are met, SBAdmin marks the first extra inline form as changed during formset `full_clean()`. This lets normal validation/save flow create the related object (including default-only values).
+
+### ❌ BAD - Singleton inline can still be skipped
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminStackedInline
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Article, ArticleMeta
+
+
+class ArticleMetaInline(SBAdminStackedInline):
+    model = ArticleMeta
+    min_num = 1
+    max_num = 1
+    # Missing validate_min / validate_max
+    can_delete = False
+    extra = 1
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    inlines = [ArticleMetaInline]
+```
+
+### ✅ GOOD - Validated singleton is created on add
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminStackedInline
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Article, ArticleMeta
+
+
+class ArticleMetaInline(SBAdminStackedInline):
+    model = ArticleMeta
+    min_num = 1
+    max_num = 1
+    validate_min = True
+    validate_max = True
+    can_delete = False
+    extra = 1
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    inlines = [ArticleMetaInline]
+```
+
+**Key points:**
+- Scope is intentionally add-only to keep update flow conservative.
+- Validation still runs normally; this does not bypass field/model validation.
+- If required inline fields have no defaults and remain empty, validation can still fail (expected).
 
 ---
 
