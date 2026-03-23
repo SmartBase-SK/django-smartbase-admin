@@ -236,6 +236,19 @@ class SBAdminBaseView(object):
     ) -> str | None:
         return self.change_label
 
+    def get_change_view_context(
+        self, request: HttpRequest, object_id: str | int | None
+    ) -> dict[str, Any]:
+        """Default change-form context: Back → model changelist. ModelAdmin subclasses only."""
+        return {
+            "show_back_button": True,
+            "back_url": reverse(
+                "sb_admin:{}_{}_changelist".format(
+                    self.opts.app_label, self.opts.model_name
+                )
+            ),
+        }
+
     def get_global_context(
         self, request, object_id: int | str | None = None
     ) -> dict[str, Any]:
