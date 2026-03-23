@@ -13,7 +13,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
-| [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
+| [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -21,11 +21,12 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
 | [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add) | Why default-only singleton inlines can be skipped and how SBAdmin creates them during add |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
-| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
+| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, default tab from menu, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
+| [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
-| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
+| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
@@ -34,11 +35,16 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
+- **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
+- **Manual audit log entries?** → [Programmatic Audit Entries](#programmatic-audit-entries-_create_audit_log)
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
 - **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
+- **Menu opens filtered tab?** → [Default Tab and Menu Link to Filtered View](#default-tab-and-menu-link-to-filtered-view)
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
+- **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
@@ -1133,6 +1139,200 @@ class ArticleAdmin(SBAdmin):
         ]
 ```
 
+### Confirmation-Only Modals (No Form Fields)
+
+For actions that just need a confirm/cancel dialog (no user input), use an empty form. The modal renders with the title, an empty body, and Close/Continue buttons — standard confirmation UX.
+
+```python
+from django import forms
+from django.contrib import admin, messages
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
+from django_htmx.http import trigger_client_event
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
+from django_smartbase_admin.engine.modal_view import ListActionModalView
+
+from blog.models import Article
+
+
+class ConfirmForm(SBAdminBaseFormInit, forms.Form):
+    """Empty form — modal shows title + Close/Continue buttons."""
+
+
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Archive Selected Articles")
+
+    def process_form_valid(self, request, form):
+        selection_queryset = self.get_selection_queryset(request, form)
+        count = selection_queryset.update(status="archived")
+
+        messages.success(request, _("%d article(s) archived.") % count)
+        notifications_html = render_to_string(
+            "sb_admin/includes/notifications.html",
+            {"messages": messages.get_messages(request)},
+            request=request,
+        )
+        response = HttpResponse(notifications_html)
+        trigger_client_event(response, "hideModal", {})
+        trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
+        return response
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    def get_sbadmin_list_selection_actions(self, request):
+        return [
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+                css_class="btn-destructive",
+            ),
+        ]
+```
+
+### SBAdminCustomAction Parameters
+
+`SBAdminFormViewAction` extends `SBAdminCustomAction`. Available parameters:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | str | **Required** | Button label |
+| `target_view` | class | **Required** (FormViewAction only) | The `ListActionModalView` subclass |
+| `view` | SBAdmin | **Required** | The admin class instance (`self`) |
+| `action_id` | str | `None` | Unique identifier for this action |
+| `open_in_modal` | bool | `False` | Open the action in a modal dialog |
+| `css_class` | str | `None` | CSS class for the button (e.g., `"btn-destructive"` for red) |
+| `icon` | str | `None` | Icon name (from sprite set) |
+| `group` | str | `None` | Group actions under a dropdown menu |
+| `sub_actions` | list | `None` | Nested actions under this action |
+| `no_params` | bool | `False` | If `True`, don't pass current list params to the action URL |
+| `open_in_new_tab` | bool | `False` | Open action URL in a new browser tab |
+| `url` | str | `None` | Direct URL (for non-form actions) |
+| `template` | str | `None` | Custom template for the action button |
+
+### Per-Action Permissions (`has_permission_for_action`)
+
+Override `has_permission_for_action` on your admin class to control which actions are visible per request. This is called by `process_actions_permissions` every time the action list is rendered, so it's singleton-safe.
+
+**Problem:** You have two actions — "Publish" should only be visible to editors, "Archive" to everyone.
+
+```python
+# ❌ BAD - Conditionally building the action list based on request
+# URL handlers are registered via setattr on the singleton during the first request.
+# If a non-editor is first, PublishView handler is never registered.
+# When an editor visits later, the button appears but clicking it returns 404.
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    def get_sbadmin_list_selection_actions(self, request):
+        actions = []
+        permissions = set(request.session.get("permissions", []))
+        if "editor" in permissions:
+            actions.append(
+                SBAdminFormViewAction(
+                    target_view=PublishArticlesView,
+                    title=_("Publish Selected"),
+                    view=self,
+                    action_id="publish_articles",
+                    open_in_modal=True,
+                ),
+            )
+        actions.append(
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+            ),
+        )
+        return actions
+```
+
+```python
+# ✅ GOOD - Always return all actions, use has_permission_for_action to filter visibility
+from django import forms
+from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.modal_view import ListActionModalView
+
+from blog.models import Article
+
+PUBLISH_ACTION_ID = "publish_articles"
+
+
+class ConfirmForm(SBAdminBaseFormInit, forms.Form):
+    """Empty form for confirmation modals."""
+
+
+class PublishArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Publish Selected Articles")
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        selection_queryset.update(status="published")
+
+
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Archive Selected Articles")
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        selection_queryset.update(status="archived")
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    def get_sbadmin_list_selection_actions(self, request):
+        return [
+            SBAdminFormViewAction(
+                target_view=PublishArticlesView,
+                title=_("Publish Selected"),
+                view=self,
+                action_id=PUBLISH_ACTION_ID,
+                open_in_modal=True,
+            ),
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+                css_class="btn-destructive",
+            ),
+        ]
+
+    def has_permission_for_action(self, request, action):
+        if getattr(action, "action_id", None) == PUBLISH_ACTION_ID:
+            permissions = set(request.session.get("permissions", []))
+            if "editor" not in permissions and "admin" not in permissions:
+                return False
+        return super().has_permission_for_action(request, action)
+```
+
+**Key points:**
+- Always return **all** actions from `get_sbadmin_list_selection_actions` — use `has_permission_for_action` to filter visibility
+- Do NOT conditionally build the action list based on request — this causes issues with the singleton pattern (URL handlers are registered on the first request and cached via `init_actions`)
+- `has_permission_for_action` is called per-request via `process_actions_permissions`, so it's safe for user-specific logic
+- The default implementation checks `self.has_permission(request=request, obj=None, permission=action)` which delegates to `SBAdminRoleConfiguration.has_permission()`
+- The built-in "Delete Selected" action is already handled: when `has_delete_permission(request)` returns `False`, the action is automatically hidden
+
 ### Key Points
 
 - Override `get_sbadmin_list_selection_actions(request)` to return custom actions
@@ -1896,6 +2096,84 @@ An "All" tab is automatically added as the first tab.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
 
+### Default Tab and Menu Link to Filtered View
+
+By default, clicking a menu item opens the "All" tab. To make a custom tab the default (e.g., show "Published" articles when clicking the menu item):
+
+1. Override `get_base_config` to reorder tabs so your custom tab is first
+2. Override `get_menu_view_url` to construct a URL with filter parameters
+
+```python
+from django.contrib import admin
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import MultipleChoiceFilterWidget
+from django_smartbase_admin.services.views import SBAdminViewService
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status",
+            filter_widget=MultipleChoiceFilterWidget(choices=[
+                ("published", "Published"),
+                ("draft", "Draft"),
+                ("archived", "Archived"),
+            ]),
+        ),
+        "title",
+        "category",
+    )
+
+    sbadmin_list_filter = ("status",)
+
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",
+            "url_params": {
+                "filterData": {
+                    "status": [{"value": "published", "label": "Published"}],
+                }
+            },
+        },
+    ]
+
+    def get_base_config(self, request):
+        """Reorder tabs: move custom tabs before 'All'.
+
+        Default order from super(): [All, Published, ...]
+        After rotation: [Published, ..., All]
+        """
+        configs = super().get_base_config(request)
+        return configs[1:] + configs[:1]
+
+    def get_menu_view_url(self, request) -> str:
+        """Build menu URL that opens the first custom tab (Published) directly."""
+        base = reverse(f"sb_admin:{self.get_id()}_changelist")
+        filter_data = self.sbadmin_list_view_config[0]["url_params"]["filterData"]
+        params = SBAdminViewService.build_list_params_url(self.get_id(), filter_data)
+        return f"{base}?{params}"
+```
+
+**How it works:**
+- `get_base_config` returns the list of tab configs. The default order is `[All, ...custom tabs...]`. Rotating with `configs[1:] + configs[:1]` puts custom tabs first and "All" last.
+- `get_menu_view_url` is called by the menu rendering to get the URL for this model's menu item. By default it returns the changelist URL (which opens "All"). Overriding it to include filter params makes the menu link open the filtered view directly.
+- The tab order and menu URL are independent — override both for a consistent experience.
+
+**Key points:**
+- `get_base_config` rotation (`configs[1:] + configs[:1]`) works for any number of custom tabs — the first custom tab becomes the default
+- `self.get_id()` returns the view ID in `{app_label}_{model_name}` format
+- `SBAdminViewService.build_list_params_url` encodes filter data into URL query parameters
+- Without `get_menu_view_url` override, clicking the menu item would show the "All" tab even if `get_base_config` reorders tabs (the menu URL is constructed separately)
+
 ### Building Pre-filtered URLs Programmatically
 
 Use `SBAdminViewService.build_list_params_url()` to generate URLs with pre-applied filters from Python code (e.g., for redirects or links between admin pages).
@@ -2129,6 +2407,155 @@ sbadmin_fieldsets = [
 
 ---
 
+## Detail View Tabs (`sbadmin_tabs`)
+
+Use `sbadmin_tabs` to organize fieldsets and inlines into separate tabs on the detail/change view. Without tabs, all fieldsets and inlines render on a single page. With tabs, users switch between logical groups.
+
+### Usage
+
+`sbadmin_tabs` is a **dict** where:
+- **Keys** are tab label strings (displayed as tab headers)
+- **Values** are lists of **fieldset names** and/or **inline classes**
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+from blog.models import Article, ArticleTag, Comment
+
+
+class ArticleTagInline(SBAdminTableInline):
+    model = ArticleTag
+    extra = 0
+    verbose_name = "Tag"
+    verbose_name_plural = "Tags"
+
+
+class CommentInline(SBAdminTableInline):
+    model = Comment
+    extra = 0
+    verbose_name = "Comment"
+    verbose_name_plural = "Comments"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    inlines = [ArticleTagInline, CommentInline]
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("title", "body", "category"),
+            },
+        ),
+        (
+            "Publishing",
+            {
+                "fields": ("author", "status"),
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            "SEO Settings",
+            {
+                "fields": ("seo_title", "seo_description"),
+            },
+        ),
+    )
+
+    sbadmin_tabs = {
+        "Content": [None, "Publishing", ArticleTagInline],
+        "Comments": [CommentInline],
+        "SEO": ["SEO Settings"],
+    }
+```
+
+### How Tab Keys Map to Content
+
+The template tag resolves each value in the list against two maps:
+
+| Value type | Matched against | Example |
+|------------|-----------------|---------|
+| Fieldset name (first element of fieldset tuple) | `{fieldset.name: fieldset}` | `None`, `"Publishing"`, `"SEO Settings"` |
+| Inline class | `{inline.opts.__class__: inline}` | `ArticleTagInline`, `CommentInline` |
+
+A fieldset with `None` as its name (no header) is referenced as `None` in the tabs dict.
+
+### Fieldset Names Must Be Unique
+
+Because fieldsets are looked up by name, each fieldset must have a **unique** first element. Two fieldsets both named `None` would conflict — only the last one would be found in the lookup.
+
+```python
+# ❌ BAD - Two fieldsets with the same name (None)
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    (None, {"fields": ("author", "status")}),
+)
+
+# ✅ GOOD - Give at least one a name
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    ("Status", {"fields": ("author", "status")}),
+)
+```
+
+### Default Behavior (No Tabs)
+
+When `sbadmin_tabs` is `None` (the default), all fieldsets and inlines render sequentially on a single page — no tab UI is shown.
+
+### Error Handling
+
+When a form has validation errors, the tab containing the error is automatically activated and highlighted so the user sees the problem immediately. If multiple tabs have errors, the first one with errors is shown.
+
+### Combining with Sidebar
+
+Tabs work with `DETAIL_STRUCTURE_RIGHT_CLASS`. A fieldset with the sidebar class renders in the right column **within its tab**:
+
+```python
+fieldsets = (
+    (
+        None,
+        {"fields": ("title", "body")},
+    ),
+    (
+        "Metadata",
+        {
+            "fields": ("author", "status", "created_at"),
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+        },
+    ),
+    (
+        "SEO Settings",
+        {"fields": ("seo_title", "seo_description")},
+    ),
+)
+
+sbadmin_tabs = {
+    "Content": [None, "Metadata", ArticleTagInline],
+    "SEO": ["SEO Settings"],
+}
+```
+
+In this example, the "Content" tab has a two-column layout (main fields on the left, metadata sidebar on the right, tags inline below), while the "SEO" tab is a simple single-column form.
+
+**Key points:**
+- `sbadmin_tabs` is a `dict`, not a list (the attribute reference table type is approximate)
+- Keys are tab labels (strings), values are lists of fieldset names and/or inline classes
+- Fieldsets are referenced by their **name** (first element of the tuple) — use `None` for unnamed fieldsets
+- Inlines are referenced by their **class** (e.g., `ArticleTagInline`), not by a string
+- Every fieldset and inline should appear in exactly one tab — items not listed in any tab are not rendered
+- The first tab is active by default (unless there are validation errors in another tab)
+- Works with `DETAIL_STRUCTURE_RIGHT_CLASS` for sidebar layout within a tab
+- Override `get_sbadmin_tabs(request, object_id)` for dynamic tab configuration
+
+**Source:** `django_smartbase_admin/admin/admin_base.py` — `SBAdmin.sbadmin_tabs`, `get_sbadmin_tabs()`, `get_tabs_context()`; `django_smartbase_admin/templatetags/sb_admin_tags.py` — `get_tabular_context()`
+
+---
+
 ## Logo Customization
 
 Override default logo by placing files in your static directory:
@@ -2160,7 +2587,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
-| `sbadmin_tabs` | list | Organize form fields into tabs |
+| `sbadmin_tabs` | dict | Organize fieldsets and inlines into tabs (see [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)) |
 | `sbadmin_detail_actions` | list | Actions shown on detail/change page |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
@@ -2277,6 +2704,67 @@ class CommentAdmin(SBAdmin):
 ```
 
 The audit log admin itself automatically disables this to avoid circular navigation.
+
+### Programmatic Audit Entries (`_create_audit_log`)
+
+For custom actions that call external APIs or perform operations outside Django's ORM (where automatic auditing doesn't apply), create audit log entries manually using `_create_audit_log`.
+
+**Use case:** A bulk "Publish" action calls an external CMS API. The ORM is not involved, so automatic auditing doesn't capture the change. Create entries manually so the audit trail is complete.
+
+```python
+import logging
+
+from django_smartbase_admin.audit.manager import _create_audit_log
+
+from blog.models import Article
+
+logger = logging.getLogger(__name__)
+
+
+def _audit_publish_action(articles: list[dict], published_by: str) -> None:
+    """Create one audit log entry per article for an external publish action."""
+    for article in articles:
+        try:
+            _create_audit_log(
+                action_type="update",
+                model=Article,
+                object_id=str(article["id"]),
+                object_repr=f"Publish: {article['title']}",
+                changes={
+                    "status": {"old": "draft", "new": "published"},
+                    "published_by": {"old": None, "new": published_by},
+                    "author": {"old": None, "new": article["author_name"]},
+                },
+                affected_objects=[
+                    {"ct": "blog.author", "id": article["author_id"], "repr": article["author_name"]},
+                    {"ct": "blog.category", "id": article["category_id"], "repr": article["category_name"]},
+                ],
+            )
+        except Exception:
+            logger.exception("Failed to create audit log for article #%s", article["id"])
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_type` | str | Yes | `"create"`, `"update"`, `"delete"`, `"bulk_create"`, `"bulk_update"`, `"bulk_delete"` |
+| `model` | Model class | Yes | The Django model class |
+| `object_id` | str | No | Primary key of the affected object (as string) |
+| `object_repr` | str | No | Human-readable description shown in the audit log |
+| `snapshot_before` | dict | No | Full object state before the change (JSON-serializable) |
+| `changes` | dict | No | Field-level diffs: `{"field": {"old": ..., "new": ...}}` |
+| `is_bulk` | bool | No | Whether this is a bulk operation |
+| `bulk_count` | int | No | Number of affected items in bulk operation |
+| `affected_objects` | list | No | Related objects: `[{"ct": "app_label.model_name", "id": pk, "repr": "display name"}]` |
+
+**Key points:**
+- The `user` field is automatically populated from the current request via `SBAdminThreadLocalService`
+- The `request_id` is automatically populated, grouping all entries from the same request
+- Wraps in `transaction.atomic()` so audit failures never break the main transaction
+- Use for external API calls, cross-service operations, or any action not captured by ORM patching
+- For bulk operations, you can create one entry per item (individually traceable) or one summary entry with `is_bulk=True`
+- The `ct` in `affected_objects` uses format `"app_label.model_name"` (lowercase)
 
 ### Programmatic Audit URLs
 
