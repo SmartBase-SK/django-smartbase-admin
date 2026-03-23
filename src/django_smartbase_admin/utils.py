@@ -50,12 +50,7 @@ def is_modal(request):
 
 
 def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
-    """
-    SB Admin URL for the django-filer directory listing that contains this File/Image.
-
-    Uses ``File.logical_folder`` (real folder, root browser, or Unsorted Uploads), same
-    basis as filer breadcrumbs and ``SBAdminFilerFileWidget`` folder links.
-    """
+    """SB Admin directory listing URL for a django-filer File/Image (`logical_folder`)."""
     lf = file_obj.logical_folder
     if getattr(lf, "is_unsorted_uploads", False):
         return reverse("sb_admin:filer-directory_listing-unfiled_images")
