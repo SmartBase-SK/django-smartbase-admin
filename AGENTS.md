@@ -29,6 +29,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
+| [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -2875,6 +2876,228 @@ python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.Tes
 2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
 3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
 4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
+
+---
+
+## SBAdminWizardView
+
+Multi-step wizard **outside** the `change_form`. The view is a thin dispatcher — each step owns its form/formset creation, validation, context building, and save logic.
+
+### Architecture
+
+- **`SBAdminWizardView`** (`TemplateView` + `SBAdminView`) — holds the ordered step classes, dispatches `get()`/`post()` to the current step, builds base context.
+- **`SBAdminWizardStep`** — one step per class. The wizard instantiates a new step object per request. Steps define `title`, `model`, `form_class`, `formset_classes`, and override lifecycle hooks.
+
+### SBAdminWizardStep — Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `title` | str | Step title shown in the template |
+| `heading` | str \| None | Heading above the step title. Falls back to `wizard.wizard_step_heading`, then `model._meta.verbose_name` |
+| `model` | Model class | **Required**. Used for permission checks |
+| `form_class` | Form class | Main form for the step |
+| `formset_classes` | list[type[BaseFormSet]] | Formset factory classes. Used for autocomplete widget registration |
+| `requires_wizard_object` | bool | If `True`, missing wizard object redirects to step 1 |
+| `template_name` | str \| None | Override the default wizard template for this step |
+| `submit_button_label` | str \| None | Custom submit button text. `None` = "Next step" / "Finish" |
+
+### SBAdminWizardStep — Methods
+
+| Method | Description |
+|--------|-------------|
+| `get_form_kwargs(**kwargs)` | Returns kwargs for the main form. Default includes `request` and `view=wizard`. Override to add `instance` |
+| `get_form(data, files)` | Creates the main form instance. Bound when `data` is provided |
+| `get_formsets(data, files)` | Returns `[(title, formset_instance), ...]`. Override to declare formsets. On GET `data` is `None` |
+| `get_context_data(context, **kwargs)` | Builds step-specific template context. Formsets are auto-injected into `wizard_formsets` |
+| `form_valid(form, formsets)` | Called after successful validation. **Must return `HttpResponse`**. Raises `NotImplementedError` by default |
+| `form_invalid(form, formsets)` | Re-renders the page with bound form/formsets and errors |
+| `get_blocked_get_response()` | Return a redirect to block entry to this step (e.g. pending background tasks) |
+| `adjust_navigation(nav)` | Modify `back_url`, `wizard_footer_back_url`, `prev_step_url` dict |
+| `check_permission(request)` | Raises `PermissionDenied`. Default: `requires_wizard_object` → check *change*, otherwise *add* |
+
+### Step Lifecycle
+
+**GET:**
+
+```
+get() → get_blocked_get_response() → _check_requires_wizard_object()
+     → get_form() → wizard.get_context_data() → step.get_context_data()
+     → get_formsets() injected into context → render
+```
+
+**POST:**
+
+```
+post() → _check_requires_wizard_object()
+      → get_form(POST) + get_formsets(POST)
+      → validate all → form_valid(form, formsets)
+                     OR form_invalid(form, formsets)
+```
+
+### SBAdminWizardView — Required
+
+| Attribute / Method | Description |
+|--------------------|-------------|
+| `wizard_steps` | Tuple of `SBAdminWizardStep` classes |
+| `build_wizard_url(step, object_id=None)` | Returns URL with `?step=N` for the given step |
+| `get_wizard_object()` | Returns the wizard's current object from session (or `None`) |
+| `update_object_wizard_state(obj, step, completed)` | Persists the wizard progress on the object |
+
+### Example
+
+```python
+from django import forms
+from django.forms import formset_factory
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm, SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.views.sbadmin_wizard_step import SBAdminWizardStep
+from django_smartbase_admin.views.sbadmin_wizard_view import SBAdminWizardView
+
+from blog.models import Article, Tag
+
+
+# -- Step 1: create the article --
+
+class ArticleStep1Form(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "category")
+
+
+class ArticleStep1(SBAdminWizardStep):
+    title = "Basic Info"
+    model = Article
+    form_class = ArticleStep1Form
+
+    def form_valid(self, form, formsets):
+        obj = form.save()
+        self.wizard.update_object_wizard_state(obj, step=1, completed=False)
+        return HttpResponseRedirect(self.wizard.build_wizard_url(2, obj.pk))
+
+
+# -- Step 2: assign tags via formset --
+
+class TagRowForm(SBAdminBaseFormInit, forms.Form):
+    tag = forms.ModelChoiceField(
+        queryset=Tag.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Tag, multiselect=False,
+            label_lambda=lambda request, item: item.name,
+        ),
+    )
+
+TagRowFormSet = formset_factory(TagRowForm, extra=1, can_delete=True)
+
+
+class ArticleStep2(SBAdminWizardStep):
+    title = "Tags"
+    model = Article
+    form_class = ArticleStep1Form
+    formset_classes = [TagRowFormSet]
+    requires_wizard_object = True
+
+    def get_form_kwargs(self, **kwargs):
+        kwargs = super().get_form_kwargs(**kwargs)
+        kwargs["instance"] = self.wizard.get_wizard_object()
+        return kwargs
+
+    def get_formsets(self, data=None, files=None):
+        kwargs = {
+            "prefix": "tags",
+            "form_kwargs": {"view": self.wizard, "request": self.request},
+        }
+        if data is not None:
+            kwargs["data"] = data
+        return [("Tags", TagRowFormSet(**kwargs))]
+
+    def form_valid(self, form, formsets):
+        article = self.wizard.get_wizard_object()
+        fs = formsets[0][1]
+        # ... save tag associations from fs.cleaned_data ...
+        self.wizard.update_object_wizard_state(article, step=2, completed=True)
+        return HttpResponseRedirect("...")
+
+
+# -- Wizard view --
+
+class ArticleWizard(SBAdminWizardView):
+    wizard_steps = (ArticleStep1, ArticleStep2)
+
+    def build_wizard_url(self, step, object_id=None):
+        url = reverse("sb_admin:blog_article_wizard")
+        return f"{url}?step={step}"
+```
+
+Register in `SBAdminRoleConfiguration.registered_views`:
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from blog.wizard_views import ArticleWizard
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+        ArticleWizard(title="Create Article"),
+    ],
+)
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+The wizard view is automatically routed via `view_map` — no manual URL registration needed.
+
+### Formsets in Steps
+
+Steps declare formsets via `get_formsets()` which returns `[(title, formset_instance), ...]`. The base class handles:
+
+- **Context injection**: formsets are automatically added to `wizard_formsets` in the template context
+- **Multipart detection**: `form_is_multipart` is set if any form or formset form has file fields
+- **POST validation**: all formsets are validated alongside the main form; on failure, `form_invalid` re-renders with bound formsets and errors
+- **Autocomplete registration**: `formset_classes` are iterated during `register_autocomplete_views` to instantiate each formset's row form class for widget initialization
+
+**Key points:**
+- `formset_classes` is used **only** for autocomplete widget registration (happens during `init_view_dynamic` when no wizard object is available)
+- `get_formsets()` is used for actual formset **instance creation** (happens per-request with full wizard state)
+- Row forms should extend `SBAdminBaseFormInit` for autocomplete widgets to work
+- Pass `form_kwargs={"view": self.wizard, "request": self.request}` when creating formset instances
+
+### Navigation
+
+- **`back_url`** (top arrow): if a wizard object exists in session and the user has `change` permission, points to the object's **change** page; otherwise points to the changelist.
+- **`wizard_footer_back_url`**: on step > 1, points to the previous wizard step; on step 1 with an existing object, points to the **change** page (same as the arrow); otherwise the footer "Back" button is hidden.
+- Override `adjust_navigation(nav)` on the step to customize these URLs.
+
+### Template
+
+Default template: `sb_admin/wizard/wizard_step.html`
+
+| Context variable | Description |
+|-----------------|-------------|
+| `wizard_heading` | Heading from `step.get_heading()` |
+| `sbadmin_wizard_step_title` | Step title |
+| `sbadmin_wizard_submit_label` | Submit button text |
+| `wizard_formsets` | List of `(title, formset)` tuples |
+| `form_is_multipart` | `True` if any form has file fields |
+| `wizard_primary_section_title` | Optional title above the main form fields |
+| `sbadmin_wizard_step_banner` | Optional HTML banner shown at the top of the step |
+| `sbadmin_wizard_poll_seconds` | If set, the page auto-refreshes at this interval |
+
+**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.wizard-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.wizard-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.wizard-formset-add` button are rendered. The script `sb_admin/js/wizard_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `wizard-formset-row-added` on `document.body` (useful for re-initializing autocomplete widgets in new rows).
+
 
 ---
 

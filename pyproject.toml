@@ -8,7 +8,8 @@ license = "MIT"
 homepage = "https://smartbase-sk.github.io/django-smartbase-admin-docs/"
 repository = "https://github.com/SmartBase-SK/django-smartbase-admin"
 include = [
-    "**/static/sb_admin/dist/**/*"
+    "**/static/sb_admin/dist/**/*",
+    "**/static/sb_admin/js/wizard_formset.js",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
