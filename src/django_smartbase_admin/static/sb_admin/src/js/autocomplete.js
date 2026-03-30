@@ -93,6 +93,17 @@ export default class Autocomplete {
             this.search(choicesJS.SBcurrentSearchTerm, choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage)
         }, 200))
 
+        choicesJS.input.element.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return
+            const btn = choicesJS.SBaddNewButton
+            if (!btn || btn.parentElement.classList.contains('hidden')) return
+            const highlighted = choicesJS.dropdown.element.querySelector('.is-highlighted')
+            if (highlighted) return
+            e.preventDefault()
+            e.stopPropagation()
+            btn.click()
+        })
+
         choiceInput.addEventListener('selectItem', (event) => {
             if(!event.target.hasAttribute('multiple')) {
                 this.updateEditButtonUrl(event)
