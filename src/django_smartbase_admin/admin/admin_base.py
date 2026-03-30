@@ -337,10 +337,19 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
         )
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
-        for field in self.declared_fields:
-            form_field = self.fields.get(field)
-            if form_field:
-                self.assign_widget_to_form_field(form_field, request=threadsafe_request)
+        model = getattr(getattr(self, "_meta", None), "model", None)
+        for field_name, form_field in self.fields.items():
+            db_field = None
+            if model is not None:
+                try:
+                    db_field = model._meta.get_field(field_name)
+                except FieldDoesNotExist:
+                    db_field = None
+            self.assign_widget_to_form_field(
+                form_field,
+                db_field=db_field,
+                request=threadsafe_request,
+            )
 
     def init_widgets_dynamic(self, request):
         for field in self.fields:
