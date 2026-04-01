@@ -7,7 +7,7 @@
 {{ block.super }}
 {% if form %}{{ form.media }}{% endif %}
 {% if wizard_formsets %}{% for _t, fs in wizard_formsets %}{{ fs.media }}{% endfor %}
-<script src="{% static 'sb_admin/js/wizard_formset.js' %}"></script>
+<script src="{% static 'sb_admin/js/sbadmin_formset.js' %}"></script>
 {% endif %}
 {% endblock %}
 
@@ -70,11 +70,11 @@
     {% if wizard_formsets %}
     {% for fs_title, fs in wizard_formsets %}
     {% with can_add=fs.show_add_button|default:False %}
-    <div class="wizard-formset-dynamic mb-32" data-prefix="{{ fs.prefix }}" data-max-forms="{{ fs.max_num }}">
+    <div class="sbadmin-formset-dynamic mb-32" data-prefix="{{ fs.prefix }}" data-max-forms="{{ fs.max_num }}">
         <header class="flex flex-wrap items-center gap-16 justify-between mb-16">
             <h2 class="text-18 font-bold text-dark-900 m-0">{{ fs_title }}</h2>
             {% if can_add and fs.max_num != 0 and fs.total_form_count < fs.max_num %}
-            <button type="button" class="wizard-formset-add btn btn-secondary flex items-center gap-8">
+            <button type="button" class="sbadmin-formset-add btn btn-secondary flex items-center gap-8">
                 <svg class="w-20 h-20 shrink-0">
                     <use xlink:href="#Plus"></use>
                 </svg>
@@ -88,9 +88,9 @@
         </div>
         {% endif %}
         {{ fs.management_form }}
-        <div class="wizard-formset-forms">
+        <div class="sbadmin-formset-forms">
             {% for form in fs.forms %}
-            <div class="wizard-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
+            <div id="{{ fs.prefix }}-{{ forloop.counter0 }}" class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
                 {% if fs.can_delete %}
                 <div class="mb-8 text-14 text-dark-600">{% trans "Row" %} {{ forloop.counter }}</div>
                 {% endif %}
@@ -109,7 +109,7 @@
         </div>
         {% if can_add and fs.max_num != 0 and fs.total_form_count < fs.max_num %}
         <template id="{{ fs.prefix }}-empty-template">
-            <div class="wizard-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
+            <div class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
                 <div class="mb-8 text-14 text-dark-600">{% trans "New row" %}</div>
                 {% with ef=fs.empty_form %}
                 {% for field in ef %}
