@@ -19,6 +19,7 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminFormViewAction,
+    sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
     Action,
@@ -113,6 +114,7 @@ class SBAdminBaseView(object):
         def inner_view(request, modifier):
             return processed_action.target_view.as_view(view=self)(request)
 
+        inner_view._is_sbadmin_action = True
         return inner_view
 
     def process_actions(
@@ -163,24 +165,13 @@ class SBAdminBaseView(object):
             self.field_cache[field.name] = field
         return fields
 
-    def action_view(self, request, action=None, modifier=None):
-        action_function = getattr(self, action, None)
-        if not action_function:
-            raise Http404
-        action = SBAdminCustomAction(
-            title=action, view=self, action_id=action, action_modifier=modifier
-        )
-        permitted_action = self.has_permission_for_action(request, action)
-        if not permitted_action:
-            raise PermissionDenied
-        return action_function(request, modifier)
-
     def get_action_url(self, action, modifier="template"):
         raise NotImplementedError
 
     def register_autocomplete_views(self, request):
         pass
 
+    @sbadmin_action
     def action_autocomplete(self, request, modifier):
         autocomplete_view = request.request_data.configuration.autocomplete_map.get(
             modifier
@@ -335,10 +326,12 @@ class SBAdminBaseListView(SBAdminBaseView):
     def activate_reorder(self, request) -> None:
         request.reorder_active = True
 
+    @sbadmin_action
     def action_list_json_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         return self.action_list_json(request, modifier, page_size=100)
 
+    @sbadmin_action
     def action_enter_reorder(self, request, modifier):
         self.activate_reorder(request)
         tabulator_definition = self.get_tabulator_definition(request)
@@ -376,6 +369,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def is_reorder_available(self, request) -> str | None:
         return self.sbadmin_list_reorder_field
 
+    @sbadmin_action
     def action_table_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         qs = self.get_queryset(request)
@@ -410,6 +404,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
+    @sbadmin_action
     def action_table_data_edit(self, request, modifier) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
@@ -633,11 +628,13 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         return self.sbadmin_xlsx_options
 
+    @sbadmin_action
     def action_xlsx_export(self, request, modifier) -> HttpResponse:
         action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
+    @sbadmin_action
     def action_bulk_delete(self, request, modifier):
         action = self.sbadmin_list_action_class(self, request)
         if (
@@ -663,6 +660,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             return redirect(self.get_menu_view_url(request))
         return response
 
+    @sbadmin_action
     def action_config(self, request, config_id=None):
         config_id = config_id if config_id != "None" else None
 
@@ -706,6 +704,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         redirect_to = urllib.parse.urlunparse(url)
         return redirect_to
 
+    @sbadmin_action
     def action_list(
         self,
         request,
@@ -747,6 +746,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             extra_context,
         )
 
+    @sbadmin_action
     def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()

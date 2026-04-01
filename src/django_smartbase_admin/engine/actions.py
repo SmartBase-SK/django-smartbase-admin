@@ -1,6 +1,31 @@
 from django.core.exceptions import ImproperlyConfigured
 
 
+def sbadmin_action(func=None, **kwargs):
+    """Mark a view method as callable via SBAdmin URL dispatch.
+
+    Any keyword arguments are stored on the function as ``_sbadmin_action_attrs``
+    for future use by ``delegate_to_action`` (e.g. permission, methods).
+
+    Usage::
+
+        @sbadmin_action
+        def action_list_json(self, request, modifier): ...
+
+        @sbadmin_action(permission="delete")
+        def action_bulk_delete(self, request, modifier): ...
+    """
+
+    def decorator(fn):
+        fn._is_sbadmin_action = True
+        fn._sbadmin_action_attrs = kwargs
+        return fn
+
+    if func is not None:
+        return decorator(func)
+    return decorator
+
+
 class SBAdminCustomAction(object):
     title = None
     url = None

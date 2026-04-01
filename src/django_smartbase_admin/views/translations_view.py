@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.admin.admin_base import SBAdminInlineAndAdminCommon
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
     TRANSLATION_MODEL_KEY,
@@ -246,6 +247,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
             return response
         return None
 
+    @sbadmin_action
     def list(self, request, modifier):
         language_choice_change_response = self.handle_language_choice_change(request)
         if language_choice_change_response:
@@ -273,6 +275,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
         translation_obj.save()
         return translation_obj
 
+    @sbadmin_action
     def detail(self, request, modifier):
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         language_choice_change_response = self.handle_language_choice_change(request)
@@ -455,6 +458,7 @@ class SBAdminTranslationsView(SBAdminView):
         )
         self.translations_definition = translations_definition
 
+    @sbadmin_action
     def translations(self, request, modifier):
         context = self.get_global_context(request)
         context.update({"sub_views": self.sub_views})

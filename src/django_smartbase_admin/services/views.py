@@ -3,7 +3,9 @@ import pickle
 import urllib
 from typing import Any, TYPE_CHECKING
 
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q, FilteredRelation, F
+from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -15,6 +17,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     TABLE_TAB_ADVANCED_FITLERS,
 )
+from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
@@ -135,9 +138,26 @@ class SBAdminViewService(object):
         request_data.selected_view.init_view_dynamic(request, request_data, **kwargs)
         if request_data.selected_view and not request_data.action:
             return redirect(request_data.selected_view.get_menu_view_url(request))
-        return getattr(request_data.selected_view, request_data.action)(
-            request, request_data.modifier
+
+        view = request_data.selected_view
+        action_name = request_data.action
+
+        action_function = getattr(view, action_name, None)
+        if not action_function or not getattr(
+            action_function, "_is_sbadmin_action", False
+        ):
+            raise Http404
+
+        action_obj = SBAdminCustomAction(
+            title=action_name,
+            view=view,
+            action_id=action_name,
+            action_modifier=request_data.modifier,
         )
+        if not view.has_permission_for_action(request, action_obj):
+            raise PermissionDenied
+
+        return action_function(request, request_data.modifier)
 
     @classmethod
     def apply_global_filter_to_queryset(
