@@ -32,7 +32,7 @@ def main():
     django.setup()
     TestRunner = get_runner(settings)
     test_runner = TestRunner(verbosity=2)
-    test_labels = sys.argv[1:] or ["django_smartbase_admin.audit.tests"]
+    test_labels = sys.argv[1:] or ["django_smartbase_admin"]
     failures = test_runner.run_tests(test_labels)
     sys.exit(bool(failures))
 
