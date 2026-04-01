@@ -172,6 +172,14 @@ export default class Datepicker {
     createClear(datePickerInstance) {
         const el = document.createElement('div')
         el.classList.add('flatpickr-footer')
+        const timezoneLabel = sbadminDatepickerData.flatpickrOptions?.displayTimezoneLabel || sbadminDatepickerData.displayTimezoneLabel
+        const timezoneTitle = window.sb_admin_translation_strings?.timezone || 'Timezone'
+        if (timezoneLabel) {
+            const infoHint = document.createElement('p')
+            infoHint.classList.add('px-12', 'pb-8', '-mt-8', 'text-10', 'block')
+            infoHint.textContent = `${timezoneTitle}: ${timezoneLabel}`
+            el.append(infoHint)
+        }
         const clear = document.createElement('a')
         clear.text = 'Clear'
         clear.addEventListener('click', (e) => {

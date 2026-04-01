@@ -437,11 +437,14 @@ class DateFilterWidget(SBAdminFilterWidget):
                 "flatpickrOptions": {
                     "locale": {
                         "rangeSeparator": self.DATE_RANGE_SPLIT,
-                    }
+                    },
                 },
             },
             cls=SBAdminJSONEncoder,
         )
+
+    def get_timezone_label(self):
+        return timezone.get_current_timezone_name()
 
     def get_shortcuts_data(self):
         return json.dumps(
