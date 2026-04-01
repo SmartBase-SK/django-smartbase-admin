@@ -1,9 +1,9 @@
 /**
- * Dynamické riadky ModelFormSet vo wizardi (ako Django admin inliny).
- * Klonuje markup z <template> a nahrádza __prefix__ indexom (TOTAL_FORMS).
+ * Dynamic formset rows for SBAdmin (used in wizards and other views).
+ * Clones markup from <template> and replaces __prefix__ with the row index.
  */
 (function () {
-    function replaceFormsetPrefix(root, index) {
+    function replacePrefix(root, index) {
         var idx = String(index);
         var nodes = [root];
         var q = root.querySelectorAll("*");
@@ -20,16 +20,16 @@
         }
     }
 
-    function initWizardFormset(container) {
+    function initFormset(container) {
         var prefix = container.getAttribute("data-prefix");
         if (!prefix) return;
         var maxForms = parseInt(container.getAttribute("data-max-forms") || "1000", 10);
         var totalInput = container.querySelector(
             'input[name="' + prefix + '-TOTAL_FORMS"]'
         );
-        var formsWrap = container.querySelector(".wizard-formset-forms");
+        var formsWrap = container.querySelector(".sbadmin-formset-forms");
         var tpl = document.getElementById(prefix + "-empty-template");
-        var addBtn = container.querySelector(".wizard-formset-add");
+        var addBtn = container.querySelector(".sbadmin-formset-add");
         if (!totalInput || !formsWrap || !tpl || !tpl.content || !addBtn) return;
 
         addBtn.addEventListener("click", function (e) {
@@ -38,16 +38,17 @@
             if (isNaN(total) || total >= maxForms) return;
             var row = tpl.content.firstElementChild.cloneNode(true);
             if (!row) return;
-            replaceFormsetPrefix(row, total);
-            row.querySelectorAll("script").forEach(function (s) {
+            replacePrefix(row, total);
+            row.id = prefix + "-" + total;
+            row.querySelectorAll("script:not([type='application/json'])").forEach(function (s) {
                 s.remove();
             });
             formsWrap.appendChild(row);
             totalInput.value = total + 1;
-            document.body.dispatchEvent(
-                new CustomEvent("wizard-formset-row-added", {
+            row.dispatchEvent(
+                new CustomEvent("formset:added", {
                     bubbles: true,
-                    detail: { row: row, formsetPrefix: prefix },
+                    detail: { formsetName: prefix },
                 })
             );
         });
@@ -55,8 +56,8 @@
 
     function run() {
         document
-            .querySelectorAll(".wizard-formset-dynamic")
-            .forEach(initWizardFormset);
+            .querySelectorAll(".sbadmin-formset-dynamic")
+            .forEach(initFormset);
     }
 
     if (document.readyState === "loading") {

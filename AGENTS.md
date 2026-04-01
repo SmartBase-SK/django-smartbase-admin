@@ -3112,7 +3112,7 @@ Default template: `sb_admin/wizard/wizard_step.html`
 | `sbadmin_wizard_step_banner` | Optional HTML banner shown at the top of the step |
 | `sbadmin_wizard_poll_seconds` | If set, the page auto-refreshes at this interval |
 
-**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.wizard-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.wizard-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.wizard-formset-add` button are rendered. The script `sb_admin/js/wizard_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `wizard-formset-row-added` on `document.body` (useful for re-initializing autocomplete widgets in new rows).
+**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/js/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
 
 
 ---
