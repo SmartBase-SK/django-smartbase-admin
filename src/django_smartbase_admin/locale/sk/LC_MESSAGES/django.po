@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-09-11 16:32+0200\n"
+"POT-Creation-Date: 2026-04-01 14:45+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -94,6 +94,15 @@ msgstr "Pre vybratie viacerých súborov podržte “Control”, alebo “Comman
 msgid "Change history: %s"
 msgstr "História zmien: %s"
 
+msgid "Log in"
+msgstr "Prihlásiť sa"
+
+msgid "Timezone"
+msgstr "Časové pásmo"
+
+msgid "The new value was created but became unselected due to another validation error. Please select it again."
+msgstr ""
+
 msgid "Clear"
 msgstr "Vymazať"
 
@@ -109,6 +118,34 @@ msgstr ""
 msgid "Cannot set parent to it's own child"
 msgstr ""
 
+msgid "Details"
+msgstr ""
+
+msgid "Bulk"
+msgstr ""
+
+msgid "Parent Context"
+msgstr ""
+
+msgid "(empty)"
+msgstr ""
+
+#, fuzzy
+#| msgid "Change"
+msgid "Changes"
+msgstr "Zmeniť"
+
+#, fuzzy
+#| msgid "Objects"
+msgid "Affected Objects"
+msgstr "Objekty"
+
+msgid "Related Changes"
+msgstr ""
+
+msgid "Summary"
+msgstr "Zhrnutie"
+
 msgid "Search..."
 msgstr "Vyhľadať..."
 
@@ -118,6 +155,9 @@ msgstr "Ukončiť preusporiadanie"
 #, python-brace-format
 msgid "Reorder {self.model._meta.verbose_name}"
 msgstr ""
+
+msgid "History"
+msgstr "História"
 
 msgid "Download XLSX"
 msgstr "Stiahnuť XLSX"
@@ -178,6 +218,15 @@ msgstr "Posledný štvrťrok"
 msgid "Last Year"
 msgstr "Posledný rok"
 
+msgid "Yes"
+msgstr "Áno"
+
+msgid "No"
+msgstr "Nie"
+
+msgid "View on site"
+msgstr "Zobraziť na stránke"
+
 msgid "Today"
 msgstr "Dnes"
 
@@ -220,12 +269,6 @@ msgstr "Téma"
 
 msgid "Translations"
 msgstr "Preklady"
-
-msgid "History"
-msgstr "História"
-
-msgid "View on site"
-msgstr "Zobraziť na stránke"
 
 msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
@@ -274,9 +317,6 @@ msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie
 #, python-format
 msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
 msgstr "Ste si istý že chcete odstrániť %(object_name)s \"%(escaped_object)s\"? Všetky nasledujúce položky budú odstránené:"
-
-msgid "Summary"
-msgstr "Zhrnutie"
 
 msgid "Objects"
 msgstr "Objekty"
@@ -350,6 +390,40 @@ msgstr "Zobraziť preklady"
 msgid "Save Order"
 msgstr "Uložiť zoradenie"
 
+msgid "more"
+msgstr ""
+
+msgid "No other affected objects."
+msgstr ""
+
+#, fuzzy
+#| msgid "Operations"
+msgid "Bulk operation"
+msgstr "Operácie"
+
+msgid "items affected"
+msgstr ""
+
+msgid "Field"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "No changes recorded."
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+#, fuzzy
+#| msgid "Objects"
+msgid "Object"
+msgstr "Objekty"
+
+msgid "No related changes in this request."
+msgstr ""
+
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
 msgstr "Ste prihlásený ako %(username)s, ale k tejto stránke nemáte prístup. Chcete sa prihlásiť pod iným účtom?"
@@ -359,9 +433,6 @@ msgstr "Vitajte späť"
 
 msgid "Enter your details to enter the application."
 msgstr "Pre vstup do aplikácie zadajte prihlasovacie údaje."
-
-msgid "Log in"
-msgstr "Prihlásiť sa"
 
 msgid "Can't sign in?"
 msgstr "Nedarí sa vám prihlásiť?"
@@ -484,12 +555,6 @@ msgstr "Zrušiť"
 msgid "Calendar"
 msgstr "Kalendár"
 
-msgid "Yes"
-msgstr "Áno"
-
-msgid "No"
-msgstr "Nie"
-
 msgid "From"
 msgstr "Od"
 
@@ -498,10 +563,6 @@ msgstr "Do"
 
 msgid "Type to filter"
 msgstr "Začnite písať"
-
-#, python-format
-msgid "Add %(name)s"
-msgstr "Pridať %(name)s"
 
 msgid "Editorial reviews"
 msgstr "Redakčné recenzie"
@@ -628,6 +689,9 @@ msgstr ""
 msgid "Duplicates"
 msgstr "Duplikáty"
 
+msgid "URL copied to clipboard"
+msgstr ""
+
 msgid "Go back to admin homepage"
 msgstr "Naspäť na adminovú domovskú stránku"
 
@@ -698,29 +762,43 @@ msgstr "Nahrať súbory"
 msgid "You have to select a folder first"
 msgstr "Najprv si vyberte priečinok"
 
-msgid "Please select a category and domain(in bottom left corner) to sort."
-msgstr "Vyberte kategóriu a doménu (v ľavom dolnom rohu), ktorú chcete zoradiť."
+#, fuzzy
+#| msgid "Download XLSX"
+msgid "Download"
+msgstr "Stiahnuť XLSX"
 
-msgid "Operations"
-msgstr "Operácie"
+msgid "Expand"
+msgstr "Rozbaliť"
 
-msgid "Move to first"
-msgstr "Presunúť na prvé miesto"
+msgid "File is missing"
+msgstr "Súbor chýba"
 
-msgid "Position"
-msgstr "Pozícia"
+msgid "Type"
+msgstr ""
 
-msgid "Set"
-msgstr "Nastaviť"
+msgid "Size"
+msgstr ""
 
-msgid "Reordering please wait"
-msgstr "Poradie sa upravuje, prosím čakajte"
+msgid "File-size"
+msgstr ""
+
+msgid "Modified"
+msgstr ""
+
+msgid "Created"
+msgstr ""
+
+msgid "Owner"
+msgstr ""
 
 msgid "Logout"
 msgstr "Odhlásiť sa"
 
 msgid "Continue"
 msgstr "Pokračovať"
+
+msgid "Move to first"
+msgstr "Presunúť na prvé miesto"
 
 msgid "Move to last"
 msgstr "Presunúť na posledné miesto"
@@ -733,9 +811,6 @@ msgstr "Posunúť nižšie"
 
 msgid "Reorder"
 msgstr "Preusporiadať"
-
-msgid "Expand"
-msgstr "Rozbaliť"
 
 msgid "Collapse"
 msgstr "Zbaliť"
@@ -811,9 +886,6 @@ msgstr ""
 
 msgid "No file selected"
 msgstr "Nebol vybraný žiadny súbor"
-
-msgid "File is missing"
-msgstr "Súbor chýba"
 
 msgid "Lookup"
 msgstr "Vyhľadať"

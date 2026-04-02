@@ -1,3 +1,5 @@
+{% load i18n tz %}
+{% get_current_timezone as TIME_ZONE %}
 <div class="dropdown-menu dropdown-menu-datepicker"
      style="max-width: none; width: auto; height: auto; max-height: none;">
     <div class="px-12 py-8">
@@ -17,6 +19,9 @@
                data-sbadmin-datepicker-real-input-id="{{ filter_widget.input_id }}"
                data-sbadmin-datepicker="{{ filter_widget.get_data }}"
                data-sbadmin-datepicker-shortcuts="{{ filter_widget.get_shortcuts_data }}">
+        <p class="block text-10">
+            {% trans "Timezone" %}: {{ TIME_ZONE }}
+        </p>
     </div>
     {% include "sb_admin/filter_widgets/partials/clear.html" %}
 </div>

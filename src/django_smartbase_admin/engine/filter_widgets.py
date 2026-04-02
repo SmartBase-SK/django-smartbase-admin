@@ -437,7 +437,7 @@ class DateFilterWidget(SBAdminFilterWidget):
                 "flatpickrOptions": {
                     "locale": {
                         "rangeSeparator": self.DATE_RANGE_SPLIT,
-                    }
+                    },
                 },
             },
             cls=SBAdminJSONEncoder,

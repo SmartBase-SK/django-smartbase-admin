@@ -23,6 +23,7 @@ from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
+from django.utils.timezone import get_current_timezone_name
 from django.utils.translation import gettext_lazy as _, get_language
 from django.views.generic.base import ContextMixin
 from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
@@ -269,6 +270,7 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATE_FORMAT")
                     ),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -283,10 +285,21 @@ class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
             form_field,
             attrs={
                 "class": "input js-timepicker",
+                "data-sbadmin-datepicker": self.get_data(),
                 "placeholder": get_datetime_placeholder()["time"],
                 "autocomplete": "do-not-autofill",
                 **(attrs or {}),
             },
+        )
+
+    def get_data(self):
+        return json.dumps(
+            {
+                "flatpickrOptions": {
+                    "displayTimezoneLabel": get_current_timezone_name(),
+                },
+            },
+            cls=SBAdminJSONEncoder,
         )
 
 
@@ -314,6 +327,7 @@ class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATETIME_FORMAT")
                     ),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
