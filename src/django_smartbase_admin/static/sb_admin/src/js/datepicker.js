@@ -185,7 +185,7 @@ export default class Datepicker {
         datePickerInstance.calendarContainer.append(el)
     }
 
-    createClear(datePickerInstance = {}) {
+    createClear(datePickerInstance) {
         const el = document.createElement('div')
         el.classList.add('flatpickr-footer')
         const clear = document.createElement('a')
