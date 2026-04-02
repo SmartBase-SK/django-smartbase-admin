@@ -21,6 +21,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
 | [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add) | Why default-only singleton inlines can be skipped and how SBAdmin creates them during add |
+| [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin) | Show related models without a real Django FK to the parent — cross-database, unmanaged, or indirect relationships |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, default tab from menu, programmatic URL building |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
@@ -56,6 +57,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
+- **Inline for model without FK to parent?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
+- **Cross-database or unmanaged inline?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
+- **Multiple inlines for the same model?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
 
 ---
 
@@ -1669,6 +1673,150 @@ class ArticleAdmin(SBAdmin):
 - Scope is intentionally add-only to keep update flow conservative.
 - Validation still runs normally; this does not bypass field/model validation.
 - If required inline fields have no defaults and remain empty, validation can still fail (expected).
+
+---
+
+## Fake Inlines (`SBAdminFakeInlineMixin`)
+
+Django's built-in inlines require a real `ForeignKey` from the inline model to the parent model on the **same** database. Fake inlines remove that constraint. Use them when:
+
+- The inline model lives in a **different database** (cross-database relationship)
+- The models are **unmanaged** (`Meta.managed = False`) and Django can't introspect the FK
+- The relationship is **indirect** (e.g., through a junction table or computed path)
+- You need a **read-only inline** showing related data without a direct Django FK
+- You need **multiple inlines for the same model** on one parent admin (e.g., active vs archived comments) — Django forbids duplicate model inlines, but each fake inline creates a unique proxy model
+
+### How It Works
+
+`SBAdminFakeInlineMixin` creates a dynamic **proxy model** from the inline model at startup. This proxy tricks Django's formset machinery into accepting the inline without a real FK. A monkeypatch on `_get_foreign_key` catches the `ValueError` that Django raises for the missing FK and substitutes a synthetic one.
+
+At query time, the mixin:
+1. Annotates the queryset with a fake FK field (`inline_fake_relationship`) using `get_fake_inline_identifier_annotate()`
+2. Intercepts `.filter()` calls from the formset and delegates to `filter_fake_inline_identifier_by_parent_instance()` to apply the actual parent-child filtering
+
+### Usage
+
+Mix `SBAdminFakeInlineMixin` with `SBAdminTableInline` (or `SBAdminStackedInline`). Register the inline on the parent admin via `sbadmin_fake_inlines` (not `inlines`).
+
+```python
+from django.contrib import admin
+from django.db.models import F
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+
+from blog.models import Article, Comment
+
+
+class CommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    fields = ("text", "created_at")
+    readonly_fields = ("text", "created_at")
+    verbose_name = "Comment"
+    verbose_name_plural = "Comments"
+    extra = 0
+    can_delete = False
+    max_num = 0
+    path_to_parent_instance_id = "article_id"
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+
+    sbadmin_fieldsets = [
+        (None, {"fields": ["title", "status", "category"]}),
+    ]
+```
+
+### Key Parameters and Methods
+
+| Parameter / Method | Type | Description |
+|--------------------|------|-------------|
+| `model` | Model class | **Required**. The inline model (can be unmanaged, cross-database) |
+| `path_to_parent_instance_id` | str | **Required**. Lookup path from inline model to parent's PK (e.g., `"article_id"`, `"article__author_id"`) |
+| `get_fake_inline_identifier_annotate()` | method → Expression | **Required override**. Returns an `F()` expression that annotates each inline row with the parent's identifier. Must correspond to `path_to_parent_instance_id` |
+| `filter_fake_inline_identifier_by_parent_instance()` | method | Filters inline queryset by parent instance. Default implementation uses `path_to_parent_instance_id` — override for custom logic |
+| `save_new_fake_inline_instance()` | method | Handles saving new inline instances. Override for writable fake inlines |
+| `get_queryset()` | method | Override to add extra filtering (e.g., `.filter(active=True)`) or ordering. **Must call `super()` first** |
+
+### Writable Pattern
+
+For editable fake inlines, set `path_to_parent_instance_id` and allow mutations. The mixin's `save_new_fake_inline_instance()` sets the FK value on new instances before saving:
+
+```python
+class CommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    fields = ("text",)
+    extra = 1
+    can_delete = True
+    path_to_parent_instance_id = "article_id"
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+```
+
+### Custom Queryset Filtering
+
+Override `get_queryset` to add extra conditions. Always call `super()` first to get the properly configured fake queryset:
+
+```python
+class ActiveCommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    path_to_parent_instance_id = "article_id"
+    # ...
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.filter(is_approved=True).order_by("-created_at")
+```
+
+### Registration
+
+**CRITICAL**: Fake inlines go in `sbadmin_fake_inlines`, NOT `inlines`:
+
+```python
+# ❌ BAD - Regular inlines list; Django will fail looking for a real FK
+class ArticleAdmin(SBAdmin):
+    inlines = [CommentFakeInline]
+
+# ✅ GOOD - Fake inlines list; SBAdminFakeInlineMixin handles the fake FK
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+```
+
+### Using with Tabs
+
+Fake inlines work with `sbadmin_tabs` just like regular inlines — reference by class:
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+
+    sbadmin_tabs = {
+        "Content": [None],
+        "Comments": [CommentFakeInline],
+    }
+```
+
+**Key points:**
+- `SBAdminFakeInlineMixin` must be the **first** parent class (before `SBAdminTableInline`/`SBAdminStackedInline`) for correct MRO
+- `path_to_parent_instance_id` is a Django ORM lookup path (e.g., `"article_id"`, `"article__author_id"`)
+- `get_fake_inline_identifier_annotate()` must return an `F()` expression that maps each inline row to the parent PK it belongs to
+- Permission checks flow through `SBAdminRoleConfiguration.has_permission()` using the inline's `original_model`
+- The dynamic proxy model is created once at startup and cached in the Django app registry
+- Works across databases — the inline queryset uses the database router for the inline's model, not the parent's
+
+**Source:** `django_smartbase_admin/engine/fake_inline.py` — `SBAdminFakeInlineMixin`, `FakeQueryset`, `SBAdminFakeInlineFormset`; `django_smartbase_admin/monkeypatch/fake_inline_monkeypatch.py`
 
 ---
 
