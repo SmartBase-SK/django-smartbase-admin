@@ -170,12 +170,12 @@ export default class Datepicker {
     }
 
     createTimezone(datePickerInstance, sbadminDatepickerData = {}) {
-        const timezoneLabel = sbadminDatepickerData.flatpickrOptions?.displayTimezoneLabel || sbadminDatepickerData.displayTimezoneLabel
+        const timezoneLabel = sbadminDatepickerData.flatpickrOptions?.displayTimezoneLabel
         if (!timezoneLabel) {
             return
         }
 
-        const timezoneTitle = sbadminDatepickerData.flatpickrOptions?.displayTimezoneTitle || window.sb_admin_translation_strings?.timezone || 'Timezone'
+        const timezoneTitle = window.sb_admin_translation_strings?.timezone || 'Timezone'
         const el = document.createElement('div')
         el.classList.add('flatpickr-timezone')
         const infoHint = document.createElement('p')
