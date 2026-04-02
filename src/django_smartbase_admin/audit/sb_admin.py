@@ -17,6 +17,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -643,6 +644,7 @@ class AdminAuditLogAdmin(SBAdmin):
 
     _OBJECT_HISTORY_FILTER_CACHE_KEY = "_audit_object_history_filter"
 
+    @sbadmin_action
     def action_list_json(self, request, modifier, page_size=None):
         """Override to ensure object_history filter is cached before processing rows."""
         from django.http import JsonResponse

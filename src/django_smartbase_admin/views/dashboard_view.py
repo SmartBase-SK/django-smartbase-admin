@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.template.response import TemplateResponse
 
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import Action
 
@@ -39,6 +40,7 @@ class SBAdminDashboardView(SBAdminView):
             self.sub_views.extend(widget_view_sub_views)
         return self.sub_views
 
+    @sbadmin_action
     def dashboard(self, request, modifier):
         context = self.get_global_context(request)
         context["sub_views"] = self.sub_views

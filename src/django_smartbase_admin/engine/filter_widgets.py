@@ -14,6 +14,7 @@ from django_smartbase_admin.actions.advanced_filters import (
     NUMBER_ATTRIBUTES,
     DATE_ATTRIBUTES,
 )
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_SEARCH_NAME,
@@ -604,6 +605,7 @@ class AutocompleteFilterWidget(
             Action.AUTOCOMPLETE.value, modifier=self.get_id()
         )
 
+    @sbadmin_action
     def action_autocomplete(self, request, modifier):
         result = self.search(request, request.request_data.request_post)
         return JsonResponse({"data": result})
@@ -843,6 +845,7 @@ class SBAdminTreeWidgetMixin:
             self.template_name = "sb_admin/widgets/tree_select_inline.html"
         super().__init__(*args, **kwargs)
 
+    @sbadmin_action
     def action_autocomplete(self, request, modifier):
         result = self.format_tree_data(request, self.get_queryset(request))
         return JsonResponse(data=result, safe=False)

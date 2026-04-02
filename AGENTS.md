@@ -25,6 +25,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
+| [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -49,6 +50,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
+- **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
 
 ---
 
@@ -1085,25 +1087,30 @@ list_filter = ("title", "status", "author__email")
 
 Add custom actions that operate on selected rows in the list view.
 
-### Using SBAdminFormViewAction with Modal
-
-For actions that need user input (like selecting options), use `SBAdminFormViewAction` with `ListActionModalView`:
-
 ```python
 from django import forms
-from django.db.models import Q
+from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
+from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
-
-from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_htmx.http import trigger_client_event
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
 from django_smartbase_admin.engine.modal_view import ListActionModalView
 
-from blog.models import Category
+from blog.models import Article, Category
+```
 
+### Modal with Form
 
+For actions that need user input, use `SBAdminFormViewAction` with `ListActionModalView`:
+
+```python
 class AssignCategoryForm(SBAdminBaseFormInit, forms.Form):
-    """Form with SBAdminBaseFormInit mixin for modal integration."""
     category = forms.ModelChoiceField(
         label=_("Category"),
         queryset=Category.objects.all(),
@@ -1120,14 +1127,13 @@ class AssignCategoryView(ListActionModalView):
     modal_title = _("Assign Category")
 
     def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
-        """Called with the selected rows queryset after form validation."""
         category = form.cleaned_data["category"]
         selection_queryset.update(category=category)
 
 
+@admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     def get_sbadmin_list_selection_actions(self, request):
-        """Override to define custom selection actions."""
         return [
             SBAdminFormViewAction(
                 target_view=AssignCategoryView,
@@ -1141,26 +1147,11 @@ class ArticleAdmin(SBAdmin):
 
 ### Confirmation-Only Modals (No Form Fields)
 
-For actions that just need a confirm/cancel dialog (no user input), use an empty form. The modal renders with the title, an empty body, and Close/Continue buttons — standard confirmation UX.
+Use an empty form for confirm/cancel dialogs. The modal renders the title with Close/Continue buttons.
 
 ```python
-from django import forms
-from django.contrib import admin, messages
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.utils.translation import gettext_lazy as _
-from django_htmx.http import trigger_client_event
-from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
-from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminFormViewAction
-from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
-from django_smartbase_admin.engine.modal_view import ListActionModalView
-
-from blog.models import Article
-
-
 class ConfirmForm(SBAdminBaseFormInit, forms.Form):
-    """Empty form — modal shows title + Close/Continue buttons."""
+    pass
 
 
 class ArchiveArticlesView(ListActionModalView):
@@ -1185,8 +1176,6 @@ class ArchiveArticlesView(ListActionModalView):
 
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    model = Article
-
     def get_sbadmin_list_selection_actions(self, request):
         return [
             SBAdminFormViewAction(
@@ -1222,61 +1211,14 @@ class ArticleAdmin(SBAdmin):
 
 ### Per-Action Permissions (`has_permission_for_action`)
 
-Override `has_permission_for_action` on your admin class to control which actions are visible per request. This is called by `process_actions_permissions` every time the action list is rendered, so it's singleton-safe.
-
-**Problem:** You have two actions — "Publish" should only be visible to editors, "Archive" to everyone.
+Override `has_permission_for_action` on your admin class to control which actions are visible per request.
 
 ```python
-# ❌ BAD - Conditionally building the action list based on request
-# URL handlers are registered via setattr on the singleton during the first request.
-# If a non-editor is first, PublishView handler is never registered.
-# When an editor visits later, the button appears but clicking it returns 404.
-@admin.register(Article, site=sb_admin_site)
-class ArticleAdmin(SBAdmin):
-    model = Article
-
-    def get_sbadmin_list_selection_actions(self, request):
-        actions = []
-        permissions = set(request.session.get("permissions", []))
-        if "editor" in permissions:
-            actions.append(
-                SBAdminFormViewAction(
-                    target_view=PublishArticlesView,
-                    title=_("Publish Selected"),
-                    view=self,
-                    action_id="publish_articles",
-                    open_in_modal=True,
-                ),
-            )
-        actions.append(
-            SBAdminFormViewAction(
-                target_view=ArchiveArticlesView,
-                title=_("Archive Selected"),
-                view=self,
-                action_id="archive_articles",
-                open_in_modal=True,
-            ),
-        )
-        return actions
-```
-
-```python
-# ✅ GOOD - Always return all actions, use has_permission_for_action to filter visibility
-from django import forms
-from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
-from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
-from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminFormViewAction
-from django_smartbase_admin.engine.modal_view import ListActionModalView
-
-from blog.models import Article
-
 PUBLISH_ACTION_ID = "publish_articles"
 
 
 class ConfirmForm(SBAdminBaseFormInit, forms.Form):
-    """Empty form for confirmation modals."""
+    pass
 
 
 class PublishArticlesView(ListActionModalView):
@@ -1295,10 +1237,39 @@ class ArchiveArticlesView(ListActionModalView):
         selection_queryset.update(status="archived")
 
 
+# ❌ BAD - Conditionally building the action list based on request.
+# URL handlers are registered via setattr on the singleton during the first request.
+# If a non-editor visits first, PublishView handler is never registered.
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    model = Article
+    def get_sbadmin_list_selection_actions(self, request):
+        actions = []
+        permissions = set(request.session.get("permissions", []))
+        if "editor" in permissions:
+            actions.append(
+                SBAdminFormViewAction(
+                    target_view=PublishArticlesView,
+                    title=_("Publish Selected"),
+                    view=self,
+                    action_id=PUBLISH_ACTION_ID,
+                    open_in_modal=True,
+                ),
+            )
+        actions.append(
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+            ),
+        )
+        return actions
 
+
+# ✅ GOOD - Always return all actions, use has_permission_for_action to filter visibility
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
     def get_sbadmin_list_selection_actions(self, request):
         return [
             SBAdminFormViewAction(
@@ -1328,76 +1299,24 @@ class ArticleAdmin(SBAdmin):
 
 **Key points:**
 - Always return **all** actions from `get_sbadmin_list_selection_actions` — use `has_permission_for_action` to filter visibility
-- Do NOT conditionally build the action list based on request — this causes issues with the singleton pattern (URL handlers are registered on the first request and cached via `init_actions`)
-- `has_permission_for_action` is called per-request via `process_actions_permissions`, so it's safe for user-specific logic
-- The default implementation checks `self.has_permission(request=request, obj=None, permission=action)` which delegates to `SBAdminRoleConfiguration.has_permission()`
-- The built-in "Delete Selected" action is already handled: when `has_delete_permission(request)` returns `False`, the action is automatically hidden
+- Do NOT conditionally build the action list based on request — URL handlers are registered on the singleton during the first request and cached via `init_actions`
+- The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
+- `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
+- When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
 
-### Key Points
+### Modal Error Handling
 
-- Override `get_sbadmin_list_selection_actions(request)` to return custom actions
-- Use `SBAdminFormViewAction` with `open_in_modal=True` for modal dialogs
-- Extend `ListActionModalView` and implement `process_form_valid_list_selection_queryset`
-- Forms should extend `SBAdminBaseFormInit` mixin (from `django_smartbase_admin.admin.admin_base`)
-- For autocomplete multiselect: use `SBAdminAutocompleteWidget` with `ModelMultipleChoiceField` (model restrictions applied automatically via `restrict_queryset`)
-- `selection_queryset` contains all selected rows, already filtered by user selection
-- Default actions include "Export Selected" and "Delete Selected"
-
-### Modal Success Notifications and Error Handling
-
-Django SmartBase Admin uses Django's messages framework with HTMX out-of-band swaps for notifications. When handling success/error in modal views:
-
-**Error handling** - Display errors in the modal form:
 ```python
 class AssignCategoryView(ListActionModalView):
     def process_form_valid(self, request, form):
         try:
             return super().process_form_valid(request, form)
         except ValidationError as e:
-            form.add_error(None, str(e))  # Add as non-field error
-            return self.form_invalid(form)  # Re-render modal with error
-```
-
-The modal template (`sb_admin/partials/modal/modal_content.html`) automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
-
-**Success notifications** - Show toast notification and close modal:
-```python
-from django.contrib import messages
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django_htmx.http import trigger_client_event
-from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
-
-class AssignCategoryView(ListActionModalView):
-    success_message = _("Category assigned successfully.")
-
-    def process_form_valid(self, request, form):
-        try:
-            selection_queryset = self.get_selection_queryset(request, form)
-            self.process_form_valid_list_selection_queryset(request, form, selection_queryset)
-        except ValidationError as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
-
-        # Add success message and render notifications template
-        messages.success(request, self.success_message)
-        notifications_html = render_to_string(
-            "sb_admin/includes/notifications.html",
-            {"messages": messages.get_messages(request)},
-            request=request,
-        )
-
-        # Return response with notifications (OOB swap) and client events
-        response = HttpResponse(notifications_html)
-        trigger_client_event(response, "hideModal", {})
-        trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
-        return response
 ```
 
-**How it works:**
-- `notifications.html` has `hx-swap-oob="beforeend"` - HTMX appends it to the notification container
-- Success alerts auto-dismiss after 5 seconds (`remove-me="5s"` attribute)
-- Message levels: `messages.success()`, `messages.warning()`, `messages.error()` map to different alert styles
+The modal template automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
 
 ---
 
@@ -2561,6 +2480,71 @@ In this example, the "Content" tab has a two-column layout (main fields on the l
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
+
+---
+
+## URL-Callable Action Methods (`@sbadmin_action`)
+
+Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions go through `delegate_to_action`, which checks for this decorator and runs `has_permission_for_action` before dispatching.
+
+### Usage
+
+```python
+from django.contrib import admin
+from django.http import JsonResponse
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
+
+from blog.models import Article
+
+
+# ❌ BAD — method is not decorated, returns 404 when called via URL
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ def action_custom_export(self, request, modifier):
+ return JsonResponse({"status": "exported"})
+
+ def get_sbadmin_list_actions(self, request):
+ return [
+ SBAdminCustomAction(
+ title="Export", view=self, action_id="action_custom_export"
+ ),
+ ]
+
+
+# ✅ GOOD — method is decorated
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ @sbadmin_action
+ def action_custom_export(self, request, modifier):
+ return JsonResponse({"status": "exported"})
+
+ def get_sbadmin_list_actions(self, request):
+ return [
+ SBAdminCustomAction(
+ title="Export", view=self, action_id="action_custom_export"
+ ),
+ ]
+
+
+# ✅ GOOD — decorator with keyword arguments
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ @sbadmin_action(permission="delete")
+ def action_bulk_archive(self, request, modifier):
+ ...
+```
+
+**Key points:**
+- Import from `django_smartbase_admin.engine.actions`
+- All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated
+- `SBAdminFormViewAction` modal views (see [Selection Actions](#selection-actions-bulk-actions)) are automatically marked — no decorator needed
+- `SBAdminCustomAction` with direct `action_id` (via `get_sbadmin_list_actions` or `get_sbadmin_list_selection_actions`) requires the decorator on the target method
+- Subclasses that override decorated methods inherit the marker
+- `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
+
+**Source:** `django_smartbase_admin/engine/actions.py` — `sbadmin_action`; `django_smartbase_admin/services/views.py` — `SBAdminViewService.delegate_to_action`
 
 ---
 
