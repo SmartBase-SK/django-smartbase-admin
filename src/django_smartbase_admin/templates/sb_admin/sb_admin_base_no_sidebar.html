@@ -21,7 +21,9 @@
         <meta name="msapplication-config" content="{% static 'sb_admin/favicon/browserconfig.xml' %}">
         <meta name="theme-color" content="#ffffff">
     {% endblock %}
-    <link rel="stylesheet" href="{% static 'sb_admin/dist/main_style.css' %}">
+    {% block main_style %}
+        <link rel="stylesheet" href="{% static 'sb_admin/dist/main_style.css' %}">
+    {% endblock %}
     {% block style_init %}{% endblock %}
 
     <script>window.csrf_token = "{{ csrf_token }}"</script>
