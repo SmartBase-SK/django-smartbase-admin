@@ -443,9 +443,6 @@ class DateFilterWidget(SBAdminFilterWidget):
             cls=SBAdminJSONEncoder,
         )
 
-    def get_timezone_label(self):
-        return timezone.get_current_timezone_name()
-
     def get_shortcuts_data(self):
         return json.dumps(
             self.get_shortcuts(),

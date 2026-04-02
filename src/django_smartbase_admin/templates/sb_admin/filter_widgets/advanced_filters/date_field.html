@@ -1,4 +1,5 @@
-{% load i18n %}
+{% load i18n tz %}
+{% get_current_timezone as TIME_ZONE %}
 <div class="relative">
     <input
         type="hidden"
@@ -17,6 +18,6 @@
         data-sbadmin-datepicker-shortcuts-dict="{{ filter_widget.get_shortcuts_dict_data }}"
     >
     <p class="block text-10">
-        {% trans "Timezone" %}: {{ filter_widget.get_timezone_label }}
+        {% trans "Timezone" %}: {{ TIME_ZONE }}
     </p>
 </div>

@@ -68,20 +68,6 @@ def get_datetime_placeholder(lang=None):
     )
 
 
-def get_timezone_label():
-    try:
-        request = SBAdminThreadLocalService.get_request()
-    except LookupError:
-        request = None
-
-    if request is not None:
-        request_timezone = getattr(request, "timezone", None)
-        if request_timezone:
-            return str(getattr(request_timezone, "zone", request_timezone))
-
-    return get_current_timezone_name() or settings.TIME_ZONE
-
-
 class SBAdminBaseWidget(ContextMixin):
     sb_admin_widget = True
 
@@ -284,7 +270,7 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATE_FORMAT")
                     ),
-                    "displayTimezoneLabel": get_timezone_label(),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -310,7 +296,7 @@ class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
         return json.dumps(
             {
                 "flatpickrOptions": {
-                    "displayTimezoneLabel": get_timezone_label(),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -341,7 +327,7 @@ class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATETIME_FORMAT")
                     ),
-                    "displayTimezoneLabel": get_timezone_label(),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
