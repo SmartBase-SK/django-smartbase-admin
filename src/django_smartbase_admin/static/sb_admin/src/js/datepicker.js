@@ -52,6 +52,7 @@ export default class Datepicker {
 
 
                 if(!isInTable){
+                    this.createTimezone(instance, sbadminDatepickerData)
                     this.createClear(instance)
                 }
 
@@ -168,20 +169,27 @@ export default class Datepicker {
         })
     }
 
+    createTimezone(datePickerInstance, sbadminDatepickerData = {}) {
+        const timezoneLabel = sbadminDatepickerData.flatpickrOptions?.displayTimezoneLabel || sbadminDatepickerData.displayTimezoneLabel
+        if (!timezoneLabel) {
+            return
+        }
 
-    createClear(datePickerInstance) {
+        const timezoneTitle = sbadminDatepickerData.flatpickrOptions?.displayTimezoneTitle || window.sb_admin_translation_strings?.timezone || 'Timezone'
+        const el = document.createElement('div')
+        el.classList.add('flatpickr-timezone')
+        const infoHint = document.createElement('p')
+        infoHint.classList.add('px-12', 'pb-8', '-mt-8', 'text-10', 'block', 'text-left')
+        infoHint.textContent = `${timezoneTitle}: ${timezoneLabel}`
+        el.append(infoHint)
+        datePickerInstance.calendarContainer.append(el)
+    }
+
+    createClear(datePickerInstance = {}) {
         const el = document.createElement('div')
         el.classList.add('flatpickr-footer')
-        const timezoneLabel = sbadminDatepickerData.flatpickrOptions?.displayTimezoneLabel || sbadminDatepickerData.displayTimezoneLabel
-        const timezoneTitle = window.sb_admin_translation_strings?.timezone || 'Timezone'
-        if (timezoneLabel) {
-            const infoHint = document.createElement('p')
-            infoHint.classList.add('px-12', 'pb-8', '-mt-8', 'text-10', 'block')
-            infoHint.textContent = `${timezoneTitle}: ${timezoneLabel}`
-            el.append(infoHint)
-        }
         const clear = document.createElement('a')
-        clear.text = 'Clear'
+        clear.text = window.sb_admin_translation_strings?.clear || 'Clear'
         clear.addEventListener('click', (e) => {
             e.preventDefault()
             datePickerInstance.clear()
