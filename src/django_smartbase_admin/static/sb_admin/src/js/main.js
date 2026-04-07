@@ -121,18 +121,17 @@ class Main {
 
     handleColorSchemeChange() {
         const picker = document.querySelector('.js-color-scheme-picker')
-        if(!picker) {
-            return
+        if(picker) {
+            picker.addEventListener('change', (e)=>{
+                if(e.target.value) {
+                    document.documentElement.setAttribute('data-theme', e.target.value)
+                    this.switchBodyColorSchemeClass(true)
+                    this.switchCKEditorTheme()
+                    return
+                }
+                document.documentElement.removeAttribute('data-theme')
+            })
         }
-        picker.addEventListener('change', (e)=>{
-            if(e.target.value) {
-                document.documentElement.setAttribute('data-theme', e.target.value)
-                this.switchBodyColorSchemeClass(true)
-                this.switchCKEditorTheme()
-                return
-            }
-            document.documentElement.removeAttribute('data-theme')
-        })
         this.switchBodyColorSchemeClass()
         this.switchCKEditorTheme()
     }
