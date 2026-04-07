@@ -28,6 +28,7 @@ import Range from "./range"
 import Sorting from "./sorting"
 import Autocomplete from "./autocomplete"
 import ChoicesJS from "./choices"
+import TextTags from "./text_tags"
 import {setCookie, setDropdownLabel} from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
@@ -80,6 +81,7 @@ class Main {
                 this.initDropdowns(detail.target)
                 this.initInputs(detail.target)
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
+                this.textTags.handleDynamicallyAddedTextTags(detail.target)
                 this.initInlines(detail.target)
             })
 
@@ -95,6 +97,7 @@ class Main {
         this.initInputs()
         new Sorting()
         this.autocomplete = new Autocomplete()
+        this.textTags = new TextTags()
         new ChoicesJS()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)

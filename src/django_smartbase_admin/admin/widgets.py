@@ -115,6 +115,22 @@ class SBAdminTextInputWidget(SBAdminBaseWidget, forms.TextInput):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
 
 
+class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
+    template_name = "sb_admin/widgets/text_tags.html"
+    input_type = "text"
+
+    def __init__(self, form_field=None, attrs=None, *, delimiter: str = ","):
+        super().__init__(
+            form_field,
+            attrs={
+                "class": "input js-sbadmin-text-tags",
+                "data-choices-delimiter": delimiter,
+                "autocomplete": "off",
+                **(attrs or {}),
+            },
+        )
+
+
 class SBAdminPasswordInputWidget(SBAdminBaseWidget, forms.PasswordInput):
     template_name = "sb_admin/widgets/password.html"
 
