@@ -1,4 +1,5 @@
 import {SBAdminTableModule} from "./base_module"
+import {hasSelectedText} from "../utils"
 
 
 export class DetailViewModule extends SBAdminTableModule {
@@ -8,11 +9,6 @@ export class DetailViewModule extends SBAdminTableModule {
     }
 
     afterInit() {
-        const hasSelectedText = () => {
-            const selection = window.getSelection ? window.getSelection() : null
-            return Boolean(selection && selection.toString().trim())
-        }
-
         // Handle middle mouse button clicks via mousedown to prevent browser scroll
         this.table.tabulator.element.addEventListener("mousedown", (e) => {
             // Check if middle mouse button (button === 1) and prevent default scroll behavior
