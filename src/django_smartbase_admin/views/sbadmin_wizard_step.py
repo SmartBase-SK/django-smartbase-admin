@@ -46,6 +46,7 @@ class SBAdminWizardStep:
     formset_classes: list[type[BaseFormSet]] = []
     requires_wizard_object: bool = False
     template_name: str | None = None
+    submit_button_label: str | None = None
 
     def __init__(self, wizard: SBAdminWizardView):
         self.wizard = wizard
@@ -73,8 +74,6 @@ class SBAdminWizardStep:
 
     def get_template_name(self) -> str | None:
         return self.template_name
-
-    submit_button_label: str | None = None
 
     def get_submit_button_label(self) -> str | None:
         """
