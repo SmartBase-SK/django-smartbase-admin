@@ -164,7 +164,11 @@ class SBAdminWizardStep:
             form = context.get("form")
             context["form_is_multipart"] = (
                 form is not None and form.is_multipart()
-            ) or any(any(f.is_multipart() for f in fs.forms) for _, fs in formsets)
+            ) or any(
+                any(f.is_multipart() for f in fs.forms)
+                or fs.empty_form.is_multipart()
+                for _, fs in formsets
+            )
         return context
 
     def adjust_navigation(self, nav: dict[str, Any]) -> dict[str, Any]:
