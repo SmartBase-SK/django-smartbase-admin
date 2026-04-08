@@ -96,7 +96,7 @@ export class ColumnDisplayModule extends SBAdminTableModule {
             )
             checkboxCollapsed.classList.add('ml-auto')
             labelCollapsed.appendChild(createIcon('Pin', ['w-16', 'h-16']))
-            labelCollapsed.appendChild(createIcon('Pin Filled', ['w-16', 'h-16']))
+            labelCollapsed.appendChild(createIcon('Pin-filled', ['w-16', 'h-16']))
 
 
             inputVisible.addEventListener("change", debounce(() => {
