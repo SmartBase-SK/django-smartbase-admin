@@ -67,6 +67,15 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
             global_filter_data_map or self.global_filter_data_map
         )
         self.sub_views = sub_views or self.sub_views
+        action_callable = getattr(self, self.menu_action, None)
+        if not callable(action_callable):
+            return
+        fn = getattr(action_callable, "__func__", action_callable)
+        if getattr(fn, "_is_sbadmin_action", False):
+            return
+        fn._is_sbadmin_action = True
+        if not hasattr(fn, "_sbadmin_action_attrs"):
+            fn._sbadmin_action_attrs = {}
 
     def get_id(self):
         return SBAdminConfigurationService.get_view_url_identifier(
