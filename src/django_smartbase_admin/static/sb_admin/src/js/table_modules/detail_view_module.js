@@ -1,4 +1,5 @@
 import {SBAdminTableModule} from "./base_module"
+import {hasSelectedText} from "../utils"
 
 
 export class DetailViewModule extends SBAdminTableModule {
@@ -24,11 +25,14 @@ export class DetailViewModule extends SBAdminTableModule {
         this.table.tabulator.element.addEventListener("auxclick", (e) => {
             // Check if middle mouse button (button === 1)
             if (e.button === 1) {
+                if (hasSelectedText()) {
+                    return
+                }
                 const rowElement = e.target.closest(".tabulator-row")
                 if (rowElement && !e.target.closest(".row-select-wrapper") && !e.target.closest(".row-prevent-click")) {
                     e.preventDefault()
                     e.stopPropagation()
-                    
+
                     // Find the row by matching the element
                     const rows = this.table.tabulator.getRows()
                     let row = null
@@ -38,7 +42,7 @@ export class DetailViewModule extends SBAdminTableModule {
                             break
                         }
                     }
-                    
+
                     if (row) {
                         // Use window.open directly - browsers may focus new tabs, but this is the most reliable method
                         // Note: Browser security restrictions prevent programmatic prevention of focus changes
@@ -50,6 +54,9 @@ export class DetailViewModule extends SBAdminTableModule {
 
         // Handle regular left clicks
         this.table.tabulator.on("rowClick", (e, row) => {
+            if (hasSelectedText()) {
+                return
+            }
             if (e.target.closest(".row-select-wrapper") || e.target.closest(".row-prevent-click")) {
                 return
             }
