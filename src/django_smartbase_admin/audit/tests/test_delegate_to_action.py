@@ -7,6 +7,7 @@ from django.http import Http404, HttpResponse
 from django.test import RequestFactory, TestCase
 
 from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.services.views import SBAdminViewService
 
 PATCH_FROM_REQUEST = (
@@ -112,3 +113,39 @@ class TestSbadminActionDecorator(TestCase):
 
         self.assertTrue(my_action._is_sbadmin_action)
         self.assertEqual(my_action._sbadmin_action_attrs["permission"], "delete")
+
+
+class TestMenuActionAutoMarking(TestCase):
+    def test_menu_action_method_is_auto_marked(self):
+        class MyView(SBAdminView):
+            menu_action = "landing"
+
+            def landing(self, request, modifier):
+                return HttpResponse("ok")
+
+            def not_menu_action(self, request, modifier):
+                return HttpResponse("nope")
+
+        v = MyView()
+        bound = v.landing
+        fn = getattr(bound, "__func__", bound)
+        self.assertTrue(getattr(fn, "_is_sbadmin_action", False))
+        bound = v.not_menu_action
+        fn = getattr(bound, "__func__", bound)
+        self.assertFalse(getattr(fn, "_is_sbadmin_action", False))
+
+    def test_menu_action_decorator_kwargs_are_preserved(self):
+        class MyView(SBAdminView):
+            menu_action = "landing"
+
+            @sbadmin_action(permission="delete")
+            def landing(self, request, modifier):
+                return HttpResponse("ok")
+
+        v = MyView()
+        bound = v.landing
+        fn = getattr(bound, "__func__", bound)
+        self.assertTrue(getattr(fn, "_is_sbadmin_action", False))
+        self.assertEqual(
+            getattr(fn, "_sbadmin_action_attrs", {}).get("permission"), "delete"
+        )
