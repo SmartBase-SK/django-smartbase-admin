@@ -67,6 +67,9 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
             global_filter_data_map or self.global_filter_data_map
         )
         self.sub_views = sub_views or self.sub_views
+        self.init_menu_action_callable()
+
+    def init_menu_action_callable(self) -> None:
         action_callable = getattr(self, self.menu_action, None)
         if not callable(action_callable):
             return
