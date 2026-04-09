@@ -37,18 +37,10 @@ class Main {
     constructor() {
         document.body.classList.add('js-ready')
         this.handleColorSchemeChange()
-
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map((tooltipTriggerEl) => {
-            const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
-            if (tooltipEl) {
-                return new Tooltip(tooltipTriggerEl, {container: tooltipEl})
-            }
-            return null
-        })
-
+        this.initTooltips()
         this.initDropdowns()
         document.addEventListener('formset:added', (e) => {
+            this.initTooltips(e.target)
             this.initDropdowns(e.target)
             this.initFileInputs(e.target)
             this.switchCKEditorTheme(e.target)
@@ -83,6 +75,7 @@ class Main {
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
                 this.textTags.handleDynamicallyAddedTextTags(detail.target)
                 this.initInlines(detail.target)
+                this.initTooltips(detail.target)
             })
 
             window.htmx.on("htmx:afterSettle", (detail) => {
@@ -166,6 +159,18 @@ class Main {
         this.range = new Range(null, null, target)
         this.multiselect = new Multiselect(null, null, target)
         this.radio = new Radio(null, target)
+    }
+
+    initTooltips(target) {
+        target = target || document
+        const tooltipTriggerList = [].slice.call(target.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map((tooltipTriggerEl) => {
+            const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
+            if (tooltipEl) {
+                return new Tooltip(tooltipTriggerEl, {container: tooltipEl})
+            }
+            return null
+        })
     }
 
     handleLocationHashFromTabs() {
