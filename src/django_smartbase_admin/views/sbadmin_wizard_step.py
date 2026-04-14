@@ -164,8 +164,7 @@ class SBAdminWizardStep:
             context["form_is_multipart"] = (
                 form is not None and form.is_multipart()
             ) or any(
-                any(f.is_multipart() for f in fs.forms)
-                or fs.empty_form.is_multipart()
+                any(f.is_multipart() for f in fs.forms) or fs.empty_form.is_multipart()
                 for _, fs in formsets
             )
         return context
