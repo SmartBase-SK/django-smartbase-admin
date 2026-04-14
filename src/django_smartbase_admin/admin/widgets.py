@@ -209,10 +209,34 @@ class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
 
-    def __init__(self, form_field=None, attrs=None, choices=()):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        choices=(),
+        disable_empty_option=True,
+    ):
+        self.disable_empty_option = disable_empty_option
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        if (
+            self.disable_empty_option
+            and (value is None or str(value) == "")
+            and self.form_field is not None
+            and getattr(self.form_field, "required", False)
+        ):
+            option_attrs = dict(option.get("attrs") or {})
+            option_attrs["disabled"] = True
+            option["attrs"] = option_attrs
+        return option
 
 
 class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
