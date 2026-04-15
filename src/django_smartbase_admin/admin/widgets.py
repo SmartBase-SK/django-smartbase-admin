@@ -928,7 +928,7 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
             "sb_admin/js/codemirror/codemirror.min.js",
             "sb_admin/js/codemirror/overlay.min.js",
             "sb_admin/js/codemirror/django.min.js",
-            "sb_admin/src/js/code.js",
+            "sb_admin/js/code.js",
         ]
 
 
