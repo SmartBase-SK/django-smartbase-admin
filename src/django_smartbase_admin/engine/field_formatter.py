@@ -14,6 +14,8 @@ class BadgeType(Enum):
     NOTICE = "notice"
     WARNING = "warning"
     ERROR = "negative"
+    NEUTRAL = "neutral"
+    POSITIVE = "positive"
 
 
 def datetime_formatter(object_id, value):
