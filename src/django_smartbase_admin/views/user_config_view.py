@@ -33,7 +33,9 @@ class ColorSchemeForm(SBAdminBaseFormInit, forms.ModelForm):
         choices_formatted = []
         for choice in self.fields["color_scheme"].choices:
             choice_label = format_html(
-                f'<span class="flex gap-8"><svg class="w-20 h-20"><use href="#{self.color_scheme_icons.get(choice[0])}"></use></svg><span>{choice[1]}</span></span>'
+                '<span class="flex gap-8"><svg class="w-20 h-20"><use href="#{}"></use></svg><span>{}</span></span>',
+                self.color_scheme_icons.get(choice[0]),
+                choice[1],
             )
             choices_formatted.append((choice[0], choice_label))
         self.fields["color_scheme"].choices = choices_formatted
