@@ -7,8 +7,10 @@ from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_not_required
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.urls import path, reverse_lazy, URLPattern, URLResolver, reverse
+from django.urls import URLPattern, URLResolver, path, reverse, reverse_lazy
 from django.utils.decorators import method_decorator
+from django.utils.functional import LazyObject
+from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
@@ -248,4 +250,17 @@ class SBAdminSite(admin.AdminSite):
         )
 
 
-sb_admin_site = SBAdminSite(name="sb_admin")
+class DefaultAdminSite(LazyObject):
+    def _setup(self):
+        from django.apps import apps
+
+        AdminSiteClass = import_string(
+            apps.get_app_config("django_smartbase_admin").default_site
+        )
+        self._wrapped = AdminSiteClass(name="sb_admin")
+
+    def __repr__(self):
+        return repr(self._wrapped)
+
+
+sb_admin_site = DefaultAdminSite()

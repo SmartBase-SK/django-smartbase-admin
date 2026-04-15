@@ -26,6 +26,9 @@ class SBAdminListViewConfiguration(models.Model):
 
     objects = SBAdminListViewConfigurationQueryset.as_manager()
 
+    class Meta:
+        app_label = "django_smartbase_admin"
+
 
 class SBAdminUserConfiguration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,3 +43,6 @@ class SBAdminUserConfiguration(models.Model):
         default=ColorScheme.AUTO,
         verbose_name=_("Theme"),
     )
+
+    class Meta:
+        app_label = "django_smartbase_admin"
