@@ -133,6 +133,9 @@ export default class Autocomplete {
         if(wrapperElButton){
             // filter in dropdown
             wrapperElButton.addEventListener('show.bs.dropdown', initLoad)
+            wrapperElButton.addEventListener('shown.bs.dropdown', () => {
+                choicesJS.input.element.focus()
+            })
         } else {
             choicesJS.input.element.addEventListener('focus', initLoad)
         }
@@ -209,6 +212,8 @@ export default class Autocomplete {
         if (searchOn) {
             choicesJS.containerOuter.element.classList.add('search-on')
             choicesJS.containerOuter.element.classList.remove('search-off')
+            // Focus the search input once it becomes visible (first open only).
+            choicesJS.input.element.focus()
         } else {
             choicesJS.containerOuter.element.classList.remove('search-on')
             choicesJS.containerOuter.element.classList.add('search-off')
@@ -236,7 +241,26 @@ export default class Autocomplete {
             autocompleteData.forward.forEach(fieldToForward => {
                 // replace current field id for forward field id keeping the view_id or inline_id prefixes intact
                 const fieldToForwardInputId = inputEl.id.replace(new RegExp(autocompleteData.field_name + '$'), fieldToForward)
-                autocompleteForwardData[fieldToForward] = document.getElementById(fieldToForwardInputId).value
+                const fieldToForwardEl = document.getElementById(fieldToForwardInputId)
+                let forwardValue
+                if (fieldToForwardEl && fieldToForwardEl.value !== undefined) {
+                    // Standard input / select — use .value directly.
+                    forwardValue = fieldToForwardEl.value
+                } else {
+                    // Radio / checkbox widgets render as <ul id="id_..."> with no .value.
+                    // Derive the input name from the element id (strip leading "id_") so that
+                    // nested-form prefixes (e.g. "form-0-state") are preserved correctly.
+                    const fieldName = fieldToForwardInputId.replace(/^id_/, '')
+                    const checkedInputs = Array.from(document.querySelectorAll(`[name="${fieldName}"]:checked`))
+                    if (checkedInputs.length > 1) {
+                        // Checkbox group — forward all checked values as an array.
+                        forwardValue = checkedInputs.map(el => el.value)
+                    } else {
+                        // Radio group (or nothing checked) — forward single value or empty string.
+                        forwardValue = checkedInputs.length === 1 ? checkedInputs[0].value : ''
+                    }
+                }
+                autocompleteForwardData[fieldToForward] = forwardValue
             })
         }
         autocompleteRequestData.set(autocompleteData.constants.autocomplete_forward, JSON.stringify(autocompleteForwardData))
