@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-15 13:54+0200\n"
+"POT-Creation-Date: 2026-04-16 11:52+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 msgid "Equal"
 msgstr "Gleich"
 
@@ -86,7 +87,9 @@ msgstr "In den letzten"
 msgid "In the next"
 msgstr "In den nächsten"
 
-msgid "Hold down “Control“, or “Command” on a Mac, to select more than one."
+#, fuzzy
+#| msgid "Hold down “Control“, or “Command” on a Mac, to select more than one."
+msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
 msgstr "Halten Sie “Strg“ oder auf einem Mac “Befehl” gedrückt, um mehrere Einträge auszuwählen."
 
 #, python-format
@@ -315,7 +318,9 @@ msgstr "Objekte"
 msgid "No, take me back"
 msgstr "Nein, zurück"
 
-msgid "Yes, I'm sure"
+#, fuzzy
+#| msgid "Yes, I'm sure"
+msgid "Yes, I’m sure"
 msgstr "Ja, ich bin sicher"
 
 #, python-format
@@ -442,7 +447,9 @@ msgstr "Passwortänderung"
 msgid "Your password was changed."
 msgstr "Ihr Passwort wurde geändert."
 
-msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+#, fuzzy
+#| msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgid "Please enter your old password, for security’s sake, and then enter your new password twice so we can verify you typed it in correctly."
 msgstr "Bitte geben Sie aus Sicherheitsgründen Ihr altes Passwort ein und dann Ihr neues Passwort zweimal, damit wir überprüfen können, ob Sie es korrekt eingegeben haben."
 
 msgid "Change my password"
@@ -460,10 +467,14 @@ msgstr "Bitte geben Sie Ihr neues Passwort zweimal ein, damit wir überprüfen k
 msgid "The password reset link was invalid, possibly because it has already been used.  Please request a new password reset."
 msgstr "Der Link zum Zurücksetzen des Passworts war ungültig, möglicherweise weil er bereits verwendet wurde. Bitte fordern Sie ein neues Zurücksetzen des Passworts an."
 
-msgid "We've emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+#, fuzzy
+#| msgid "We've emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgid "We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
 msgstr "Wenn ein Konto mit der eingegebenen E-Mail-Adresse existiert, haben wir Ihnen Anweisungen zum Festlegen Ihres Passworts gesendet. Sie sollten diese in Kürze erhalten."
 
-msgid "If you don't receive an email, please make sure you've entered the address you registered with, and check your spam folder."
+#, fuzzy
+#| msgid "If you don't receive an email, please make sure you've entered the address you registered with, and check your spam folder."
+msgid "If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your spam folder."
 msgstr "Wenn Sie keine E-Mail erhalten, stellen Sie bitte sicher, dass Sie die Adresse eingegeben haben, mit der Sie sich registriert haben, und überprüfen Sie Ihren Spam-Ordner."
 
 #, python-format
@@ -473,7 +484,9 @@ msgstr "Sie erhalten diese E-Mail, weil Sie ein Zurücksetzen des Passworts für
 msgid "Please go to the following page and choose a new password:"
 msgstr "Bitte gehen Sie auf die folgende Seite und wählen Sie ein neues Passwort:"
 
-msgid "Your username, in case you've forgotten:"
+#, fuzzy
+#| msgid "Your username, in case you've forgotten:"
+msgid "Your username, in case you’ve forgotten:"
 msgstr "Ihr Benutzername, falls Sie ihn vergessen haben:"
 
 msgid "Thanks for using our site!"
@@ -483,7 +496,9 @@ msgstr "Danke, dass Sie unsere Website nutzen!"
 msgid "The %(site_name)s team"
 msgstr "Das %(site_name)s-Team"
 
-msgid "Forgotten your password? Enter your email address below, and we'll email instructions for setting a new one."
+#, fuzzy
+#| msgid "Forgotten your password? Enter your email address below, and we'll email instructions for setting a new one."
+msgid "Forgotten your password? Enter your email address below, and we’ll email instructions for setting a new one."
 msgstr "Passwort vergessen? Geben Sie unten Ihre E-Mail-Adresse ein und wir senden Ihnen Anweisungen zum Festlegen eines neuen Passworts."
 
 msgid "Reset my password"
@@ -802,6 +817,14 @@ msgstr "Neu anordnen"
 
 msgid "Collapse"
 msgstr "Einklappen"
+
+#, fuzzy
+#| msgid "results"
+msgid "No results found"
+msgstr "Ergebnisse"
+
+msgid "No choices to choose from"
+msgstr ""
 
 #, python-brace-format
 msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"

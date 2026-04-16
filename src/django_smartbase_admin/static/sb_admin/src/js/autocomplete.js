@@ -66,9 +66,11 @@ export default class Autocomplete {
         const options = JSON.parse(choiceInput.dataset.autocompleteOptions || "{}")
         const choicesJS = new Choices(choiceInput, {
             ...choicesJSOptions(choiceInput),
-            placeholderValue: 'Search',
+            placeholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
             searchChoices: false,
-            searchPlaceholderValue: 'Search',
+            searchPlaceholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
+            noResultsText: window.sb_admin_translation_strings?.["no_results"] || 'No results found',
+            noChoicesText: window.sb_admin_translation_strings?.["no_choices"] || 'No choices to choose from',
             searchResultLimit: 999,
 
             callbackOnInit: () => {

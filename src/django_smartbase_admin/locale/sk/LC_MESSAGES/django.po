@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-15 13:54+0200\n"
+"POT-Creation-Date: 2026-04-16 11:51+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -814,6 +814,12 @@ msgstr "Preusporiadať"
 
 msgid "Collapse"
 msgstr "Zbaliť"
+
+msgid "No results found"
+msgstr "Žiadne výsledky"
+
+msgid "No choices to choose from"
+msgstr "Žiadne možnosti na výber"
 
 #, python-brace-format
 msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"

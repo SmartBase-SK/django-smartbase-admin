@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-15 13:54+0200\n"
+"POT-Creation-Date: 2026-04-16 11:52+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -16,8 +16,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n "
-"<= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;\n"
+"Plural-Forms: nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;\n"
 
 msgid "Equal"
 msgstr "Rovná se"
@@ -88,7 +87,9 @@ msgstr "V posledních"
 msgid "In the next"
 msgstr "V příštích"
 
-msgid "Hold down “Control“, or “Command“ on a Mac, to select more than one."
+#, fuzzy
+#| msgid "Hold down “Control“, or “Command“ on a Mac, to select more than one."
+msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
 msgstr "Podržte “Control“, nebo “Command“ na Macu, pro výběr více položek."
 
 #, python-format
@@ -168,12 +169,14 @@ msgstr "Nebyl proveden žádný výběr."
 msgid "All"
 msgstr "Vše"
 
-#, python-brace-format
-msgid "The {name} “{obj}“ was changed successfully. You may edit it again below."
+#, fuzzy, python-brace-format
+#| msgid "The {name} “{obj}“ was changed successfully. You may edit it again below."
+msgid "The {name} “{obj}” was changed successfully. You may edit it again below."
 msgstr "{name} “{obj}“ byl úspěšně změněn. Níže ho můžete znovu upravit."
 
-#, python-brace-format
-msgid "The {name} “{obj}“ was changed successfully."
+#, fuzzy, python-brace-format
+#| msgid "The {name} “{obj}“ was changed successfully."
+msgid "The {name} “{obj}” was changed successfully."
 msgstr "{name} “{obj}“ byl úspěšně změněn."
 
 msgid "Year"
@@ -319,7 +322,9 @@ msgstr "Objekty"
 msgid "No, take me back"
 msgstr "Ne, vrátit se zpět"
 
-msgid "Yes, I'm sure"
+#, fuzzy
+#| msgid "Yes, I'm sure"
+msgid "Yes, I’m sure"
 msgstr "Ano, jsem si jistý"
 
 #, python-format
@@ -446,7 +451,9 @@ msgstr "Změna hesla"
 msgid "Your password was changed."
 msgstr "Vaše heslo bylo změněno."
 
-msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+#, fuzzy
+#| msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgid "Please enter your old password, for security’s sake, and then enter your new password twice so we can verify you typed it in correctly."
 msgstr "Z bezpečnostních důvodů prosím zadejte staré heslo a poté dvakrát zadejte nové heslo, abychom ověřili, že jste ho zadali správně."
 
 msgid "Change my password"
@@ -464,10 +471,14 @@ msgstr "Prosím zadejte nové heslo dvakrát, abychom ověřili, že jste ho zad
 msgid "The password reset link was invalid, possibly because it has already been used.  Please request a new password reset."
 msgstr "Odkaz pro obnovení hesla byl neplatný, pravděpodobně proto, že již byl použit. Požádejte prosím o nové obnovení hesla."
 
-msgid "We've emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+#, fuzzy
+#| msgid "We've emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgid "We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
 msgstr "Pokud existuje účet s vámi zadanou e-mailovou adresou, zaslali jsme vám pokyny pro nastavení hesla. Měli byste je obdržet brzy."
 
-msgid "If you don't receive an email, please make sure you've entered the address you registered with, and check your spam folder."
+#, fuzzy
+#| msgid "If you don't receive an email, please make sure you've entered the address you registered with, and check your spam folder."
+msgid "If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your spam folder."
 msgstr "Pokud e-mail neobdržíte, ujistěte se prosím, že jste zadali adresu, se kterou jste se zaregistrovali, a zkontrolujte složku se spamem."
 
 #, python-format
@@ -477,7 +488,9 @@ msgstr "Tento e-mail obdržujete, protože jste požádali o obnovení hesla pro
 msgid "Please go to the following page and choose a new password:"
 msgstr "Přejděte prosím na následující stránku a zvolte nové heslo:"
 
-msgid "Your username, in case you've forgotten:"
+#, fuzzy
+#| msgid "Your username, in case you've forgotten:"
+msgid "Your username, in case you’ve forgotten:"
 msgstr "Vaše uživatelské jméno, pro případ, že jste ho zapomněli:"
 
 msgid "Thanks for using our site!"
@@ -487,7 +500,9 @@ msgstr "Děkujeme, že používáte náš web!"
 msgid "The %(site_name)s team"
 msgstr "Tým %(site_name)s"
 
-msgid "Forgotten your password? Enter your email address below, and we'll email instructions for setting a new one."
+#, fuzzy
+#| msgid "Forgotten your password? Enter your email address below, and we'll email instructions for setting a new one."
+msgid "Forgotten your password? Enter your email address below, and we’ll email instructions for setting a new one."
 msgstr "Zapomněli jste heslo? Zadejte níže svou e-mailovou adresu a my vám zašleme pokyny pro nastavení nového hesla."
 
 msgid "Reset my password"
@@ -807,6 +822,12 @@ msgstr "Přeuspořádat"
 msgid "Collapse"
 msgstr "Sbalit"
 
+msgid "No results found"
+msgstr "Žádné výsledky"
+
+msgid "No choices to choose from"
+msgstr "Žádné možnosti na výběr"
+
 #, python-brace-format
 msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
 msgstr "<strong>${from} - ${to}</strong> z <strong>${total}</strong><span class=\"max-xs:hidden\"> položek</span>"
@@ -897,8 +918,9 @@ msgstr "Řádek"
 msgid "New row"
 msgstr "Nový řádek"
 
-#, python-brace-format
-msgid "Added {name} “{object}“."
+#, fuzzy, python-brace-format
+#| msgid "Added {name} “{object}“."
+msgid "Added {name} “{object}”."
 msgstr "Přidáno {name} “{object}“."
 
 msgid "Added."
@@ -907,16 +929,18 @@ msgstr "Přidáno."
 msgid "and"
 msgstr "a"
 
-#, python-brace-format
-msgid "Changed {fields} for {name} “{object}“."
+#, fuzzy, python-brace-format
+#| msgid "Changed {fields} for {name} “{object}“."
+msgid "Changed {fields} for {name} “{object}”."
 msgstr "Změněno {fields} pro {name} “{object}“."
 
 #, python-brace-format
 msgid "Changed {fields}."
 msgstr "Změněno {fields}."
 
-#, python-brace-format
-msgid "Deleted {name} “{object}“."
+#, fuzzy, python-brace-format
+#| msgid "Deleted {name} “{object}“."
+msgid "Deleted {name} “{object}”."
 msgstr "Smazáno {name} “{object}“."
 
 msgid "No fields changed."
