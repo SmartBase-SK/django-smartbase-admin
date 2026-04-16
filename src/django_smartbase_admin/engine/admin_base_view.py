@@ -371,6 +371,11 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     @sbadmin_action
     def action_table_reorder(self, request, modifier) -> JsonResponse:
+        try:
+            from cacheops import invalidate_model
+        except ImportError:
+            invalidate_model = None
+
         self.activate_reorder(request)
         qs = self.get_queryset(request)
         pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
@@ -402,6 +407,10 @@ class SBAdminBaseListView(SBAdminBaseView):
                     + int(diff)
                 }
             )
+
+        # Ensure fresh ordering after reorder for cacheops-managed models.
+        if invalidate_model:
+            invalidate_model(self.model)
         return JsonResponse({"message": request.POST})
 
     @sbadmin_action
