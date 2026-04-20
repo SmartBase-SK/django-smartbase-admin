@@ -49,6 +49,11 @@ export const getObjectOrValue = (value) => {
     return value
 }
 
+export const hasSelectedText = () => {
+    const selection = window.getSelection ? window.getSelection() : null
+    return Boolean(selection && selection.toString().trim())
+}
+
 export const filterInputValueChangeListener = (inputSelector, callbackFunction) => {
     document.querySelectorAll(inputSelector).forEach((input) => {
         input.addEventListener('change', callbackFunction)
