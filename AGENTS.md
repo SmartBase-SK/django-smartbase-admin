@@ -12,6 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
@@ -28,6 +29,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
+| [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
@@ -36,6 +38,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
+- **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
@@ -49,6 +52,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **Regenerate translations?** → [Internationalization](#internationalization)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
@@ -387,6 +391,13 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 
 **Note**: Use `registered_views` with `SBAdminDashboardView` to register custom views. Model admin views (like `blog_article`) are automatically discovered from the admin site registry when `django_smartbase_admin` loads (which is why the INSTALLED_APPS ordering matters).
 
+### Supported Versions
+
+Package metadata currently targets:
+
+- Django `>= 4.1, < 7.0`
+- Python `3.10` through `3.14`
+
 ### Menu Item View IDs
 
 Format: `{app_label}_{model_name}` (lowercase)
@@ -420,9 +431,11 @@ Return, Star-2, Star-2-filled, Right, Right-c, Right-small, Right-small-down,
 Right-small-up, Save, Search, Send-email, Setting-config, Setting-two, Shop,
 Shopping, Shopping-bag, Shopping-cart-one, Sort, Sort-amount-down, Sort-amount-up,
 Sort-one, Sort-three, Sort-alt, Star, Success, Sun-one, Switch, Table-report,
-Tag, Tag-one, Time, Tips-one, To-top, Transfer-data, Translate, Translation,
+Tag, Tag-one, Thumbs-down, Thumbs-down-filled, Thumbs-up, Thumbs-up-filled,
+Time, Tips-one, To-top, Transfer-data, Translate, Translation,
 Triangle-round-rectangle, Truck, Undo, Unlock, Up, Up-c, Up-small, Upload,
-Upload-one, User-business, View-grid-list, Write, Zoom-in, Zoom-out
+Upload-one, User-business, View-grid-list, Write, Writing-fluently-filled,
+Zoom-in, Zoom-out
 ```
 
 Example:
@@ -997,6 +1010,92 @@ This is useful when you want to filter by related data that doesn't need its own
 
 ---
 
+## Form Widgets
+
+Use these when you need SBAdmin-styled form controls outside list filters.
+
+### `SBAdminTextTagsWidget` - delimiter-separated text tags
+
+Use `SBAdminTextTagsWidget` for a single text field that stores multiple values separated by a delimiter (default: comma). This is useful when you want tag-like UX without a related model or M2M table.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminTextTagsWidget
+
+
+class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
+    tag_names = forms.CharField(
+        label="Tag names",
+        required=False,
+        help_text="Comma-separated values",
+        widget=SBAdminTextTagsWidget(
+            delimiter=",",
+            attrs={"placeholder": "news, featured, internal"},
+        ),
+    )
+```
+
+**Key points:**
+- Stored value remains a plain string in the underlying input; the widget only upgrades the UX.
+- `delimiter` controls how pasted/typed values are split.
+- Duplicate values are prevented client-side.
+- Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
+
+### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
+
+When a form inherits from `SBAdminBaseForm`, widgets defined in `Meta.widgets` are initialized even if the field is not re-declared on the form class.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminRadioDropdownWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminRadioDropdownWidget(
+                choices=Article._meta.get_field("status").choices
+            ),
+        }
+```
+
+**Why this matters:** You no longer need to re-declare `status = forms.ChoiceField(...)` just to get SBAdmin widget initialization. `Meta.widgets` is enough.
+
+### Required selects and empty placeholder option
+
+`SBAdminSelectWidget` now disables the empty option by default for required fields. This prevents users from going back to an invalid blank value after choosing a real one.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminSelectWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminSelectWidget(
+                disable_empty_option=False,  # keep placeholder selectable
+            ),
+        }
+```
+
+**Key points:**
+- Default behavior is safer for required fields: blank placeholder is shown but disabled.
+- Set `disable_empty_option=False` if you explicitly want the empty option to remain selectable.
+- The setting only affects empty values (`""` / `None`) on required fields.
+
+---
+
 ## Admin Registration
 
 ```python
@@ -1373,7 +1472,8 @@ Use `format_array` directly for custom badge colors:
 ```python
 from django_smartbase_admin.engine.field_formatter import format_array, BadgeType
 
-# BadgeType options: SUCCESS (green), WARNING (yellow), ERROR (red), NOTICE (default)
+# BadgeType options: NOTICE (default), SUCCESS/POSITIVE (green), WARNING (yellow),
+# ERROR (red), NEUTRAL (gray), PRIMARY (brand color)
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
 
@@ -1680,6 +1780,48 @@ subcategory = forms.ModelChoiceField(
     ),
 )
 ```
+
+### Forward with radio and checkbox widgets
+
+`forward=[...]` also works when the forwarded source field renders as a radio group or checkbox group (not just plain inputs/selects). SBAdmin reads checked input values and forwards them to `filter_search_lambda`.
+
+```python
+from django import forms
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import (
+    SBAdminAutocompleteWidget,
+    SBAdminRadioDropdownWidget,
+)
+
+from blog.models import Article, Author
+
+
+class AuthorByStatusForm(SBAdminBaseFormInit, forms.Form):
+    status = forms.ChoiceField(
+        choices=Article._meta.get_field("status").choices,
+        widget=SBAdminRadioDropdownWidget(
+            choices=Article._meta.get_field("status").choices
+        ),
+    )
+    author = forms.ModelChoiceField(
+        queryset=Author.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Author,
+            multiselect=False,
+            forward=["status"],
+            filter_search_lambda=lambda req, term, fwd: (
+                Q(article__status=fwd.get("status")) if fwd.get("status") else Q()
+            ),
+        ),
+    )
+```
+
+**Key points:**
+- Radio widgets forward a single value.
+- Checkbox groups forward a list of checked values.
+- This works for nested form prefixes too, so the same pattern is safe inside inline/formset rows.
 
 ### Example: Create on the fly with create_value_field + forward_to_create
 
@@ -2825,6 +2967,48 @@ Projects can further restrict access by:
 - Not adding the audit log `SBAdminMenuItem` for non-admin roles
 - Overriding `has_permission` in the role configuration to deny access to the `AdminAuditLog` model
 - Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog` itself
+
+---
+
+## Internationalization
+
+SBAdmin now ships locale catalogs for multiple languages and includes helper scripts to regenerate them in one pass.
+
+### Supported locales
+
+Translation helper scripts are configured for:
+
+- `sk`, `en`, `de`, `cs`, `hu`, `ro`, `sl`, `hr`, `fr`, `pl`, `it`
+
+### Updating translation catalogs
+
+Run these from the repository root:
+
+```bash
+# Extract strings for all configured locales
+python src/django_smartbase_admin/makemessages.py
+
+# Compile all locale catalogs
+python src/django_smartbase_admin/compilemessages.py
+```
+
+**Key points:**
+- `makemessages.py` loops through every locale in `settings.LANGUAGES`; it is no longer Slovak-only.
+- `compilemessages.py` compiles the same full locale list.
+- After adding new UI strings, regenerate `.po` files first, then compile `.mo` files.
+
+### JavaScript translation strings
+
+When adding client-side text, expose it through `templates/sb_admin/sb_admin_js_trans.html` with `{% trans %}` instead of hardcoding English inside JavaScript.
+
+```html
+<script>
+    window.sb_admin_translation_strings["search"] = '{% trans "Search" %}';
+    window.sb_admin_translation_strings["no_results"] = '{% trans "No results found" %}';
+</script>
+```
+
+This is the preferred pattern for autocomplete placeholders, empty states, and other JS-rendered UI labels.
 
 ---
 
