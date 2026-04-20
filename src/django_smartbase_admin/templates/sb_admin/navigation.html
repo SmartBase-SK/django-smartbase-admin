@@ -101,6 +101,7 @@
                 {#                </li>#}
                 {#            </ul>#}
             </div>
+            {% block before_footer %}{% endblock %}
             <footer class="mt-auto border-t border-dark-200">
                 {#            Global Search #}
                 {#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
@@ -176,5 +177,6 @@
             </footer>
         </nav>
         <div class="bg-filter js-sidebar-toggle" data-sidebar-target="main-navigation"></div>
+        {% block after_navigation %}{% endblock %}
     {% endif %}
 {% endblock %}
