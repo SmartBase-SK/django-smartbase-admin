@@ -12,6 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
@@ -28,13 +29,16 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
+| [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
+| [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
+- **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
@@ -48,6 +52,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **Regenerate translations?** → [Internationalization](#internationalization)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
@@ -386,6 +391,13 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 
 **Note**: Use `registered_views` with `SBAdminDashboardView` to register custom views. Model admin views (like `blog_article`) are automatically discovered from the admin site registry when `django_smartbase_admin` loads (which is why the INSTALLED_APPS ordering matters).
 
+### Supported Versions
+
+Package metadata currently targets:
+
+- Django `>= 4.1, < 7.0`
+- Python `3.10` through `3.14`
+
 ### Menu Item View IDs
 
 Format: `{app_label}_{model_name}` (lowercase)
@@ -419,9 +431,11 @@ Return, Star-2, Star-2-filled, Right, Right-c, Right-small, Right-small-down,
 Right-small-up, Save, Search, Send-email, Setting-config, Setting-two, Shop,
 Shopping, Shopping-bag, Shopping-cart-one, Sort, Sort-amount-down, Sort-amount-up,
 Sort-one, Sort-three, Sort-alt, Star, Success, Sun-one, Switch, Table-report,
-Tag, Tag-one, Time, Tips-one, To-top, Transfer-data, Translate, Translation,
+Tag, Tag-one, Thumbs-down, Thumbs-down-filled, Thumbs-up, Thumbs-up-filled,
+Time, Tips-one, To-top, Transfer-data, Translate, Translation,
 Triangle-round-rectangle, Truck, Undo, Unlock, Up, Up-c, Up-small, Upload,
-Upload-one, User-business, View-grid-list, Write, Zoom-in, Zoom-out
+Upload-one, User-business, View-grid-list, Write, Writing-fluently-filled,
+Zoom-in, Zoom-out
 ```
 
 Example:
@@ -996,6 +1010,92 @@ This is useful when you want to filter by related data that doesn't need its own
 
 ---
 
+## Form Widgets
+
+Use these when you need SBAdmin-styled form controls outside list filters.
+
+### `SBAdminTextTagsWidget` - delimiter-separated text tags
+
+Use `SBAdminTextTagsWidget` for a single text field that stores multiple values separated by a delimiter (default: comma). This is useful when you want tag-like UX without a related model or M2M table.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminTextTagsWidget
+
+
+class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
+    tag_names = forms.CharField(
+        label="Tag names",
+        required=False,
+        help_text="Comma-separated values",
+        widget=SBAdminTextTagsWidget(
+            delimiter=",",
+            attrs={"placeholder": "news, featured, internal"},
+        ),
+    )
+```
+
+**Key points:**
+- Stored value remains a plain string in the underlying input; the widget only upgrades the UX.
+- `delimiter` controls how pasted/typed values are split.
+- Duplicate values are prevented client-side.
+- Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
+
+### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
+
+When a form inherits from `SBAdminBaseForm`, widgets defined in `Meta.widgets` are initialized even if the field is not re-declared on the form class.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminRadioDropdownWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminRadioDropdownWidget(
+                choices=Article._meta.get_field("status").choices
+            ),
+        }
+```
+
+**Why this matters:** You no longer need to re-declare `status = forms.ChoiceField(...)` just to get SBAdmin widget initialization. `Meta.widgets` is enough.
+
+### Required selects and empty placeholder option
+
+`SBAdminSelectWidget` now disables the empty option by default for required fields. This prevents users from going back to an invalid blank value after choosing a real one.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminSelectWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminSelectWidget(
+                disable_empty_option=False,  # keep placeholder selectable
+            ),
+        }
+```
+
+**Key points:**
+- Default behavior is safer for required fields: blank placeholder is shown but disabled.
+- Set `disable_empty_option=False` if you explicitly want the empty option to remain selectable.
+- The setting only affects empty values (`""` / `None`) on required fields.
+
+---
+
 ## Admin Registration
 
 ```python
@@ -1372,7 +1472,8 @@ Use `format_array` directly for custom badge colors:
 ```python
 from django_smartbase_admin.engine.field_formatter import format_array, BadgeType
 
-# BadgeType options: SUCCESS (green), WARNING (yellow), ERROR (red), NOTICE (default)
+# BadgeType options: NOTICE (default), SUCCESS/POSITIVE (green), WARNING (yellow),
+# ERROR (red), NEUTRAL (gray), PRIMARY (brand color)
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
 
@@ -1679,6 +1780,48 @@ subcategory = forms.ModelChoiceField(
     ),
 )
 ```
+
+### Forward with radio and checkbox widgets
+
+`forward=[...]` also works when the forwarded source field renders as a radio group or checkbox group (not just plain inputs/selects). SBAdmin reads checked input values and forwards them to `filter_search_lambda`.
+
+```python
+from django import forms
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import (
+    SBAdminAutocompleteWidget,
+    SBAdminRadioDropdownWidget,
+)
+
+from blog.models import Article, Author
+
+
+class AuthorByStatusForm(SBAdminBaseFormInit, forms.Form):
+    status = forms.ChoiceField(
+        choices=Article._meta.get_field("status").choices,
+        widget=SBAdminRadioDropdownWidget(
+            choices=Article._meta.get_field("status").choices
+        ),
+    )
+    author = forms.ModelChoiceField(
+        queryset=Author.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Author,
+            multiselect=False,
+            forward=["status"],
+            filter_search_lambda=lambda req, term, fwd: (
+                Q(article__status=fwd.get("status")) if fwd.get("status") else Q()
+            ),
+        ),
+    )
+```
+
+**Key points:**
+- Radio widgets forward a single value.
+- Checkbox groups forward a list of checked values.
+- This works for nested form prefixes too, so the same pattern is safe inside inline/formset rows.
 
 ### Example: Create on the fly with create_value_field + forward_to_create
 
@@ -2827,6 +2970,48 @@ Projects can further restrict access by:
 
 ---
 
+## Internationalization
+
+SBAdmin now ships locale catalogs for multiple languages and includes helper scripts to regenerate them in one pass.
+
+### Supported locales
+
+Translation helper scripts are configured for:
+
+- `sk`, `en`, `de`, `cs`, `hu`, `ro`, `sl`, `hr`, `fr`, `pl`, `it`
+
+### Updating translation catalogs
+
+Run these from the repository root:
+
+```bash
+# Extract strings for all configured locales
+python src/django_smartbase_admin/makemessages.py
+
+# Compile all locale catalogs
+python src/django_smartbase_admin/compilemessages.py
+```
+
+**Key points:**
+- `makemessages.py` loops through every locale in `settings.LANGUAGES`; it is no longer Slovak-only.
+- `compilemessages.py` compiles the same full locale list.
+- After adding new UI strings, regenerate `.po` files first, then compile `.mo` files.
+
+### JavaScript translation strings
+
+When adding client-side text, expose it through `templates/sb_admin/sb_admin_js_trans.html` with `{% trans %}` instead of hardcoding English inside JavaScript.
+
+```html
+<script>
+    window.sb_admin_translation_strings["search"] = '{% trans "Search" %}';
+    window.sb_admin_translation_strings["no_results"] = '{% trans "No results found" %}';
+</script>
+```
+
+This is the preferred pattern for autocomplete placeholders, empty states, and other JS-rendered UI labels.
+
+---
+
 ## Testing
 
 ### Setup
@@ -2875,6 +3060,228 @@ python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.Tes
 2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
 3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
 4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
+
+---
+
+## SBAdminWizardView
+
+Multi-step wizard **outside** the `change_form`. The view is a thin dispatcher — each step owns its form/formset creation, validation, context building, and save logic.
+
+### Architecture
+
+- **`SBAdminWizardView`** (`TemplateView` + `SBAdminView`) — holds the ordered step classes, dispatches `get()`/`post()` to the current step, builds base context.
+- **`SBAdminWizardStep`** — one step per class. The wizard instantiates a new step object per request. Steps define `title`, `model`, `form_class`, `formset_classes`, and override lifecycle hooks.
+
+### SBAdminWizardStep — Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `title` | str | Step title shown in the template |
+| `heading` | str \| None | Heading above the step title. Falls back to `wizard.wizard_step_heading`, then `model._meta.verbose_name` |
+| `model` | Model class | **Required**. Used for permission checks |
+| `form_class` | Form class | Main form for the step |
+| `formset_classes` | list[type[BaseFormSet]] | Formset factory classes. Used for autocomplete widget registration |
+| `requires_wizard_object` | bool | If `True`, missing wizard object redirects to step 1 |
+| `template_name` | str \| None | Override the default wizard template for this step |
+| `submit_button_label` | str \| None | Custom submit button text. `None` = "Next step" / "Finish" |
+
+### SBAdminWizardStep — Methods
+
+| Method | Description |
+|--------|-------------|
+| `get_form_kwargs(**kwargs)` | Returns kwargs for the main form. Default includes `request` and `view=wizard`. Override to add `instance` |
+| `get_form(data, files)` | Creates the main form instance. Bound when `data` is provided |
+| `get_formsets(data, files)` | Returns `[(title, formset_instance), ...]`. Override to declare formsets. On GET `data` is `None` |
+| `get_context_data(context, **kwargs)` | Builds step-specific template context. Formsets are auto-injected into `wizard_formsets` |
+| `form_valid(form, formsets)` | Called after successful validation. **Must return `HttpResponse`**. Raises `NotImplementedError` by default |
+| `form_invalid(form, formsets)` | Re-renders the page with bound form/formsets and errors |
+| `get_blocked_get_response()` | Return a redirect to block entry to this step (e.g. pending background tasks) |
+| `adjust_navigation(nav)` | Modify `back_url`, `wizard_footer_back_url`, `prev_step_url` dict |
+| `check_permission(request)` | Raises `PermissionDenied`. Default: `requires_wizard_object` → check *change*, otherwise *add* |
+
+### Step Lifecycle
+
+**GET:**
+
+```
+get() → get_blocked_get_response() → _check_requires_wizard_object()
+     → get_form() → wizard.get_context_data() → step.get_context_data()
+     → get_formsets() injected into context → render
+```
+
+**POST:**
+
+```
+post() → _check_requires_wizard_object()
+      → get_form(POST) + get_formsets(POST)
+      → validate all → form_valid(form, formsets)
+                     OR form_invalid(form, formsets)
+```
+
+### SBAdminWizardView — Required
+
+| Attribute / Method | Description |
+|--------------------|-------------|
+| `wizard_steps` | Tuple of `SBAdminWizardStep` classes |
+| `build_wizard_url(step, object_id=None)` | Returns URL with `?step=N` for the given step |
+| `get_wizard_object()` | Returns the wizard's current object from session (or `None`) |
+| `update_object_wizard_state(obj, step, completed)` | Persists the wizard progress on the object |
+
+### Example
+
+```python
+from django import forms
+from django.forms import formset_factory
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm, SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.views.sbadmin_wizard_step import SBAdminWizardStep
+from django_smartbase_admin.views.sbadmin_wizard_view import SBAdminWizardView
+
+from blog.models import Article, Tag
+
+
+# -- Step 1: create the article --
+
+class ArticleStep1Form(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "category")
+
+
+class ArticleStep1(SBAdminWizardStep):
+    title = "Basic Info"
+    model = Article
+    form_class = ArticleStep1Form
+
+    def form_valid(self, form, formsets):
+        obj = form.save()
+        self.wizard.update_object_wizard_state(obj, step=1, completed=False)
+        return HttpResponseRedirect(self.wizard.build_wizard_url(2, obj.pk))
+
+
+# -- Step 2: assign tags via formset --
+
+class TagRowForm(SBAdminBaseFormInit, forms.Form):
+    tag = forms.ModelChoiceField(
+        queryset=Tag.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Tag, multiselect=False,
+            label_lambda=lambda request, item: item.name,
+        ),
+    )
+
+TagRowFormSet = formset_factory(TagRowForm, extra=1, can_delete=True)
+
+
+class ArticleStep2(SBAdminWizardStep):
+    title = "Tags"
+    model = Article
+    form_class = ArticleStep1Form
+    formset_classes = [TagRowFormSet]
+    requires_wizard_object = True
+
+    def get_form_kwargs(self, **kwargs):
+        kwargs = super().get_form_kwargs(**kwargs)
+        kwargs["instance"] = self.wizard.get_wizard_object()
+        return kwargs
+
+    def get_formsets(self, data=None, files=None):
+        kwargs = {
+            "prefix": "tags",
+            "form_kwargs": {"view": self.wizard, "request": self.request},
+        }
+        if data is not None:
+            kwargs["data"] = data
+        return [("Tags", TagRowFormSet(**kwargs))]
+
+    def form_valid(self, form, formsets):
+        article = self.wizard.get_wizard_object()
+        fs = formsets[0][1]
+        # ... save tag associations from fs.cleaned_data ...
+        self.wizard.update_object_wizard_state(article, step=2, completed=True)
+        return HttpResponseRedirect("...")
+
+
+# -- Wizard view --
+
+class ArticleWizard(SBAdminWizardView):
+    wizard_steps = (ArticleStep1, ArticleStep2)
+
+    def build_wizard_url(self, step, object_id=None):
+        url = reverse("sb_admin:blog_article_wizard")
+        return f"{url}?step={step}"
+```
+
+Register in `SBAdminRoleConfiguration.registered_views`:
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from blog.wizard_views import ArticleWizard
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+        ArticleWizard(title="Create Article"),
+    ],
+)
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+The wizard view is automatically routed via `view_map` — no manual URL registration needed.
+
+### Formsets in Steps
+
+Steps declare formsets via `get_formsets()` which returns `[(title, formset_instance), ...]`. The base class handles:
+
+- **Context injection**: formsets are automatically added to `wizard_formsets` in the template context
+- **Multipart detection**: `form_is_multipart` is set if any form or formset form has file fields
+- **POST validation**: all formsets are validated alongside the main form; on failure, `form_invalid` re-renders with bound formsets and errors
+- **Autocomplete registration**: `formset_classes` are iterated during `register_autocomplete_views` to instantiate each formset's row form class for widget initialization
+
+**Key points:**
+- `formset_classes` is used **only** for autocomplete widget registration (happens during `init_view_dynamic` when no wizard object is available)
+- `get_formsets()` is used for actual formset **instance creation** (happens per-request with full wizard state)
+- Row forms should extend `SBAdminBaseFormInit` for autocomplete widgets to work
+- Pass `form_kwargs={"view": self.wizard, "request": self.request}` when creating formset instances
+
+### Navigation
+
+- **`back_url`** (top arrow): if a wizard object exists in session and the user has `change` permission, points to the object's **change** page; otherwise points to the changelist.
+- **`wizard_footer_back_url`**: on step > 1, points to the previous wizard step; on step 1 with an existing object, points to the **change** page (same as the arrow); otherwise the footer "Back" button is hidden.
+- Override `adjust_navigation(nav)` on the step to customize these URLs.
+
+### Template
+
+Default template: `sb_admin/wizard/wizard_step.html`
+
+| Context variable | Description |
+|-----------------|-------------|
+| `wizard_heading` | Heading from `step.get_heading()` |
+| `sbadmin_wizard_step_title` | Step title |
+| `sbadmin_wizard_submit_label` | Submit button text |
+| `wizard_formsets` | List of `(title, formset)` tuples |
+| `form_is_multipart` | `True` if any form has file fields |
+| `wizard_primary_section_title` | Optional title above the main form fields |
+| `sbadmin_wizard_step_banner` | Optional HTML banner shown at the top of the step |
+| `sbadmin_wizard_poll_seconds` | If set, the page auto-refreshes at this interval |
+
+**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/js/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
+
 
 ---
 

@@ -2,12 +2,12 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-01 14:45+0200\n"
+"POT-Creation-Date: 2026-04-16 11:51+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -96,9 +96,6 @@ msgstr "História zmien: %s"
 
 msgid "Log in"
 msgstr "Prihlásiť sa"
-
-msgid "Timezone"
-msgstr "Časové pásmo"
 
 msgid "The new value was created but became unselected due to another validation error. Please select it again."
 msgstr ""
@@ -555,6 +552,9 @@ msgstr "Zrušiť"
 msgid "Calendar"
 msgstr "Kalendár"
 
+msgid "Timezone"
+msgstr "Časové pásmo"
+
 msgid "From"
 msgstr "Od"
 
@@ -815,6 +815,12 @@ msgstr "Preusporiadať"
 msgid "Collapse"
 msgstr "Zbaliť"
 
+msgid "No results found"
+msgstr "Žiadne výsledky"
+
+msgid "No choices to choose from"
+msgstr "Žiadne možnosti na výber"
+
 #, python-brace-format
 msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
 msgstr "<strong>${from} - ${to}</strong> z <strong>${total}</strong><span class=\"max-xs:hidden\"> položiek</span>"
@@ -893,6 +899,18 @@ msgstr "Vyhľadať"
 msgid "Choose File"
 msgstr "Zvoľte súbor"
 
+msgid "Wizard"
+msgstr "Wizard"
+
+msgid "Add another row"
+msgstr "Pridať ďalší riadok"
+
+msgid "Row"
+msgstr ""
+
+msgid "New row"
+msgstr "Nový riadok"
+
 #, python-brace-format
 msgid "Added {name} “{object}”."
 msgstr "Pridané {name} “{object}”."
@@ -917,6 +935,15 @@ msgstr "Odstránené {name} “{object}”."
 
 msgid "No fields changed."
 msgstr "Žiadne zmeny."
+
+msgid "Finish"
+msgstr "Dokončiť"
+
+msgid "Next step"
+msgstr "Ďalší krok"
+
+msgid "Please complete the first step first."
+msgstr "Najprv dokončite prvý krok."
 
 msgid "Not Translated"
 msgstr "Nepreložené"

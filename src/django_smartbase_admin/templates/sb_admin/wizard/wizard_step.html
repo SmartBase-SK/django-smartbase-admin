@@ -1,0 +1,148 @@
+{% extends "sb_admin/sb_admin_base.html" %}
+{% load i18n static sb_admin_tags %}
+
+{% block view_class %}change-form{% endblock %}
+
+{% block js_init %}
+{{ block.super }}
+{% if form %}{{ form.media }}{% endif %}
+{% if wizard_formsets %}{% for _t, fs in wizard_formsets %}{{ fs.media }}{% endfor %}
+<script src="{% static 'sb_admin/js/sbadmin_formset.js' %}"></script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if sbadmin_wizard_poll_seconds %}
+<div
+    hx-get=""
+    hx-trigger="every {{ sbadmin_wizard_poll_seconds }}s"
+    hx-swap="none"
+    hx-push-url="false"
+></div>
+{% endif %}
+<div
+    id="sbadmin-wizard-step-banner"
+    class="max-w-1180 mx-auto px-20{% if sbadmin_wizard_step_banner %} mb-24{% endif %}"
+    hx-swap-oob="true"
+>
+    {% if sbadmin_wizard_step_banner %}
+    <div class="alert bg-notice-50 border border-notice-100 text-notice-900">
+        {{ sbadmin_wizard_step_banner }}
+    </div>
+    {% endif %}
+</div>
+<div class="detail-view-header py-16 md:pb-32 flex items-center max-xs:px-20 w-full max-w-1180 mx-auto">
+    {% if back_url %}
+    <a href="{{ back_url }}" class="btn p-0 w-40 mr-16">
+        <svg class="w-20 h-20">
+            <use xlink:href="#Left-small"></use>
+        </svg>
+    </a>
+    {% endif %}
+    <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1">
+        {{ wizard_heading|default:_("Wizard") }} – {{ sbadmin_wizard_step_title }}
+        ({{ sbadmin_wizard_step }}/{{ sbadmin_wizard_steps_total }})
+    </h1>
+</div>
+
+<form action="" method="post" {% if form_is_multipart|default:form.is_multipart %} enctype="multipart/form-data" {% endif %} class="detail-view-form flex-grow w-full max-w-1180 mx-auto flex flex-col" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="step" value="{{ sbadmin_wizard_step }}">
+
+    {% if form.non_field_errors %}
+    <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+        {{ form.non_field_errors }}
+    </div>
+    {% endif %}
+
+    {% if wizard_primary_section_title %}
+    <div class="mb-8 text-18 font-bold text-dark-900">{{ wizard_primary_section_title }}</div>
+    {% endif %}
+    <div class="mb-24">
+        {% for field in form %}
+        <div class="mb-16 field-{{ field.name }}{% if field.is_hidden %} hidden{% endif %}">
+            {{ field }}
+            {{ field.errors }}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if wizard_formsets %}
+    {% for fs_title, fs in wizard_formsets %}
+    {% with can_add=fs.show_add_button|default:False %}
+    <div class="sbadmin-formset-dynamic mb-32" data-prefix="{{ fs.prefix }}" data-max-forms="{{ fs.max_num }}">
+        <header class="flex flex-wrap items-center gap-16 justify-between mb-16">
+            <h2 class="text-18 font-bold text-dark-900 m-0">{{ fs_title }}</h2>
+            {% if can_add and fs.max_num != 0 and fs.total_form_count < fs.max_num %}
+            <button type="button" class="sbadmin-formset-add btn btn-secondary flex items-center gap-8">
+                <svg class="w-20 h-20 shrink-0">
+                    <use xlink:href="#Plus"></use>
+                </svg>
+                <span>{% trans "Add another row" %}</span>
+            </button>
+            {% endif %}
+        </header>
+        {% if fs.non_form_errors %}
+        <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+            {{ fs.non_form_errors }}
+        </div>
+        {% endif %}
+        {{ fs.management_form }}
+        <div class="sbadmin-formset-forms">
+            {% for form in fs.forms %}
+            <div id="{{ fs.prefix }}-{{ forloop.counter0 }}" class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
+                {% if fs.can_delete %}
+                <div class="mb-8 text-14 text-dark-600">{% trans "Row" %} {{ forloop.counter }}</div>
+                {% endif %}
+                {% if form.non_field_errors %}
+                <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-16">{{
+                    form.non_field_errors }}</div>
+                {% endif %}
+                {% for field in form %}
+                <div class="mb-16 field-{{ field.name }}{% if field.is_hidden %} hidden{% endif %}">
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% if can_add and fs.max_num != 0 and fs.total_form_count < fs.max_num %}
+        <template id="{{ fs.prefix }}-empty-template">
+            <div class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
+                <div class="mb-8 text-14 text-dark-600">{% trans "New row" %}</div>
+                {% with ef=fs.empty_form %}
+                {% for field in ef %}
+                <div class="mb-16 field-{{ field.name }}{% if field.is_hidden %} hidden{% endif %}">
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+                {% endfor %}
+                {% endwith %}
+            </div>
+        </template>
+        {% endif %}
+    </div>
+    {% endwith %}
+    {% endfor %}
+    {% endif %}
+
+    <div class="detail-view-action-bar">
+        <div>
+            <div class="flex w-full flex-wrap items-center gap-16 justify-between">
+                <div class="flex gap-8">
+                    {% if back_url %}
+                    <a href="{{ back_url }}" class="btn btn-secondary">{% trans "Back" %}</a>
+                    {% endif %}
+                </div>
+                <div id="sbadmin-wizard-submit-slot" class="flex ml-auto gap-8" hx-swap-oob="true">
+                    <button type="submit" class="btn btn-primary">
+                        {{ sbadmin_wizard_submit_label }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</form>
+{% endblock %}

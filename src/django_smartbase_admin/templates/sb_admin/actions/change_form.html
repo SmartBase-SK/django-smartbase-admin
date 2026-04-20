@@ -99,7 +99,12 @@
                             {% if detail_actions %}
                                 {% for action in detail_actions %}
                                     <li class="max-sm:hidden">
-                                        <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn btn-empty {{ action.css_class|default_if_none:'' }}">
+                                        <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="btn {{ action.css_class|default_if_none:'' }}">
+                                            {% if action.icon %}
+                                                <svg class="w-16 h-16 mr-8">
+                                                    <use href="#{{ action.icon }}"></use>
+                                                </svg>
+                                            {% endif %}
                                             {{ action.title }}
                                         </a>
                                     </li>

@@ -66,9 +66,11 @@ export default class Autocomplete {
         const options = JSON.parse(choiceInput.dataset.autocompleteOptions || "{}")
         const choicesJS = new Choices(choiceInput, {
             ...choicesJSOptions(choiceInput),
-            placeholderValue: 'Search',
+            placeholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
             searchChoices: false,
-            searchPlaceholderValue: 'Search',
+            searchPlaceholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
+            noResultsText: window.sb_admin_translation_strings?.["no_results"] || 'No results found',
+            noChoicesText: window.sb_admin_translation_strings?.["no_choices"] || 'No choices to choose from',
             searchResultLimit: 999,
 
             callbackOnInit: () => {
@@ -92,6 +94,17 @@ export default class Autocomplete {
             choicesJS.SBhasNextPage = true
             this.search(choicesJS.SBcurrentSearchTerm, choicesJS, inputEl, autocompleteData, choicesJS.SBcurrentPage)
         }, 200))
+
+        choicesJS.input.element.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return
+            const btn = choicesJS.SBaddNewButton
+            if (!btn || btn.parentElement.classList.contains('hidden')) return
+            const highlighted = choicesJS.dropdown.element.querySelector('.is-highlighted')
+            if (highlighted) return
+            e.preventDefault()
+            e.stopPropagation()
+            btn.click()
+        })
 
         choiceInput.addEventListener('selectItem', (event) => {
             if(!event.target.hasAttribute('multiple')) {
@@ -122,6 +135,9 @@ export default class Autocomplete {
         if(wrapperElButton){
             // filter in dropdown
             wrapperElButton.addEventListener('show.bs.dropdown', initLoad)
+            wrapperElButton.addEventListener('shown.bs.dropdown', () => {
+                choicesJS.input.element.focus()
+            })
         } else {
             choicesJS.input.element.addEventListener('focus', initLoad)
         }
@@ -198,6 +214,8 @@ export default class Autocomplete {
         if (searchOn) {
             choicesJS.containerOuter.element.classList.add('search-on')
             choicesJS.containerOuter.element.classList.remove('search-off')
+            // Focus the search input once it becomes visible (first open only).
+            choicesJS.input.element.focus()
         } else {
             choicesJS.containerOuter.element.classList.remove('search-on')
             choicesJS.containerOuter.element.classList.add('search-off')
@@ -225,7 +243,26 @@ export default class Autocomplete {
             autocompleteData.forward.forEach(fieldToForward => {
                 // replace current field id for forward field id keeping the view_id or inline_id prefixes intact
                 const fieldToForwardInputId = inputEl.id.replace(new RegExp(autocompleteData.field_name + '$'), fieldToForward)
-                autocompleteForwardData[fieldToForward] = document.getElementById(fieldToForwardInputId).value
+                const fieldToForwardEl = document.getElementById(fieldToForwardInputId)
+                let forwardValue
+                if (fieldToForwardEl && fieldToForwardEl.value !== undefined) {
+                    // Standard input / select — use .value directly.
+                    forwardValue = fieldToForwardEl.value
+                } else {
+                    // Radio / checkbox widgets render as <ul id="id_..."> with no .value.
+                    // Derive the input name from the element id (strip leading "id_") so that
+                    // nested-form prefixes (e.g. "form-0-state") are preserved correctly.
+                    const fieldName = fieldToForwardInputId.replace(/^id_/, '')
+                    const checkedInputs = Array.from(document.querySelectorAll(`[name="${fieldName}"]:checked`))
+                    if (checkedInputs.length > 1) {
+                        // Checkbox group — forward all checked values as an array.
+                        forwardValue = checkedInputs.map(el => el.value)
+                    } else {
+                        // Radio group (or nothing checked) — forward single value or empty string.
+                        forwardValue = checkedInputs.length === 1 ? checkedInputs[0].value : ''
+                    }
+                }
+                autocompleteForwardData[fieldToForward] = forwardValue
             })
         }
         autocompleteRequestData.set(autocompleteData.constants.autocomplete_forward, JSON.stringify(autocompleteForwardData))

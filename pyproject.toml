@@ -8,12 +8,18 @@ license = "MIT"
 homepage = "https://smartbase-sk.github.io/django-smartbase-admin-docs/"
 repository = "https://github.com/SmartBase-SK/django-smartbase-admin"
 include = [
-    "**/static/sb_admin/dist/**/*"
+    "**/static/sb_admin/dist/**/*",
+    "**/static/sb_admin/js/wizard_formset.js",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
     "Framework :: Django",
+    "Framework :: Django :: 4.1",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 6.0",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -21,12 +27,13 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13"
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14"
 ]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-django = ">= 4.1, < 6.0"
+django = ">= 4.1, < 7.0"
 django-ckeditor = "^6.7.1"
 django-admin-inline-paginator = "^0.4.0"
 django-nested-admin = "^4.1.1"

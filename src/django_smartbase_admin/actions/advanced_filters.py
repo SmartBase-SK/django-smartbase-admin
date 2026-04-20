@@ -123,7 +123,7 @@ class QueryBuilderFilter:
                     "filter_widget": filter_widget_for_context,
                     "prefix_to_replace": QB_JS_PREFIX,
                 },
-            ).replace("</script>", "<\/script>"),
+            ).replace("</script>", r"<\/script>"),
         )
 
 

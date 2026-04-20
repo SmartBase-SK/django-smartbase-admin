@@ -115,6 +115,22 @@ class SBAdminTextInputWidget(SBAdminBaseWidget, forms.TextInput):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
 
 
+class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
+    template_name = "sb_admin/widgets/text_tags.html"
+    input_type = "text"
+
+    def __init__(self, form_field=None, attrs=None, *, delimiter: str = ","):
+        super().__init__(
+            form_field,
+            attrs={
+                "class": "input js-sbadmin-text-tags",
+                "data-choices-delimiter": delimiter,
+                "autocomplete": "off",
+                **(attrs or {}),
+            },
+        )
+
+
 class SBAdminPasswordInputWidget(SBAdminBaseWidget, forms.PasswordInput):
     template_name = "sb_admin/widgets/password.html"
 
@@ -193,10 +209,34 @@ class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
 
-    def __init__(self, form_field=None, attrs=None, choices=()):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        choices=(),
+        disable_empty_option=True,
+    ):
+        self.disable_empty_option = disable_empty_option
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        if (
+            self.disable_empty_option
+            and (value is None or str(value) == "")
+            and self.form_field is not None
+            and getattr(self.form_field, "required", False)
+        ):
+            option_attrs = dict(option.get("attrs") or {})
+            option_attrs["disabled"] = True
+            option["attrs"] = option_attrs
+        return option
 
 
 class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
@@ -888,7 +928,7 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
             "sb_admin/js/codemirror/codemirror.min.js",
             "sb_admin/js/codemirror/overlay.min.js",
             "sb_admin/js/codemirror/django.min.js",
-            "sb_admin/src/js/code.js",
+            "sb_admin/js/code.js",
         ]
 
 
