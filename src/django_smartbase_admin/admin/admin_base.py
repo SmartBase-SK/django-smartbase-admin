@@ -201,6 +201,7 @@ class SBAdminFormFieldWidgetsMixin:
         formfield_widgets[PageSelectFormField] = SBAdminPageSelectWidget
 
     django_widget_to_widget = {
+        forms.HiddenInput: SBAdminHiddenWidget,
         forms.PasswordInput: SBAdminPasswordInputWidget,
         AdminTextareaWidget: SBAdminTextareaWidget,
     }
