@@ -16,6 +16,7 @@ class BadgeType(Enum):
     ERROR = "negative"
     NEUTRAL = "neutral"
     POSITIVE = "positive"
+    PRIMARY = "primary"
 
 
 def datetime_formatter(object_id, value):
