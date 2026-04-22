@@ -17,13 +17,14 @@ export class Confirmation {
         }
         this.modal = new window.bootstrap5.Modal(this.modalEl)
 
+        const translations = window.sb_admin_translation_strings || {}
         this.defaultModalData = {
             'responseTarget': 'body',
             'confirmBody': null,
             'confirmIcon': null,
             'confirmFooter': null,
-            'confirmSubmit': 'Confirm',
-            'confirmClose': 'Cancel',
+            'confirmSubmit': translations['confirm'] || 'Confirm',
+            'confirmClose': translations['cancel'] || 'Cancel',
             'submitEvent': 'confirm',
             'cancelEvent': 'cancel',
         }
