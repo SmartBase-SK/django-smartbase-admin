@@ -10,6 +10,7 @@ import {MovableColumnsModule} from "./table_modules/movable_columns_module"
 import {DataEditModule} from "./table_modules/data_edit_module"
 import {FullTextSearchModule} from "./table_modules/full_text_search_module"
 import { HeaderTabsModule } from "./table_modules/header_tabs_module"
+import { StickyFooterModule } from "./table_modules/sticky_footer_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 
 
@@ -380,4 +381,5 @@ window.SBAdminTableModulesClass = {
     'dataEditModule': DataEditModule,
     'fullTextSearchModule': FullTextSearchModule,
     'headerTabsModule': HeaderTabsModule,
+    'stickyFooterModule': StickyFooterModule,
 }

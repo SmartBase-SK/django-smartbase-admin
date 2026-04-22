@@ -105,12 +105,19 @@
                 <div id="{{ view_id }}-table" class="list-view-table"></div>
             {% endblock %}
             {% block tabulator_custom_footer %}
-                <div class="tabulator-custom-footer">
-                    <div class="flex items-center">
-                        <div class="mr-16 max-sm:hidden">{% trans 'For page' %}</div>
-                        <div id="{{ view_id }}-page-size-widget"></div>
+                <div class="tabulator-custom-footer{% if content_context.tabulator_definition.stickyFooter %} tabulator-custom-footer--sticky{% endif %}">
+                    {% if content_context.tabulator_definition.stickyFooter %}
+                        <div class="tabulator-sticky-scrollbar max-lg:hidden" data-sticky-scrollbar="{{ view_id }}">
+                            <div class="tabulator-sticky-scrollbar__spacer"></div>
+                        </div>
+                    {% endif %}
+                    <div class="tabulator-custom-footer__inner">
+                        <div class="flex items-center">
+                            <div class="mr-16 max-sm:hidden">{% trans 'For page' %}</div>
+                            <div id="{{ view_id }}-page-size-widget"></div>
+                        </div>
+                        <div id="{{ view_id }}-pagination-widget" class="ml-auto flex items-center"></div>
                     </div>
-                    <div id="{{ view_id }}-pagination-widget" class="ml-auto flex items-center"></div>
                 </div>
             {% endblock %}
         </div>

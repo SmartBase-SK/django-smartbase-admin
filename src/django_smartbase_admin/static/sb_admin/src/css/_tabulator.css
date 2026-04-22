@@ -795,9 +795,42 @@
 }
 
 .tabulator-custom-footer {
-    @apply flex p-16;
     @apply border-t border-dark-200;
     @apply text-14;
+}
+
+.tabulator-custom-footer__inner {
+    @apply flex p-16;
+}
+
+.tabulator-custom-footer--sticky {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    @apply bg-bg-elevated;
+}
+
+.tabulator-sticky-scrollbar {
+    overflow-x: auto;
+    @apply border-b border-dark-200;
+    @extend .custom-scrollbar;
+}
+
+.tabulator-sticky-scrollbar[data-no-overflow] {
+    display: none;
+}
+
+.tabulator-sticky-scrollbar__spacer {
+    height: 1px;
+}
+
+.tabulator-tableholder--sticky-footer::-webkit-scrollbar:horizontal {
+    display: none;
+}
+
+.tabulator-tableholder--sticky-footer {
+    scrollbar-width: none;
 }
 
 .tabulator-responsive-collapse table {
