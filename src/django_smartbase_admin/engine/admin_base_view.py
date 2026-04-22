@@ -151,8 +151,6 @@ class SBAdminBaseView(object):
         return self.field_cache
 
     def init_fields_cache(self, fields_source, configuration, force=False):
-        if not force and self.field_cache:
-            return self.field_cache.values()
         from django_smartbase_admin.engine.field import SBAdminField
 
         fields = []
@@ -319,6 +317,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
     sbadmin_nested: dict | None = None
+    sbadmin_list_sticky_footer = None
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
@@ -490,8 +489,14 @@ class SBAdminBaseListView(SBAdminBaseView):
             return False
         return super().has_add_permission(request)
 
+    def get_sbadmin_list_sticky_footer(self, request) -> bool:
+        if self.sbadmin_list_sticky_footer is not None:
+            return self.sbadmin_list_sticky_footer
+        return request.request_data.configuration.default_list_sticky_footer
+
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
+        sticky_footer = self.get_sbadmin_list_sticky_footer(request)
         tabulator_definition = {
             "viewId": view_id,
             "advancedFilterId": f"{view_id}" + "-advanced-filter",
@@ -510,6 +515,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialSort": self.get_list_initial_order(request),
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
+            "stickyFooter": sticky_footer,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -554,6 +560,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 request=request,
                 definition=tabulator_definition,
             )
+        if sticky_footer:
+            tabulator_definition["modules"].append("stickyFooterModule")
         return tabulator_definition
 
     def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
@@ -777,7 +785,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbadmin_list_display(request) or []
-        self.init_fields_cache(list_fields, request.request_data.configuration)
+        list_fields = self.init_fields_cache(
+            list_fields, request.request_data.configuration
+        )
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields
