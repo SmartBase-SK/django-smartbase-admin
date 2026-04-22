@@ -9,12 +9,34 @@ Usage:
 
 SECRET_KEY = "test-secret-key-not-for-production"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+import os
+
+# Default: in-memory SQLite. Override via SBADMIN_TEST_DATABASE_URL to
+# run against Postgres (required for plugin data-path tests that use
+# ArrayAgg).
+#   export SBADMIN_TEST_DATABASE_URL="postgresql://user:pass@host:port/db"
+_db_url = os.environ.get("SBADMIN_TEST_DATABASE_URL")
+if _db_url:
+    from urllib.parse import urlparse
+
+    _parsed = urlparse(_db_url)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _parsed.path.lstrip("/"),
+            "USER": _parsed.username or "",
+            "PASSWORD": _parsed.password or "",
+            "HOST": _parsed.hostname or "",
+            "PORT": str(_parsed.port or ""),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
 
 INSTALLED_APPS = [
     "django.contrib.admin",

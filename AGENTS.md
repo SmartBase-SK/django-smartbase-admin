@@ -24,6 +24,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin) | Show related models without a real Django FK to the parent — cross-database, unmanaged, or indirect relationships |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
 | [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, default tab from menu, programmatic URL building |
+| [Nested List View](#nested-list-view-sbadmin_nested) | One-level self-referential tree rendering via Tabulator `dataTree` with `TabulatorNestedPlugin` |
+| [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node) | Multi-level tree rendering for django-treebeard `MP_Node` models — form widget, filter widget, `actions/tree_list.html` |
+| [List View Plugins](#list-view-plugins-sbadminplugin) | Protocol for reshaping the list pipeline globally — queryset hooks, per-request state, Tabulator definition |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
@@ -49,6 +52,11 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
 - **Menu opens filtered tab?** → [Default Tab and Menu Link to Filtered View](#default-tab-and-menu-link-to-filtered-view)
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
+- **Tree / parent-child rows in list view (one level, self-FK)?** → [Nested List View](#nested-list-view-sbadmin_nested)
+- **Multi-level tree / django-treebeard `MP_Node`?** → [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node)
+- **Pick parent from a tree in a form?** → [`SBAdminTreeWidget` as a form widget](#sbadmintreewidget--form-widget-for-picking-a-node)
+- **Filter a list by tree node?** → [`SBAdminTreeFilterWidget`](#sbadmintreefilterwidget--filter-widget)
+- **Reshape list queryset / Tabulator options globally?** → [List View Plugins](#list-view-plugins-sbadminplugin)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
@@ -2470,6 +2478,453 @@ class CommentAdmin(SBAdmin):
 
 ---
 
+## Nested List View (`sbadmin_nested`)
+
+Render a self-referential model as a one-level tree in the list view using Tabulator's `dataTree`. Pagination is by **parent groups** (one page = N roots + their children), filters apply across the whole tree, and `restrict_queryset` is re-enforced on the parent side of the FK.
+
+The `Category` model in the demo schema has a self-referential `parent` FK — the examples below use it as the concrete example.
+
+### Minimal Setup
+
+Two things are needed: register `TabulatorNestedPlugin` globally on your role configuration, then opt-in per-admin via `sbadmin_nested`.
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
+
+
+_role_config = SBAdminRoleConfiguration(
+    # ... menu_items, registered_views, etc. ...
+    plugins=[TabulatorNestedPlugin],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+```python
+# blog/admin.py
+from django.contrib import admin
+
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Category
+
+
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+    sbadmin_list_display = ("name", "parent")
+    sbadmin_nested = {"parent_field": "parent"}
+```
+
+Result: root categories render as top-level rows with an expand chevron; one level of children appears under each root. Grandchildren are **not** rendered.
+
+### Configuration Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `parent_field` | str | **required** | Name of the self-referential FK on the model (e.g. `"parent"`). Must be a `ForeignKey("self", null=True)` — validated at request time. |
+| `element_column` | str | first visible column | Column that gets the tree expand/collapse chevron (`dataTreeElementColumn`). Accepts either a column name from `sbadmin_list_display` or a raw Tabulator field id. |
+| `start_expanded` | bool | `False` | Render all parent rows expanded on first load. |
+| `only_show_filtered_children` | bool | `True` | If `True`, children only appear when they match the current filter; parents always hydrate even if they didn't match. If `False`, all direct children of each visible parent are included. |
+
+Example with all keys:
+
+```python
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+    sbadmin_list_display = ("name", "parent")
+    sbadmin_nested = {
+        "parent_field": "parent",
+        "element_column": "name",           # chevron on the name column
+        "start_expanded": True,
+        "only_show_filtered_children": False,
+    }
+```
+
+### Dynamic Config: `get_sbadmin_nested()`
+
+Like most `sbadmin_*` attributes, `sbadmin_nested` has a request-aware companion. Useful for toggling the tree per user role or per query parameter:
+
+```python
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+
+    def get_sbadmin_nested(self, request):
+        # Flat list for search; tree otherwise.
+        if request.GET.get("q"):
+            return None
+        return {"parent_field": "parent"}
+```
+
+Return `None` to disable the tree for that request — the admin renders a normal flat list.
+
+**Key points:**
+- `TabulatorNestedPlugin` must be added to `SBAdminRoleConfiguration.plugins` **and** the admin must declare `sbadmin_nested` — the plugin self-guards and is a no-op for admins without it.
+- `parent_field` must be a self-referential `ForeignKey`; proxy models pointing at the concrete model also validate.
+- Only **one level** of nesting is supported. Grandchildren are dropped; flatten deeper hierarchies before displaying.
+- Pagination counts parent groups; `list_per_page` controls roots-per-page, not rows-per-page.
+- Filters apply to the whole tree by default (`only_show_filtered_children=True`). Parents still hydrate even when only a child matched.
+- `restrict_queryset` is re-enforced on the parent side of the FK automatically — a child whose parent was filtered out won't leak as a phantom root.
+- **PostgreSQL required** at the data-query level (uses `ArrayAgg`).
+
+**Source:** `django_smartbase_admin/plugins/nested.py` — `TabulatorNestedPlugin`, `resolve_nested`
+
+---
+
+## Tree Widget & Tree List View (treebeard `MP_Node`)
+
+For **multi-level** hierarchical data backed by [django-treebeard](https://django-treebeard.readthedocs.io/) materialized-path nodes (`MP_Node`), SBAdmin ships three complementary pieces built on top of [Fancytree](https://wwwendt.de/tech/fancytree/):
+
+| Piece | Purpose |
+|-------|---------|
+| `SBAdminTreeWidget` | Form widget to pick a node (e.g. a parent) from a searchable collapsible tree |
+| `SBAdminTreeFilterWidget` | Filter widget to restrict a list view by subtree |
+| `sb_admin/actions/tree_list.html` | Changelist template that replaces the flat Tabulator table with a Fancytree tree — supports drag reorder |
+
+> **When to use this vs `sbadmin_nested`?** — `sbadmin_nested` is for **one-level** trees over an ordinary self-referential `ForeignKey`. Use `MP_Node` + the tree widget/list for **arbitrary-depth** hierarchies (taxonomies, menu trees, folder structures), especially when you need drag-and-drop reorder across levels.
+
+### Demo Model
+
+The demo schema's `Category` model (self-FK) covers the one-level `sbadmin_nested` case. For the multi-level tree examples below, extend the schema with a separate treebeard-backed `Topic` taxonomy (e.g. `Technology > Programming > Python`):
+
+```python
+# blog/models.py
+from treebeard.mp_tree import MP_Node
+from django.db import models
+
+
+class Topic(MP_Node):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, unique=True)
+
+    node_order_by = ["name"]
+
+    def __str__(self):
+        return self.name
+```
+
+`MP_Node` provides the `path`, `depth`, and `numchild` fields plus `steplen` / `_inc_path` / `_get_basepath` helpers that the widget relies on.
+
+### Subclassing `SBAdminTreeWidgetMixin`
+
+Both the form widget and the filter widget derive from `SBAdminTreeWidgetMixin`. You subclass it once to teach SBAdmin how to render rows for your model, then reuse the subclass anywhere:
+
+```python
+# blog/tree_widgets.py
+from django_smartbase_admin.admin.widgets import SBAdminTreeWidget
+from django_smartbase_admin.engine.filter_widgets import SBAdminTreeFilterWidget
+
+from blog.models import Topic
+
+
+class TopicTreeMixin:
+    """Shared config for any Topic tree widget (form, filter, list)."""
+
+    model = Topic
+    order_by = ("path",)
+    path_field = "path"
+
+    @classmethod
+    def get_tree_title(cls, request, item):
+        """Fancytree node label (HTML allowed)."""
+        return item["name"]
+
+    @classmethod
+    def get_label(cls, request, item):
+        """Label shown in the bound form field's pill after selection."""
+        return item.name
+
+
+class TopicTreeWidget(TopicTreeMixin, SBAdminTreeWidget):
+    """Form widget: pick a Topic (e.g. a parent) from a tree."""
+
+
+class TopicTreeFilterWidget(TopicTreeMixin, SBAdminTreeFilterWidget):
+    """Filter widget: restrict a list view to a Topic subtree."""
+```
+
+Required overrides on the mixin:
+
+| Classmethod / attribute | Purpose |
+|-------------------------|---------|
+| `model` | The treebeard model class. |
+| `order_by` | Ordering used when walking the queryset — typically `("path",)`. |
+| `get_tree_title(cls, request, item)` | Text shown inside each tree row. `item` is a dict of the values listed by `get_tree_base_values()` (at minimum `id` and `path`). |
+| `get_label(cls, request, item)` | Label shown in the selected-value pill of a form widget. Only required when using the widget as a form field. |
+
+Optional extensions:
+
+| Extension point | When to override |
+|-----------------|------------------|
+| `get_tree_base_values()` | Fetch additional columns from the DB (e.g. `["id", "path", "url"]`) so `get_tree_title` / `get_additional_data` can use them. |
+| `get_additional_data(cls, request, item, tree_process_global_data)` | Inject per-row data into the Fancytree node (rendered in `additional_columns`). |
+| `tree_process_global_data(cls, request, queryset, **kwargs)` | Precompute shared state (e.g. permission maps) once per request and feed it to `get_additional_data`. |
+
+### `SBAdminTreeWidget` — form widget for picking a node
+
+Use on a `ModelChoiceField` to let users pick a parent (or any node) from the tree. The widget supports a parent-only mode that disables selecting the current object or its descendants — essential for "change parent" forms to avoid cycles.
+
+```python
+# blog/forms.py
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.engine.filter_widgets import SBAdminTreeWidgetMixin
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeWidget
+
+
+class TopicForm(SBAdminBaseForm):
+    parent = forms.ModelChoiceField(
+        label="Parent topic",
+        required=False,
+        queryset=Topic.objects.all(),
+        widget=TopicTreeWidget(
+            model=Topic,
+            relationship_pick_mode=SBAdminTreeWidgetMixin.RELATIONSHIP_PICK_MODE_PARENT,
+            # Optional: render extra columns in the tree popup
+            additional_columns=[
+                {"field": "slug", "title": "Slug"},
+            ],
+        ),
+    )
+
+    class Meta:
+        model = Topic
+        fields = ["name", "slug", "parent"]
+```
+
+Key parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `relationship_pick_mode` | `None` | Set to `RELATIONSHIP_PICK_MODE_PARENT` when the field is a **parent** reference; the widget disables selecting the edited object itself and its descendants and raises `ValidationError` if the user tampers with the value client-side. |
+| `inline` | `False` | Render the tree inline (always visible) instead of in a popup. Switches the template to `sb_admin/widgets/tree_select_inline.html`. |
+| `additional_columns` | `None` | List of `{"field": ..., "title": ...}` dicts shown as extra columns next to the node title. |
+| `tree_strings` | Sensible defaults | Override UI strings (`loading`, `loadError`, `moreData`, `noData`). |
+
+### `SBAdminTreeFilterWidget` — filter widget
+
+Swap in as the `filter_widget` on an `SBAdminField` to get a tree-based filter UI — users expand/collapse subtrees and tick nodes to restrict the list.
+
+```python
+# blog/admin.py
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeFilterWidget
+
+
+@admin.register(Topic, site=sb_admin_site)
+class TopicAdmin(SBAdmin):
+    sbadmin_list_display = (
+        "name",
+        SBAdminField(
+            name="topic_subtree",
+            title="Subtree",
+            filter_field="path",
+            filter_widget=TopicTreeFilterWidget(model=Topic, multiselect=True),
+            list_visible=False,
+        ),
+    )
+    sbadmin_list_filter = ("topic_subtree",)
+```
+
+The filter's selected values are materialized-path prefixes; combined with a `filter_field` resolving to the model's `path`, treebeard's path semantics naturally restrict to the selected subtrees.
+
+### Tree List View (`sb_admin/actions/tree_list.html`)
+
+For the full tree changelist (no flat Tabulator rows — the whole list renders as a Fancytree with drag reorder), override `change_list_template` on your admin. The tree pulls its data from a URL you expose via `@sbadmin_action` using `get_tree_data`:
+
+```python
+# blog/admin.py
+from django.contrib import admin
+from django.http import JsonResponse
+
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import sbadmin_action
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeMixin
+
+
+@admin.register(Topic, site=sb_admin_site)
+class TopicAdmin(TopicTreeMixin, SBAdmin):
+    change_list_template = "sb_admin/actions/tree_list.html"
+    # Keep the default reorder template — reorder mode uses the flat list.
+    # reorder_list_template = "sb_admin/actions/list.html"  # already default
+
+    sbadmin_list_display = ("name", "slug")
+
+    @sbadmin_action
+    def action_tree_json(self, request, modifier):
+        """Emit Fancytree node JSON for the whole tree."""
+        qs = self.get_queryset(request)
+        data = self.get_tree_data(request, qs, values=["name", "slug"])
+        return JsonResponse(data, safe=False)
+
+    def get_context_data(self, request):
+        context = super().get_context_data(request)
+        context.update(
+            {
+                "list_title": "Topic tree",
+                "tree_json_url": self.get_action_url("action_tree_json"),
+                "additional_columns": [
+                    {"field": "slug", "title": "Slug"},
+                ],
+            }
+        )
+        return context
+
+    def get_tabulator_definition(self, request):
+        definition = super().get_tabulator_definition(request)
+        # Enable drag reorder on the Fancytree list — POST target for reordered paths.
+        definition["treeReorderUrl"] = self.get_action_url("action_tree_reorder")
+        return definition
+```
+
+The `tree_list.html` template expects these context values (set them in `get_context_data` as shown above):
+
+| Context key | Description |
+|-------------|-------------|
+| `list_title` | Label of the main tree column (usually the model's verbose name). |
+| `tree_json_url` | URL that returns the Fancytree JSON — the admin's `@sbadmin_action` endpoint. |
+| `additional_columns` | Extra columns (`[{"field": ..., "title": ...}, ...]`) shown alongside the tree. |
+| `tabulator_definition.treeReorderUrl` | *(optional)* URL that accepts the reorder POST when users drag nodes. Omit to render a read-only tree. |
+
+### Saving reorder with `process_treebeard_tree`
+
+When users drag nodes in the tree list view, the JS posts the full new tree shape `[{"key": "<path>", "children": [...]}, ...]` to your `treeReorderUrl`. Use `SBAdminTreeWidgetMixin.process_treebeard_tree` to translate that payload into the minimal set of `path` / `depth` / `numchild` updates and persist them in a single `bulk_update`:
+
+```python
+import json
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+from django_smartbase_admin.engine.actions import sbadmin_action
+
+from blog.models import Topic
+
+
+class TopicAdmin(TopicTreeMixin, SBAdmin):
+    # ... fields above ...
+
+    @sbadmin_action
+    @require_POST
+    def action_tree_reorder(self, request, modifier):
+        tree_widget_data = json.loads(request.body)
+        objs_by_path = {obj.path: obj for obj in Topic.objects.all()}
+        to_update = self.process_treebeard_tree(tree_widget_data, objs_by_path)
+        Topic.objects.bulk_update(to_update, ["path", "depth", "numchild"])
+        return JsonResponse({"status": "ok"})
+```
+
+`process_treebeard_tree` walks the submitted tree in order, recomputes each node's `path` / `depth` / `numchild`, and returns **only** the objects whose values actually changed — bulk updating that reduced set is safe and cheap even for large trees.
+
+**Key points:**
+- Requires [django-treebeard](https://django-treebeard.readthedocs.io/) — the model **must** inherit from `MP_Node` (materialized path). `AL_Node` / `NS_Node` are not supported; the depth math hard-codes the materialized-path encoding.
+- `SBAdminTreeWidgetMixin` is the single subclassing point — always share it between the form widget, filter widget, and list view to keep row labels consistent.
+- Set `relationship_pick_mode=RELATIONSHIP_PICK_MODE_PARENT` on *every* parent-selection form widget — without it the user can pick the edited node or its children and create a cycle.
+- The tree list view is **wired by hand** — nothing auto-registers `action_tree_json` / `action_tree_reorder` URLs or the context values; the template is a scaffold, not a turnkey changelist. Decorate URL-callable methods with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action).
+- Keep `reorder_list_template` at its default (`sb_admin/actions/list.html`) — reorder mode uses the flat list even when the normal list is a tree. Users enter reorder mode via the standard list reorder action.
+- Works across databases — tree traversal is purely in-Python over the flat queryset; no DB-specific features required (unlike `TabulatorNestedPlugin` which needs Postgres).
+
+**Source:** `django_smartbase_admin/engine/filter_widgets.py` — `SBAdminTreeWidgetMixin`, `SBAdminTreeFilterWidget`, `process_treebeard_tree`; `django_smartbase_admin/admin/widgets.py` — `SBAdminTreeWidget`; `django_smartbase_admin/templates/sb_admin/actions/tree_list.html`; `django_smartbase_admin/templates/sb_admin/widgets/tree_base.html`.
+
+---
+
+## List View Plugins (`SBAdminPlugin`)
+
+`SBAdminPlugin` is the protocol the list-view pipeline exposes for cross-admin reshaping — Tabulator definition, queryset shaping, and post-formatting. `TabulatorNestedPlugin` is the built-in example; write your own when you need the same reshape across every list view (e.g. tenant scoping, soft-delete dimming, custom tree variants).
+
+### Registration
+
+Plugins live on `SBAdminRoleConfiguration.plugins`. The list is iterated for every list view in the role:
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
+
+from blog.plugins import SoftDeleteDimmingPlugin
+
+
+_role_config = SBAdminRoleConfiguration(
+    plugins=[TabulatorNestedPlugin, SoftDeleteDimmingPlugin],
+    # ...
+)
+```
+
+Plugins are **stateless classmethod-only classes** — within a single request they share state across hooks through `get_request_data_plugin_store`. They must **self-guard**: inspect `view.sbadmin_nested` / admin config, and return their input unchanged when they don't apply.
+
+### Hook Pipeline
+
+Hooks are called in this order by `SBAdminListAction`:
+
+| # | Hook | Purpose |
+|---|------|---------|
+| 1 | `modify_tabulator_definition(view, request, definition)` | Inject Tabulator options (dataTree, custom modules, etc.) into the JSON sent to the client. |
+| 2 | `modify_count_queryset(action, request, qs)` | Reshape the qs `.count()` runs on. Used by the nested plugin to group by parent id so pagination counts parent groups. |
+| 3 | `modify_base_queryset(action, request, qs, values)` | **Store-only**. Observe the unfiltered `.values()`-applied qs. Reshaping here leaks into the visible page — return `qs` unchanged. |
+| 4 | `modify_data_queryset(action, request, qs, page_num, page_size)` | Reshape the unsliced, filtered, ordered data qs. Caller slices `[from:to]` on the return value. |
+| 5 | `modify_final_data(action, request, data)` | Reshape already-formatted row dicts (e.g. assemble `_children` from group metadata). Runs **after** column formatters. |
+
+### Per-Request State
+
+Cross-hook state goes through `get_request_data_plugin_store(request)`. It returns a per-request, per-plugin-class scratch dict keyed by `cls.__name__`, so sibling plugins don't collide:
+
+```python
+from django_smartbase_admin.plugins.base import SBAdminPlugin
+
+
+class SoftDeleteDimmingPlugin(SBAdminPlugin):
+    @classmethod
+    def modify_base_queryset(cls, action, request, qs, values, **kwargs):
+        # Store-only — observe, don't reshape.
+        if "deleted_at" in values:
+            cls.get_request_data_plugin_store(request)["had_deleted_at"] = True
+        return qs
+
+    @classmethod
+    def modify_final_data(cls, action, request, data, **kwargs):
+        store = cls.get_request_data_plugin_store(request)
+        if not store.get("had_deleted_at"):
+            return data
+        for row in data:
+            if row.get("deleted_at"):
+                row["_css_class"] = "row-dimmed"
+        return data
+```
+
+### Hook Signature Conventions
+
+All hooks take `request` as a keyword-style argument and accept `**kwargs` — call sites stay forward-compatible when new args are added. All hooks are `@classmethod`.
+
+**Key points:**
+- Plugins are **classmethod-only**; never instantiate them.
+- Self-guard by inspecting admin config — a plugin returns its input unchanged when it doesn't apply, so it's safe to register globally.
+- `modify_base_queryset` is store-only; reshaping there changes the visible page silently. Use `modify_data_queryset` if you want reshape to affect the slice.
+- Plugins that need to re-enter `build_final_data_{count_,}queryset` pass `apply_plugins=False` to avoid recursion.
+- Cross-hook state via `get_request_data_plugin_store`; the action never writes into a plugin's slot.
+
+**Source:** `django_smartbase_admin/plugins/base.py` — `SBAdminPlugin`, `PLUGIN_DATA_KEY`
+
+---
+
 ## Detail View Layout (Sidebar)
 
 The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
@@ -2851,6 +3306,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_list_display_data` | tuple | Field names always fetched (even if column hidden) |
 | `sbadmin_list_filter` | tuple | Default visible filters - accepts `SBAdminField` names |
 | `sbadmin_list_view_config` | list[dict] | Pre-filtered view tabs configuration |
+| `sbadmin_nested` | dict | Opt-in one-level tree rendering via `TabulatorNestedPlugin` (see [Nested List View](#nested-list-view-sbadmin_nested)) |
 | `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
 | `sbadmin_list_actions` | list | List-level actions (not selection-based) |
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |

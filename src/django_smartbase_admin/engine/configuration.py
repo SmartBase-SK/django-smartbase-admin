@@ -187,6 +187,11 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     default_color_scheme = ColorScheme.AUTO
     login_view_class = LoginView
     admin_title = "SBAdmin"
+    # List of SBAdminPlugin subclasses that participate in every list
+    # view's data pipeline and Tabulator definition. See
+    # ``plugins/base.py`` for the protocol. Each plugin hook is expected
+    # to self-guard based on admin config (e.g. ``sbadmin_nested``).
+    plugins: list = []
 
     def __init__(
         self,
@@ -198,6 +203,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         default_color_scheme=None,
         login_view_class=None,
         admin_title=None,
+        plugins=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -210,6 +216,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.default_color_scheme = default_color_scheme or self.default_color_scheme
         self.login_view_class = login_view_class or self.login_view_class
         self.admin_title = admin_title or self.admin_title
+        # Copy the class-level list to avoid accidental cross-instance
+        # mutation when subclasses assign ``plugins = [...]``.
+        self.plugins = list(plugins if plugins is not None else self.plugins)
 
     def init_registered_views(self):
         registered_views = []

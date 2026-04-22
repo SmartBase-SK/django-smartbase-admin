@@ -890,7 +890,9 @@ class SBAdmin(
             request, object_id
         )
         all_ids = list(
-            list_action.build_final_data_count_queryset(additional_filter)
+            list_action.build_final_data_count_queryset(
+                additional_filter, apply_plugins=False
+            )
             .order_by(*list_action.get_order_by_from_request())
             .values_list("id", flat=True)
         )

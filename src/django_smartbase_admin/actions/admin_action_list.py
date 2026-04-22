@@ -370,7 +370,9 @@ class SBAdminListAction(SBAdminAction):
         )
         return base_qs
 
-    def build_final_data_count_queryset(self, additional_filter=None):
+    def build_final_data_count_queryset(
+        self, additional_filter=None, apply_plugins=True
+    ):
         additional_filter = additional_filter or Q()
         filter_fields = self.get_filter_fields_from_request()
         base_qs = (
@@ -379,20 +381,59 @@ class SBAdminListAction(SBAdminAction):
             .filter(additional_filter)
         )
         base_qs = self.search_in_queryset(base_qs)
+        if apply_plugins:
+            request = self.threadsafe_request
+            plugins = list(request.request_data.configuration.plugins)
+            for plugin in plugins:
+                base_qs = plugin.modify_count_queryset(
+                    self,
+                    request=request,
+                    qs=base_qs,
+                )
         return base_qs
 
-    def build_final_data_queryset(self, page_num, page_size, additional_filter=None):
+    def build_final_data_queryset(
+        self, page_num, page_size, additional_filter=None, apply_plugins=True
+    ):
+        """Return the sliced data qs for the current page.
+
+        ``apply_plugins=False`` is the escape hatch plugins use to
+        re-enter this method and grab the raw filtered+ordered qs
+        without recursing back into their own hooks.
+        """
         additional_filter = additional_filter or Q()
         from_item = (page_num - 1) * page_size
         to_item = page_num * page_size
-        data_queryset = self.get_data_queryset()
-        base_qs = (
-            data_queryset.values(*self.get_data_queryset_values())
-            .filter(self.get_filter_from_request())
-            .filter(additional_filter)
+        values = list(self.get_data_queryset_values())
+        base_qs = self.get_data_queryset().values(*values)
+
+        request = self.threadsafe_request
+        plugins = (
+            list(request.request_data.configuration.plugins) if apply_plugins else []
+        )
+        for plugin in plugins:
+            base_qs = plugin.modify_base_queryset(
+                self,
+                request=request,
+                qs=base_qs,
+                values=values,
+            )
+
+        base_qs = base_qs.filter(self.get_filter_from_request()).filter(
+            additional_filter
         )
         base_qs = self.search_in_queryset(base_qs)
-        return base_qs.order_by(*self.get_order_by_from_request())[from_item:to_item]
+        base_qs = base_qs.order_by(*self.get_order_by_from_request())
+        if apply_plugins:
+            for plugin in plugins:
+                base_qs = plugin.modify_data_queryset(
+                    self,
+                    request=request,
+                    qs=base_qs,
+                    page_num=page_num,
+                    page_size=page_size,
+                )
+        return base_qs[from_item:to_item]
 
     def get_data(self, page_num=None, page_size=None, additional_filter=None):
         additional_filter = additional_filter or Q()
@@ -401,14 +442,23 @@ class SBAdminListAction(SBAdminAction):
         page_size = page_size or self.page_size
 
         total_count = self.build_final_data_count_queryset(additional_filter).count()
-        final_data = list(
-            self.build_final_data_queryset(page_num, page_size, additional_filter)
-        )
 
-        self.process_final_data(final_data)
+        data_qs = self.build_final_data_queryset(page_num, page_size, additional_filter)
+        data = list(data_qs)
+
+        self.process_final_data(data)
+        request = self.threadsafe_request
+        plugins = list(request.request_data.configuration.plugins)
+        for plugin in plugins:
+            data = plugin.modify_final_data(
+                self,
+                request=request,
+                data=data,
+            )
+
         return {
             "last_page": math.ceil(total_count / page_size),
-            "data": final_data,
+            "data": data,
             "last_row": total_count,
         }
 
