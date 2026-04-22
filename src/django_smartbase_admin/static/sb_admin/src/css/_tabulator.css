@@ -1,7 +1,7 @@
 .tabulator {
     position: relative;
     text-align: left;
-    overflow: hidden;
+    overflow: visible;
     transform: translateZ(0);
     @apply text-14;
 }
@@ -26,6 +26,12 @@
     overflow: hidden;
     user-select: none;
     @apply border-b border-dark-200 bg-dark-50 text-dark-600;
+}
+
+.tabulator.tabulator--sticky-header-and-footer .tabulator-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .tabulator .tabulator-header.tabulator-header-hidden {

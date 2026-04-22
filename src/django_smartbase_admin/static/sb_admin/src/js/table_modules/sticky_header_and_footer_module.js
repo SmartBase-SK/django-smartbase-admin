@@ -1,21 +1,23 @@
 import { SBAdminTableModule } from "./base_module"
 
 
-export class StickyFooterModule extends SBAdminTableModule {
+export class StickyHeaderAndFooterModule extends SBAdminTableModule {
 
     afterInit() {
+        const tableEl = this.table.tabulator.element
+        tableEl.classList.add("tabulator--sticky-header-and-footer")
+
         const scrollbar = document.querySelector(
             `[data-sticky-scrollbar="${this.table.viewId}"]`
         )
         if (!scrollbar) {
-            console.warn(`[StickyFooterModule] sticky scrollbar element missing for viewId: ${this.table.viewId}`)
+            console.warn(`[StickyHeaderAndFooterModule] sticky scrollbar element missing for viewId: ${this.table.viewId}`)
             return
         }
         const spacer = scrollbar.firstElementChild
-        const tableEl = this.table.tabulator.element
         const tableholder = tableEl.querySelector(".tabulator-tableholder")
         if (!tableholder || !spacer) {
-            console.warn(`[StickyFooterModule] tableholder or spacer missing for viewId: ${this.table.viewId}`)
+            console.warn(`[StickyHeaderAndFooterModule] tableholder or spacer missing for viewId: ${this.table.viewId}`)
             return
         }
 

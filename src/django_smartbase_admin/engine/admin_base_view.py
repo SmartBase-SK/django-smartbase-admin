@@ -317,7 +317,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
     sbadmin_nested: dict | None = None
-    sbadmin_list_sticky_footer = None
+    sbadmin_list_sticky_header_and_footer = None
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
@@ -489,14 +489,16 @@ class SBAdminBaseListView(SBAdminBaseView):
             return False
         return super().has_add_permission(request)
 
-    def get_sbadmin_list_sticky_footer(self, request) -> bool:
-        if self.sbadmin_list_sticky_footer is not None:
-            return self.sbadmin_list_sticky_footer
-        return request.request_data.configuration.default_list_sticky_footer
+    def get_sbadmin_list_sticky_header_and_footer(self, request) -> bool:
+        if self.sbadmin_list_sticky_header_and_footer is not None:
+            return self.sbadmin_list_sticky_header_and_footer
+        return request.request_data.configuration.default_list_sticky_header_and_footer
 
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
-        sticky_footer = self.get_sbadmin_list_sticky_footer(request)
+        sticky_header_and_footer = self.get_sbadmin_list_sticky_header_and_footer(
+            request
+        )
         tabulator_definition = {
             "viewId": view_id,
             "advancedFilterId": f"{view_id}" + "-advanced-filter",
@@ -515,7 +517,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialSort": self.get_list_initial_order(request),
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
-            "stickyFooter": sticky_footer,
+            "stickyHeaderAndFooter": sticky_header_and_footer,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -560,8 +562,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 request=request,
                 definition=tabulator_definition,
             )
-        if sticky_footer:
-            tabulator_definition["modules"].append("stickyFooterModule")
+        if sticky_header_and_footer:
+            tabulator_definition["modules"].append("stickyHeaderAndFooterModule")
         return tabulator_definition
 
     def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
@@ -785,9 +787,11 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbadmin_list_display(request) or []
-        list_fields = self.init_fields_cache(
+        initialized_fields = self.init_fields_cache(
             list_fields, request.request_data.configuration
         )
+        if initialized_fields is not None:
+            list_fields = initialized_fields
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields

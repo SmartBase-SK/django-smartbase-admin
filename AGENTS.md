@@ -3332,7 +3332,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
 | `sbadmin_xlsx_options` | dict | Excel export configuration options |
 | `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
-| `sbadmin_list_sticky_footer` | bool \| None | Stick pagination footer to viewport bottom on scroll. On desktop, adds a synced horizontal scrollbar above it that mirrors the table's horizontal scroll. `None` (default) falls back to `SBAdminRoleConfiguration.default_list_sticky_footer`; explicit `True`/`False` overrides the global setting. |
+| `sbadmin_list_sticky_header_and_footer` | bool \| None | Enable sticky Tabulator column header together with sticky pagination footer and synced horizontal scrollbar. `None` falls back to `SBAdminRoleConfiguration.default_list_sticky_header_and_footer`; explicit `True`/`False` overrides the global setting. |
 
 ### Detail/Change View Attributes (SBAdmin)
 

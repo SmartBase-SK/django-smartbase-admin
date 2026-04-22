@@ -105,9 +105,9 @@
                 <div id="{{ view_id }}-table" class="list-view-table"></div>
             {% endblock %}
             {% block tabulator_custom_footer %}
-                <div class="tabulator-custom-footer{% if content_context.tabulator_definition.stickyFooter %} tabulator-custom-footer--sticky{% endif %}">
-                    {% if content_context.tabulator_definition.stickyFooter %}
-                        <div class="tabulator-sticky-scrollbar max-lg:hidden" data-sticky-scrollbar="{{ view_id }}">
+                <div class="tabulator-custom-footer{% if content_context.tabulator_definition.stickyHeaderAndFooter %} tabulator-custom-footer--sticky{% endif %}">
+                    {% if content_context.tabulator_definition.stickyHeaderAndFooter %}
+                        <div class="tabulator-sticky-scrollbar" data-sticky-scrollbar="{{ view_id }}">
                             <div class="tabulator-sticky-scrollbar__spacer"></div>
                         </div>
                     {% endif %}
