@@ -878,6 +878,26 @@ Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on s
 
 > **Recommendation:** Prefer `MultipleChoiceFilterWidget` over `ChoiceFilterWidget` for choice-based filters. It provides a better UX and gives users more flexibility to select multiple values at once.
 
+### Grouped Choices
+
+Both `ChoiceFilterWidget` and `MultipleChoiceFilterWidget` accept Django-style grouped choices in addition to the flat form. Grouped input renders a header (`<optgroup>` in select templates, a styled header `<li>` in the checkbox-dropdown templates); flat input renders identically to before.
+
+```python
+# Flat (unchanged)
+MultipleChoiceFilterWidget(choices=[
+    ("draft", "Draft"),
+    ("published", "Published"),
+])
+
+# Grouped — shipper is the group header
+MultipleChoiceFilterWidget(choices=[
+    ("GLS", [("1", "Insurance"), ("2", "Signature required")]),
+    ("SPS", [("5", "Special handling"), ("6", "Overweight")]),
+])
+```
+
+Detection follows the same rule Django's `ChoiceWidget.optgroups` uses: the top-level structure is grouped if the second element of the first item is a list/tuple. Mixing flat and grouped choices in the same call is not supported.
+
 ### Custom Filter Widget Example
 
 ```python
@@ -3312,6 +3332,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
 | `sbadmin_xlsx_options` | dict | Excel export configuration options |
 | `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
+| `sbadmin_list_sticky_footer` | bool \| None | Stick pagination footer to viewport bottom on scroll. On desktop, adds a synced horizontal scrollbar above it that mirrors the table's horizontal scroll. `None` (default) falls back to `SBAdminRoleConfiguration.default_list_sticky_footer`; explicit `True`/`False` overrides the global setting. |
 
 ### Detail/Change View Attributes (SBAdmin)
 

@@ -257,13 +257,45 @@ class ChoiceFilterWidget(SBAdminFilterWidget):
         )
         self.choices = self.choices or choices
 
+    @property
+    def grouped_choices(self):
+        """Normalise ``choices`` into ``[(group_label_or_None, [(value, label), ...])]``.
+
+        Accepts flat ``[(value, label), ...]`` and Django-style grouped
+        ``[(group_label, [(value, label), ...]), ...]``. Flat input becomes a
+        single ``None``-labelled group so templates iterate uniformly and skip
+        the header when ``group_label`` is falsy. Mirrors the detection
+        ``ChoiceWidget.optgroups`` uses internally.
+        """
+        if not self.choices:
+            return []
+        items = list(self.choices)
+        first = items[0]
+        is_grouped = (
+            isinstance(first, (list, tuple))
+            and len(first) == 2
+            and isinstance(first[1], (list, tuple))
+        )
+        if is_grouped:
+            return [(group_label, list(options)) for group_label, options in items]
+        return [(None, items)]
+
+    @property
+    def flat_choices(self):
+        """Flat ``[(value, label), ...]`` view of ``choices`` — same list for
+        both flat and grouped input. Use this for label lookup."""
+        flat = []
+        for _, options in self.grouped_choices:
+            flat.extend(options)
+        return flat
+
     def get_default_label(self):
         if self.default_label:
             return self.default_label
         else:
             default_value = self.get_default_value()
             found_label = [
-                label for value, label in self.choices if value == default_value
+                label for value, label in self.flat_choices if value == default_value
             ]
             return found_label[0] if found_label else default_value
 

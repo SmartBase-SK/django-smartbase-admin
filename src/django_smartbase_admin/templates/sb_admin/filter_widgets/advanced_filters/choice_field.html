@@ -4,11 +4,15 @@
     id="{{ filter_widget.input_id }}"
     name="{{ filter_widget.input_name }}"
 >
-    {% for choice in filter_widget.choices %}
-        <option
-            value="{{ choice.0 }}"
-        >
-            {{ choice.1 }}
-        </option>
+    {% for group_label, group_choices in filter_widget.grouped_choices %}
+        {% if group_label %}<optgroup label="{{ group_label }}">{% endif %}
+        {% for choice in group_choices %}
+            <option
+                value="{{ choice.0 }}"
+            >
+                {{ choice.1 }}
+            </option>
+        {% endfor %}
+        {% if group_label %}</optgroup>{% endif %}
     {% endfor %}
 </select>
