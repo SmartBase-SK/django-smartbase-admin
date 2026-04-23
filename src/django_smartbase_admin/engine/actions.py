@@ -60,7 +60,7 @@ class SBAdminCustomAction(object):
         self.view = view
         self.action_id = action_id
         self.action_modifier = action_modifier
-        self.css_class = css_class
+        self.css_class = css_class or "btn btn-empty"
         self.no_params = no_params
         self.open_in_modal = open_in_modal
         self.group = group
