@@ -528,6 +528,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "filterModule",
                 "tableParamsModule",
                 "detailViewModule",
+                "dataTreeModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",

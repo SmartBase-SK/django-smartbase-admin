@@ -62,6 +62,7 @@ if TYPE_CHECKING:
 CHILDREN_FIELD = "_children"
 PARENT_REAL_ID = "parent_real_id"
 CHILDREN_IDS = "children_ids"
+LAST_CHILD_FIELD = "_sbadmin_tree_last_child"
 
 _KNOWN_KEYS = {
     "parent_field",
@@ -126,6 +127,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             "dataTree": True,
             "dataTreeChildField": CHILDREN_FIELD,
             "dataTreeStartExpanded": nested.get("start_expanded", False),
+            "sbadminTreeLastChildField": LAST_CHILD_FIELD,
         }
         if element_column:
             options["dataTreeElementColumn"] = element_column
@@ -260,7 +262,12 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             root_row = by_id.get(root_id)
             if root_row is None:
                 continue
-            root_row[CHILDREN_FIELD] = children_by_parent.get(root_id, [])
+            children = children_by_parent.get(root_id)
+            if children:
+                children[-1][LAST_CHILD_FIELD] = True
+                root_row[CHILDREN_FIELD] = children
+            else:
+                root_row.pop(CHILDREN_FIELD, None)
             result.append(root_row)
         return result
 
@@ -285,6 +292,9 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         flattened: list[dict[str, Any]] = []
         for row in data:
             children = row.pop(CHILDREN_FIELD, None) or []
+            row.pop(LAST_CHILD_FIELD, None)
+            if children:
+                children[-1].pop(LAST_CHILD_FIELD, None)
             flattened.append(row)
             flattened.extend(children)
         return flattened
