@@ -318,10 +318,20 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_table_history_enabled = True
     sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
+    sbadmin_nested: dict | None = None
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
+
+    def get_sbadmin_nested(self, request) -> dict | None:
+        """Return the nested config dict for this view, or ``None`` for a flat list.
+
+        Override for per-request logic. The returned dict must contain a
+        ``parent_field`` key pointing at a self-referential ForeignKey.
+        See ``plugins/nested.py`` for the full schema.
+        """
+        return self.sbadmin_nested
 
     def activate_reorder(self, request) -> None:
         request.reorder_active = True
@@ -537,6 +547,12 @@ class SBAdminBaseListView(SBAdminBaseView):
                     "fullTextSearchModule",
                     "headerTabsModule",
                 ]
+            )
+        for plugin in request.request_data.configuration.plugins:
+            tabulator_definition = plugin.modify_tabulator_definition(
+                self,
+                request=request,
+                definition=tabulator_definition,
             )
         return tabulator_definition
 
