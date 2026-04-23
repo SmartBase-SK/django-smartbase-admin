@@ -538,6 +538,13 @@ class SBAdminListAction(SBAdminAction):
                     additional_filter=additional_filter,
                 )["data"]
             )
+        plugins = list(request.request_data.configuration.plugins)
+        for plugin in plugins:
+            data_list = plugin.modify_xlsx_data(
+                self,
+                request=request,
+                data=data_list,
+            )
         options = (
             self.view.get_sbadmin_xlsx_options(request).to_json()
             if self.view.get_sbadmin_xlsx_options(request)

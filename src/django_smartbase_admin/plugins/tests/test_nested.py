@@ -253,6 +253,50 @@ class TabulatorNestedPluginTests(TestCase):
         )
 
     @postgres_only
+    def test_only_show_filtered_children_false_shows_all_direct_children(self):
+        """With ``only_show_filtered_children=False`` every direct child
+        of a visible parent appears — not just the ones that matched
+        the active filter."""
+        view, request = self._make_view_and_request(
+            sbadmin_nested={
+                "parent_field": "parent",
+                "only_show_filtered_children": False,
+            },
+        )
+
+        payload = json.loads(
+            view.action_list_json(request, modifier="template").content
+        )
+
+        root_a_row = next(r for r in payload["data"] if r["id"] == self.root_a.pk)
+        self.assertEqual(
+            {c["id"] for c in root_a_row["_children"]},
+            {self.child_a1.pk, self.child_a2.pk},
+        )
+
+    @postgres_only
+    def test_xlsx_export_flattens_children_into_sibling_rows(self):
+        """XLSX columns are flat, so the plugin's ``modify_xlsx_data``
+        unbundles each parent's ``_children`` into sibling rows right
+        after the parent — otherwise children silently disappear from
+        the export."""
+        from django_smartbase_admin.engine.const import IGNORE_LIST_SELECTION
+
+        view, request = self._make_view_and_request()
+        view.ordering = ("name",)
+        request.request_data.modifier = IGNORE_LIST_SELECTION
+        action = view.sbadmin_list_action_class(view, request)
+
+        _, data_list, _, _ = action.get_xlsx_data(request)
+
+        self.assertEqual(
+            [row["name"] for row in data_list],
+            ["root_a", "child_a1", "child_a2", "root_b"],
+        )
+        for row in data_list:
+            self.assertNotIn("_children", row)
+
+    @postgres_only
     def test_action_list_json_is_noop_without_sbadmin_nested(self):
         """Plugin is registered globally on the configuration, but only
         admins that opt in via ``sbadmin_nested`` get the tree

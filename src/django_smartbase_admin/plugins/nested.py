@@ -1,15 +1,17 @@
 """Tabulator nested (one-level) data plugin.
 
-Admins opt in by declaring :attr:`sbadmin_nested` on the ModelAdmin
-and adding :class:`TabulatorNestedPlugin` to :attr:`sbadmin_plugins`::
+Admins opt in by declaring :attr:`sbadmin_nested` on the admin and
+registering :class:`TabulatorNestedPlugin` on
+``SBAdminRoleConfiguration.plugins``::
+
+    plugins = [TabulatorNestedPlugin]
 
     sbadmin_nested = {
-        "parent_field": "team_manager",           # required self-ref FK
-        "element_column": "display_name",         # optional
+        "parent_field": "<self_fk_field>",        # required self-ref FK
+        "element_column": "<tree_toggle_column>", # optional: column that shows the expand/collapse toggle
         "start_expanded": False,                  # optional
         "only_show_filtered_children": True,      # optional, default True
     }
-    sbadmin_plugins = [TabulatorNestedPlugin]
 
 Why the pipeline looks the way it does:
 
@@ -263,6 +265,31 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         return result
 
     @classmethod
+    def modify_xlsx_data(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        data: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """Flatten the ``_children`` tree back into sibling rows.
+
+        XLSX columns are flat, so nested children disappear if left
+        under ``_children``. Emit parent then its direct children in
+        order — the caller's sort was already applied during
+        hydration, so sibling order is preserved.
+        """
+        nested = resolve_nested(action.view, request)
+        if nested is None:
+            return data
+        flattened: list[dict[str, Any]] = []
+        for row in data:
+            children = row.pop(CHILDREN_FIELD, None) or []
+            flattened.append(row)
+            flattened.extend(children)
+        return flattened
+
+    @classmethod
     def _build_grouped_qs(
         cls,
         action: "SBAdminListAction",
@@ -287,9 +314,10 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         Caller ordering is preserved but rewritten to aggregate-per-
         group: the sort columns are pulled from the **parent row**
         (``parent_field IS NULL``) via ``MAX(CASE WHEN ...)``. Left
-        raw, they would sneak into ``GROUP BY`` and split every
-        parent into one row per distinct child sort value, duplicat-
-        ing groups in both count and data queries.
+        raw, Django's compiler auto-appends them to ``GROUP BY`` to
+        keep the generated SQL valid, which splits every parent into
+        one row per distinct child sort value and duplicates groups
+        in both count and data queries.
         """
         parent_field: str = nested["parent_field"]
         pk_name = action.get_pk_field().name
@@ -309,8 +337,9 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         )
 
         # Capture caller ordering before we clear it; only simple
-        # column strings are rewritable (expressions are left as-is
-        # by falling back to ``parent_real_id`` order).
+        # column strings are rewritable. Non-string expressions
+        # (e.g. OrderBy objects) are dropped — in practice
+        # get_order_by_from_request always returns strings.
         order_strings = [
             expr for expr in filtered_qs.query.order_by if isinstance(expr, str)
         ]
@@ -321,9 +350,10 @@ class TabulatorNestedPlugin(SBAdminPlugin):
                 | Q(**{f"{parent_field}__in": visible_parent_ids})
             )
             # Drop caller ordering now — we re-apply it per group
-            # below. Leaving it in forces the sort columns into
-            # ``GROUP BY`` and splits every parent into duplicate
-            # rows (one per distinct child sort value).
+            # below. Django's compiler auto-appends order-by columns
+            # to ``GROUP BY`` on ``.values().annotate()`` queries,
+            # which would split every parent into duplicate rows
+            # (one per distinct child sort value).
             .order_by()
             .annotate(**{PARENT_REAL_ID: parent_real_id})
             .values(PARENT_REAL_ID)

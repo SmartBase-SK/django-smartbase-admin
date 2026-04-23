@@ -17,6 +17,9 @@ Hook pipeline (in call order):
    qs is sliced ``[from:to]`` by the caller.
 5. ``modify_final_data`` — reshape the already-formatted row dicts
    (e.g. assemble ``_children`` trees from group metadata).
+6. ``modify_xlsx_data`` — final pass before XLSX serialization, after
+   all paged ``get_data`` chunks are concatenated (e.g. flatten a
+   ``_children`` tree back into sibling rows the spreadsheet can render).
 
 Hook contract:
 
@@ -124,4 +127,18 @@ class SBAdminPlugin:
     ) -> list[dict[str, Any]]:
         """Reshape rows **after** column formatters have run (e.g.
         assemble a ``_children`` tree from group metadata)."""
+        return data
+
+    @classmethod
+    def modify_xlsx_data(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        data: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """Final pass before XLSX serialization. Runs once on the
+        concatenated rows from all paged ``get_data`` chunks — the
+        right place to unbundle tree rows (``_children``) that the
+        spreadsheet can't render nested."""
         return data
