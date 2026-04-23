@@ -1,5 +1,4 @@
-<div id="notification-messages" hx-swap-oob="beforeend"
-     class="messagelist z-1000 fixed right-0 left-0 xl:left-260 mx-24{% if classes %} {{ classes }}{% endif %}">
+<div id="notification-messages" hx-swap-oob="beforeend" class="messagelist{% if classes %} {{ classes }}{% endif %}">
     {% for message in messages %}
         {% if message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
             {% include 'sb_admin/partials/messages/alert_success.html' with text=message %}
@@ -8,7 +7,7 @@
         {% elif message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
             {% include 'sb_admin/partials/messages/alert_error.html' with text=message %}
         {% else %}
-            {% include 'sb_admin/partials/messages/alert_success.html' with text=message %}
+            {% include 'sb_admin/partials/messages/alert_info.html' with text=message %}
         {% endif %}
     {% endfor %}
 </div>

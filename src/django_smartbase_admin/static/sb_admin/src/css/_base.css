@@ -104,4 +104,12 @@
     mark {
         @apply text-dark-900 bg-notice-100;
     }
+
+    #notification-messages {
+        @apply z-1000 fixed bottom-72 left-24 right-24 mx-auto max-w-1180 mb-24 flex flex-col items-center gap-16 overflow-y-auto;
+        max-height: calc(100vh - 6rem);
+        @screen xl {
+            left: 17.75rem;
+        }
+    }
 }
