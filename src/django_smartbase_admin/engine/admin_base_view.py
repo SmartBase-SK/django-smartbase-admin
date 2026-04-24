@@ -215,6 +215,13 @@ class SBAdminBaseView(object):
             "color_scheme_form": color_scheme_form,
         }
 
+    def get_language_form_context(self, request):
+        if len(settings.LANGUAGES) <= 1:
+            return {"language_form": None}
+        from django_smartbase_admin.views.user_config_view import LanguageForm
+
+        return {"language_form": LanguageForm(request=request)}
+
     def get_add_label(
         self, request: HttpRequest, object_id: str | None = None
     ) -> str | None:
@@ -269,6 +276,7 @@ class SBAdminBaseView(object):
                 }
             ),
             **self.get_color_scheme_context(request),
+            **self.get_language_form_context(request),
         }
 
     def get_model_path(self) -> str:

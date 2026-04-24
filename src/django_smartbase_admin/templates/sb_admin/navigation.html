@@ -153,6 +153,17 @@
                                 </svg>
                                 {% trans 'Change password' %}
                             </li>
+                            {% if language_form %}
+                                {% block language_picker %}
+                                    <li class="border-t border-dark-100 pt-8">
+                                        <form method="post" action="{% url 'set_language' %}" id="language-form" onchange="this.submit()">
+                                            {% csrf_token %}
+                                            {{ language_form.next }}
+                                            {{ language_form.language }}
+                                        </form>
+                                    </li>
+                                {% endblock %}
+                            {% endif %}
                             {% block color_scheme %}
                                 <li class="border-t border-dark-100 pt-8">
                                     <form hx-post="{% url 'sb_admin:color_scheme' %}" hx-trigger="change" hx-swap="none" id="color-schema-form" class="js-color-scheme-picker">
