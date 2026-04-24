@@ -289,7 +289,7 @@ class SBAdminChoiceSearchableWidget(SBAdminBaseWidget, forms.Select):
 
     template_name = "sb_admin/widgets/choice_search.html"
 
-    def __init__(self, form_field=None, attrs=None, choices=(), full_width=True):
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
         self.full_width = full_width
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
@@ -310,7 +310,7 @@ class SBAdminMultipleChoiceSearchableWidget(SBAdminBaseWidget, forms.SelectMulti
 
     template_name = "sb_admin/widgets/choice_search.html"
 
-    def __init__(self, form_field=None, attrs=None, choices=(), full_width=True):
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
         self.full_width = full_width
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
@@ -495,7 +495,7 @@ class SBAdminAutocompleteWidget(
     default_create_data = None
     forward_to_create = None
     reload_on_save = None
-    full_width = True
+    full_width = False
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
 
     def __init__(self, form_field=None, *args, **kwargs):
