@@ -1,9 +1,9 @@
 {% load i18n %}
-<div class="relative{% if widget.full_width %} w-full{% endif %}">
+<div class="relative">
     {% include 'sb_admin/widgets/includes/field_label.html' %}
     <div id="{{ widget.attrs.id }}-wrapper"
          {% if widget.full_width %}data-autocomplete-full-width="true"{% endif %}
-         class="relative flex items-center max-w-full overflow-hidden{% if widget.full_width %} w-full{% endif %}">
+         class="relative flex items-center max-w-full overflow-hidden">
         <button
                 type="button"
                 data-bs-toggle="dropdown"
