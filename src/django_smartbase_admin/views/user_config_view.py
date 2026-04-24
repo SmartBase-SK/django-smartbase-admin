@@ -59,6 +59,7 @@ class ColorSchemeView(FormView):
         sb_admin_user_config.save(update_fields=["color_scheme"])
         return HttpResponse(status=200)
 
+
 class LanguageForm(SBAdminBaseFormInit, forms.Form):
     language = forms.ChoiceField(
         label=_("Language"),

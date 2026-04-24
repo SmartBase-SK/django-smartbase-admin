@@ -152,7 +152,9 @@ class SBAdminBaseView(object):
 
     def init_fields_cache(self, fields_source, configuration, force=False):
         from django_smartbase_admin.engine.field import SBAdminField
-        from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
 
         try:
             request = SBAdminThreadLocalService.get_request()
