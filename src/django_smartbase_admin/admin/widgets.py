@@ -208,7 +208,6 @@ class SBAdminCKEditorUploadingWidget(CKEditorUploadingWidget, SBAdminCKEditorWid
 class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
-    searchable_template_name = "sb_admin/widgets/choice_search.html"
 
     def __init__(
         self,
@@ -216,22 +215,11 @@ class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
         attrs=None,
         choices=(),
         disable_empty_option=True,
-        searchable=False,
-        full_width=True,
     ):
         self.disable_empty_option = disable_empty_option
-        self.searchable = searchable
-        self.full_width = full_width
-        if searchable:
-            self.template_name = self.searchable_template_name
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
-
-    def get_context(self, name, value, attrs):
-        context = super().get_context(name, value, attrs)
-        context["widget"]["full_width"] = self.full_width
-        return context
 
     def create_option(
         self, name, value, label, selected, index, subindex=None, attrs=None
@@ -276,25 +264,35 @@ class SBAdminRadioDropdownWidget(SBAdminBaseWidget, forms.RadioSelect):
 class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultiple):
     template_name = "sb_admin/widgets/checkbox_dropdown.html"
     option_template_name = "sb_admin/widgets/checkbox_option.html"
-    searchable_template_name = "sb_admin/widgets/choice_search.html"
 
-    def __init__(
-        self,
-        form_field=None,
-        attrs=None,
-        choices=(),
-        searchable=False,
-        full_width=True,
-    ):
-        self.searchable = searchable
-        self.full_width = full_width
-        if searchable:
-            self.template_name = self.searchable_template_name
-            self.use_fieldset = False
+    def __init__(self, form_field=None, attrs=None, choices=()):
         super().__init__(
             form_field,
             choices=choices,
             attrs={"class": "checkbox", **(attrs or {})},
+        )
+
+
+class SBAdminMultipleChoiceInlineWidget(SBAdminMultipleChoiceWidget):
+    template_name = "sb_admin/widgets/checkbox_group.html"
+    option_template_name = "sb_admin/widgets/checkbox.html"
+
+
+class SBAdminChoiceSearchableWidget(SBAdminBaseWidget, forms.Select):
+    """Single-choice dropdown with client-side search (Choices.js).
+
+    Shares the autocomplete UI shell with ``SBAdminAutocompleteWidget`` but the
+    options are rendered inline as ``<option>`` tags — no API fetch, no
+    pagination. The native ``<select>`` submits as a single value, so a plain
+    ``ChoiceField`` is enough on the backend.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=True):
+        self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
 
     def get_context(self, name, value, attrs):
@@ -303,9 +301,25 @@ class SBAdminMultipleChoiceWidget(SBAdminBaseWidget, forms.CheckboxSelectMultipl
         return context
 
 
-class SBAdminMultipleChoiceInlineWidget(SBAdminMultipleChoiceWidget):
-    template_name = "sb_admin/widgets/checkbox_group.html"
-    option_template_name = "sb_admin/widgets/checkbox.html"
+class SBAdminMultipleChoiceSearchableWidget(SBAdminBaseWidget, forms.SelectMultiple):
+    """Multi-choice dropdown with client-side search (Choices.js).
+
+    Same UI shell as ``SBAdminChoiceSearchableWidget`` but renders a
+    ``<select multiple>`` and pairs with ``MultipleChoiceField``.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=True):
+        self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
+        )
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["full_width"] = self.full_width
+        return context
 
 
 class SBAdminNullBooleanSelectWidget(SBAdminBaseWidget, forms.NullBooleanSelect):
