@@ -192,6 +192,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     # ``plugins/base.py`` for the protocol. Each plugin hook is expected
     # to self-guard based on admin config (e.g. ``sbadmin_nested``).
     plugins: list = []
+    default_list_sticky_header_and_footer = True
 
     def __init__(
         self,
@@ -204,6 +205,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         login_view_class=None,
         admin_title=None,
         plugins=None,
+        default_list_sticky_header_and_footer=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -219,6 +221,10 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         # Copy the class-level list to avoid accidental cross-instance
         # mutation when subclasses assign ``plugins = [...]``.
         self.plugins = list(plugins if plugins is not None else self.plugins)
+        if default_list_sticky_header_and_footer is not None:
+            self.default_list_sticky_header_and_footer = (
+                default_list_sticky_header_and_footer
+            )
 
     def init_registered_views(self):
         registered_views = []

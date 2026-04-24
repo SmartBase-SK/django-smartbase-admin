@@ -151,9 +151,21 @@ class SBAdminBaseView(object):
         return self.field_cache
 
     def init_fields_cache(self, fields_source, configuration, force=False):
-        if not force and self.field_cache:
-            return self.field_cache.values()
         from django_smartbase_admin.engine.field import SBAdminField
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
+        try:
+            request = SBAdminThreadLocalService.get_request()
+        except LookupError:
+            request = None
+        cache_key = self.get_id()
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            if not force and cache_key in request_field_cache:
+                self.field_cache = request_field_cache[cache_key]
+                return self.field_cache.values()
 
         fields = []
         self.field_cache = {}
@@ -163,6 +175,10 @@ class SBAdminBaseView(object):
             field.init_field_static(self, configuration)
             fields.append(field)
             self.field_cache[field.name] = field
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            request_field_cache[cache_key] = self.field_cache
+            request._sbadmin_field_cache = request_field_cache
         return fields
 
     def get_action_url(self, action, modifier="template"):
@@ -216,6 +232,13 @@ class SBAdminBaseView(object):
             "user_config": user_config,
             "color_scheme_form": color_scheme_form,
         }
+
+    def get_language_form_context(self, request):
+        if len(settings.LANGUAGES) <= 1:
+            return {"language_form": None}
+        from django_smartbase_admin.views.user_config_view import LanguageForm
+
+        return {"language_form": LanguageForm(request=request)}
 
     def get_add_label(
         self, request: HttpRequest, object_id: str | None = None
@@ -271,6 +294,7 @@ class SBAdminBaseView(object):
                 }
             ),
             **self.get_color_scheme_context(request),
+            **self.get_language_form_context(request),
         }
 
     def get_model_path(self) -> str:
@@ -319,6 +343,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
     sbadmin_nested: dict | None = None
+    sbadmin_list_sticky_header_and_footer = None
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
@@ -490,8 +515,16 @@ class SBAdminBaseListView(SBAdminBaseView):
             return False
         return super().has_add_permission(request)
 
+    def get_sbadmin_list_sticky_header_and_footer(self, request) -> bool:
+        if self.sbadmin_list_sticky_header_and_footer is not None:
+            return self.sbadmin_list_sticky_header_and_footer
+        return request.request_data.configuration.default_list_sticky_header_and_footer
+
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
+        sticky_header_and_footer = self.get_sbadmin_list_sticky_header_and_footer(
+            request
+        )
         tabulator_definition = {
             "viewId": view_id,
             "advancedFilterId": f"{view_id}" + "-advanced-filter",
@@ -510,6 +543,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialSort": self.get_list_initial_order(request),
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
+            "stickyHeaderAndFooter": sticky_header_and_footer,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -520,6 +554,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "filterModule",
                 "tableParamsModule",
                 "detailViewModule",
+                "dataTreeModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",
@@ -554,6 +589,8 @@ class SBAdminBaseListView(SBAdminBaseView):
                 request=request,
                 definition=tabulator_definition,
             )
+        if sticky_header_and_footer:
+            tabulator_definition["modules"].append("stickyHeaderAndFooterModule")
         return tabulator_definition
 
     def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
@@ -777,7 +814,11 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbadmin_list_display(request) or []
-        self.init_fields_cache(list_fields, request.request_data.configuration)
+        initialized_fields = self.init_fields_cache(
+            list_fields, request.request_data.configuration
+        )
+        if initialized_fields is not None:
+            list_fields = initialized_fields
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields

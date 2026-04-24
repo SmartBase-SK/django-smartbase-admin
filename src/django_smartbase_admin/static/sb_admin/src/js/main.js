@@ -242,8 +242,11 @@ class Main {
             const dropdownWrapper = dropdownToggleEl.closest('.js-dropdown-wrapper')
             if(dropdownWrapper) {
                 const dropdownLabelEl = dropdownWrapper.querySelector('.js-dropdown-label')
-                dropdown._menu.addEventListener('change', ()=>{
+                dropdown._menu.addEventListener('change', (event)=>{
                     setDropdownLabel(dropdown._menu, dropdownLabelEl)
+                    if(event.target.closest("input[type='radio']")) {
+                        dropdown.hide()
+                    }
                 })
             }
             return dropdown

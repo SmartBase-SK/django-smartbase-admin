@@ -30,6 +30,7 @@ from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.plugins.nested import (
+    LAST_CHILD_FIELD,
     TabulatorNestedPlugin,
     resolve_nested,
 )
@@ -155,6 +156,7 @@ class TabulatorNestedPluginTests(TestCase):
         self.assertTrue(opts["dataTree"])
         self.assertEqual(opts["dataTreeChildField"], "_children")
         self.assertEqual(opts["dataTreeElementColumn"], "id")
+        self.assertEqual(opts["sbadminTreeLastChildField"], LAST_CHILD_FIELD)
 
         view, request = self._make_view_and_request(sbadmin_nested=None)
         opts = view.get_tabulator_definition(request)["tabulatorOptions"]
@@ -251,6 +253,9 @@ class TabulatorNestedPluginTests(TestCase):
             [child["name"] for child in payload["data"][0]["_children"]],
             ["a_child", "z_child"],
         )
+        self.assertNotIn(LAST_CHILD_FIELD, payload["data"][0])
+        self.assertNotIn(LAST_CHILD_FIELD, payload["data"][0]["_children"][0])
+        self.assertTrue(payload["data"][0]["_children"][1][LAST_CHILD_FIELD])
 
     @postgres_only
     def test_only_show_filtered_children_false_shows_all_direct_children(self):
