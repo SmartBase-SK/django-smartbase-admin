@@ -285,12 +285,18 @@ class SBAdminChoiceSearchableWidget(SBAdminBaseWidget, forms.Select):
     options are rendered inline as ``<option>`` tags — no API fetch, no
     pagination. The native ``<select>`` submits as a single value, so a plain
     ``ChoiceField`` is enough on the backend.
+
+    ``full_width`` is a class attribute so subclasses can flip the default
+    without re-declaring ``__init__`` — useful when wiring this widget as the
+    project-wide default via ``get_form_field_widget_class``.
     """
 
     template_name = "sb_admin/widgets/choice_search.html"
+    full_width = False
 
-    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
-        self.full_width = full_width
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=None):
+        if full_width is not None:
+            self.full_width = full_width
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
@@ -309,9 +315,11 @@ class SBAdminMultipleChoiceSearchableWidget(SBAdminBaseWidget, forms.SelectMulti
     """
 
     template_name = "sb_admin/widgets/choice_search.html"
+    full_width = False
 
-    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
-        self.full_width = full_width
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=None):
+        if full_width is not None:
+            self.full_width = full_width
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
