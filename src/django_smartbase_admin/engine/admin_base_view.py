@@ -12,7 +12,7 @@ from django.db.models import F
 from django.http import HttpResponse, Http404, JsonResponse, HttpRequest
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
@@ -234,11 +234,18 @@ class SBAdminBaseView(object):
         }
 
     def get_language_form_context(self, request):
-        if len(settings.LANGUAGES) <= 1:
-            return {"language_form": None}
         from django_smartbase_admin.views.user_config_view import LanguageForm
 
-        return {"language_form": LanguageForm(request=request)}
+        language_form = None
+        set_language_url = None
+        if len(settings.LANGUAGES) > 1:
+            try:
+                set_language_url = reverse("set_language")
+                language_form = LanguageForm(request=request)
+            except NoReverseMatch:
+                pass
+
+        return {"language_form": language_form, "set_language_url": set_language_url}
 
     def get_add_label(
         self, request: HttpRequest, object_id: str | None = None

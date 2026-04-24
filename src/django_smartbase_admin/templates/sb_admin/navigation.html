@@ -156,7 +156,7 @@
                             {% if language_form %}
                                 {% block language_picker %}
                                     <li class="border-t border-dark-100 pt-8">
-                                        <form method="post" action="{% url 'set_language' %}" id="language-form" onchange="this.submit()">
+                                        <form method="post" action="{{ set_language_url }}" id="language-form" onchange="this.submit()">
                                             {% csrf_token %}
                                             {{ language_form.next }}
                                             {{ language_form.language }}
