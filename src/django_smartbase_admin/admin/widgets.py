@@ -278,6 +278,50 @@ class SBAdminMultipleChoiceInlineWidget(SBAdminMultipleChoiceWidget):
     option_template_name = "sb_admin/widgets/checkbox.html"
 
 
+class SBAdminChoiceSearchableWidget(SBAdminBaseWidget, forms.Select):
+    """Single-choice dropdown with client-side search (Choices.js).
+
+    Shares the autocomplete UI shell with ``SBAdminAutocompleteWidget`` but the
+    options are rendered inline as ``<option>`` tags — no API fetch, no
+    pagination. The native ``<select>`` submits as a single value, so a plain
+    ``ChoiceField`` is enough on the backend.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
+        self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
+        )
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["full_width"] = self.full_width
+        return context
+
+
+class SBAdminMultipleChoiceSearchableWidget(SBAdminBaseWidget, forms.SelectMultiple):
+    """Multi-choice dropdown with client-side search (Choices.js).
+
+    Same UI shell as ``SBAdminChoiceSearchableWidget`` but renders a
+    ``<select multiple>`` and pairs with ``MultipleChoiceField``.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=False):
+        self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
+        )
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["full_width"] = self.full_width
+        return context
+
+
 class SBAdminNullBooleanSelectWidget(SBAdminBaseWidget, forms.NullBooleanSelect):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
@@ -451,6 +495,7 @@ class SBAdminAutocompleteWidget(
     default_create_data = None
     forward_to_create = None
     reload_on_save = None
+    full_width = False
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
 
     def __init__(self, form_field=None, *args, **kwargs):
@@ -459,6 +504,7 @@ class SBAdminAutocompleteWidget(
         self.allow_add = kwargs.pop("allow_add", None)
         self.create_value_field = kwargs.pop("create_value_field", None)
         self.forward_to_create = kwargs.pop("forward_to_create", [])
+        self.full_width = kwargs.pop("full_width", self.full_width)
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
         if self.multiselect and self.allow_add:

@@ -1,5 +1,5 @@
 import Choices from "choices.js"
-import {createIcon, filterInputValueChangedUtil} from "./utils"
+import {createIcon, filterInputValueChangedUtil, syncDropdownMenuWidth} from "./utils"
 import {choicesJSListeners, choicesJSOptions} from "./choices"
 import debounce from "lodash/debounce"
 
@@ -138,6 +138,7 @@ export default class Autocomplete {
             wrapperElButton.addEventListener('shown.bs.dropdown', () => {
                 choicesJS.input.element.focus()
             })
+            syncDropdownMenuWidth(wrapperEl, wrapperElButton)
         } else {
             choicesJS.input.element.addEventListener('focus', initLoad)
         }

@@ -27,6 +27,7 @@ import Datepicker from "./datepicker"
 import Range from "./range"
 import Sorting from "./sorting"
 import Autocomplete from "./autocomplete"
+import StaticAutocomplete from "./static_autocomplete"
 import ChoicesJS from "./choices"
 import TextTags from "./text_tags"
 import {setCookie, setDropdownLabel} from "./utils"
@@ -73,6 +74,7 @@ class Main {
                 this.initDropdowns(detail.target)
                 this.initInputs(detail.target)
                 this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
+                this.staticAutocomplete.handleDynamicallyAdded(detail.target)
                 this.textTags.handleDynamicallyAddedTextTags(detail.target)
                 this.initInlines(detail.target)
                 this.initTooltips(detail.target)
@@ -90,8 +92,9 @@ class Main {
         this.initInputs()
         new Sorting()
         this.autocomplete = new Autocomplete()
+        this.staticAutocomplete = new StaticAutocomplete()
         this.textTags = new TextTags()
-        new ChoicesJS()
+        this.choicesJS = new ChoicesJS()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)
