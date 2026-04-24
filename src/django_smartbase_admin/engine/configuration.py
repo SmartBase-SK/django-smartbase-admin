@@ -192,7 +192,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     # ``plugins/base.py`` for the protocol. Each plugin hook is expected
     # to self-guard based on admin config (e.g. ``sbadmin_nested``).
     plugins: list = []
-    default_list_sticky_header_and_footer = False
+    default_list_sticky_header_and_footer = True
 
     def __init__(
         self,
