@@ -152,6 +152,18 @@ class SBAdminBaseView(object):
 
     def init_fields_cache(self, fields_source, configuration, force=False):
         from django_smartbase_admin.engine.field import SBAdminField
+        from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+
+        try:
+            request = SBAdminThreadLocalService.get_request()
+        except LookupError:
+            request = None
+        cache_key = self.get_id()
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            if not force and cache_key in request_field_cache:
+                self.field_cache = request_field_cache[cache_key]
+                return self.field_cache.values()
 
         fields = []
         self.field_cache = {}
@@ -161,6 +173,10 @@ class SBAdminBaseView(object):
             field.init_field_static(self, configuration)
             fields.append(field)
             self.field_cache[field.name] = field
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            request_field_cache[cache_key] = self.field_cache
+            request._sbadmin_field_cache = request_field_cache
         return fields
 
     def get_action_url(self, action, modifier="template"):
