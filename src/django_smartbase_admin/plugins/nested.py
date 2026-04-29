@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
-from django.db.models import Case, F, Max, Q, When
+from django.db.models import F, Max, Q, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
 from django_smartbase_admin.plugins.base import SBAdminPlugin
@@ -384,13 +384,24 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         # yields that parent's value — the group sorts by the
         # parent, not by any of its children.
         parent_row = Q(**{f"{parent_field}__isnull": True})
+        column_fields_map = {cf.field: cf for cf in action.column_fields}
         sort_annotations: dict = {}
         new_order: list[str] = []
         for idx, expr in enumerate(order_strings):
             desc = expr.startswith("-")
             field = expr.lstrip("-+")
             alias = f"_nested_sort_{idx}"
-            sort_annotations[alias] = Max(Case(When(parent_row, then=F(field))))
+            visible_field = column_fields_map.get(field)
+            sort_parent_qs = action.get_data_queryset(
+                visible_fields=[visible_field] if visible_field else []
+            )
+            sort_annotations[alias] = Max(
+                Subquery(
+                    sort_parent_qs.filter(id=OuterRef("parent_real_id")).values(field)[
+                        :1
+                    ]
+                )
+            )
             new_order.append(f"-{alias}" if desc else alias)
         return grouped.annotate(**sort_annotations).order_by(*new_order)
 

@@ -13,6 +13,7 @@ import { HeaderTabsModule } from "./table_modules/header_tabs_module"
 import { DataTreeModule } from "./table_modules/data_tree_module"
 import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_footer_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
+import { registerFitDataStretchGrowLayout } from "./tabulator_layouts/fit_data_stretch_grow"
 
 
 class SBAdminTable {
@@ -252,6 +253,7 @@ class SBAdminTable {
                 return "<a href='" + self.tableDetailUrl.replace(self.constants.OBJECT_ID_PLACEHOLDER, dataId) + "'>" + cellContent + "</a>"
             }
         })
+        registerFitDataStretchGrowLayout(Tabulator, this.tabulatorOptions)
 
         this.defaultRowSelectionFormatter = Tabulator.moduleBindings.format.formatters.rowSelection
         const self = this
