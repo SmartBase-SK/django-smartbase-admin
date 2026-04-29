@@ -392,7 +392,9 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             field = expr.lstrip("-+")
             alias = f"_nested_sort_{idx}"
             visible_field = column_fields_map.get(field)
-            sort_parent_qs = action.get_data_queryset(visible_fields=[visible_field] if visible_field else [])
+            sort_parent_qs = action.get_data_queryset(
+                visible_fields=[visible_field] if visible_field else []
+            )
             sort_annotations[alias] = Subquery(
                 sort_parent_qs.filter(id=OuterRef("parent_real_id")).values(field)[:1]
             )
