@@ -88,7 +88,7 @@ class TestDelegateToAction(TestCase):
         from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
 
         mock_action = MagicMock()
-        mock_action.target_view.as_view.return_value = lambda request: HttpResponse(
+        mock_action.target_view.as_view.return_value = lambda request, **kwargs: HttpResponse(
             "ok"
         )
 

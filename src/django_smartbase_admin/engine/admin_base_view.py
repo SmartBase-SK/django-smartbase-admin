@@ -112,7 +112,9 @@ class SBAdminBaseView(object):
 
     def delegate_to_action_view(self, processed_action):
         def inner_view(request, modifier):
-            return processed_action.target_view.as_view(view=self)(request)
+            return processed_action.target_view.as_view(view=self)(
+                request, modifier=modifier
+            )
 
         inner_view._is_sbadmin_action = True
         return inner_view
