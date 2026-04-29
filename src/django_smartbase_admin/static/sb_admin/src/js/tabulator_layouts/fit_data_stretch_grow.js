@@ -49,20 +49,21 @@ function fitDataStretchGrow(columns) {
     })
 
     const targetCol = stretchCol || lastCol
+    const naturalColWidth = targetCol ? targetCol.getWidth() : 0
 
     if(targetCol) {
-        gap = tableWidth - colsWidth + targetCol.getWidth()
+        gap = tableWidth - colsWidth + naturalColWidth
 
         if(this.table.options.responsiveLayout && this.table.modExists("responsiveLayout", true)) {
             targetCol.setWidth(0)
             this.table.modules.responsiveLayout.update()
         }
 
-        if(gap > 0) {
+        if(gap > naturalColWidth) {
             targetCol.setWidth(gap)
             targetCol.modules.fitDataStretchGrowWidth = true
         } else {
-            targetCol.reinitializeWidth()
+            targetCol.setWidth(naturalColWidth)
         }
     } else if(this.table.options.responsiveLayout && this.table.modExists("responsiveLayout", true)) {
         this.table.modules.responsiveLayout.update()
