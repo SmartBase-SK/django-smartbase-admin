@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
-from django.db.models import F, Q, OuterRef, Subquery
+from django.db.models import F, Max, Q, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
 from django_smartbase_admin.plugins.base import SBAdminPlugin
@@ -395,8 +395,12 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             sort_parent_qs = action.get_data_queryset(
                 visible_fields=[visible_field] if visible_field else []
             )
-            sort_annotations[alias] = Subquery(
-                sort_parent_qs.filter(id=OuterRef("parent_real_id")).values(field)[:1]
+            sort_annotations[alias] = Max(
+                Subquery(
+                    sort_parent_qs.filter(id=OuterRef("parent_real_id")).values(field)[
+                        :1
+                    ]
+                )
             )
             new_order.append(f"-{alias}" if desc else alias)
         return grouped.annotate(**sort_annotations).order_by(*new_order)
