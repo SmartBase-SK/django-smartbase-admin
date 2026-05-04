@@ -187,6 +187,7 @@ class SBAdminListAction(SBAdminAction):
                     "title": "",
                     "headerSort": False,
                     "frozen": True,
+                    "sbadminSystemColumn": True,
                     "hozAlign": "right",
                     "formatter": "sbadminRowActionsFormatter",
                     "cssClass": "row-actions-cell",

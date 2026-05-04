@@ -171,7 +171,7 @@
     z-index: 10;
     background-color: transparent;
     &:before {
-        @apply bg-dark-100;
+        @apply bg-dark-50;
     }
 }
 
@@ -415,8 +415,7 @@
 }
 
 .tabulator-row .row-actions-cell-inner {
-    @apply max-sm:hidden inline-flex items-center justify-end gap-4;
-    @apply md:opacity-0 transition-opacity duration-150;
+    @apply inline-flex items-center justify-end gap-4 relative;
 }
 
 .row-action-link {
@@ -435,10 +434,6 @@
     }
 
     .view-on-site-link {
-        @apply md:opacity-100;
-    }
-
-    .row-actions-cell-inner {
         @apply md:opacity-100;
     }
 }

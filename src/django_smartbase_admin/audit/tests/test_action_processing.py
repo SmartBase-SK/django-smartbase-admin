@@ -169,6 +169,9 @@ class RowActionIntegrationTests(TestCase):
             context["tabulator_definition"]["tableColumns"][0]["formatter"],
             "sbadminRowActionsFormatter",
         )
+        self.assertTrue(
+            context["tabulator_definition"]["tableColumns"][0]["sbadminSystemColumn"]
+        )
         self.assertEqual(
             rows[0]["_row_actions"],
             [
