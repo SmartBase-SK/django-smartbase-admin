@@ -165,9 +165,8 @@
     }
 }
 
-.tabulator .tabulator-header .tabulator-frozen {
-    position: sticky;
-    left: 0;
+.tabulator .tabulator-frozen {
+    position: absolute !important;
     z-index: 10;
     background-color: transparent;
     &:before {
@@ -176,6 +175,7 @@
 }
 
 .tabulator .tabulator-header .tabulator-frozen.tabulator-frozen-left {
+    left: 0;
     @apply pr-8;
     &:before {
         @apply mr-8;
@@ -183,6 +183,8 @@
 }
 
 .tabulator .tabulator-header .tabulator-frozen.tabulator-frozen-right {
+    left: auto;
+    right: 0;
     @apply pl-8;
     &:before {
         @apply ml-8;
@@ -532,7 +534,6 @@
 .tabulator-row .tabulator-cell.tabulator-frozen {
     display: inline-block;
     position: sticky;
-    left: 0;
     z-index: 10;
     &:before {
         @apply bg-light;
@@ -540,6 +541,7 @@
 }
 
 .tabulator-row .tabulator-cell.tabulator-frozen.tabulator-frozen-left {
+    left: 0;
      @apply pr-16;
     &:before {
         @apply mr-8;
@@ -547,6 +549,8 @@
 }
 
 .tabulator-row .tabulator-cell.tabulator-frozen.tabulator-frozen-right {
+    left: auto;
+    right: 0;
      @apply pl-16;
     &:before {
         @apply ml-8;
