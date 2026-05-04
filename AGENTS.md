@@ -1518,6 +1518,35 @@ class ArticleAdmin(SBAdmin):
         return self.build_action_response(request)
 ```
 
+### Restricted Querysets in Row Modals
+
+`RowActionModalView` loads the row object through the owning admin's `get_queryset(request)` by default. This is important: the object lookup keeps normal admin queryset restrictions, role filters, tenant filters, and other `restrict_queryset` rules in force.
+
+Do not override `get_object_queryset()` just to return `Model.objects.all()` or a raw manager queryset. That bypasses the admin's restricted queryset and can expose or mutate objects the user should not reach.
+
+Only override `get_object_queryset()` when the row action intentionally resolves a different model. In that case, apply the same restriction path explicitly:
+
+```python
+class PublishArticleView(RowActionModalView):
+    form_class = PublishArticleForm
+    modal_title = _("Publish Article")
+    # No get_object_queryset override needed.
+    # Default: self.view.get_queryset(request)
+```
+
+```python
+# ❌ BAD - bypasses admin restrictions
+class PublishArticleView(RowActionModalView):
+    def get_object_queryset(self, request):
+        return Article.objects.all()
+
+
+# ✅ GOOD - preserve the admin's restricted queryset
+class PublishArticleView(RowActionModalView):
+    def get_object_queryset(self, request):
+        return self.view.get_queryset(request)
+```
+
 ### Registration Gotcha
 
 Row actions follow the same registration rule as list and bulk actions: always return every possible action, then hide unavailable actions with permissions or row predicates.
@@ -1598,6 +1627,7 @@ Framework consumers call processed getters, not raw getters:
 **Key points:**
 - Use `get_sbadmin_row_actions()` when the action needs `view=self`. URL-only actions can also be declared in the `sbadmin_row_actions` class attribute.
 - `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; row action materialization replaces it with the row pk server-side.
+- `RowActionModalView` resolves objects with `self.view.get_queryset(request)` by default. Do not override this with a raw model manager unless you also preserve queryset restrictions.
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
 - Always return all possible actions from action getters and use `has_permission_for_action()` or row enablement to hide them. Conditional omission can prevent modal URL handlers from being registered.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
