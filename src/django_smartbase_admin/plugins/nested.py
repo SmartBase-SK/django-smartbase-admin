@@ -246,7 +246,9 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         if order_by:
             hydrated = hydrated.order_by(*order_by)
         rows = list(hydrated)
+        raw_rows_by_pk = {row[pk_name]: dict(row) for row in rows}
         action.process_final_data(rows)
+        action.inject_row_actions(rows, raw_rows_by_pk=raw_rows_by_pk)
 
         by_id = {row[pk_name]: row for row in rows}
         children_by_parent: dict[Any, list[dict[str, Any]]] = {}

@@ -2,6 +2,7 @@ import json
 import urllib.parse
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import copy
 from typing import Any, TYPE_CHECKING
 
 from django.conf import settings
@@ -18,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
-    SBAdminFormViewAction,
+    SBAdminRowAction,
     sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
@@ -37,6 +38,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_UPDATE_ROW_DATA_EVENT_NAME,
     SELECT_ALL_KEYWORD,
     IGNORE_LIST_SELECTION,
+    MODIFIER_OBJECT_ID,
     SUPPORTED_FILE_TYPE_ICONS,
 )
 from django_smartbase_admin.services.configuration import (
@@ -119,22 +121,68 @@ class SBAdminBaseView(object):
         inner_view._is_sbadmin_action = True
         return inner_view
 
+    def process_list_actions(
+        self, request, actions: list[SBAdminCustomAction]
+    ) -> list[SBAdminCustomAction]:
+        self._register_form_view_actions(actions)
+        return self.process_actions_permissions(request, actions)
+
+    def process_row_actions(
+        self, request, actions: list[SBAdminCustomAction]
+    ) -> list[SBAdminCustomAction]:
+        self._register_form_view_actions(actions)
+        return self.process_actions_permissions(request, actions)
+
+    def process_detail_actions(
+        self,
+        request,
+        actions: list[SBAdminCustomAction],
+        object_id: int | str | None = None,
+    ) -> list[SBAdminCustomAction]:
+        materialized_actions = [
+            self._materialize_modifier_object_id(action, object_id)
+            for action in actions
+        ]
+        self._register_form_view_actions(materialized_actions)
+        return self.process_actions_permissions(request, materialized_actions)
+
+    def process_inline_actions(
+        self, request, actions: list[SBAdminCustomAction]
+    ) -> list[SBAdminCustomAction]:
+        self._register_form_view_actions(actions)
+        return self.process_actions_permissions(request, actions)
+
+    def _register_form_view_actions(self, actions: list[SBAdminCustomAction]) -> None:
+        for action in actions:
+            target_view = getattr(action, "target_view", None)
+            if target_view is None:
+                continue
+            action_id = target_view.__name__
+            if not hasattr(self, action_id):
+                setattr(self, action_id, self.delegate_to_action_view(action))
+            action.action_id = action_id
+            action.url = self.get_action_url(
+                action_id, modifier=action.action_modifier or "template"
+            )
+
+    @staticmethod
+    def _materialize_modifier_object_id(
+        action: SBAdminCustomAction, object_id: int | str | None
+    ) -> SBAdminCustomAction:
+        if getattr(action, "action_modifier", None) != MODIFIER_OBJECT_ID:
+            return action
+        new_action = copy(action)
+        new_action.action_modifier = (
+            str(object_id) if object_id is not None else IGNORE_LIST_SELECTION
+        )
+        new_action.url = None
+        return new_action
+
     def process_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        processed_actions = self.process_actions_permissions(request, actions)
-        for processed_action in processed_actions:
-            if isinstance(processed_action, SBAdminFormViewAction):
-                action_id = processed_action.target_view.__name__
-                setattr(
-                    self,
-                    action_id,
-                    self.delegate_to_action_view(processed_action),
-                )
-                processed_action.url = self.get_action_url(action_id)
-                processed_action.action_id = action_id
-
-        return processed_actions
+        self._register_form_view_actions(actions)
+        return self.process_actions_permissions(request, actions)
 
     def process_actions_permissions(
         self, request, actions: list[SBAdminCustomAction]
@@ -189,6 +237,16 @@ class SBAdminBaseView(object):
     def register_autocomplete_views(self, request):
         pass
 
+    def register_action_autocomplete_views(
+        self, request, actions: Iterable[SBAdminCustomAction] | None
+    ) -> None:
+        for action in actions or []:
+            target_view = getattr(action, "target_view", None)
+            form_class = getattr(target_view, "form_class", None)
+            if form_class:
+                form_class.view = self
+                form_class()
+
     @sbadmin_action
     def action_autocomplete(self, request, modifier):
         autocomplete_view = request.request_data.configuration.autocomplete_map.get(
@@ -224,6 +282,15 @@ class SBAdminBaseView(object):
         self, request, object_id: int | str | None = None
     ) -> Iterable[SBAdminCustomAction] | None:
         return self.sbadmin_detail_actions
+
+    def get_sbadmin_detail_actions_processed(
+        self, request, object_id: int | str | None = None
+    ) -> list[SBAdminCustomAction]:
+        return self.process_detail_actions(
+            request,
+            [*(self.get_sbadmin_detail_actions(request, object_id) or [])],
+            object_id,
+        )
 
     def get_color_scheme_context(self, request):
         from django_smartbase_admin.views.user_config_view import ColorSchemeForm
@@ -285,7 +352,9 @@ class SBAdminBaseView(object):
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
             "username_data": self.get_username_data(request),
-            "detail_actions": self.get_sbadmin_detail_actions(request, object_id),
+            "detail_actions": self.get_sbadmin_detail_actions_processed(
+                request, object_id
+            ),
             SBADMIN_IS_MODAL_VAR: is_modal(request),
             SBADMIN_RELOAD_ON_SAVE_VAR: SBADMIN_RELOAD_ON_SAVE_VAR in request.GET
             or SBADMIN_RELOAD_ON_SAVE_VAR in request.POST,
@@ -346,6 +415,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_display_data = None
     sbadmin_list_selection_actions = None
     sbadmin_list_actions = None
+    sbadmin_row_actions = None
     sbadmin_list_filter = None
     sbadmin_xlsx_options = None
     sbadmin_table_history_enabled = True
@@ -459,8 +529,8 @@ class SBAdminBaseListView(SBAdminBaseView):
     def init_actions(self, request) -> None:
         if self.sbadmin_actions_initialized:
             return
-        self.process_actions(request, self.get_sbadmin_list_selection_actions(request))
-        self.process_actions(request, self.get_sbadmin_list_actions(request))
+        self.get_sbadmin_list_selection_actions_processed(request)
+        self.get_sbadmin_list_actions_processed(request)
         self.sbadmin_actions_initialized = True
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
@@ -480,14 +550,13 @@ class SBAdminBaseListView(SBAdminBaseView):
             request.request_data.configuration,
             force=True,
         )
-        all_list_actions = self.get_sbadmin_list_selection_actions(
-            request
-        ) + self.get_sbadmin_list_actions(request)
-        for list_action in all_list_actions:
-            if isinstance(list_action, SBAdminFormViewAction):
-                form = list_action.target_view.form_class
-                form.view = self
-                form()
+        all_actions = [
+            *self.get_sbadmin_list_selection_actions_processed(request),
+            *self.get_sbadmin_list_actions_processed(request),
+            *self.get_sbadmin_row_actions_processed(request),
+            *self.get_sbadmin_detail_actions_processed(request),
+        ]
+        self.register_action_autocomplete_views(request, all_actions)
 
     def get_list_display(self, request) -> list[str]:
         return [
@@ -602,7 +671,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             tabulator_definition["modules"].append("stickyHeaderAndFooterModule")
         return tabulator_definition
 
-    def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
+    def get_sbadmin_list_actions_processed(
+        self, request
+    ) -> list[SBAdminCustomAction] | list:
         list_actions = [*(self.get_sbadmin_list_actions(request) or [])]
         if self.is_reorder_available(request):
             list_actions = [
@@ -634,7 +705,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 ]
             except Exception:
                 pass
-        return list_actions
+        return self.process_list_actions(request, list_actions)
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:
         if not self.sbadmin_list_actions:
@@ -665,12 +736,25 @@ class SBAdminBaseListView(SBAdminBaseView):
             ]
         return self.sbadmin_list_selection_actions
 
+    def get_sbadmin_list_selection_actions_processed(
+        self, request
+    ) -> list[SBAdminCustomAction]:
+        return self.process_list_actions(
+            request, self.get_sbadmin_list_selection_actions(request)
+        )
+
+    def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:
+        return [*(self.sbadmin_row_actions or [])]
+
+    def get_sbadmin_row_actions_processed(self, request) -> list[SBAdminRowAction]:
+        return self.process_row_actions(request, self.get_sbadmin_row_actions(request))
+
     def get_sbadmin_list_selection_actions_grouped(
         self, request
     ) -> dict[str, list[SBAdminCustomAction]]:
         result = {}
-        list_selection_actions = self.process_actions(
-            request, self.get_sbadmin_list_selection_actions(request)
+        list_selection_actions = self.get_sbadmin_list_selection_actions_processed(
+            request
         )
         for action in list_selection_actions:
             if not result.get(action.group):

@@ -35,6 +35,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     ADVANCED_FILTER_DATA_NAME,
     IGNORE_LIST_SELECTION,
+    MODIFIER_OBJECT_ID,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import import_with_injection
@@ -176,6 +177,21 @@ class SBAdminListAction(SBAdminAction):
         }
 
         columns, id_column_name = self.get_tabulator_columns_add_id_column_if_missing()
+        row_actions = self.view.get_sbadmin_row_actions_processed(
+            self.threadsafe_request
+        )
+        if row_actions:
+            columns.append(
+                {
+                    "field": "_row_actions",
+                    "title": "",
+                    "headerSort": False,
+                    "frozen": True,
+                    "hozAlign": "right",
+                    "formatter": "sbadminRowActionsFormatter",
+                    "cssClass": "row-actions-cell",
+                }
+            )
         tabulator_definition = (
             self.tabulator_definition
             or self.view.get_tabulator_definition(self.threadsafe_request)
@@ -184,8 +200,10 @@ class SBAdminListAction(SBAdminAction):
         tabulator_definition["tableIdColumnName"] = id_column_name
         tabulator_definition["constants"] = constants
 
-        list_actions = self.list_actions or self.view._get_sbadmin_list_actions(
-            self.threadsafe_request
+        list_actions = (
+            self.view.process_list_actions(self.threadsafe_request, self.list_actions)
+            if self.list_actions is not None
+            else self.view.get_sbadmin_list_actions_processed(self.threadsafe_request)
         )
 
         context_data.update(
@@ -207,9 +225,7 @@ class SBAdminListAction(SBAdminAction):
                 "search_field_placeholder": self.view.get_search_field_placeholder(
                     self.threadsafe_request
                 ),
-                "list_actions": self.view.process_actions(
-                    self.threadsafe_request, list_actions
-                ),
+                "list_actions": list_actions,
                 "list_selection_actions": self.view.get_sbadmin_list_selection_actions_grouped(
                     self.threadsafe_request
                 ),
@@ -445,6 +461,7 @@ class SBAdminListAction(SBAdminAction):
 
         data_qs = self.build_final_data_queryset(page_num, page_size, additional_filter)
         data = list(data_qs)
+        raw_rows_by_pk = {row[self.get_pk_field().name]: dict(row) for row in data}
 
         self.process_final_data(data)
         request = self.threadsafe_request
@@ -455,6 +472,8 @@ class SBAdminListAction(SBAdminAction):
                 request=request,
                 data=data,
             )
+
+        self.inject_row_actions(data, raw_rows_by_pk=raw_rows_by_pk)
 
         return {
             "last_page": math.ceil(total_count / page_size),
@@ -489,6 +508,48 @@ class SBAdminListAction(SBAdminAction):
                 if isinstance(value, str) and not isinstance(value, SafeString):
                     value = escape(value)
                 row[field_key] = value
+
+    def inject_row_actions(
+        self, final_data: list[dict[str, Any]], raw_rows_by_pk: dict | None = None
+    ) -> None:
+        actions = self.view.get_sbadmin_row_actions_processed(self.threadsafe_request)
+        if not actions:
+            return
+        pk_field = self.get_pk_field().name
+        for row in final_data:
+            obj_id = row.get(pk_field)
+            raw_row = (raw_rows_by_pk or {}).get(obj_id)
+            row["_row_actions"] = [
+                descriptor
+                for action in actions
+                if (
+                    descriptor := self._materialize_row_action(
+                        action, row, obj_id, raw_row=raw_row
+                    )
+                )
+                is not None
+            ]
+
+    def _materialize_row_action(
+        self, action, row: dict[str, Any], obj_id: Any, raw_row=None
+    ) -> dict[str, Any] | None:
+        action_row = raw_row or row
+        if not action.is_enabled(action_row):
+            return None
+
+        url = action.url
+        if url and MODIFIER_OBJECT_ID in url:
+            url = url.replace(MODIFIER_OBJECT_ID, str(obj_id))
+
+        return {
+            "url": url,
+            "title": str(action.get_title(action_row) or ""),
+            "icon": action.get_icon(action_row),
+            "css_class": action.get_css_class(action_row) or "",
+            "open_in_modal": bool(action.open_in_modal),
+            "is_method_action": bool(action.action_id) and not action.open_in_modal,
+            "open_in_new_tab": bool(action.open_in_new_tab),
+        }
 
     def get_json_data(self):
         return self.get_data()

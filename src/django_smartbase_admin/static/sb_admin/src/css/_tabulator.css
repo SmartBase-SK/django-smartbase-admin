@@ -414,6 +414,19 @@
     @apply md:opacity-100;
 }
 
+.tabulator-row .row-actions-cell-inner {
+    @apply max-sm:hidden inline-flex items-center justify-end gap-4;
+    @apply md:opacity-0 transition-opacity duration-150;
+}
+
+.row-action-link {
+    @apply inline-flex flex-shrink-0 flex-center;
+}
+
+.row-action-link:focus {
+    @apply md:opacity-100;
+}
+
 .tabulator-row.tabulator-selectable:hover {
     cursor: pointer;
     @apply bg-primary-50;
@@ -422,6 +435,10 @@
     }
 
     .view-on-site-link {
+        @apply md:opacity-100;
+    }
+
+    .row-actions-cell-inner {
         @apply md:opacity-100;
     }
 }

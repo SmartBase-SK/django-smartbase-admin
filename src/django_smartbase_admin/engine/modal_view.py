@@ -2,7 +2,17 @@ from django.http import HttpResponse
 from django.views.generic import FormView
 from django_htmx.http import trigger_client_event
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
-from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
+from django_smartbase_admin.engine.const import (
+    IGNORE_LIST_SELECTION,
+    TABLE_RELOAD_DATA_EVENT_NAME,
+)
+from django_smartbase_admin.utils import (
+    render_notifications as render_notifications_html,
+)
+
+
+class SBAdminActionError(Exception):
+    """Raise inside an action modal hook to surface as a non-field form error."""
 
 
 class ActionModalView(FormView):
@@ -10,13 +20,17 @@ class ActionModalView(FormView):
     form_class = None
     modal_title = ""
     view = None
+    render_notifications = True
 
     def __init__(self, view=None, *args, **kwargs):
         self.view = view
         super().__init__(*args, **kwargs)
 
-    def process_form_valid(self, request, form):
-        response = HttpResponse()
+    def build_success_response(self, request):
+        content = (
+            render_notifications_html(request) if self.render_notifications else ""
+        )
+        response = HttpResponse(content)
         trigger_client_event(response, "hideModal", {})
         trigger_client_event(
             response,
@@ -24,6 +38,9 @@ class ActionModalView(FormView):
             {},
         )
         return response
+
+    def process_form_valid(self, request, form):
+        return self.build_success_response(request)
 
     def get_form_class(self):
         form_class = super().get_form_class()
@@ -41,7 +58,11 @@ class ActionModalView(FormView):
     def post(self, request, *args, **kwargs):
         form = self.get_form()
         if form.is_valid():
-            return self.process_form_valid(request, form)
+            try:
+                return self.process_form_valid(request, form)
+            except SBAdminActionError as e:
+                form.add_error(None, str(e))
+                return self.form_invalid(form)
         else:
             return self.form_invalid(form)
 
@@ -57,11 +78,10 @@ class ActionModalView(FormView):
 class ListActionModalView(ActionModalView):
 
     def process_form_valid(self, request, form):
-        response = super().process_form_valid(request, form)
         self.process_form_valid_list_selection_queryset(
             request, form, self.get_selection_queryset(request, form)
         )
-        return response
+        return super().process_form_valid(request, form)
 
     def get_selection_queryset(self, request, form):
         list_action = self.view.sbadmin_list_action_class(self.view, request)
@@ -72,4 +92,35 @@ class ListActionModalView(ActionModalView):
     def process_form_valid_list_selection_queryset(
         self, request, form, selection_queryset
     ):
+        pass
+
+
+class RowActionModalView(ActionModalView):
+    not_found_message = "Not found."
+
+    def get_object_queryset(self, request):
+        return self.view.get_queryset(request)
+
+    def get_object(self):
+        if not hasattr(self, "_resolved_object"):
+            modifier = self.kwargs.get("modifier")
+            if modifier in (None, IGNORE_LIST_SELECTION):
+                self._resolved_object = None
+            else:
+                self._resolved_object = (
+                    self.get_object_queryset(self.request).filter(pk=modifier).first()
+                )
+        return self._resolved_object
+
+    def dispatch(self, request, *args, **kwargs):
+        modifier = kwargs.get("modifier")
+        if modifier not in (None, IGNORE_LIST_SELECTION) and self.get_object() is None:
+            return HttpResponse(self.not_found_message, status=404)
+        return super().dispatch(request, *args, **kwargs)
+
+    def process_form_valid(self, request, form):
+        self.process_form_valid_object(request, form, self.get_object())
+        return super().process_form_valid(request, form)
+
+    def process_form_valid_object(self, request, form, obj):
         pass

@@ -1,5 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
+from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+
 
 def sbadmin_action(func=None, **kwargs):
     """Mark a view method as callable via SBAdmin URL dispatch.
@@ -96,3 +98,122 @@ class SBAdminFormViewAction(SBAdminCustomAction):
         self.url and self.action_id is resolved in side django_smartbase_admin.engine.admin_base_view.SBAdminBaseView.process_actions
         """
         pass
+
+
+class SBAdminRowAction(SBAdminCustomAction):
+    """Per-row icon action declared through ``sbadmin_row_actions``.
+
+    Pass exactly one of ``target_view``, ``action_id``, or ``url``:
+    ``target_view`` opens a modal, ``action_id`` calls an ``@sbadmin_action``
+    method, and ``url`` renders a plain link.
+
+    Per-row enablement can be declared with ``enabled_if`` or with the simpler
+    ``enabled_field``/``enabled_value`` pair. ``enabled_if`` may be a callable
+    receiving the row dict and takes precedence; ``enabled_field`` renders the
+    action only when ``row[enabled_field] == enabled_value``. Without either,
+    the action is enabled for every row.
+    """
+
+    target_view = None
+    css_class = "btn-icon"
+    open_in_new_tab = False
+    enabled_if = None
+    enabled_field = None
+    enabled_value = None
+
+    def __init__(
+        self,
+        *,
+        title=None,
+        icon=None,
+        view=None,
+        target_view=None,
+        action_id=None,
+        url=None,
+        css_class=None,
+        open_in_new_tab=None,
+        enabled_if=None,
+        enabled_field=None,
+        enabled_value=None,
+    ) -> None:
+        resolved_title = title if title is not None else self.title
+        resolved_icon = icon if icon is not None else self.icon
+        resolved_view = view if view is not None else self.view
+        resolved_target_view = (
+            target_view if target_view is not None else self.target_view
+        )
+        resolved_action_id = action_id if action_id is not None else self.action_id
+        resolved_url = url if url is not None else self.url
+        resolved_css_class = css_class if css_class is not None else self.css_class
+        resolved_open_in_new_tab = (
+            open_in_new_tab if open_in_new_tab is not None else self.open_in_new_tab
+        )
+
+        modes = (
+            resolved_target_view is not None,
+            resolved_action_id is not None,
+            resolved_url is not None,
+        )
+        if sum(modes) != 1:
+            raise ImproperlyConfigured(
+                "SBAdminRowAction requires exactly one of: target_view, action_id, url"
+            )
+
+        # Set before super().__init__ calls resolve_url().
+        self.target_view = resolved_target_view
+
+        super().__init__(
+            title=resolved_title or "",
+            view=resolved_view,
+            action_id=resolved_action_id,
+            url=resolved_url,
+            css_class=resolved_css_class,
+            open_in_modal=resolved_target_view is not None,
+            open_in_new_tab=resolved_open_in_new_tab,
+            icon=resolved_icon,
+            action_modifier=MODIFIER_OBJECT_ID,
+        )
+
+        self.enabled_if = enabled_if if enabled_if is not None else self.enabled_if
+        self.enabled_field = (
+            enabled_field if enabled_field is not None else self.enabled_field
+        )
+        self.enabled_value = (
+            enabled_value if enabled_value is not None else self.enabled_value
+        )
+
+    def resolve_url(self):
+        if self.target_view is not None:
+            return
+        super().resolve_url()
+
+    def resolve_row_value(self, value, row):
+        if callable(value):
+            return value(row)
+        return value
+
+    def get_title(self, row):
+        return self.resolve_row_value(self.title, row)
+
+    def get_icon(self, row):
+        return self.resolve_row_value(self.icon, row)
+
+    def get_css_class(self, row):
+        return self.resolve_row_value(self.css_class, row)
+
+    def get_enabled_if(self, row):
+        return self.resolve_row_value(self.enabled_if, row)
+
+    def get_enabled_field(self, row):
+        return self.resolve_row_value(self.enabled_field, row)
+
+    def get_enabled_value(self, row):
+        return self.resolve_row_value(self.enabled_value, row)
+
+    def is_enabled(self, row):
+        if self.enabled_if is not None:
+            return bool(self.get_enabled_if(row))
+        enabled_field = self.get_enabled_field(row)
+        if enabled_field is not None:
+            return row.get(enabled_field) == self.get_enabled_value(row)
+        return True

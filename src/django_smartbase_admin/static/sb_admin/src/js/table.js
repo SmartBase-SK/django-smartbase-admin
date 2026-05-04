@@ -13,6 +13,7 @@ import { HeaderTabsModule } from "./table_modules/header_tabs_module"
 import { DataTreeModule } from "./table_modules/data_tree_module"
 import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_footer_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
+import { createIcon } from "./utils"
 
 
 class SBAdminTable {
@@ -250,6 +251,41 @@ class SBAdminTable {
                     cellContent = '-'
                 }
                 return "<a href='" + self.tableDetailUrl.replace(self.constants.OBJECT_ID_PLACEHOLDER, dataId) + "'>" + cellContent + "</a>"
+            },
+            sbadminRowActionsFormatter: function (cell) {
+                const actions = cell.getRow().getData()._row_actions || []
+                const wrapper = document.createElement('div')
+                wrapper.classList.add('row-actions-cell-inner')
+                actions.forEach((action) => {
+                    const link = document.createElement('a')
+                    link.classList.add('row-action-link')
+                    if (action.css_class) {
+                        link.classList.add(...action.css_class.split(' ').filter(Boolean))
+                    }
+                    link.title = action.title || ''
+                    link.setAttribute('aria-label', action.title || '')
+                    link.addEventListener('click', (event) => event.stopPropagation())
+                    if (action.open_in_modal) {
+                        link.setAttribute('data-bs-toggle', 'modal')
+                        link.setAttribute('data-bs-target', '#sb-admin-modal')
+                        link.setAttribute('hx-get', action.url)
+                        link.setAttribute('hx-target', '#sb-admin-modal')
+                    } else if (action.is_method_action) {
+                        link.setAttribute('hx-post', action.url)
+                        link.setAttribute('hx-swap', 'none')
+                    } else {
+                        link.href = action.url
+                        if (action.open_in_new_tab) {
+                            link.target = '_blank'
+                            link.rel = 'noopener'
+                        }
+                    }
+                    if (action.icon) {
+                        link.append(createIcon(action.icon, ['w-16', 'h-16']))
+                    }
+                    wrapper.append(link)
+                })
+                return wrapper
             }
         })
 
