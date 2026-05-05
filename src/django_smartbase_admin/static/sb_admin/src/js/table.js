@@ -1,4 +1,4 @@
-import {TabulatorFull as Tabulator, Renderer} from 'tabulator-tables'
+import {TabulatorFull as Tabulator, Renderer, Module} from 'tabulator-tables'
 import {ViewsModule} from "./table_modules/views_module"
 import {SelectionModule} from "./table_modules/selection_module"
 import {ColumnDisplayModule} from "./table_modules/column_display_module"
@@ -14,7 +14,18 @@ import { DataTreeModule } from "./table_modules/data_tree_module"
 import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_footer_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 import { createIcon } from "./utils"
-import { registerFitDataStretchGrowLayout } from "./tabulator_layouts/fit_data_stretch_grow"
+import { registerFitDataFillAvailableSpaceLayout } from "./tabulator_layouts/fit_data_fill_available_space"
+
+
+class SBAdminColumnOptionsModule extends Module {
+    static moduleName = "sbadminColumnOptions"
+
+    constructor(table) {
+        super(table)
+        this.registerColumnOption("sbadminKeepDataWidth", false)
+        this.registerColumnOption("sbadminSystemColumn", false)
+    }
+}
 
 
 class SBAdminTable {
@@ -289,7 +300,7 @@ class SBAdminTable {
                 return wrapper
             }
         })
-        registerFitDataStretchGrowLayout(Tabulator, this.tabulatorOptions)
+        registerFitDataFillAvailableSpaceLayout(Tabulator, this.tabulatorOptions)
 
         this.defaultRowSelectionFormatter = Tabulator.moduleBindings.format.formatters.rowSelection
         const self = this
@@ -338,6 +349,7 @@ class SBAdminTable {
         tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
         tabulatorOptions['ajaxConfig']['headers']['X-TabulatorRequest'] = true
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
+        Tabulator.registerModule(SBAdminColumnOptionsModule)
         Tabulator.registerModule(SBAjaxParamsTabulatorModifier)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         this.tabulator.SBTable = this

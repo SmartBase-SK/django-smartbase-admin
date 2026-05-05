@@ -638,6 +638,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "renderVertical": "basic",
                 "persistence": False,
                 "layoutColumnsOnNewData": True,
+                "layout": "fitDataFillAvailableSpace",
                 "height": "100%",
                 "ajaxContentType": "json",
                 "ajaxConfig": {

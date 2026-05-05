@@ -187,6 +187,7 @@ class SBAdminListAction(SBAdminAction):
                     "title": "",
                     "headerSort": False,
                     "frozen": True,
+                    "sbadminKeepDataWidth": True,
                     "sbadminSystemColumn": True,
                     "hozAlign": "right",
                     "formatter": "sbadminRowActionsFormatter",
@@ -462,7 +463,6 @@ class SBAdminListAction(SBAdminAction):
 
         data_qs = self.build_final_data_queryset(page_num, page_size, additional_filter)
         data = list(data_qs)
-        raw_rows_by_pk = {row[self.get_pk_field().name]: dict(row) for row in data}
 
         self.process_final_data(data)
         request = self.threadsafe_request
@@ -474,6 +474,7 @@ class SBAdminListAction(SBAdminAction):
                 data=data,
             )
 
+        raw_rows_by_pk = {row[self.get_pk_field().name]: dict(row) for row in data}
         self.inject_row_actions(data, raw_rows_by_pk=raw_rows_by_pk)
 
         return {
