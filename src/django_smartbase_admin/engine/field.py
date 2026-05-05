@@ -7,6 +7,7 @@ from django.db.models import (
     Value,
     CharField,
     F,
+    DateField,
     DateTimeField,
     BooleanField,
     FilteredRelation,
@@ -15,6 +16,7 @@ from django.db.models.functions import Concat
 
 from django_smartbase_admin.engine.const import ANNOTATE_KEY, Formatter
 from django_smartbase_admin.engine.field_formatter import (
+    date_formatter,
     datetime_formatter,
     boolean_formatter,
 )
@@ -239,7 +241,9 @@ class SBAdminField(JSONSerializableMixin):
         if self.model_field and not self.python_formatter and not self.view_method:
             if isinstance(self.model_field, DateTimeField):
                 self.python_formatter = datetime_formatter
-            if isinstance(self.model_field, BooleanField):
+            elif isinstance(self.model_field, DateField):
+                self.python_formatter = date_formatter
+            elif isinstance(self.model_field, BooleanField):
                 self.python_formatter = boolean_formatter
         self.filter_field = self.filter_field or self.field
         self.init_filter_for_field(configuration)

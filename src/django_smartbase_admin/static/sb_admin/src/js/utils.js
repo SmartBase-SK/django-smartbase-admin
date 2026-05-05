@@ -49,6 +49,11 @@ export const getObjectOrValue = (value) => {
     return value
 }
 
+export const hasSelectedText = () => {
+    const selection = window.getSelection ? window.getSelection() : null
+    return Boolean(selection && selection.toString().trim())
+}
+
 export const filterInputValueChangeListener = (inputSelector, callbackFunction) => {
     document.querySelectorAll(inputSelector).forEach((input) => {
         input.addEventListener('change', callbackFunction)
@@ -66,7 +71,7 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
     })
 }
 
-const getResultLabel = (valueOrObject, separator=', ') => {
+export const getResultLabel = (valueOrObject, separator=', ') => {
     const labelArray = []
     const entries = Object.values(valueOrObject)
     let hasMaxEntries = false
@@ -110,6 +115,24 @@ export const setDropdownLabel = (dropdownMenuEl, dropdownLabelEl) => {
         }
     })
     dropdownLabelEl.innerHTML = getResultLabel(fields)
+}
+
+export const syncDropdownMenuWidth = (wrapperEl, wrapperElButton) => {
+    // Wrapper opts in via data-autocomplete-full-width="true": the dropdown
+    // menu is resized to match the wrapper (and kept in sync on resize while
+    // it's open). Used by both the dynamic autocomplete and the static
+    // Choices.js dropdowns.
+    if (wrapperEl.dataset.autocompleteFullWidth !== 'true') return
+    const menuEl = wrapperEl.querySelector('.dropdown-menu')
+    if (!menuEl) return
+    const syncMenuWidth = () => {
+        menuEl.style.width = `${wrapperEl.offsetWidth}px`
+    }
+    wrapperElButton.addEventListener('show.bs.dropdown', syncMenuWidth)
+    wrapperElButton.addEventListener('shown.bs.dropdown', syncMenuWidth)
+    window.addEventListener('resize', () => {
+        if (menuEl.classList.contains('show')) syncMenuWidth()
+    })
 }
 
 export const filterInputValueChangedUtil = (field) => {

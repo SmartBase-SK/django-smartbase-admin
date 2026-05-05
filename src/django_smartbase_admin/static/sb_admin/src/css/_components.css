@@ -237,7 +237,7 @@
     }
 
     .saved-filters {
-        @apply flex gap-8;
+        @apply flex gap-8 overflow-x-auto;
         @apply text-14 text-dark-600 font-medium;
         > li {
             button {

@@ -92,7 +92,7 @@ export const monthYearViewsPlugin = (fp) => {
     const buildBackButton = (backToView) => {
         const back = document.createElement('div')
         back.classList.add('flatpickr-back')
-        back.textContent = "Back"
+        back.textContent = window.sb_admin_translation_strings?.back || "Back"
         fp._bind(back, 'click', (e) => {
             e.preventDefault()
             e.stopPropagation()

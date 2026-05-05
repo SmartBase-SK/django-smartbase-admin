@@ -23,6 +23,7 @@ from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
+from django.utils.timezone import get_current_timezone_name
 from django.utils.translation import gettext_lazy as _, get_language
 from django.views.generic.base import ContextMixin
 from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
@@ -42,7 +43,11 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     SBAdminJSONEncoder,
 )
-from django_smartbase_admin.utils import is_modal, convert_django_to_flatpickr_format
+from django_smartbase_admin.utils import (
+    convert_django_to_flatpickr_format,
+    is_modal,
+    sb_admin_filer_directory_listing_url_for_file,
+)
 
 try:
     # Django >= 5.0
@@ -108,6 +113,22 @@ class SBAdminTextInputWidget(SBAdminBaseWidget, forms.TextInput):
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
+
+
+class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
+    template_name = "sb_admin/widgets/text_tags.html"
+    input_type = "text"
+
+    def __init__(self, form_field=None, attrs=None, *, delimiter: str = ","):
+        super().__init__(
+            form_field,
+            attrs={
+                "class": "input js-sbadmin-text-tags",
+                "data-choices-delimiter": delimiter,
+                "autocomplete": "off",
+                **(attrs or {}),
+            },
+        )
 
 
 class SBAdminPasswordInputWidget(SBAdminBaseWidget, forms.PasswordInput):
@@ -188,10 +209,34 @@ class SBAdminSelectWidget(SBAdminBaseWidget, forms.Select):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
 
-    def __init__(self, form_field=None, attrs=None, choices=()):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        choices=(),
+        disable_empty_option=True,
+    ):
+        self.disable_empty_option = disable_empty_option
         super().__init__(
             form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
         )
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        if (
+            self.disable_empty_option
+            and (value is None or str(value) == "")
+            and self.form_field is not None
+            and getattr(self.form_field, "required", False)
+        ):
+            option_attrs = dict(option.get("attrs") or {})
+            option_attrs["disabled"] = True
+            option["attrs"] = option_attrs
+        return option
 
 
 class SBAdminRadioWidget(SBAdminBaseWidget, forms.RadioSelect):
@@ -233,6 +278,58 @@ class SBAdminMultipleChoiceInlineWidget(SBAdminMultipleChoiceWidget):
     option_template_name = "sb_admin/widgets/checkbox.html"
 
 
+class SBAdminChoiceSearchableWidget(SBAdminBaseWidget, forms.Select):
+    """Single-choice dropdown with client-side search (Choices.js).
+
+    Shares the autocomplete UI shell with ``SBAdminAutocompleteWidget`` but the
+    options are rendered inline as ``<option>`` tags — no API fetch, no
+    pagination. The native ``<select>`` submits as a single value, so a plain
+    ``ChoiceField`` is enough on the backend.
+
+    ``full_width`` is a class attribute so subclasses can flip the default
+    without re-declaring ``__init__`` — useful when wiring this widget as the
+    project-wide default via ``get_form_field_widget_class``.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+    full_width = False
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=None):
+        if full_width is not None:
+            self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
+        )
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["full_width"] = self.full_width
+        return context
+
+
+class SBAdminMultipleChoiceSearchableWidget(SBAdminBaseWidget, forms.SelectMultiple):
+    """Multi-choice dropdown with client-side search (Choices.js).
+
+    Same UI shell as ``SBAdminChoiceSearchableWidget`` but renders a
+    ``<select multiple>`` and pairs with ``MultipleChoiceField``.
+    """
+
+    template_name = "sb_admin/widgets/choice_search.html"
+    full_width = False
+
+    def __init__(self, form_field=None, attrs=None, choices=(), full_width=None):
+        if full_width is not None:
+            self.full_width = full_width
+        super().__init__(
+            form_field, attrs={"class": "input", **(attrs or {})}, choices=choices
+        )
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["full_width"] = self.full_width
+        return context
+
+
 class SBAdminNullBooleanSelectWidget(SBAdminBaseWidget, forms.NullBooleanSelect):
     template_name = "sb_admin/widgets/select.html"
     option_template_name = "sb_admin/widgets/select_option.html"
@@ -265,6 +362,7 @@ class SBAdminDateWidget(SBAdminBaseWidget, forms.DateInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATE_FORMAT")
                     ),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -279,10 +377,21 @@ class SBAdminTimeWidget(SBAdminBaseWidget, forms.TimeInput):
             form_field,
             attrs={
                 "class": "input js-timepicker",
+                "data-sbadmin-datepicker": self.get_data(),
                 "placeholder": get_datetime_placeholder()["time"],
                 "autocomplete": "do-not-autofill",
                 **(attrs or {}),
             },
+        )
+
+    def get_data(self):
+        return json.dumps(
+            {
+                "flatpickrOptions": {
+                    "displayTimezoneLabel": get_current_timezone_name(),
+                },
+            },
+            cls=SBAdminJSONEncoder,
         )
 
 
@@ -310,6 +419,7 @@ class SBAdminDateTimeWidget(SBAdminBaseWidget, forms.DateTimeInput):
                     "altFormat": convert_django_to_flatpickr_format(
                         get_format("SHORT_DATETIME_FORMAT")
                     ),
+                    "displayTimezoneLabel": get_current_timezone_name(),
                 },
             },
             cls=SBAdminJSONEncoder,
@@ -393,6 +503,7 @@ class SBAdminAutocompleteWidget(
     default_create_data = None
     forward_to_create = None
     reload_on_save = None
+    full_width = False
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
 
     def __init__(self, form_field=None, *args, **kwargs):
@@ -401,6 +512,7 @@ class SBAdminAutocompleteWidget(
         self.allow_add = kwargs.pop("allow_add", None)
         self.create_value_field = kwargs.pop("create_value_field", None)
         self.forward_to_create = kwargs.pop("forward_to_create", [])
+        self.full_width = kwargs.pop("full_width", self.full_width)
         super().__init__(form_field, *args, **kwargs)
         self.attrs = {} if attrs is None else attrs.copy()
         if self.multiselect and self.allow_add:
@@ -785,13 +897,7 @@ class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         if value:
             try:
                 file_obj = File.objects.get(pk=value)
-                if file_obj.logical_folder.is_root:
-                    related_url = reverse("sb_admin:filer-directory_listing-root")
-                else:
-                    related_url = reverse(
-                        "sb_admin:filer-directory_listing",
-                        args=(file_obj.logical_folder.id,),
-                    )
+                related_url = sb_admin_filer_directory_listing_url_for_file(file_obj)
                 change_url = reverse(
                     "sb_admin:{}_{}_change".format(
                         file_obj._meta.app_label,
@@ -843,9 +949,8 @@ class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashW
     template_name = "sb_admin/widgets/read_only_password_hash.html"
 
 
-class SBAdminHiddenWidget(SBAdminBaseWidget, forms.Widget):
+class SBAdminHiddenWidget(SBAdminBaseWidget, forms.HiddenInput):
     template_name = "sb_admin/widgets/hidden.html"
-    input_type = "hidden"
 
 
 class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
@@ -877,7 +982,7 @@ class SBAdminCodeWidget(SBAdminBaseWidget, forms.Widget):
             "sb_admin/js/codemirror/codemirror.min.js",
             "sb_admin/js/codemirror/overlay.min.js",
             "sb_admin/js/codemirror/django.min.js",
-            "sb_admin/src/js/code.js",
+            "sb_admin/js/code.js",
         ]
 
 

@@ -1,0 +1,966 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# 
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-16 11:52+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Equal"
+msgstr "Gleich"
+
+msgid "Not equal"
+msgstr "Ungleich"
+
+msgid "Less"
+msgstr "Kleiner"
+
+msgid "Less or equal"
+msgstr "Kleiner oder gleich"
+
+msgid "Greater"
+msgstr "Größer"
+
+msgid "Greater or equal"
+msgstr "Größer oder gleich"
+
+msgid "Between"
+msgstr "Zwischen"
+
+msgid "Not between"
+msgstr "Nicht zwischen"
+
+msgid "In"
+msgstr "In"
+
+msgid "Not in"
+msgstr "Nicht in"
+
+msgid "Begins with"
+msgstr "Beginnt mit"
+
+msgid "Not begins with"
+msgstr "Beginnt nicht mit"
+
+msgid "Contains"
+msgstr "Enthält"
+
+msgid "Not contains"
+msgstr "Enthält nicht"
+
+msgid "End with"
+msgstr "Endet mit"
+
+msgid "Not ends with"
+msgstr "Endet nicht mit"
+
+msgid "Is empty"
+msgstr "Ist leer"
+
+msgid "Is null"
+msgstr "Ist null"
+
+msgid "Is not null"
+msgstr "Ist nicht null"
+
+msgid "Before"
+msgstr "Vor"
+
+msgid "After"
+msgstr "Nach"
+
+msgid "In the last"
+msgstr "In den letzten"
+
+msgid "In the next"
+msgstr "In den nächsten"
+
+#, fuzzy
+#| msgid "Hold down “Control“, or “Command” on a Mac, to select more than one."
+msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
+msgstr "Halten Sie “Strg“ oder auf einem Mac “Befehl” gedrückt, um mehrere Einträge auszuwählen."
+
+#, python-format
+msgid "Change history: %s"
+msgstr "Änderungsverlauf: %s"
+
+msgid "Log in"
+msgstr "Anmelden"
+
+msgid "The new value was created but became unselected due to another validation error. Please select it again."
+msgstr "Der neue Wert wurde erstellt, aber aufgrund eines anderen Validierungsfehlers abgewählt. Bitte wählen Sie ihn erneut aus."
+
+msgid "Clear"
+msgstr "Leeren"
+
+msgid "Currently"
+msgstr "Aktuell"
+
+msgid "Change file"
+msgstr "Datei ändern"
+
+msgid "Cannot set parent to itself"
+msgstr "Übergeordnetes Element kann nicht auf sich selbst gesetzt werden"
+
+msgid "Cannot set parent to it's own child"
+msgstr "Übergeordnetes Element kann nicht auf ein eigenes untergeordnetes Element gesetzt werden"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Bulk"
+msgstr "Massen"
+
+msgid "Parent Context"
+msgstr "Übergeordneter Kontext"
+
+msgid "(empty)"
+msgstr "(leer)"
+
+msgid "Changes"
+msgstr "Änderungen"
+
+msgid "Affected Objects"
+msgstr "Betroffene Objekte"
+
+msgid "Related Changes"
+msgstr "Verwandte Änderungen"
+
+msgid "Summary"
+msgstr "Zusammenfassung"
+
+msgid "Search..."
+msgstr "Suchen..."
+
+msgid "Exit Reorder"
+msgstr "Neuanordnung beenden"
+
+#, python-brace-format
+msgid "Reorder {self.model._meta.verbose_name}"
+msgstr "{self.model._meta.verbose_name} neu anordnen"
+
+msgid "History"
+msgstr "Verlauf"
+
+msgid "Download XLSX"
+msgstr "XLSX herunterladen"
+
+msgid "Export Selected"
+msgstr "Auswahl exportieren"
+
+msgid "Delete Selected"
+msgstr "Auswahl löschen"
+
+msgid "No selection made."
+msgstr "Keine Auswahl getroffen."
+
+msgid "All"
+msgstr "Alle"
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully. You may edit it again below."
+msgstr "{name} “{obj}” wurde erfolgreich geändert. Sie können es unten erneut bearbeiten."
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully."
+msgstr "{name} “{obj}” wurde erfolgreich geändert."
+
+msgid "Year"
+msgstr "Jahr"
+
+msgid "Month"
+msgstr "Monat"
+
+msgid "Week"
+msgstr "Woche"
+
+msgid "Day"
+msgstr "Tag"
+
+msgid "Previous Period"
+msgstr "Vorheriger Zeitraum"
+
+msgid "Previous Year"
+msgstr "Vorjahr"
+
+msgid "Resolution"
+msgstr "Auflösung"
+
+msgid "Compare"
+msgstr "Vergleichen"
+
+msgid "Date"
+msgstr "Datum"
+
+msgid "Last 30 days"
+msgstr "Letzte 30 Tage"
+
+msgid "Last Quarter"
+msgstr "Letztes Quartal"
+
+msgid "Last Year"
+msgstr "Letztes Jahr"
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "No"
+msgstr "Nein"
+
+msgid "View on site"
+msgstr "Auf der Website anzeigen"
+
+msgid "Today"
+msgstr "Heute"
+
+msgid "Last 7 days"
+msgstr "Letzte 7 Tage"
+
+msgid "Last 90 days"
+msgstr "Letzte 90 Tage"
+
+msgid "Last 12 months"
+msgstr "Letzte 12 Monate"
+
+msgctxt "Tree widget"
+msgid "Loading..."
+msgstr "Wird geladen..."
+
+msgctxt "Tree widget"
+msgid "Load error!"
+msgstr "Ladefehler!"
+
+msgctxt "Tree widget"
+msgid "More..."
+msgstr "Mehr..."
+
+msgctxt "Tree widget"
+msgid "No data."
+msgstr "Keine Daten."
+
+msgid "System"
+msgstr "System"
+
+msgid "Dark"
+msgstr "Dunkel"
+
+msgid "Light"
+msgstr "Hell"
+
+msgid "Theme"
+msgstr "Design"
+
+msgid "Translations"
+msgstr "Übersetzungen"
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Bitte korrigieren Sie den untenstehenden Fehler."
+msgstr[1] "Bitte korrigieren Sie die untenstehenden Fehler."
+
+msgid "Save"
+msgstr "Speichern"
+
+msgid "Close"
+msgstr "Schließen"
+
+msgid "Prev"
+msgstr "Zurück"
+
+#, python-format
+msgid "<strong>%(current_index)s</strong> / %(all_objects_count)s"
+msgstr "<strong>%(current_index)s</strong> / %(all_objects_count)s"
+
+msgid "Next"
+msgstr "Weiter"
+
+msgid "Back"
+msgstr "Zurück"
+
+msgid "Change password"
+msgstr "Passwort ändern"
+
+#, python-format
+msgid "Enter a new password for the user <strong>%(username)s</strong>."
+msgstr "Geben Sie ein neues Passwort für den Benutzer <strong>%(username)s</strong> ein."
+
+#, python-format
+msgid "Delete %(object)s"
+msgstr "%(object)s löschen"
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde das Löschen der folgenden geschützten verwandten Objekte erfordern:"
+
+#, python-format
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr "Möchten Sie %(object_name)s \"%(escaped_object)s\" wirklich löschen? Alle folgenden verwandten Einträge werden gelöscht:"
+
+msgid "Objects"
+msgstr "Objekte"
+
+msgid "No, take me back"
+msgstr "Nein, zurück"
+
+#, fuzzy
+#| msgid "Yes, I'm sure"
+msgid "Yes, I’m sure"
+msgstr "Ja, ich bin sicher"
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Das Löschen der ausgewählten %(objects_name)s würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgstr "Das Löschen der ausgewählten %(objects_name)s würde das Löschen der folgenden geschützten verwandten Objekte erfordern:"
+
+#, python-format
+msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgstr "Möchten Sie die ausgewählten %(objects_name)s wirklich löschen? Alle folgenden Objekte und ihre verwandten Einträge werden gelöscht:"
+
+msgid "Add"
+msgstr "Hinzufügen"
+
+msgid "For page"
+msgstr "Für Seite"
+
+msgid "Date/time"
+msgstr "Datum/Uhrzeit"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Action"
+msgstr "Aktion"
+
+msgid "This object doesn't have a change history. It probably wasn't added via this admin site."
+msgstr "Dieses Objekt hat keinen Änderungsverlauf. Es wurde wahrscheinlich nicht über diese Administrationsseite hinzugefügt."
+
+msgid "Select all"
+msgstr "Alle auswählen"
+
+msgid "Select none"
+msgstr "Keine auswählen"
+
+msgid "Save view"
+msgstr "Ansicht speichern"
+
+msgid "Search and filter"
+msgstr "Suchen und filtern"
+
+msgid "Quick Search"
+msgstr "Schnellsuche"
+
+msgid "Saved Views"
+msgstr "Gespeicherte Ansichten"
+
+msgid "Advanced Filters"
+msgstr "Erweiterte Filter"
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Copy"
+msgstr "Kopieren"
+
+msgid "Show translations"
+msgstr "Übersetzungen anzeigen"
+
+msgid "Save Order"
+msgstr "Reihenfolge speichern"
+
+msgid "more"
+msgstr "mehr"
+
+msgid "No other affected objects."
+msgstr "Keine weiteren betroffenen Objekte."
+
+msgid "Bulk operation"
+msgstr "Massenoperation"
+
+msgid "items affected"
+msgstr "betroffene Einträge"
+
+msgid "Field"
+msgstr "Feld"
+
+msgid "Value"
+msgstr "Wert"
+
+msgid "No changes recorded."
+msgstr "Keine Änderungen aufgezeichnet."
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Object"
+msgstr "Objekt"
+
+msgid "No related changes in this request."
+msgstr "Keine verwandten Änderungen in dieser Anfrage."
+
+#, python-format
+msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
+msgstr "Sie sind als %(username)s angemeldet, aber nicht berechtigt, auf diese Seite zuzugreifen. Möchten Sie sich mit einem anderen Konto anmelden?"
+
+msgid "Welcome back"
+msgstr "Willkommen zurück"
+
+msgid "Enter your details to enter the application."
+msgstr "Geben Sie Ihre Daten ein, um die Anwendung zu öffnen."
+
+msgid "Can't sign in?"
+msgstr "Können Sie sich nicht anmelden?"
+
+msgid "Reset password"
+msgstr "Passwort zurücksetzen"
+
+msgid "Logged out"
+msgstr "Abgemeldet"
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr "Danke, dass Sie heute Zeit auf unserer Website verbracht haben."
+
+msgid "Log in again"
+msgstr "Erneut anmelden"
+
+msgid "Password change"
+msgstr "Passwortänderung"
+
+msgid "Your password was changed."
+msgstr "Ihr Passwort wurde geändert."
+
+#, fuzzy
+#| msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgid "Please enter your old password, for security’s sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgstr "Bitte geben Sie aus Sicherheitsgründen Ihr altes Passwort ein und dann Ihr neues Passwort zweimal, damit wir überprüfen können, ob Sie es korrekt eingegeben haben."
+
+msgid "Change my password"
+msgstr "Mein Passwort ändern"
+
+msgid "Password reset"
+msgstr "Passwort zurücksetzen"
+
+msgid "Your password has been set.  You may go ahead and log in now."
+msgstr "Ihr Passwort wurde festgelegt. Sie können sich jetzt anmelden."
+
+msgid "Please enter your new password twice so we can verify you typed it in correctly."
+msgstr "Bitte geben Sie Ihr neues Passwort zweimal ein, damit wir überprüfen können, ob Sie es korrekt eingegeben haben."
+
+msgid "The password reset link was invalid, possibly because it has already been used.  Please request a new password reset."
+msgstr "Der Link zum Zurücksetzen des Passworts war ungültig, möglicherweise weil er bereits verwendet wurde. Bitte fordern Sie ein neues Zurücksetzen des Passworts an."
+
+#, fuzzy
+#| msgid "We've emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgid "We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgstr "Wenn ein Konto mit der eingegebenen E-Mail-Adresse existiert, haben wir Ihnen Anweisungen zum Festlegen Ihres Passworts gesendet. Sie sollten diese in Kürze erhalten."
+
+#, fuzzy
+#| msgid "If you don't receive an email, please make sure you've entered the address you registered with, and check your spam folder."
+msgid "If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your spam folder."
+msgstr "Wenn Sie keine E-Mail erhalten, stellen Sie bitte sicher, dass Sie die Adresse eingegeben haben, mit der Sie sich registriert haben, und überprüfen Sie Ihren Spam-Ordner."
+
+#, python-format
+msgid "You're receiving this email because you requested a password reset for your user account at %(site_name)s."
+msgstr "Sie erhalten diese E-Mail, weil Sie ein Zurücksetzen des Passworts für Ihr Benutzerkonto bei %(site_name)s angefordert haben."
+
+msgid "Please go to the following page and choose a new password:"
+msgstr "Bitte gehen Sie auf die folgende Seite und wählen Sie ein neues Passwort:"
+
+#, fuzzy
+#| msgid "Your username, in case you've forgotten:"
+msgid "Your username, in case you’ve forgotten:"
+msgstr "Ihr Benutzername, falls Sie ihn vergessen haben:"
+
+msgid "Thanks for using our site!"
+msgstr "Danke, dass Sie unsere Website nutzen!"
+
+#, python-format
+msgid "The %(site_name)s team"
+msgstr "Das %(site_name)s-Team"
+
+#, fuzzy
+#| msgid "Forgotten your password? Enter your email address below, and we'll email instructions for setting a new one."
+msgid "Forgotten your password? Enter your email address below, and we’ll email instructions for setting a new one."
+msgstr "Passwort vergessen? Geben Sie unten Ihre E-Mail-Adresse ein und wir senden Ihnen Anweisungen zum Festlegen eines neuen Passworts."
+
+msgid "Reset my password"
+msgstr "Mein Passwort zurücksetzen"
+
+msgid "Columns"
+msgstr "Spalten"
+
+msgid "Choose Columns"
+msgstr "Spalten auswählen"
+
+msgid "Select All"
+msgstr "Alle auswählen"
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "View Results"
+msgstr "Ergebnisse anzeigen"
+
+msgid ""
+"\n"
+"                                <button class=\"btn btn-primary-light btn-tiny\">Add file</button>\n"
+"                                <span class=\"ml-4 text-dark-900 text-12 leading-16\">or move here</span>\n"
+"                            "
+msgstr ""
+"\n"
+"                                <button class=\"btn btn-primary-light btn-tiny\">Datei hinzufügen</button>\n"
+"                                <span class=\"ml-4 text-dark-900 text-12 leading-16\">oder hierher verschieben</span>\n"
+"                            "
+
+msgid "JPG, PNG, GIF or WEBP max 10MB"
+msgstr "JPG, PNG, GIF oder WEBP max. 10 MB"
+
+msgid "Remove View"
+msgstr "Ansicht entfernen"
+
+msgid "Do you want to remove table view?"
+msgstr "Möchten Sie die Tabellenansicht entfernen?"
+
+msgid "Save view as"
+msgstr "Ansicht speichern als"
+
+msgid "New view"
+msgstr "Neue Ansicht"
+
+msgid "View name"
+msgstr "Ansichtsname"
+
+msgid "or save as"
+msgstr "oder speichern als"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Calendar"
+msgstr "Kalender"
+
+msgid "Timezone"
+msgstr "Zeitzone"
+
+msgid "From"
+msgstr "Von"
+
+msgid "To"
+msgstr "Bis"
+
+msgid "Type to filter"
+msgstr "Zum Filtern tippen"
+
+msgid "Editorial reviews"
+msgstr "Redaktionelle Rezensionen"
+
+msgid "Reader reviews"
+msgstr "Leserrezensionen"
+
+msgid "Author"
+msgstr "Autor"
+
+msgid "Product details"
+msgstr "Produktdetails"
+
+msgid "Awards"
+msgstr "Auszeichnungen"
+
+msgid "Are you sure?"
+msgstr "Sind Sie sicher?"
+
+msgid "Confirm"
+msgstr "Bestätigen"
+
+msgid "Loading..."
+msgstr "Wird geladen..."
+
+#, python-format
+msgid "Add another %(verbose_name)s"
+msgstr "Weitere(n) %(verbose_name)s hinzufügen"
+
+msgid "Change"
+msgstr "Ändern"
+
+msgid "View"
+msgstr "Ansehen"
+
+msgid "Delete"
+msgstr "Löschen"
+
+msgid "results"
+msgstr "Ergebnisse"
+
+msgid "List of pages"
+msgstr "Seitenliste"
+
+msgid "Page Tree"
+msgstr "Seitenbaum"
+
+msgid "Reset filter"
+msgstr "Filter zurücksetzen"
+
+msgid "Sites"
+msgstr "Websites"
+
+#, python-format
+msgid ""
+"\n"
+"                                                Restore deleted %(name)s\n"
+"                                            "
+msgstr ""
+"\n"
+"                                                Gelöschte(n) %(name)s wiederherstellen\n"
+"                                            "
+
+#, python-format
+msgid ""
+"\n"
+"                                New %(name)s\n"
+"                            "
+msgstr ""
+"\n"
+"                                Neue(n) %(name)s\n"
+"                            "
+
+msgid "Main Navigation"
+msgstr "Hauptnavigation"
+
+msgid "Options"
+msgstr "Optionen"
+
+msgid "Paste"
+msgstr "Einfügen"
+
+msgid "Successfully moved"
+msgstr "Erfolgreich verschoben"
+
+msgid "Changes within the tree might require a refresh."
+msgstr "Änderungen in der Baumstruktur erfordern möglicherweise eine Aktualisierung."
+
+msgid "Error:"
+msgstr "Fehler:"
+
+msgid "This page cannot be copied because an application is attached to it. See the Page's Advanced settings to manage apphooks."
+msgstr "Diese Seite kann nicht kopiert werden, da eine Anwendung daran angehängt ist. Informationen zur Verwaltung von App-Hooks finden Sie in den erweiterten Seiteneinstellungen."
+
+msgid "Are you sure you want to § this page?"
+msgstr "Möchten Sie diese Seite wirklich § ?"
+
+msgid "Reload"
+msgstr "Neu laden"
+
+msgid "New node"
+msgstr "Neuer Knoten"
+
+msgid "nodes"
+msgstr "Knoten"
+
+msgid "Menu"
+msgstr "Menü"
+
+#, python-format
+msgid ""
+"\n"
+"                            <em>There is no %(object)s around yet.</em>\n"
+"                            <br>\n"
+"                            <a href=\"%(add_url)s\" class=\"addlink\">Add %(object)s</a> now.\n"
+"                        "
+msgstr ""
+"\n"
+"                            <em>Es ist noch kein %(object)s vorhanden.</em>\n"
+"                            <br>\n"
+"                            <a href=\"%(add_url)s\" class=\"addlink\">%(object)s hinzufügen</a>.\n"
+"                        "
+
+msgid "Duplicates"
+msgstr "Duplikate"
+
+msgid "URL copied to clipboard"
+msgstr "URL in die Zwischenablage kopiert"
+
+msgid "Go back to admin homepage"
+msgstr "Zurück zur Administrationsseite"
+
+msgid "Home"
+msgstr "Startseite"
+
+msgid "Go back to Filer app"
+msgstr "Zurück zur Filer-App"
+
+msgid "Filer"
+msgstr "Filer"
+
+msgid "Go back to root folder"
+msgstr "Zurück zum Stammordner"
+
+msgid "root"
+msgstr "Stamm"
+
+#, python-format
+msgid "Go back to '%(folder_name)s' folder"
+msgstr "Zurück zum Ordner '%(folder_name)s'"
+
+msgid "Go back to the parent folder"
+msgstr "Zurück zum übergeordneten Ordner"
+
+msgid "Folder Icon"
+msgstr "Ordnersymbol"
+
+msgid "Go back to"
+msgstr "Zurück zu"
+
+msgid "folder"
+msgstr "Ordner"
+
+msgid "Show menu"
+msgstr "Menü anzeigen"
+
+msgid "Change current folder details"
+msgstr "Details des aktuellen Ordners ändern"
+
+msgid "Limit"
+msgstr "Einschränken"
+
+msgid "Check it to limit the search to current folder"
+msgstr "Aktivieren, um die Suche auf den aktuellen Ordner zu beschränken"
+
+msgid "Limit the search to current folder"
+msgstr "Suche auf aktuellen Ordner beschränken"
+
+msgid "Click here to run search for entered phrase"
+msgstr "Hier klicken, um die Suche nach dem eingegebenen Begriff zu starten"
+
+msgid "Move"
+msgstr "Verschieben"
+
+msgid "Dropdown"
+msgstr "Dropdown"
+
+msgid "Adds a new Folder"
+msgstr "Neuen Ordner hinzufügen"
+
+msgid "New Folder"
+msgstr "Neuer Ordner"
+
+msgid "Upload Files"
+msgstr "Dateien hochladen"
+
+msgid "You have to select a folder first"
+msgstr "Sie müssen zuerst einen Ordner auswählen"
+
+msgid "Download"
+msgstr "Herunterladen"
+
+msgid "Expand"
+msgstr "Erweitern"
+
+msgid "File is missing"
+msgstr "Datei fehlt"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Size"
+msgstr "Größe"
+
+msgid "File-size"
+msgstr "Dateigröße"
+
+msgid "Modified"
+msgstr "Geändert"
+
+msgid "Created"
+msgstr "Erstellt"
+
+msgid "Owner"
+msgstr "Eigentümer"
+
+msgid "Logout"
+msgstr "Abmelden"
+
+msgid "Continue"
+msgstr "Weiter"
+
+msgid "Move to first"
+msgstr "An erste Stelle verschieben"
+
+msgid "Move to last"
+msgstr "An letzte Stelle verschieben"
+
+msgid "Move up"
+msgstr "Nach oben verschieben"
+
+msgid "Move down"
+msgstr "Nach unten verschieben"
+
+msgid "Reorder"
+msgstr "Neu anordnen"
+
+msgid "Collapse"
+msgstr "Einklappen"
+
+#, fuzzy
+#| msgid "results"
+msgid "No results found"
+msgstr "Ergebnisse"
+
+msgid "No choices to choose from"
+msgstr ""
+
+#, python-brace-format
+msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
+msgstr "<strong>${from} - ${to}</strong> von <strong>${total}</strong><span class=\"max-xs:hidden\"> Einträgen</span>"
+
+msgid "<strong>0</strong> items"
+msgstr "<strong>0</strong> Einträge"
+
+#, python-brace-format
+msgid "${value} selected"
+msgstr "${value} ausgewählt"
+
+msgid "Basic Settings"
+msgstr "Grundeinstellungen"
+
+msgid "Advanced Settings"
+msgstr "Erweiterte Einstellungen"
+
+msgid "Save as new"
+msgstr "Als neu speichern"
+
+msgid "Save and add another"
+msgstr "Speichern und weiteres hinzufügen"
+
+msgid "Save and continue editing"
+msgstr "Speichern und weiter bearbeiten"
+
+msgid "Add file"
+msgstr "Datei hinzufügen"
+
+msgid "or move here"
+msgstr "oder hierher verschieben"
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Open color picker"
+msgstr "Farbauswahl öffnen"
+
+msgid "Close color picker"
+msgstr "Farbauswahl schließen"
+
+msgid "Clear the selected color"
+msgstr "Ausgewählte Farbe löschen"
+
+#, python-brace-format
+msgid "Saturation: {s}. Brightness: {v}."
+msgstr "Sättigung: {s}. Helligkeit: {v}."
+
+msgid "Hue slider"
+msgstr "Farbtonregler"
+
+msgid "Opacity slider"
+msgstr "Transparenzregler"
+
+msgid "Color value field"
+msgstr "Farbwertfeld"
+
+msgid "Color format"
+msgstr "Farbformat"
+
+msgid "Color swatch"
+msgstr "Farbmuster"
+
+msgid "Saturation and brightness selector. Use up, down, left and right arrow keys to select."
+msgstr "Sättigungs- und Helligkeitsauswahl. Verwenden Sie die Pfeiltasten oben, unten, links und rechts zur Auswahl."
+
+msgid "drop your file here or"
+msgstr "Datei hier ablegen oder"
+
+msgid "No file selected"
+msgstr "Keine Datei ausgewählt"
+
+msgid "Lookup"
+msgstr "Nachschlagen"
+
+msgid "Choose File"
+msgstr "Datei auswählen"
+
+msgid "Wizard"
+msgstr "Assistent"
+
+msgid "Add another row"
+msgstr "Weitere Zeile hinzufügen"
+
+msgid "Row"
+msgstr "Zeile"
+
+msgid "New row"
+msgstr "Neue Zeile"
+
+#, python-brace-format
+msgid "Added {name} “{object}”."
+msgstr "{name} “{object}” hinzugefügt."
+
+msgid "Added."
+msgstr "Hinzugefügt."
+
+msgid "and"
+msgstr "und"
+
+#, python-brace-format
+msgid "Changed {fields} for {name} “{object}”."
+msgstr "{fields} für {name} “{object}” geändert."
+
+#, python-brace-format
+msgid "Changed {fields}."
+msgstr "{fields} geändert."
+
+#, python-brace-format
+msgid "Deleted {name} “{object}”."
+msgstr "{name} “{object}” gelöscht."
+
+msgid "No fields changed."
+msgstr "Keine Felder geändert."
+
+msgid "Finish"
+msgstr "Fertigstellen"
+
+msgid "Next step"
+msgstr "Nächster Schritt"
+
+msgid "Please complete the first step first."
+msgstr "Bitte schließen Sie zuerst den ersten Schritt ab."
+
+msgid "Not Translated"
+msgstr "Nicht übersetzt"
+
+msgid "Incomplete"
+msgstr "Unvollständig"
+
+msgid "Translated"
+msgstr "Übersetzt"
+
+msgid "Status"
+msgstr "Status"
+
+msgid " of "
+msgstr " von "

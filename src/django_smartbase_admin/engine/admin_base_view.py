@@ -12,13 +12,14 @@ from django.db.models import F
 from django.http import HttpResponse, Http404, JsonResponse, HttpRequest
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminFormViewAction,
+    sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
     Action,
@@ -111,8 +112,11 @@ class SBAdminBaseView(object):
 
     def delegate_to_action_view(self, processed_action):
         def inner_view(request, modifier):
-            return processed_action.target_view.as_view(view=self)(request)
+            return processed_action.target_view.as_view(view=self)(
+                request, modifier=modifier
+            )
 
+        inner_view._is_sbadmin_action = True
         return inner_view
 
     def process_actions(
@@ -149,9 +153,21 @@ class SBAdminBaseView(object):
         return self.field_cache
 
     def init_fields_cache(self, fields_source, configuration, force=False):
-        if not force and self.field_cache:
-            return self.field_cache.values()
         from django_smartbase_admin.engine.field import SBAdminField
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
+        try:
+            request = SBAdminThreadLocalService.get_request()
+        except LookupError:
+            request = None
+        cache_key = self.get_id()
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            if not force and cache_key in request_field_cache:
+                self.field_cache = request_field_cache[cache_key]
+                return self.field_cache.values()
 
         fields = []
         self.field_cache = {}
@@ -161,19 +177,11 @@ class SBAdminBaseView(object):
             field.init_field_static(self, configuration)
             fields.append(field)
             self.field_cache[field.name] = field
+        if request is not None:
+            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
+            request_field_cache[cache_key] = self.field_cache
+            request._sbadmin_field_cache = request_field_cache
         return fields
-
-    def action_view(self, request, action=None, modifier=None):
-        action_function = getattr(self, action, None)
-        if not action_function:
-            raise Http404
-        action = SBAdminCustomAction(
-            title=action, view=self, action_id=action, action_modifier=modifier
-        )
-        permitted_action = self.has_permission_for_action(request, action)
-        if not permitted_action:
-            raise PermissionDenied
-        return action_function(request, modifier)
 
     def get_action_url(self, action, modifier="template"):
         raise NotImplementedError
@@ -181,6 +189,7 @@ class SBAdminBaseView(object):
     def register_autocomplete_views(self, request):
         pass
 
+    @sbadmin_action
     def action_autocomplete(self, request, modifier):
         autocomplete_view = request.request_data.configuration.autocomplete_map.get(
             modifier
@@ -226,6 +235,20 @@ class SBAdminBaseView(object):
             "color_scheme_form": color_scheme_form,
         }
 
+    def get_language_form_context(self, request):
+        from django_smartbase_admin.views.user_config_view import LanguageForm
+
+        language_form = None
+        set_language_url = None
+        if len(settings.LANGUAGES) > 1:
+            try:
+                set_language_url = reverse("set_language")
+                language_form = LanguageForm(request=request)
+            except NoReverseMatch:
+                pass
+
+        return {"language_form": language_form, "set_language_url": set_language_url}
+
     def get_add_label(
         self, request: HttpRequest, object_id: str | None = None
     ) -> str | None:
@@ -235,6 +258,19 @@ class SBAdminBaseView(object):
         self, request: HttpRequest, object_id: str | None = None
     ) -> str | None:
         return self.change_label
+
+    def get_change_view_context(
+        self, request: HttpRequest, object_id: str | int | None
+    ) -> dict[str, Any]:
+        """Default change-form context: Back → model changelist. ModelAdmin subclasses only."""
+        return {
+            "show_back_button": True,
+            "back_url": reverse(
+                "sb_admin:{}_{}_changelist".format(
+                    self.opts.app_label, self.opts.model_name
+                )
+            ),
+        }
 
     def get_global_context(
         self, request, object_id: int | str | None = None
@@ -267,6 +303,7 @@ class SBAdminBaseView(object):
                 }
             ),
             **self.get_color_scheme_context(request),
+            **self.get_language_form_context(request),
         }
 
     def get_model_path(self) -> str:
@@ -314,18 +351,31 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_table_history_enabled = True
     sbadmin_list_history_enabled = True
     sbadmin_list_reorder_field = None
+    sbadmin_nested: dict | None = None
+    sbadmin_list_sticky_header_and_footer = None
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
 
+    def get_sbadmin_nested(self, request) -> dict | None:
+        """Return the nested config dict for this view, or ``None`` for a flat list.
+
+        Override for per-request logic. The returned dict must contain a
+        ``parent_field`` key pointing at a self-referential ForeignKey.
+        See ``plugins/nested.py`` for the full schema.
+        """
+        return self.sbadmin_nested
+
     def activate_reorder(self, request) -> None:
         request.reorder_active = True
 
+    @sbadmin_action
     def action_list_json_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         return self.action_list_json(request, modifier, page_size=100)
 
+    @sbadmin_action
     def action_enter_reorder(self, request, modifier):
         self.activate_reorder(request)
         tabulator_definition = self.get_tabulator_definition(request)
@@ -363,6 +413,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def is_reorder_available(self, request) -> str | None:
         return self.sbadmin_list_reorder_field
 
+    @sbadmin_action
     def action_table_reorder(self, request, modifier) -> JsonResponse:
         self.activate_reorder(request)
         qs = self.get_queryset(request)
@@ -397,6 +448,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
+    @sbadmin_action
     def action_table_data_edit(self, request, modifier) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
@@ -472,8 +524,16 @@ class SBAdminBaseListView(SBAdminBaseView):
             return False
         return super().has_add_permission(request)
 
+    def get_sbadmin_list_sticky_header_and_footer(self, request) -> bool:
+        if self.sbadmin_list_sticky_header_and_footer is not None:
+            return self.sbadmin_list_sticky_header_and_footer
+        return request.request_data.configuration.default_list_sticky_header_and_footer
+
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
+        sticky_header_and_footer = self.get_sbadmin_list_sticky_header_and_footer(
+            request
+        )
         tabulator_definition = {
             "viewId": view_id,
             "advancedFilterId": f"{view_id}" + "-advanced-filter",
@@ -492,6 +552,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialSort": self.get_list_initial_order(request),
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
+            "stickyHeaderAndFooter": sticky_header_and_footer,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -502,6 +563,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 "filterModule",
                 "tableParamsModule",
                 "detailViewModule",
+                "dataTreeModule",
             ],
             "tabulatorOptions": {
                 "renderVertical": "basic",
@@ -530,6 +592,14 @@ class SBAdminBaseListView(SBAdminBaseView):
                     "headerTabsModule",
                 ]
             )
+        for plugin in request.request_data.configuration.plugins:
+            tabulator_definition = plugin.modify_tabulator_definition(
+                self,
+                request=request,
+                definition=tabulator_definition,
+            )
+        if sticky_header_and_footer:
+            tabulator_definition["modules"].append("stickyHeaderAndFooterModule")
         return tabulator_definition
 
     def _get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction] | list:
@@ -620,11 +690,13 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         return self.sbadmin_xlsx_options
 
+    @sbadmin_action
     def action_xlsx_export(self, request, modifier) -> HttpResponse:
         action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
+    @sbadmin_action
     def action_bulk_delete(self, request, modifier):
         action = self.sbadmin_list_action_class(self, request)
         if (
@@ -650,6 +722,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             return redirect(self.get_menu_view_url(request))
         return response
 
+    @sbadmin_action
     def action_config(self, request, config_id=None):
         config_id = config_id if config_id != "None" else None
 
@@ -693,6 +766,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         redirect_to = urllib.parse.urlunparse(url)
         return redirect_to
 
+    @sbadmin_action
     def action_list(
         self,
         request,
@@ -734,6 +808,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             extra_context,
         )
 
+    @sbadmin_action
     def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()
@@ -748,7 +823,11 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbadmin_list_display(request) or []
-        self.init_fields_cache(list_fields, request.request_data.configuration)
+        initialized_fields = self.init_fields_cache(
+            list_fields, request.request_data.configuration
+        )
+        if initialized_fields is not None:
+            list_fields = initialized_fields
         base_filter = {
             getattr(field, "filter_field", field): ""
             for field in list_fields

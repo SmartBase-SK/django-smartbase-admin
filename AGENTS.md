@@ -12,35 +12,62 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
-| [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, success/error handling |
+| [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
 | [Inlines](#inlines) | `SBAdminTableInline`, `SBAdminStackedInline` for related models |
+| [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add) | Why default-only singleton inlines can be skipped and how SBAdmin creates them during add |
+| [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin) | Show related models without a real Django FK to the parent — cross-database, unmanaged, or indirect relationships |
 | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) | `label_lambda`, `search_query_lambda`, dependent dropdowns, subclassing for computed values |
-| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, programmatic URL building |
+| [Pre-filtered List Views](#pre-filtered-list-views-sbadmin_list_view_config) | Tab-based filtered views with `sbadmin_list_view_config`, default tab from menu, programmatic URL building |
+| [Nested List View](#nested-list-view-sbadmin_nested) | One-level self-referential tree rendering via Tabulator `dataTree` with `TabulatorNestedPlugin` |
+| [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node) | Multi-level tree rendering for django-treebeard `MP_Node` models — form widget, filter widget, `actions/tree_list.html` |
+| [List View Plugins](#list-view-plugins-sbadminplugin) | Protocol for reshaping the list pipeline globally — queryset hooks, per-request state, Tabulator definition |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
+| [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
+| [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
-| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic URLs |
+| [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
+| [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
+| [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
+- **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
+- **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
+- **Manual audit log entries?** → [Programmatic Audit Entries](#programmatic-audit-entries-_create_audit_log)
 - **N+1 query issues?** → [Performance Optimization](#performance-optimization)
 - **Autocomplete customization?** → [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization)
 - **Ordering by computed field?** → [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield)
+- **Menu opens filtered tab?** → [Default Tab and Menu Link to Filtered View](#default-tab-and-menu-link-to-filtered-view)
 - **Building pre-filtered URLs?** → [Building Pre-filtered URLs Programmatically](#building-pre-filtered-urls-programmatically)
+- **Tree / parent-child rows in list view (one level, self-FK)?** → [Nested List View](#nested-list-view-sbadmin_nested)
+- **Multi-level tree / django-treebeard `MP_Node`?** → [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node)
+- **Pick parent from a tree in a form?** → [`SBAdminTreeWidget` as a form widget](#sbadmintreewidget--form-widget-for-picking-a-node)
+- **Filter a list by tree node?** → [`SBAdminTreeFilterWidget`](#sbadmintreefilterwidget--filter-widget)
+- **Reshape list queryset / Tabulator options globally?** → [List View Plugins](#list-view-plugins-sbadminplugin)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
+- **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **Regenerate translations?** → [Internationalization](#internationalization)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
+- **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
+- **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
+- **Inline for model without FK to parent?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
+- **Cross-database or unmanaged inline?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
+- **Multiple inlines for the same model?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
 
 ---
 
@@ -78,6 +105,12 @@ class Comment(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+class ArticleMeta(models.Model):
+    """Singleton metadata row for each Article."""
+    article = models.OneToOneField(Article, on_delete=models.CASCADE, related_name="meta")
+    heading = models.CharField(max_length=200, default="Metadata")
+    description = models.TextField(blank=True, default="")
 ```
 
 ---
@@ -370,6 +403,13 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 
 **Note**: Use `registered_views` with `SBAdminDashboardView` to register custom views. Model admin views (like `blog_article`) are automatically discovered from the admin site registry when `django_smartbase_admin` loads (which is why the INSTALLED_APPS ordering matters).
 
+### Supported Versions
+
+Package metadata currently targets:
+
+- Django `>= 4.1, < 7.0`
+- Python `3.10` through `3.14`
+
 ### Menu Item View IDs
 
 Format: `{app_label}_{model_name}` (lowercase)
@@ -397,15 +437,17 @@ Left-small-down, Left-small-up, Lightning, Lightning-fill, Like, Link-two,
 List-checkbox, Lock, Login, Logout, Magic, Magic-wand, Mail, Mail-download,
 Mail-open, Message-emoji, Message-one, Minus, Minus-the-top, Moon, More,
 More-one, More-three, More-two, Paperclip, Parallel-gateway, People-top-card,
-Percentage, Phone-telephone, Picture-one, Pin, Pin Filled, Plus, Preview-close,
+Percentage, Phone-telephone, Picture-one, Pin, Pin-filled, Plus, Preview-close,
 Preview-close-one, Preview-open, Printer, Pull, Pushpin, Reduce-one, Refresh-one,
-Return, Rewora, Rewora Filled, Right, Right-c, Right-small, Right-small-down,
+Return, Star-2, Star-2-filled, Right, Right-c, Right-small, Right-small-down,
 Right-small-up, Save, Search, Send-email, Setting-config, Setting-two, Shop,
 Shopping, Shopping-bag, Shopping-cart-one, Sort, Sort-amount-down, Sort-amount-up,
-Sort-one, Sort-three, Sort Alt, Star, Success, Sun-one, Switch, Table-report,
-Tag, Tag-one, Time, Tips-one, To-top, Transfer-data, Translate, Translation,
+Sort-one, Sort-three, Sort-alt, Star, Success, Sun-one, Switch, Table-report,
+Tag, Tag-one, Thumbs-down, Thumbs-down-filled, Thumbs-up, Thumbs-up-filled,
+Time, Tips-one, To-top, Transfer-data, Translate, Translation,
 Triangle-round-rectangle, Truck, Undo, Unlock, Up, Up-c, Up-small, Upload,
-Upload-one, User-business, View-grid-list, Write, Zoom-in, Zoom-out
+Upload-one, User-business, View-grid-list, Write, Writing-fluently-filled,
+Zoom-in, Zoom-out
 ```
 
 Example:
@@ -836,6 +878,26 @@ Styles live in `static/sb_admin/src/css/_tabulator.css`: the icon is hidden on s
 
 > **Recommendation:** Prefer `MultipleChoiceFilterWidget` over `ChoiceFilterWidget` for choice-based filters. It provides a better UX and gives users more flexibility to select multiple values at once.
 
+### Grouped Choices
+
+Both `ChoiceFilterWidget` and `MultipleChoiceFilterWidget` accept Django-style grouped choices in addition to the flat form. Grouped input renders a header (`<optgroup>` in select templates, a styled header `<li>` in the checkbox-dropdown templates); flat input renders identically to before.
+
+```python
+# Flat (unchanged)
+MultipleChoiceFilterWidget(choices=[
+    ("draft", "Draft"),
+    ("published", "Published"),
+])
+
+# Grouped — shipper is the group header
+MultipleChoiceFilterWidget(choices=[
+    ("GLS", [("1", "Insurance"), ("2", "Signature required")]),
+    ("SPS", [("5", "Special handling"), ("6", "Overweight")]),
+])
+```
+
+Detection follows the same rule Django's `ChoiceWidget.optgroups` uses: the top-level structure is grouped if the second element of the first item is a list/tuple. Mixing flat and grouped choices in the same call is not supported.
+
 ### Custom Filter Widget Example
 
 ```python
@@ -980,6 +1042,92 @@ This is useful when you want to filter by related data that doesn't need its own
 
 ---
 
+## Form Widgets
+
+Use these when you need SBAdmin-styled form controls outside list filters.
+
+### `SBAdminTextTagsWidget` - delimiter-separated text tags
+
+Use `SBAdminTextTagsWidget` for a single text field that stores multiple values separated by a delimiter (default: comma). This is useful when you want tag-like UX without a related model or M2M table.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminTextTagsWidget
+
+
+class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
+    tag_names = forms.CharField(
+        label="Tag names",
+        required=False,
+        help_text="Comma-separated values",
+        widget=SBAdminTextTagsWidget(
+            delimiter=",",
+            attrs={"placeholder": "news, featured, internal"},
+        ),
+    )
+```
+
+**Key points:**
+- Stored value remains a plain string in the underlying input; the widget only upgrades the UX.
+- `delimiter` controls how pasted/typed values are split.
+- Duplicate values are prevented client-side.
+- Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
+
+### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
+
+When a form inherits from `SBAdminBaseForm`, widgets defined in `Meta.widgets` are initialized even if the field is not re-declared on the form class.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminRadioDropdownWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminRadioDropdownWidget(
+                choices=Article._meta.get_field("status").choices
+            ),
+        }
+```
+
+**Why this matters:** You no longer need to re-declare `status = forms.ChoiceField(...)` just to get SBAdmin widget initialization. `Meta.widgets` is enough.
+
+### Required selects and empty placeholder option
+
+`SBAdminSelectWidget` now disables the empty option by default for required fields. This prevents users from going back to an invalid blank value after choosing a real one.
+
+```python
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import SBAdminSelectWidget
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "status")
+        widgets = {
+            "status": SBAdminSelectWidget(
+                disable_empty_option=False,  # keep placeholder selectable
+            ),
+        }
+```
+
+**Key points:**
+- Default behavior is safer for required fields: blank placeholder is shown but disabled.
+- Set `disable_empty_option=False` if you explicitly want the empty option to remain selectable.
+- The setting only affects empty values (`""` / `None`) on required fields.
+
+---
+
 ## Admin Registration
 
 ```python
@@ -1071,25 +1219,30 @@ list_filter = ("title", "status", "author__email")
 
 Add custom actions that operate on selected rows in the list view.
 
-### Using SBAdminFormViewAction with Modal
-
-For actions that need user input (like selecting options), use `SBAdminFormViewAction` with `ListActionModalView`:
-
 ```python
 from django import forms
-from django.db.models import Q
+from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
+from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
-
-from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_htmx.http import trigger_client_event
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
 from django_smartbase_admin.engine.modal_view import ListActionModalView
 
-from blog.models import Category
+from blog.models import Article, Category
+```
 
+### Modal with Form
 
+For actions that need user input, use `SBAdminFormViewAction` with `ListActionModalView`:
+
+```python
 class AssignCategoryForm(SBAdminBaseFormInit, forms.Form):
-    """Form with SBAdminBaseFormInit mixin for modal integration."""
     category = forms.ModelChoiceField(
         label=_("Category"),
         queryset=Category.objects.all(),
@@ -1106,14 +1259,13 @@ class AssignCategoryView(ListActionModalView):
     modal_title = _("Assign Category")
 
     def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
-        """Called with the selected rows queryset after form validation."""
         category = form.cleaned_data["category"]
         selection_queryset.update(category=category)
 
 
+@admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     def get_sbadmin_list_selection_actions(self, request):
-        """Override to define custom selection actions."""
         return [
             SBAdminFormViewAction(
                 target_view=AssignCategoryView,
@@ -1125,71 +1277,178 @@ class ArticleAdmin(SBAdmin):
         ]
 ```
 
-### Key Points
+### Confirmation-Only Modals (No Form Fields)
 
-- Override `get_sbadmin_list_selection_actions(request)` to return custom actions
-- Use `SBAdminFormViewAction` with `open_in_modal=True` for modal dialogs
-- Extend `ListActionModalView` and implement `process_form_valid_list_selection_queryset`
-- Forms should extend `SBAdminBaseFormInit` mixin (from `django_smartbase_admin.admin.admin_base`)
-- For autocomplete multiselect: use `SBAdminAutocompleteWidget` with `ModelMultipleChoiceField` (model restrictions applied automatically via `restrict_queryset`)
-- `selection_queryset` contains all selected rows, already filtered by user selection
-- Default actions include "Export Selected" and "Delete Selected"
+Use an empty form for confirm/cancel dialogs. The modal renders the title with Close/Continue buttons.
 
-### Modal Success Notifications and Error Handling
+```python
+class ConfirmForm(SBAdminBaseFormInit, forms.Form):
+    pass
 
-Django SmartBase Admin uses Django's messages framework with HTMX out-of-band swaps for notifications. When handling success/error in modal views:
 
-**Error handling** - Display errors in the modal form:
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Archive Selected Articles")
+
+    def process_form_valid(self, request, form):
+        selection_queryset = self.get_selection_queryset(request, form)
+        count = selection_queryset.update(status="archived")
+
+        messages.success(request, _("%d article(s) archived.") % count)
+        notifications_html = render_to_string(
+            "sb_admin/includes/notifications.html",
+            {"messages": messages.get_messages(request)},
+            request=request,
+        )
+        response = HttpResponse(notifications_html)
+        trigger_client_event(response, "hideModal", {})
+        trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
+        return response
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_list_selection_actions(self, request):
+        return [
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+                css_class="btn-destructive",
+            ),
+        ]
+```
+
+### SBAdminCustomAction Parameters
+
+`SBAdminFormViewAction` extends `SBAdminCustomAction`. Available parameters:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | str | **Required** | Button label |
+| `target_view` | class | **Required** (FormViewAction only) | The `ListActionModalView` subclass |
+| `view` | SBAdmin | **Required** | The admin class instance (`self`) |
+| `action_id` | str | `None` | Unique identifier for this action |
+| `open_in_modal` | bool | `False` | Open the action in a modal dialog |
+| `css_class` | str | `None` | CSS class for the button (e.g., `"btn-destructive"` for red) |
+| `icon` | str | `None` | Icon name (from sprite set) |
+| `group` | str | `None` | Group actions under a dropdown menu |
+| `sub_actions` | list | `None` | Nested actions under this action |
+| `no_params` | bool | `False` | If `True`, don't pass current list params to the action URL |
+| `open_in_new_tab` | bool | `False` | Open action URL in a new browser tab |
+| `url` | str | `None` | Direct URL (for non-form actions) |
+| `template` | str | `None` | Custom template for the action button |
+
+### Per-Action Permissions (`has_permission_for_action`)
+
+Override `has_permission_for_action` on your admin class to control which actions are visible per request.
+
+```python
+PUBLISH_ACTION_ID = "publish_articles"
+
+
+class ConfirmForm(SBAdminBaseFormInit, forms.Form):
+    pass
+
+
+class PublishArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Publish Selected Articles")
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        selection_queryset.update(status="published")
+
+
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmForm
+    modal_title = _("Archive Selected Articles")
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        selection_queryset.update(status="archived")
+
+
+# ❌ BAD - Conditionally building the action list based on request.
+# URL handlers are registered via setattr on the singleton during the first request.
+# If a non-editor visits first, PublishView handler is never registered.
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_list_selection_actions(self, request):
+        actions = []
+        permissions = set(request.session.get("permissions", []))
+        if "editor" in permissions:
+            actions.append(
+                SBAdminFormViewAction(
+                    target_view=PublishArticlesView,
+                    title=_("Publish Selected"),
+                    view=self,
+                    action_id=PUBLISH_ACTION_ID,
+                    open_in_modal=True,
+                ),
+            )
+        actions.append(
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+            ),
+        )
+        return actions
+
+
+# ✅ GOOD - Always return all actions, use has_permission_for_action to filter visibility
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_list_selection_actions(self, request):
+        return [
+            SBAdminFormViewAction(
+                target_view=PublishArticlesView,
+                title=_("Publish Selected"),
+                view=self,
+                action_id=PUBLISH_ACTION_ID,
+                open_in_modal=True,
+            ),
+            SBAdminFormViewAction(
+                target_view=ArchiveArticlesView,
+                title=_("Archive Selected"),
+                view=self,
+                action_id="archive_articles",
+                open_in_modal=True,
+                css_class="btn-destructive",
+            ),
+        ]
+
+    def has_permission_for_action(self, request, action):
+        if getattr(action, "action_id", None) == PUBLISH_ACTION_ID:
+            permissions = set(request.session.get("permissions", []))
+            if "editor" not in permissions and "admin" not in permissions:
+                return False
+        return super().has_permission_for_action(request, action)
+```
+
+**Key points:**
+- Always return **all** actions from `get_sbadmin_list_selection_actions` — use `has_permission_for_action` to filter visibility
+- Do NOT conditionally build the action list based on request — URL handlers are registered on the singleton during the first request and cached via `init_actions`
+- The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
+- `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
+- When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
+
+### Modal Error Handling
+
 ```python
 class AssignCategoryView(ListActionModalView):
     def process_form_valid(self, request, form):
         try:
             return super().process_form_valid(request, form)
         except ValidationError as e:
-            form.add_error(None, str(e))  # Add as non-field error
-            return self.form_invalid(form)  # Re-render modal with error
-```
-
-The modal template (`sb_admin/partials/modal/modal_content.html`) automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
-
-**Success notifications** - Show toast notification and close modal:
-```python
-from django.contrib import messages
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django_htmx.http import trigger_client_event
-from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
-
-class AssignCategoryView(ListActionModalView):
-    success_message = _("Category assigned successfully.")
-
-    def process_form_valid(self, request, form):
-        try:
-            selection_queryset = self.get_selection_queryset(request, form)
-            self.process_form_valid_list_selection_queryset(request, form, selection_queryset)
-        except ValidationError as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
-
-        # Add success message and render notifications template
-        messages.success(request, self.success_message)
-        notifications_html = render_to_string(
-            "sb_admin/includes/notifications.html",
-            {"messages": messages.get_messages(request)},
-            request=request,
-        )
-
-        # Return response with notifications (OOB swap) and client events
-        response = HttpResponse(notifications_html)
-        trigger_client_event(response, "hideModal", {})
-        trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
-        return response
 ```
 
-**How it works:**
-- `notifications.html` has `hx-swap-oob="beforeend"` - HTMX appends it to the notification container
-- Success alerts auto-dismiss after 5 seconds (`remove-me="5s"` attribute)
-- Message levels: `messages.success()`, `messages.warning()`, `messages.error()` map to different alert styles
+The modal template automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
 
 ---
 
@@ -1245,7 +1504,8 @@ Use `format_array` directly for custom badge colors:
 ```python
 from django_smartbase_admin.engine.field_formatter import format_array, BadgeType
 
-# BadgeType options: SUCCESS (green), WARNING (yellow), ERROR (red), NOTICE (default)
+# BadgeType options: NOTICE (default), SUCCESS/POSITIVE (green), WARNING (yellow),
+# ERROR (red), NEUTRAL (gray), PRIMARY (brand color)
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
 
@@ -1373,6 +1633,219 @@ class ArticleAdmin(SBAdmin):
 - `SBAdminGenericTableInline` - For GenericForeignKey relations
 - `SBAdminGenericStackedInline` - Stacked GenericForeignKey
 
+## Validated Singleton Inline Creation on Add
+
+Django treats extra inline forms with default-only values as unchanged. For required singleton inlines, this may result in skipped creation unless the form is considered changed during validation.
+
+### Behavior in SBAdmin
+
+For parent **add** flow, SBAdmin supports validated singleton creation with:
+
+- `min_num = 1`
+- `max_num = 1`
+- `validate_min = True`
+- `validate_max = True`
+
+When these conditions are met, SBAdmin marks the first extra inline form as changed during formset `full_clean()`. This lets normal validation/save flow create the related object (including default-only values).
+
+### ❌ BAD - Singleton inline can still be skipped
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminStackedInline
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Article, ArticleMeta
+
+
+class ArticleMetaInline(SBAdminStackedInline):
+    model = ArticleMeta
+    min_num = 1
+    max_num = 1
+    # Missing validate_min / validate_max
+    can_delete = False
+    extra = 1
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    inlines = [ArticleMetaInline]
+```
+
+### ✅ GOOD - Validated singleton is created on add
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminStackedInline
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Article, ArticleMeta
+
+
+class ArticleMetaInline(SBAdminStackedInline):
+    model = ArticleMeta
+    min_num = 1
+    max_num = 1
+    validate_min = True
+    validate_max = True
+    can_delete = False
+    extra = 1
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    inlines = [ArticleMetaInline]
+```
+
+**Key points:**
+- Scope is intentionally add-only to keep update flow conservative.
+- Validation still runs normally; this does not bypass field/model validation.
+- If required inline fields have no defaults and remain empty, validation can still fail (expected).
+
+---
+
+## Fake Inlines (`SBAdminFakeInlineMixin`)
+
+Django's built-in inlines require a real `ForeignKey` from the inline model to the parent model on the **same** database. Fake inlines remove that constraint. Use them when:
+
+- The inline model lives in a **different database** (cross-database relationship)
+- The models are **unmanaged** (`Meta.managed = False`) and Django can't introspect the FK
+- The relationship is **indirect** (e.g., through a junction table or computed path)
+- You need a **read-only inline** showing related data without a direct Django FK
+- You need **multiple inlines for the same model** on one parent admin (e.g., active vs archived comments) — Django forbids duplicate model inlines, but each fake inline creates a unique proxy model
+
+### How It Works
+
+`SBAdminFakeInlineMixin` creates a dynamic **proxy model** from the inline model at startup. This proxy tricks Django's formset machinery into accepting the inline without a real FK. A monkeypatch on `_get_foreign_key` catches the `ValueError` that Django raises for the missing FK and substitutes a synthetic one.
+
+At query time, the mixin:
+1. Annotates the queryset with a fake FK field (`inline_fake_relationship`) using `get_fake_inline_identifier_annotate()`
+2. Intercepts `.filter()` calls from the formset and delegates to `filter_fake_inline_identifier_by_parent_instance()` to apply the actual parent-child filtering
+
+### Usage
+
+Mix `SBAdminFakeInlineMixin` with `SBAdminTableInline` (or `SBAdminStackedInline`). Register the inline on the parent admin via `sbadmin_fake_inlines` (not `inlines`).
+
+```python
+from django.contrib import admin
+from django.db.models import F
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+
+from blog.models import Article, Comment
+
+
+class CommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    fields = ("text", "created_at")
+    readonly_fields = ("text", "created_at")
+    verbose_name = "Comment"
+    verbose_name_plural = "Comments"
+    extra = 0
+    can_delete = False
+    max_num = 0
+    path_to_parent_instance_id = "article_id"
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+
+    sbadmin_fieldsets = [
+        (None, {"fields": ["title", "status", "category"]}),
+    ]
+```
+
+### Key Parameters and Methods
+
+| Parameter / Method | Type | Description |
+|--------------------|------|-------------|
+| `model` | Model class | **Required**. The inline model (can be unmanaged, cross-database) |
+| `path_to_parent_instance_id` | str | **Required**. Lookup path from inline model to parent's PK (e.g., `"article_id"`, `"article__author_id"`) |
+| `get_fake_inline_identifier_annotate()` | method → Expression | **Required override**. Returns an `F()` expression that annotates each inline row with the parent's identifier. Must correspond to `path_to_parent_instance_id` |
+| `filter_fake_inline_identifier_by_parent_instance()` | method | Filters inline queryset by parent instance. Default implementation uses `path_to_parent_instance_id` — override for custom logic |
+| `save_new_fake_inline_instance()` | method | Handles saving new inline instances. Override for writable fake inlines |
+| `get_queryset()` | method | Override to add extra filtering (e.g., `.filter(active=True)`) or ordering. **Must call `super()` first** |
+
+### Writable Pattern
+
+For editable fake inlines, set `path_to_parent_instance_id` and allow mutations. The mixin's `save_new_fake_inline_instance()` sets the FK value on new instances before saving:
+
+```python
+class CommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    fields = ("text",)
+    extra = 1
+    can_delete = True
+    path_to_parent_instance_id = "article_id"
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+```
+
+### Custom Queryset Filtering
+
+Override `get_queryset` to add extra conditions. Always call `super()` first to get the properly configured fake queryset:
+
+```python
+class ActiveCommentFakeInline(SBAdminFakeInlineMixin, SBAdminTableInline):
+    model = Comment
+    path_to_parent_instance_id = "article_id"
+    # ...
+
+    def get_fake_inline_identifier_annotate(self):
+        return F("article_id")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.filter(is_approved=True).order_by("-created_at")
+```
+
+### Registration
+
+**CRITICAL**: Fake inlines go in `sbadmin_fake_inlines`, NOT `inlines`:
+
+```python
+# ❌ BAD - Regular inlines list; Django will fail looking for a real FK
+class ArticleAdmin(SBAdmin):
+    inlines = [CommentFakeInline]
+
+# ✅ GOOD - Fake inlines list; SBAdminFakeInlineMixin handles the fake FK
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+```
+
+### Using with Tabs
+
+Fake inlines work with `sbadmin_tabs` just like regular inlines — reference by class:
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_fake_inlines = [CommentFakeInline]
+
+    sbadmin_tabs = {
+        "Content": [None],
+        "Comments": [CommentFakeInline],
+    }
+```
+
+**Key points:**
+- `SBAdminFakeInlineMixin` must be the **first** parent class (before `SBAdminTableInline`/`SBAdminStackedInline`) for correct MRO
+- `path_to_parent_instance_id` is a Django ORM lookup path (e.g., `"article_id"`, `"article__author_id"`)
+- `get_fake_inline_identifier_annotate()` must return an `F()` expression that maps each inline row to the parent PK it belongs to
+- Permission checks flow through `SBAdminRoleConfiguration.has_permission()` using the inline's `original_model`
+- The dynamic proxy model is created once at startup and cached in the Django app registry
+- Works across databases — the inline queryset uses the database router for the inline's model, not the parent's
+
+**Source:** `django_smartbase_admin/engine/fake_inline.py` — `SBAdminFakeInlineMixin`, `FakeQueryset`, `SBAdminFakeInlineFormset`; `django_smartbase_admin/monkeypatch/fake_inline_monkeypatch.py`
+
 ---
 
 ## Global Autocomplete Widget Customization
@@ -1483,6 +1956,48 @@ subcategory = forms.ModelChoiceField(
     ),
 )
 ```
+
+### Forward with radio and checkbox widgets
+
+`forward=[...]` also works when the forwarded source field renders as a radio group or checkbox group (not just plain inputs/selects). SBAdmin reads checked input values and forwards them to `filter_search_lambda`.
+
+```python
+from django import forms
+from django.db.models import Q
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import (
+    SBAdminAutocompleteWidget,
+    SBAdminRadioDropdownWidget,
+)
+
+from blog.models import Article, Author
+
+
+class AuthorByStatusForm(SBAdminBaseFormInit, forms.Form):
+    status = forms.ChoiceField(
+        choices=Article._meta.get_field("status").choices,
+        widget=SBAdminRadioDropdownWidget(
+            choices=Article._meta.get_field("status").choices
+        ),
+    )
+    author = forms.ModelChoiceField(
+        queryset=Author.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Author,
+            multiselect=False,
+            forward=["status"],
+            filter_search_lambda=lambda req, term, fwd: (
+                Q(article__status=fwd.get("status")) if fwd.get("status") else Q()
+            ),
+        ),
+    )
+```
+
+**Key points:**
+- Radio widgets forward a single value.
+- Checkbox groups forward a list of checked values.
+- This works for nested form prefixes too, so the same pattern is safe inside inline/formset rows.
 
 ### Example: Create on the fly with create_value_field + forward_to_create
 
@@ -1819,6 +2334,84 @@ An "All" tab is automatically added as the first tab.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
 
+### Default Tab and Menu Link to Filtered View
+
+By default, clicking a menu item opens the "All" tab. To make a custom tab the default (e.g., show "Published" articles when clicking the menu item):
+
+1. Override `get_base_config` to reorder tabs so your custom tab is first
+2. Override `get_menu_view_url` to construct a URL with filter parameters
+
+```python
+from django.contrib import admin
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import MultipleChoiceFilterWidget
+from django_smartbase_admin.services.views import SBAdminViewService
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="status",
+            filter_widget=MultipleChoiceFilterWidget(choices=[
+                ("published", "Published"),
+                ("draft", "Draft"),
+                ("archived", "Archived"),
+            ]),
+        ),
+        "title",
+        "category",
+    )
+
+    sbadmin_list_filter = ("status",)
+
+    sbadmin_list_view_config = [
+        {
+            "name": "Published",
+            "url_params": {
+                "filterData": {
+                    "status": [{"value": "published", "label": "Published"}],
+                }
+            },
+        },
+    ]
+
+    def get_base_config(self, request):
+        """Reorder tabs: move custom tabs before 'All'.
+
+        Default order from super(): [All, Published, ...]
+        After rotation: [Published, ..., All]
+        """
+        configs = super().get_base_config(request)
+        return configs[1:] + configs[:1]
+
+    def get_menu_view_url(self, request) -> str:
+        """Build menu URL that opens the first custom tab (Published) directly."""
+        base = reverse(f"sb_admin:{self.get_id()}_changelist")
+        filter_data = self.sbadmin_list_view_config[0]["url_params"]["filterData"]
+        params = SBAdminViewService.build_list_params_url(self.get_id(), filter_data)
+        return f"{base}?{params}"
+```
+
+**How it works:**
+- `get_base_config` returns the list of tab configs. The default order is `[All, ...custom tabs...]`. Rotating with `configs[1:] + configs[:1]` puts custom tabs first and "All" last.
+- `get_menu_view_url` is called by the menu rendering to get the URL for this model's menu item. By default it returns the changelist URL (which opens "All"). Overriding it to include filter params makes the menu link open the filtered view directly.
+- The tab order and menu URL are independent — override both for a consistent experience.
+
+**Key points:**
+- `get_base_config` rotation (`configs[1:] + configs[:1]`) works for any number of custom tabs — the first custom tab becomes the default
+- `self.get_id()` returns the view ID in `{app_label}_{model_name}` format
+- `SBAdminViewService.build_list_params_url` encodes filter data into URL query parameters
+- Without `get_menu_view_url` override, clicking the menu item would show the "All" tab even if `get_base_config` reorders tabs (the menu URL is constructed separately)
+
 ### Building Pre-filtered URLs Programmatically
 
 Use `SBAdminViewService.build_list_params_url()` to generate URLs with pre-applied filters from Python code (e.g., for redirects or links between admin pages).
@@ -1902,6 +2495,453 @@ class CommentAdmin(SBAdmin):
 - Use `reverse("sb_admin:{app_label}_{model_name}_changelist")` to get the base URL
 
 **Source:** `django_smartbase_admin/services/views.py` - `SBAdminViewService.build_list_params_url`
+
+---
+
+## Nested List View (`sbadmin_nested`)
+
+Render a self-referential model as a one-level tree in the list view using Tabulator's `dataTree`. Pagination is by **parent groups** (one page = N roots + their children), filters apply across the whole tree, and `restrict_queryset` is re-enforced on the parent side of the FK.
+
+The `Category` model in the demo schema has a self-referential `parent` FK — the examples below use it as the concrete example.
+
+### Minimal Setup
+
+Two things are needed: register `TabulatorNestedPlugin` globally on your role configuration, then opt-in per-admin via `sbadmin_nested`.
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
+
+
+_role_config = SBAdminRoleConfiguration(
+    # ... menu_items, registered_views, etc. ...
+    plugins=[TabulatorNestedPlugin],
+)
+
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+```python
+# blog/admin.py
+from django.contrib import admin
+
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Category
+
+
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+    sbadmin_list_display = ("name", "parent")
+    sbadmin_nested = {"parent_field": "parent"}
+```
+
+Result: root categories render as top-level rows with an expand chevron; one level of children appears under each root. Grandchildren are **not** rendered.
+
+### Configuration Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `parent_field` | str | **required** | Name of the self-referential FK on the model (e.g. `"parent"`). Must be a `ForeignKey("self", null=True)` — validated at request time. |
+| `element_column` | str | first visible column | Column that gets the tree expand/collapse chevron (`dataTreeElementColumn`). Accepts either a column name from `sbadmin_list_display` or a raw Tabulator field id. |
+| `start_expanded` | bool | `False` | Render all parent rows expanded on first load. |
+| `only_show_filtered_children` | bool | `True` | If `True`, children only appear when they match the current filter; parents always hydrate even if they didn't match. If `False`, all direct children of each visible parent are included. |
+
+Example with all keys:
+
+```python
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+    sbadmin_list_display = ("name", "parent")
+    sbadmin_nested = {
+        "parent_field": "parent",
+        "element_column": "name",           # chevron on the name column
+        "start_expanded": True,
+        "only_show_filtered_children": False,
+    }
+```
+
+### Dynamic Config: `get_sbadmin_nested()`
+
+Like most `sbadmin_*` attributes, `sbadmin_nested` has a request-aware companion. Useful for toggling the tree per user role or per query parameter:
+
+```python
+@admin.register(Category, site=sb_admin_site)
+class CategoryAdmin(SBAdmin):
+    model = Category
+
+    def get_sbadmin_nested(self, request):
+        # Flat list for search; tree otherwise.
+        if request.GET.get("q"):
+            return None
+        return {"parent_field": "parent"}
+```
+
+Return `None` to disable the tree for that request — the admin renders a normal flat list.
+
+**Key points:**
+- `TabulatorNestedPlugin` must be added to `SBAdminRoleConfiguration.plugins` **and** the admin must declare `sbadmin_nested` — the plugin self-guards and is a no-op for admins without it.
+- `parent_field` must be a self-referential `ForeignKey`; proxy models pointing at the concrete model also validate.
+- Only **one level** of nesting is supported. Grandchildren are dropped; flatten deeper hierarchies before displaying.
+- Pagination counts parent groups; `list_per_page` controls roots-per-page, not rows-per-page.
+- Filters apply to the whole tree by default (`only_show_filtered_children=True`). Parents still hydrate even when only a child matched.
+- `restrict_queryset` is re-enforced on the parent side of the FK automatically — a child whose parent was filtered out won't leak as a phantom root.
+- **PostgreSQL required** at the data-query level (uses `ArrayAgg`).
+
+**Source:** `django_smartbase_admin/plugins/nested.py` — `TabulatorNestedPlugin`, `resolve_nested`
+
+---
+
+## Tree Widget & Tree List View (treebeard `MP_Node`)
+
+For **multi-level** hierarchical data backed by [django-treebeard](https://django-treebeard.readthedocs.io/) materialized-path nodes (`MP_Node`), SBAdmin ships three complementary pieces built on top of [Fancytree](https://wwwendt.de/tech/fancytree/):
+
+| Piece | Purpose |
+|-------|---------|
+| `SBAdminTreeWidget` | Form widget to pick a node (e.g. a parent) from a searchable collapsible tree |
+| `SBAdminTreeFilterWidget` | Filter widget to restrict a list view by subtree |
+| `sb_admin/actions/tree_list.html` | Changelist template that replaces the flat Tabulator table with a Fancytree tree — supports drag reorder |
+
+> **When to use this vs `sbadmin_nested`?** — `sbadmin_nested` is for **one-level** trees over an ordinary self-referential `ForeignKey`. Use `MP_Node` + the tree widget/list for **arbitrary-depth** hierarchies (taxonomies, menu trees, folder structures), especially when you need drag-and-drop reorder across levels.
+
+### Demo Model
+
+The demo schema's `Category` model (self-FK) covers the one-level `sbadmin_nested` case. For the multi-level tree examples below, extend the schema with a separate treebeard-backed `Topic` taxonomy (e.g. `Technology > Programming > Python`):
+
+```python
+# blog/models.py
+from treebeard.mp_tree import MP_Node
+from django.db import models
+
+
+class Topic(MP_Node):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, unique=True)
+
+    node_order_by = ["name"]
+
+    def __str__(self):
+        return self.name
+```
+
+`MP_Node` provides the `path`, `depth`, and `numchild` fields plus `steplen` / `_inc_path` / `_get_basepath` helpers that the widget relies on.
+
+### Subclassing `SBAdminTreeWidgetMixin`
+
+Both the form widget and the filter widget derive from `SBAdminTreeWidgetMixin`. You subclass it once to teach SBAdmin how to render rows for your model, then reuse the subclass anywhere:
+
+```python
+# blog/tree_widgets.py
+from django_smartbase_admin.admin.widgets import SBAdminTreeWidget
+from django_smartbase_admin.engine.filter_widgets import SBAdminTreeFilterWidget
+
+from blog.models import Topic
+
+
+class TopicTreeMixin:
+    """Shared config for any Topic tree widget (form, filter, list)."""
+
+    model = Topic
+    order_by = ("path",)
+    path_field = "path"
+
+    @classmethod
+    def get_tree_title(cls, request, item):
+        """Fancytree node label (HTML allowed)."""
+        return item["name"]
+
+    @classmethod
+    def get_label(cls, request, item):
+        """Label shown in the bound form field's pill after selection."""
+        return item.name
+
+
+class TopicTreeWidget(TopicTreeMixin, SBAdminTreeWidget):
+    """Form widget: pick a Topic (e.g. a parent) from a tree."""
+
+
+class TopicTreeFilterWidget(TopicTreeMixin, SBAdminTreeFilterWidget):
+    """Filter widget: restrict a list view to a Topic subtree."""
+```
+
+Required overrides on the mixin:
+
+| Classmethod / attribute | Purpose |
+|-------------------------|---------|
+| `model` | The treebeard model class. |
+| `order_by` | Ordering used when walking the queryset — typically `("path",)`. |
+| `get_tree_title(cls, request, item)` | Text shown inside each tree row. `item` is a dict of the values listed by `get_tree_base_values()` (at minimum `id` and `path`). |
+| `get_label(cls, request, item)` | Label shown in the selected-value pill of a form widget. Only required when using the widget as a form field. |
+
+Optional extensions:
+
+| Extension point | When to override |
+|-----------------|------------------|
+| `get_tree_base_values()` | Fetch additional columns from the DB (e.g. `["id", "path", "url"]`) so `get_tree_title` / `get_additional_data` can use them. |
+| `get_additional_data(cls, request, item, tree_process_global_data)` | Inject per-row data into the Fancytree node (rendered in `additional_columns`). |
+| `tree_process_global_data(cls, request, queryset, **kwargs)` | Precompute shared state (e.g. permission maps) once per request and feed it to `get_additional_data`. |
+
+### `SBAdminTreeWidget` — form widget for picking a node
+
+Use on a `ModelChoiceField` to let users pick a parent (or any node) from the tree. The widget supports a parent-only mode that disables selecting the current object or its descendants — essential for "change parent" forms to avoid cycles.
+
+```python
+# blog/forms.py
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.engine.filter_widgets import SBAdminTreeWidgetMixin
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeWidget
+
+
+class TopicForm(SBAdminBaseForm):
+    parent = forms.ModelChoiceField(
+        label="Parent topic",
+        required=False,
+        queryset=Topic.objects.all(),
+        widget=TopicTreeWidget(
+            model=Topic,
+            relationship_pick_mode=SBAdminTreeWidgetMixin.RELATIONSHIP_PICK_MODE_PARENT,
+            # Optional: render extra columns in the tree popup
+            additional_columns=[
+                {"field": "slug", "title": "Slug"},
+            ],
+        ),
+    )
+
+    class Meta:
+        model = Topic
+        fields = ["name", "slug", "parent"]
+```
+
+Key parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `relationship_pick_mode` | `None` | Set to `RELATIONSHIP_PICK_MODE_PARENT` when the field is a **parent** reference; the widget disables selecting the edited object itself and its descendants and raises `ValidationError` if the user tampers with the value client-side. |
+| `inline` | `False` | Render the tree inline (always visible) instead of in a popup. Switches the template to `sb_admin/widgets/tree_select_inline.html`. |
+| `additional_columns` | `None` | List of `{"field": ..., "title": ...}` dicts shown as extra columns next to the node title. |
+| `tree_strings` | Sensible defaults | Override UI strings (`loading`, `loadError`, `moreData`, `noData`). |
+
+### `SBAdminTreeFilterWidget` — filter widget
+
+Swap in as the `filter_widget` on an `SBAdminField` to get a tree-based filter UI — users expand/collapse subtrees and tick nodes to restrict the list.
+
+```python
+# blog/admin.py
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeFilterWidget
+
+
+@admin.register(Topic, site=sb_admin_site)
+class TopicAdmin(SBAdmin):
+    sbadmin_list_display = (
+        "name",
+        SBAdminField(
+            name="topic_subtree",
+            title="Subtree",
+            filter_field="path",
+            filter_widget=TopicTreeFilterWidget(model=Topic, multiselect=True),
+            list_visible=False,
+        ),
+    )
+    sbadmin_list_filter = ("topic_subtree",)
+```
+
+The filter's selected values are materialized-path prefixes; combined with a `filter_field` resolving to the model's `path`, treebeard's path semantics naturally restrict to the selected subtrees.
+
+### Tree List View (`sb_admin/actions/tree_list.html`)
+
+For the full tree changelist (no flat Tabulator rows — the whole list renders as a Fancytree with drag reorder), override `change_list_template` on your admin. The tree pulls its data from a URL you expose via `@sbadmin_action` using `get_tree_data`:
+
+```python
+# blog/admin.py
+from django.contrib import admin
+from django.http import JsonResponse
+
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import sbadmin_action
+
+from blog.models import Topic
+from blog.tree_widgets import TopicTreeMixin
+
+
+@admin.register(Topic, site=sb_admin_site)
+class TopicAdmin(TopicTreeMixin, SBAdmin):
+    change_list_template = "sb_admin/actions/tree_list.html"
+    # Keep the default reorder template — reorder mode uses the flat list.
+    # reorder_list_template = "sb_admin/actions/list.html"  # already default
+
+    sbadmin_list_display = ("name", "slug")
+
+    @sbadmin_action
+    def action_tree_json(self, request, modifier):
+        """Emit Fancytree node JSON for the whole tree."""
+        qs = self.get_queryset(request)
+        data = self.get_tree_data(request, qs, values=["name", "slug"])
+        return JsonResponse(data, safe=False)
+
+    def get_context_data(self, request):
+        context = super().get_context_data(request)
+        context.update(
+            {
+                "list_title": "Topic tree",
+                "tree_json_url": self.get_action_url("action_tree_json"),
+                "additional_columns": [
+                    {"field": "slug", "title": "Slug"},
+                ],
+            }
+        )
+        return context
+
+    def get_tabulator_definition(self, request):
+        definition = super().get_tabulator_definition(request)
+        # Enable drag reorder on the Fancytree list — POST target for reordered paths.
+        definition["treeReorderUrl"] = self.get_action_url("action_tree_reorder")
+        return definition
+```
+
+The `tree_list.html` template expects these context values (set them in `get_context_data` as shown above):
+
+| Context key | Description |
+|-------------|-------------|
+| `list_title` | Label of the main tree column (usually the model's verbose name). |
+| `tree_json_url` | URL that returns the Fancytree JSON — the admin's `@sbadmin_action` endpoint. |
+| `additional_columns` | Extra columns (`[{"field": ..., "title": ...}, ...]`) shown alongside the tree. |
+| `tabulator_definition.treeReorderUrl` | *(optional)* URL that accepts the reorder POST when users drag nodes. Omit to render a read-only tree. |
+
+### Saving reorder with `process_treebeard_tree`
+
+When users drag nodes in the tree list view, the JS posts the full new tree shape `[{"key": "<path>", "children": [...]}, ...]` to your `treeReorderUrl`. Use `SBAdminTreeWidgetMixin.process_treebeard_tree` to translate that payload into the minimal set of `path` / `depth` / `numchild` updates and persist them in a single `bulk_update`:
+
+```python
+import json
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+from django_smartbase_admin.engine.actions import sbadmin_action
+
+from blog.models import Topic
+
+
+class TopicAdmin(TopicTreeMixin, SBAdmin):
+    # ... fields above ...
+
+    @sbadmin_action
+    @require_POST
+    def action_tree_reorder(self, request, modifier):
+        tree_widget_data = json.loads(request.body)
+        objs_by_path = {obj.path: obj for obj in Topic.objects.all()}
+        to_update = self.process_treebeard_tree(tree_widget_data, objs_by_path)
+        Topic.objects.bulk_update(to_update, ["path", "depth", "numchild"])
+        return JsonResponse({"status": "ok"})
+```
+
+`process_treebeard_tree` walks the submitted tree in order, recomputes each node's `path` / `depth` / `numchild`, and returns **only** the objects whose values actually changed — bulk updating that reduced set is safe and cheap even for large trees.
+
+**Key points:**
+- Requires [django-treebeard](https://django-treebeard.readthedocs.io/) — the model **must** inherit from `MP_Node` (materialized path). `AL_Node` / `NS_Node` are not supported; the depth math hard-codes the materialized-path encoding.
+- `SBAdminTreeWidgetMixin` is the single subclassing point — always share it between the form widget, filter widget, and list view to keep row labels consistent.
+- Set `relationship_pick_mode=RELATIONSHIP_PICK_MODE_PARENT` on *every* parent-selection form widget — without it the user can pick the edited node or its children and create a cycle.
+- The tree list view is **wired by hand** — nothing auto-registers `action_tree_json` / `action_tree_reorder` URLs or the context values; the template is a scaffold, not a turnkey changelist. Decorate URL-callable methods with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action).
+- Keep `reorder_list_template` at its default (`sb_admin/actions/list.html`) — reorder mode uses the flat list even when the normal list is a tree. Users enter reorder mode via the standard list reorder action.
+- Works across databases — tree traversal is purely in-Python over the flat queryset; no DB-specific features required (unlike `TabulatorNestedPlugin` which needs Postgres).
+
+**Source:** `django_smartbase_admin/engine/filter_widgets.py` — `SBAdminTreeWidgetMixin`, `SBAdminTreeFilterWidget`, `process_treebeard_tree`; `django_smartbase_admin/admin/widgets.py` — `SBAdminTreeWidget`; `django_smartbase_admin/templates/sb_admin/actions/tree_list.html`; `django_smartbase_admin/templates/sb_admin/widgets/tree_base.html`.
+
+---
+
+## List View Plugins (`SBAdminPlugin`)
+
+`SBAdminPlugin` is the protocol the list-view pipeline exposes for cross-admin reshaping — Tabulator definition, queryset shaping, and post-formatting. `TabulatorNestedPlugin` is the built-in example; write your own when you need the same reshape across every list view (e.g. tenant scoping, soft-delete dimming, custom tree variants).
+
+### Registration
+
+Plugins live on `SBAdminRoleConfiguration.plugins`. The list is iterated for every list view in the role:
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
+
+from blog.plugins import SoftDeleteDimmingPlugin
+
+
+_role_config = SBAdminRoleConfiguration(
+    plugins=[TabulatorNestedPlugin, SoftDeleteDimmingPlugin],
+    # ...
+)
+```
+
+Plugins are **stateless classmethod-only classes** — within a single request they share state across hooks through `get_request_data_plugin_store`. They must **self-guard**: inspect `view.sbadmin_nested` / admin config, and return their input unchanged when they don't apply.
+
+### Hook Pipeline
+
+Hooks are called in this order by `SBAdminListAction`:
+
+| # | Hook | Purpose |
+|---|------|---------|
+| 1 | `modify_tabulator_definition(view, request, definition)` | Inject Tabulator options (dataTree, custom modules, etc.) into the JSON sent to the client. |
+| 2 | `modify_count_queryset(action, request, qs)` | Reshape the qs `.count()` runs on. Used by the nested plugin to group by parent id so pagination counts parent groups. |
+| 3 | `modify_base_queryset(action, request, qs, values)` | **Store-only**. Observe the unfiltered `.values()`-applied qs. Reshaping here leaks into the visible page — return `qs` unchanged. |
+| 4 | `modify_data_queryset(action, request, qs, page_num, page_size)` | Reshape the unsliced, filtered, ordered data qs. Caller slices `[from:to]` on the return value. |
+| 5 | `modify_final_data(action, request, data)` | Reshape already-formatted row dicts (e.g. assemble `_children` from group metadata). Runs **after** column formatters. |
+
+### Per-Request State
+
+Cross-hook state goes through `get_request_data_plugin_store(request)`. It returns a per-request, per-plugin-class scratch dict keyed by `cls.__name__`, so sibling plugins don't collide:
+
+```python
+from django_smartbase_admin.plugins.base import SBAdminPlugin
+
+
+class SoftDeleteDimmingPlugin(SBAdminPlugin):
+    @classmethod
+    def modify_base_queryset(cls, action, request, qs, values, **kwargs):
+        # Store-only — observe, don't reshape.
+        if "deleted_at" in values:
+            cls.get_request_data_plugin_store(request)["had_deleted_at"] = True
+        return qs
+
+    @classmethod
+    def modify_final_data(cls, action, request, data, **kwargs):
+        store = cls.get_request_data_plugin_store(request)
+        if not store.get("had_deleted_at"):
+            return data
+        for row in data:
+            if row.get("deleted_at"):
+                row["_css_class"] = "row-dimmed"
+        return data
+```
+
+### Hook Signature Conventions
+
+All hooks take `request` as a keyword-style argument and accept `**kwargs` — call sites stay forward-compatible when new args are added. All hooks are `@classmethod`.
+
+**Key points:**
+- Plugins are **classmethod-only**; never instantiate them.
+- Self-guard by inspecting admin config — a plugin returns its input unchanged when it doesn't apply, so it's safe to register globally.
+- `modify_base_queryset` is store-only; reshaping there changes the visible page silently. Use `modify_data_queryset` if you want reshape to affect the slice.
+- Plugins that need to re-enter `build_final_data_{count_,}queryset` pass `apply_plugins=False` to avoid recursion.
+- Cross-hook state via `get_request_data_plugin_store`; the action never writes into a plugin's slot.
+
+**Source:** `django_smartbase_admin/plugins/base.py` — `SBAdminPlugin`, `PLUGIN_DATA_KEY`
 
 ---
 
@@ -2052,11 +3092,225 @@ sbadmin_fieldsets = [
 
 ---
 
+## Detail View Tabs (`sbadmin_tabs`)
+
+Use `sbadmin_tabs` to organize fieldsets and inlines into separate tabs on the detail/change view. Without tabs, all fieldsets and inlines render on a single page. With tabs, users switch between logical groups.
+
+### Usage
+
+`sbadmin_tabs` is a **dict** where:
+- **Keys** are tab label strings (displayed as tab headers)
+- **Values** are lists of **fieldset names** and/or **inline classes**
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+
+from blog.models import Article, ArticleTag, Comment
+
+
+class ArticleTagInline(SBAdminTableInline):
+    model = ArticleTag
+    extra = 0
+    verbose_name = "Tag"
+    verbose_name_plural = "Tags"
+
+
+class CommentInline(SBAdminTableInline):
+    model = Comment
+    extra = 0
+    verbose_name = "Comment"
+    verbose_name_plural = "Comments"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+    inlines = [ArticleTagInline, CommentInline]
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("title", "body", "category"),
+            },
+        ),
+        (
+            "Publishing",
+            {
+                "fields": ("author", "status"),
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            "SEO Settings",
+            {
+                "fields": ("seo_title", "seo_description"),
+            },
+        ),
+    )
+
+    sbadmin_tabs = {
+        "Content": [None, "Publishing", ArticleTagInline],
+        "Comments": [CommentInline],
+        "SEO": ["SEO Settings"],
+    }
+```
+
+### How Tab Keys Map to Content
+
+The template tag resolves each value in the list against two maps:
+
+| Value type | Matched against | Example |
+|------------|-----------------|---------|
+| Fieldset name (first element of fieldset tuple) | `{fieldset.name: fieldset}` | `None`, `"Publishing"`, `"SEO Settings"` |
+| Inline class | `{inline.opts.__class__: inline}` | `ArticleTagInline`, `CommentInline` |
+
+A fieldset with `None` as its name (no header) is referenced as `None` in the tabs dict.
+
+### Fieldset Names Must Be Unique
+
+Because fieldsets are looked up by name, each fieldset must have a **unique** first element. Two fieldsets both named `None` would conflict — only the last one would be found in the lookup.
+
+```python
+# ❌ BAD - Two fieldsets with the same name (None)
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    (None, {"fields": ("author", "status")}),
+)
+
+# ✅ GOOD - Give at least one a name
+fieldsets = (
+    (None, {"fields": ("title", "body")}),
+    ("Status", {"fields": ("author", "status")}),
+)
+```
+
+### Default Behavior (No Tabs)
+
+When `sbadmin_tabs` is `None` (the default), all fieldsets and inlines render sequentially on a single page — no tab UI is shown.
+
+### Error Handling
+
+When a form has validation errors, the tab containing the error is automatically activated and highlighted so the user sees the problem immediately. If multiple tabs have errors, the first one with errors is shown.
+
+### Combining with Sidebar
+
+Tabs work with `DETAIL_STRUCTURE_RIGHT_CLASS`. A fieldset with the sidebar class renders in the right column **within its tab**:
+
+```python
+fieldsets = (
+    (
+        None,
+        {"fields": ("title", "body")},
+    ),
+    (
+        "Metadata",
+        {
+            "fields": ("author", "status", "created_at"),
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+        },
+    ),
+    (
+        "SEO Settings",
+        {"fields": ("seo_title", "seo_description")},
+    ),
+)
+
+sbadmin_tabs = {
+    "Content": [None, "Metadata", ArticleTagInline],
+    "SEO": ["SEO Settings"],
+}
+```
+
+In this example, the "Content" tab has a two-column layout (main fields on the left, metadata sidebar on the right, tags inline below), while the "SEO" tab is a simple single-column form.
+
+**Key points:**
+- `sbadmin_tabs` is a `dict`, not a list (the attribute reference table type is approximate)
+- Keys are tab labels (strings), values are lists of fieldset names and/or inline classes
+- Fieldsets are referenced by their **name** (first element of the tuple) — use `None` for unnamed fieldsets
+- Inlines are referenced by their **class** (e.g., `ArticleTagInline`), not by a string
+- Every fieldset and inline should appear in exactly one tab — items not listed in any tab are not rendered
+- The first tab is active by default (unless there are validation errors in another tab)
+- Works with `DETAIL_STRUCTURE_RIGHT_CLASS` for sidebar layout within a tab
+- Override `get_sbadmin_tabs(request, object_id)` for dynamic tab configuration
+
+**Source:** `django_smartbase_admin/admin/admin_base.py` — `SBAdmin.sbadmin_tabs`, `get_sbadmin_tabs()`, `get_tabs_context()`; `django_smartbase_admin/templatetags/sb_admin_tags.py` — `get_tabular_context()`
+
+---
+
 ## Logo Customization
 
 Override default logo by placing files in your static directory:
 - `static/sb_admin/images/logo.svg` - Light mode
 - `static/sb_admin/images/logo_light.svg` - Dark mode
+
+---
+
+## URL-Callable Action Methods (`@sbadmin_action`)
+
+Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions go through `delegate_to_action`, which checks for this decorator and runs `has_permission_for_action` before dispatching.
+
+### Usage
+
+```python
+from django.contrib import admin
+from django.http import JsonResponse
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
+
+from blog.models import Article
+
+
+# ❌ BAD — method is not decorated, returns 404 when called via URL
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ def action_custom_export(self, request, modifier):
+ return JsonResponse({"status": "exported"})
+
+ def get_sbadmin_list_actions(self, request):
+ return [
+ SBAdminCustomAction(
+ title="Export", view=self, action_id="action_custom_export"
+ ),
+ ]
+
+
+# ✅ GOOD — method is decorated
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ @sbadmin_action
+ def action_custom_export(self, request, modifier):
+ return JsonResponse({"status": "exported"})
+
+ def get_sbadmin_list_actions(self, request):
+ return [
+ SBAdminCustomAction(
+ title="Export", view=self, action_id="action_custom_export"
+ ),
+ ]
+
+
+# ✅ GOOD — decorator with keyword arguments
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+ @sbadmin_action(permission="delete")
+ def action_bulk_archive(self, request, modifier):
+ ...
+```
+
+**Key points:**
+- Import from `django_smartbase_admin.engine.actions`
+- All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated
+- `SBAdminFormViewAction` modal views (see [Selection Actions](#selection-actions-bulk-actions)) are automatically marked — no decorator needed
+- `SBAdminCustomAction` with direct `action_id` (via `get_sbadmin_list_actions` or `get_sbadmin_list_selection_actions`) requires the decorator on the target method
+- Subclasses that override decorated methods inherit the marker
+- `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
+
+**Source:** `django_smartbase_admin/engine/actions.py` — `sbadmin_action`; `django_smartbase_admin/services/views.py` — `SBAdminViewService.delegate_to_action`
 
 ---
 
@@ -2072,18 +3326,20 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_list_display_data` | tuple | Field names always fetched (even if column hidden) |
 | `sbadmin_list_filter` | tuple | Default visible filters - accepts `SBAdminField` names |
 | `sbadmin_list_view_config` | list[dict] | Pre-filtered view tabs configuration |
+| `sbadmin_nested` | dict | Opt-in one-level tree rendering via `TabulatorNestedPlugin` (see [Nested List View](#nested-list-view-sbadmin_nested)) |
 | `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
 | `sbadmin_list_actions` | list | List-level actions (not selection-based) |
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
 | `sbadmin_xlsx_options` | dict | Excel export configuration options |
 | `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
+| `sbadmin_list_sticky_header_and_footer` | bool \| None | Enable sticky Tabulator column header together with sticky pagination footer and synced horizontal scrollbar. `None` falls back to `SBAdminRoleConfiguration.default_list_sticky_header_and_footer`; explicit `True`/`False` overrides the global setting. |
 
 ### Detail/Change View Attributes (SBAdmin)
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
-| `sbadmin_tabs` | list | Organize form fields into tabs |
+| `sbadmin_tabs` | dict | Organize fieldsets and inlines into tabs (see [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)) |
 | `sbadmin_detail_actions` | list | Actions shown on detail/change page |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
@@ -2201,6 +3457,67 @@ class CommentAdmin(SBAdmin):
 
 The audit log admin itself automatically disables this to avoid circular navigation.
 
+### Programmatic Audit Entries (`_create_audit_log`)
+
+For custom actions that call external APIs or perform operations outside Django's ORM (where automatic auditing doesn't apply), create audit log entries manually using `_create_audit_log`.
+
+**Use case:** A bulk "Publish" action calls an external CMS API. The ORM is not involved, so automatic auditing doesn't capture the change. Create entries manually so the audit trail is complete.
+
+```python
+import logging
+
+from django_smartbase_admin.audit.manager import _create_audit_log
+
+from blog.models import Article
+
+logger = logging.getLogger(__name__)
+
+
+def _audit_publish_action(articles: list[dict], published_by: str) -> None:
+    """Create one audit log entry per article for an external publish action."""
+    for article in articles:
+        try:
+            _create_audit_log(
+                action_type="update",
+                model=Article,
+                object_id=str(article["id"]),
+                object_repr=f"Publish: {article['title']}",
+                changes={
+                    "status": {"old": "draft", "new": "published"},
+                    "published_by": {"old": None, "new": published_by},
+                    "author": {"old": None, "new": article["author_name"]},
+                },
+                affected_objects=[
+                    {"ct": "blog.author", "id": article["author_id"], "repr": article["author_name"]},
+                    {"ct": "blog.category", "id": article["category_id"], "repr": article["category_name"]},
+                ],
+            )
+        except Exception:
+            logger.exception("Failed to create audit log for article #%s", article["id"])
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_type` | str | Yes | `"create"`, `"update"`, `"delete"`, `"bulk_create"`, `"bulk_update"`, `"bulk_delete"` |
+| `model` | Model class | Yes | The Django model class |
+| `object_id` | str | No | Primary key of the affected object (as string) |
+| `object_repr` | str | No | Human-readable description shown in the audit log |
+| `snapshot_before` | dict | No | Full object state before the change (JSON-serializable) |
+| `changes` | dict | No | Field-level diffs: `{"field": {"old": ..., "new": ...}}` |
+| `is_bulk` | bool | No | Whether this is a bulk operation |
+| `bulk_count` | int | No | Number of affected items in bulk operation |
+| `affected_objects` | list | No | Related objects: `[{"ct": "app_label.model_name", "id": pk, "repr": "display name"}]` |
+
+**Key points:**
+- The `user` field is automatically populated from the current request via `SBAdminThreadLocalService`
+- The `request_id` is automatically populated, grouping all entries from the same request
+- Wraps in `transaction.atomic()` so audit failures never break the main transaction
+- Use for external API calls, cross-service operations, or any action not captured by ORM patching
+- For bulk operations, you can create one entry per item (individually traceable) or one summary entry with `is_bulk=True`
+- The `ct` in `affected_objects` uses format `"app_label.model_name"` (lowercase)
+
 ### Programmatic Audit URLs
 
 Generate audit history URLs from Python code (e.g., for links or redirects):
@@ -2278,6 +3595,48 @@ Projects can further restrict access by:
 
 ---
 
+## Internationalization
+
+SBAdmin now ships locale catalogs for multiple languages and includes helper scripts to regenerate them in one pass.
+
+### Supported locales
+
+Translation helper scripts are configured for:
+
+- `sk`, `en`, `de`, `cs`, `hu`, `ro`, `sl`, `hr`, `fr`, `pl`, `it`
+
+### Updating translation catalogs
+
+Run these from the repository root:
+
+```bash
+# Extract strings for all configured locales
+python src/django_smartbase_admin/makemessages.py
+
+# Compile all locale catalogs
+python src/django_smartbase_admin/compilemessages.py
+```
+
+**Key points:**
+- `makemessages.py` loops through every locale in `settings.LANGUAGES`; it is no longer Slovak-only.
+- `compilemessages.py` compiles the same full locale list.
+- After adding new UI strings, regenerate `.po` files first, then compile `.mo` files.
+
+### JavaScript translation strings
+
+When adding client-side text, expose it through `templates/sb_admin/sb_admin_js_trans.html` with `{% trans %}` instead of hardcoding English inside JavaScript.
+
+```html
+<script>
+    window.sb_admin_translation_strings["search"] = '{% trans "Search" %}';
+    window.sb_admin_translation_strings["no_results"] = '{% trans "No results found" %}';
+</script>
+```
+
+This is the preferred pattern for autocomplete placeholders, empty states, and other JS-rendered UI labels.
+
+---
+
 ## Testing
 
 ### Setup
@@ -2326,6 +3685,228 @@ python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.Tes
 2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
 3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
 4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
+
+---
+
+## SBAdminWizardView
+
+Multi-step wizard **outside** the `change_form`. The view is a thin dispatcher — each step owns its form/formset creation, validation, context building, and save logic.
+
+### Architecture
+
+- **`SBAdminWizardView`** (`TemplateView` + `SBAdminView`) — holds the ordered step classes, dispatches `get()`/`post()` to the current step, builds base context.
+- **`SBAdminWizardStep`** — one step per class. The wizard instantiates a new step object per request. Steps define `title`, `model`, `form_class`, `formset_classes`, and override lifecycle hooks.
+
+### SBAdminWizardStep — Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `title` | str | Step title shown in the template |
+| `heading` | str \| None | Heading above the step title. Falls back to `wizard.wizard_step_heading`, then `model._meta.verbose_name` |
+| `model` | Model class | **Required**. Used for permission checks |
+| `form_class` | Form class | Main form for the step |
+| `formset_classes` | list[type[BaseFormSet]] | Formset factory classes. Used for autocomplete widget registration |
+| `requires_wizard_object` | bool | If `True`, missing wizard object redirects to step 1 |
+| `template_name` | str \| None | Override the default wizard template for this step |
+| `submit_button_label` | str \| None | Custom submit button text. `None` = "Next step" / "Finish" |
+
+### SBAdminWizardStep — Methods
+
+| Method | Description |
+|--------|-------------|
+| `get_form_kwargs(**kwargs)` | Returns kwargs for the main form. Default includes `request` and `view=wizard`. Override to add `instance` |
+| `get_form(data, files)` | Creates the main form instance. Bound when `data` is provided |
+| `get_formsets(data, files)` | Returns `[(title, formset_instance), ...]`. Override to declare formsets. On GET `data` is `None` |
+| `get_context_data(context, **kwargs)` | Builds step-specific template context. Formsets are auto-injected into `wizard_formsets` |
+| `form_valid(form, formsets)` | Called after successful validation. **Must return `HttpResponse`**. Raises `NotImplementedError` by default |
+| `form_invalid(form, formsets)` | Re-renders the page with bound form/formsets and errors |
+| `get_blocked_get_response()` | Return a redirect to block entry to this step (e.g. pending background tasks) |
+| `adjust_navigation(nav)` | Modify `back_url`, `wizard_footer_back_url`, `prev_step_url` dict |
+| `check_permission(request)` | Raises `PermissionDenied`. Default: `requires_wizard_object` → check *change*, otherwise *add* |
+
+### Step Lifecycle
+
+**GET:**
+
+```
+get() → get_blocked_get_response() → _check_requires_wizard_object()
+     → get_form() → wizard.get_context_data() → step.get_context_data()
+     → get_formsets() injected into context → render
+```
+
+**POST:**
+
+```
+post() → _check_requires_wizard_object()
+      → get_form(POST) + get_formsets(POST)
+      → validate all → form_valid(form, formsets)
+                     OR form_invalid(form, formsets)
+```
+
+### SBAdminWizardView — Required
+
+| Attribute / Method | Description |
+|--------------------|-------------|
+| `wizard_steps` | Tuple of `SBAdminWizardStep` classes |
+| `build_wizard_url(step, object_id=None)` | Returns URL with `?step=N` for the given step |
+| `get_wizard_object()` | Returns the wizard's current object from session (or `None`) |
+| `update_object_wizard_state(obj, step, completed)` | Persists the wizard progress on the object |
+
+### Example
+
+```python
+from django import forms
+from django.forms import formset_factory
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm, SBAdminBaseFormInit
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.views.sbadmin_wizard_step import SBAdminWizardStep
+from django_smartbase_admin.views.sbadmin_wizard_view import SBAdminWizardView
+
+from blog.models import Article, Tag
+
+
+# -- Step 1: create the article --
+
+class ArticleStep1Form(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("title", "category")
+
+
+class ArticleStep1(SBAdminWizardStep):
+    title = "Basic Info"
+    model = Article
+    form_class = ArticleStep1Form
+
+    def form_valid(self, form, formsets):
+        obj = form.save()
+        self.wizard.update_object_wizard_state(obj, step=1, completed=False)
+        return HttpResponseRedirect(self.wizard.build_wizard_url(2, obj.pk))
+
+
+# -- Step 2: assign tags via formset --
+
+class TagRowForm(SBAdminBaseFormInit, forms.Form):
+    tag = forms.ModelChoiceField(
+        queryset=Tag.objects.all(),
+        widget=SBAdminAutocompleteWidget(
+            model=Tag, multiselect=False,
+            label_lambda=lambda request, item: item.name,
+        ),
+    )
+
+TagRowFormSet = formset_factory(TagRowForm, extra=1, can_delete=True)
+
+
+class ArticleStep2(SBAdminWizardStep):
+    title = "Tags"
+    model = Article
+    form_class = ArticleStep1Form
+    formset_classes = [TagRowFormSet]
+    requires_wizard_object = True
+
+    def get_form_kwargs(self, **kwargs):
+        kwargs = super().get_form_kwargs(**kwargs)
+        kwargs["instance"] = self.wizard.get_wizard_object()
+        return kwargs
+
+    def get_formsets(self, data=None, files=None):
+        kwargs = {
+            "prefix": "tags",
+            "form_kwargs": {"view": self.wizard, "request": self.request},
+        }
+        if data is not None:
+            kwargs["data"] = data
+        return [("Tags", TagRowFormSet(**kwargs))]
+
+    def form_valid(self, form, formsets):
+        article = self.wizard.get_wizard_object()
+        fs = formsets[0][1]
+        # ... save tag associations from fs.cleaned_data ...
+        self.wizard.update_object_wizard_state(article, step=2, completed=True)
+        return HttpResponseRedirect("...")
+
+
+# -- Wizard view --
+
+class ArticleWizard(SBAdminWizardView):
+    wizard_steps = (ArticleStep1, ArticleStep2)
+
+    def build_wizard_url(self, step, object_id=None):
+        url = reverse("sb_admin:blog_article_wizard")
+        return f"{url}?step={step}"
+```
+
+Register in `SBAdminRoleConfiguration.registered_views`:
+
+```python
+# blog/sbadmin_config.py
+from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from blog.wizard_views import ArticleWizard
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(label="Dashboard", icon="All-application", view_id="dashboard"),
+        SBAdminMenuItem(label="Articles", icon="Box", view_id="blog_article"),
+    ],
+    registered_views=[
+        SBAdminDashboardView(widgets=[], title="Dashboard"),
+        ArticleWizard(title="Create Article"),
+    ],
+)
+
+class SBAdminConfiguration(SBAdminConfigurationBase):
+    def get_configuration_for_roles(self, user_roles):
+        return _role_config
+```
+
+The wizard view is automatically routed via `view_map` — no manual URL registration needed.
+
+### Formsets in Steps
+
+Steps declare formsets via `get_formsets()` which returns `[(title, formset_instance), ...]`. The base class handles:
+
+- **Context injection**: formsets are automatically added to `wizard_formsets` in the template context
+- **Multipart detection**: `form_is_multipart` is set if any form or formset form has file fields
+- **POST validation**: all formsets are validated alongside the main form; on failure, `form_invalid` re-renders with bound formsets and errors
+- **Autocomplete registration**: `formset_classes` are iterated during `register_autocomplete_views` to instantiate each formset's row form class for widget initialization
+
+**Key points:**
+- `formset_classes` is used **only** for autocomplete widget registration (happens during `init_view_dynamic` when no wizard object is available)
+- `get_formsets()` is used for actual formset **instance creation** (happens per-request with full wizard state)
+- Row forms should extend `SBAdminBaseFormInit` for autocomplete widgets to work
+- Pass `form_kwargs={"view": self.wizard, "request": self.request}` when creating formset instances
+
+### Navigation
+
+- **`back_url`** (top arrow): if a wizard object exists in session and the user has `change` permission, points to the object's **change** page; otherwise points to the changelist.
+- **`wizard_footer_back_url`**: on step > 1, points to the previous wizard step; on step 1 with an existing object, points to the **change** page (same as the arrow); otherwise the footer "Back" button is hidden.
+- Override `adjust_navigation(nav)` on the step to customize these URLs.
+
+### Template
+
+Default template: `sb_admin/wizard/wizard_step.html`
+
+| Context variable | Description |
+|-----------------|-------------|
+| `wizard_heading` | Heading from `step.get_heading()` |
+| `sbadmin_wizard_step_title` | Step title |
+| `sbadmin_wizard_submit_label` | Submit button text |
+| `wizard_formsets` | List of `(title, formset)` tuples |
+| `form_is_multipart` | `True` if any form has file fields |
+| `wizard_primary_section_title` | Optional title above the main form fields |
+| `sbadmin_wizard_step_banner` | Optional HTML banner shown at the top of the step |
+| `sbadmin_wizard_poll_seconds` | If set, the page auto-refreshes at this interval |
+
+**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/js/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
+
 
 ---
 

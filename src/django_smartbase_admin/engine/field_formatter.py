@@ -1,3 +1,4 @@
+import datetime
 from enum import Enum
 
 from django.template.defaultfilters import date, time
@@ -13,6 +14,9 @@ class BadgeType(Enum):
     NOTICE = "notice"
     WARNING = "warning"
     ERROR = "negative"
+    NEUTRAL = "neutral"
+    POSITIVE = "positive"
+    PRIMARY = "primary"
 
 
 def datetime_formatter(object_id, value):
@@ -20,6 +24,14 @@ def datetime_formatter(object_id, value):
         return None
     value = timezone.localtime(value)
     return f"{date(value)} {time(value)}"
+
+
+def date_formatter(
+    object_id, value: datetime.date | datetime.datetime | str | None
+) -> str | None:
+    if value is None:
+        return None
+    return date(value)
 
 
 def datetime_formatter_with_format(date_format=None, time_format=None):

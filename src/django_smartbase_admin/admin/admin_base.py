@@ -201,6 +201,7 @@ class SBAdminFormFieldWidgetsMixin:
         formfield_widgets[PageSelectFormField] = SBAdminPageSelectWidget
 
     django_widget_to_widget = {
+        forms.HiddenInput: SBAdminHiddenWidget,
         forms.PasswordInput: SBAdminPasswordInputWidget,
         AdminTextareaWidget: SBAdminTextareaWidget,
     }
@@ -337,10 +338,19 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
         )
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
-        for field in self.declared_fields:
-            form_field = self.fields.get(field)
-            if form_field:
-                self.assign_widget_to_form_field(form_field, request=threadsafe_request)
+        model = getattr(getattr(self, "_meta", None), "model", None)
+        for field_name, form_field in self.fields.items():
+            db_field = None
+            if model is not None:
+                try:
+                    db_field = model._meta.get_field(field_name)
+                except FieldDoesNotExist:
+                    db_field = None
+            self.assign_widget_to_form_field(
+                form_field,
+                db_field=db_field,
+                request=threadsafe_request,
+            )
 
     def init_widgets_dynamic(self, request):
         for field in self.fields:
@@ -571,7 +581,8 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
-        extra_context.update(self.get_global_context(request))
+        extra_context.update(self.get_change_view_context(request, object_id))
+        extra_context.update(self.get_global_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
@@ -695,6 +706,22 @@ class SBAdminInlineFormSetMixin:
             return f"{modal_prefix}{parent_opts.app_label}_{parent_opts.model_name}_{opts.app_label}-{opts.model_name}"
 
         return super().get_default_prefix()
+
+    def full_clean(self):
+        # Django treats inline forms with default-only values as unchanged and skips them.
+        # During parent creation, for required singleton inlines (min=max=1 with validate_min/max),
+        # we can safely mark such forms as changed so the related inline object can be created.
+        is_change = getattr(self, "parent_change", True)
+        if (
+            not is_change
+            and self.min_num == 1
+            and self.max_num == 1
+            and self.validate_min
+            and self.validate_max
+        ):
+            for form in self.forms:
+                form.has_changed = lambda: True
+        return super().full_clean()
 
 
 class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
@@ -844,16 +871,6 @@ class SBAdmin(
     def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
         return Q()
 
-    def get_change_view_context(self, request, object_id) -> dict | dict[str, Any]:
-        return {
-            "show_back_button": True,
-            "back_url": reverse(
-                "sb_admin:{}_{}_changelist".format(
-                    self.opts.app_label, self.opts.model_name
-                )
-            ),
-        }
-
     def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
@@ -873,7 +890,9 @@ class SBAdmin(
             request, object_id
         )
         all_ids = list(
-            list_action.build_final_data_count_queryset(additional_filter)
+            list_action.build_final_data_count_queryset(
+                additional_filter, apply_plugins=False
+            )
             .order_by(*list_action.get_order_by_from_request())
             .values_list("id", flat=True)
         )
@@ -1056,6 +1075,8 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
     sb_admin_add_modal = False
+    validate_min = False
+    validate_max = False
 
     def get_instance_label(self, request, obj: Model | None = None) -> str | None:
         if obj:
@@ -1201,7 +1222,9 @@ class SBAdminInline(
 
     def get_formset(self, request, obj=None, **kwargs):
         self.initialize_all_base_fields_form(request)
+        kwargs.update(validate_min=self.validate_min, validate_max=self.validate_max)
         formset = super().get_formset(request, obj, **kwargs)
+        formset.parent_change = bool(obj)
         form_class = formset.form
         self.initialize_form_class(form_class, request)
         return formset

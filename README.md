@@ -120,6 +120,15 @@ MIDDLEWARE = [
 ]
 ```
 
+Enable Django i18n URLs so `{% url 'set_language' %}` is available for the navigation language picker:
+```python
+from django.urls import include, path
+
+urlpatterns = [
+    path("i18n/", include("django.conf.urls.i18n")),
+]
+```
+
 ## 🔍 Audit Logging
 
 Built-in optional audit app that automatically tracks all admin create, update, delete, and bulk operations with field-level diffs, snapshots, and request grouping. Just add `"django_smartbase_admin.audit"` to `INSTALLED_APPS` and run migrations.

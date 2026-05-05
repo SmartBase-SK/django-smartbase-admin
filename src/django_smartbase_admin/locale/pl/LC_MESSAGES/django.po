@@ -1,0 +1,935 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# 
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-16 11:52+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);\n"
+
+msgid "Equal"
+msgstr ""
+
+msgid "Not equal"
+msgstr ""
+
+msgid "Less"
+msgstr ""
+
+msgid "Less or equal"
+msgstr ""
+
+msgid "Greater"
+msgstr ""
+
+msgid "Greater or equal"
+msgstr ""
+
+msgid "Between"
+msgstr ""
+
+msgid "Not between"
+msgstr ""
+
+msgid "In"
+msgstr ""
+
+msgid "Not in"
+msgstr ""
+
+msgid "Begins with"
+msgstr ""
+
+msgid "Not begins with"
+msgstr ""
+
+msgid "Contains"
+msgstr ""
+
+msgid "Not contains"
+msgstr ""
+
+msgid "End with"
+msgstr ""
+
+msgid "Not ends with"
+msgstr ""
+
+msgid "Is empty"
+msgstr ""
+
+msgid "Is null"
+msgstr ""
+
+msgid "Is not null"
+msgstr ""
+
+msgid "Before"
+msgstr ""
+
+msgid "After"
+msgstr ""
+
+msgid "In the last"
+msgstr ""
+
+msgid "In the next"
+msgstr ""
+
+msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
+msgstr ""
+
+#, python-format
+msgid "Change history: %s"
+msgstr ""
+
+msgid "Log in"
+msgstr ""
+
+msgid "The new value was created but became unselected due to another validation error. Please select it again."
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Currently"
+msgstr ""
+
+msgid "Change file"
+msgstr ""
+
+msgid "Cannot set parent to itself"
+msgstr ""
+
+msgid "Cannot set parent to it's own child"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "Bulk"
+msgstr ""
+
+msgid "Parent Context"
+msgstr ""
+
+msgid "(empty)"
+msgstr ""
+
+msgid "Changes"
+msgstr ""
+
+msgid "Affected Objects"
+msgstr ""
+
+msgid "Related Changes"
+msgstr ""
+
+msgid "Summary"
+msgstr ""
+
+msgid "Search..."
+msgstr ""
+
+msgid "Exit Reorder"
+msgstr ""
+
+#, python-brace-format
+msgid "Reorder {self.model._meta.verbose_name}"
+msgstr ""
+
+msgid "History"
+msgstr ""
+
+msgid "Download XLSX"
+msgstr ""
+
+msgid "Export Selected"
+msgstr ""
+
+msgid "Delete Selected"
+msgstr ""
+
+msgid "No selection made."
+msgstr ""
+
+msgid "All"
+msgstr ""
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully. You may edit it again below."
+msgstr ""
+
+#, python-brace-format
+msgid "The {name} “{obj}” was changed successfully."
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "Month"
+msgstr ""
+
+msgid "Week"
+msgstr ""
+
+msgid "Day"
+msgstr ""
+
+msgid "Previous Period"
+msgstr ""
+
+msgid "Previous Year"
+msgstr ""
+
+msgid "Resolution"
+msgstr ""
+
+msgid "Compare"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "Last 30 days"
+msgstr ""
+
+msgid "Last Quarter"
+msgstr ""
+
+msgid "Last Year"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "View on site"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Last 7 days"
+msgstr ""
+
+msgid "Last 90 days"
+msgstr ""
+
+msgid "Last 12 months"
+msgstr ""
+
+msgctxt "Tree widget"
+msgid "Loading..."
+msgstr ""
+
+msgctxt "Tree widget"
+msgid "Load error!"
+msgstr ""
+
+msgctxt "Tree widget"
+msgid "More..."
+msgstr ""
+
+msgctxt "Tree widget"
+msgid "No data."
+msgstr ""
+
+msgid "System"
+msgstr ""
+
+msgid "Dark"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Theme"
+msgstr ""
+
+msgid "Translations"
+msgstr ""
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Prev"
+msgstr ""
+
+#, python-format
+msgid "<strong>%(current_index)s</strong> / %(all_objects_count)s"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Change password"
+msgstr ""
+
+#, python-format
+msgid "Enter a new password for the user <strong>%(username)s</strong>."
+msgstr ""
+
+#, python-format
+msgid "Delete %(object)s"
+msgstr ""
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr ""
+
+#, python-format
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgstr ""
+
+#, python-format
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr ""
+
+msgid "Objects"
+msgstr ""
+
+msgid "No, take me back"
+msgstr ""
+
+msgid "Yes, I’m sure"
+msgstr ""
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr ""
+
+#, python-format
+msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgstr ""
+
+#, python-format
+msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid "For page"
+msgstr ""
+
+msgid "Date/time"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "Action"
+msgstr ""
+
+msgid "This object doesn't have a change history. It probably wasn't added via this admin site."
+msgstr ""
+
+msgid "Select all"
+msgstr ""
+
+msgid "Select none"
+msgstr ""
+
+msgid "Save view"
+msgstr ""
+
+msgid "Search and filter"
+msgstr ""
+
+msgid "Quick Search"
+msgstr ""
+
+msgid "Saved Views"
+msgstr ""
+
+msgid "Advanced Filters"
+msgstr ""
+
+msgid "Search"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Show translations"
+msgstr ""
+
+msgid "Save Order"
+msgstr ""
+
+msgid "more"
+msgstr ""
+
+msgid "No other affected objects."
+msgstr ""
+
+msgid "Bulk operation"
+msgstr ""
+
+msgid "items affected"
+msgstr ""
+
+msgid "Field"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "No changes recorded."
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+msgid "Object"
+msgstr ""
+
+msgid "No related changes in this request."
+msgstr ""
+
+#, python-format
+msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
+msgstr ""
+
+msgid "Welcome back"
+msgstr ""
+
+msgid "Enter your details to enter the application."
+msgstr ""
+
+msgid "Can't sign in?"
+msgstr ""
+
+msgid "Reset password"
+msgstr ""
+
+msgid "Logged out"
+msgstr ""
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr ""
+
+msgid "Log in again"
+msgstr ""
+
+msgid "Password change"
+msgstr ""
+
+msgid "Your password was changed."
+msgstr ""
+
+msgid "Please enter your old password, for security’s sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgstr ""
+
+msgid "Change my password"
+msgstr ""
+
+msgid "Password reset"
+msgstr ""
+
+msgid "Your password has been set.  You may go ahead and log in now."
+msgstr ""
+
+msgid "Please enter your new password twice so we can verify you typed it in correctly."
+msgstr ""
+
+msgid "The password reset link was invalid, possibly because it has already been used.  Please request a new password reset."
+msgstr ""
+
+msgid "We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You should receive them shortly."
+msgstr ""
+
+msgid "If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your spam folder."
+msgstr ""
+
+#, python-format
+msgid "You're receiving this email because you requested a password reset for your user account at %(site_name)s."
+msgstr ""
+
+msgid "Please go to the following page and choose a new password:"
+msgstr ""
+
+msgid "Your username, in case you’ve forgotten:"
+msgstr ""
+
+msgid "Thanks for using our site!"
+msgstr ""
+
+#, python-format
+msgid "The %(site_name)s team"
+msgstr ""
+
+msgid "Forgotten your password? Enter your email address below, and we’ll email instructions for setting a new one."
+msgstr ""
+
+msgid "Reset my password"
+msgstr ""
+
+msgid "Columns"
+msgstr ""
+
+msgid "Choose Columns"
+msgstr ""
+
+msgid "Select All"
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+msgid "View Results"
+msgstr ""
+
+msgid ""
+"\n"
+"                                <button class=\"btn btn-primary-light btn-tiny\">Add file</button>\n"
+"                                <span class=\"ml-4 text-dark-900 text-12 leading-16\">or move here</span>\n"
+"                            "
+msgstr ""
+
+msgid "JPG, PNG, GIF or WEBP max 10MB"
+msgstr ""
+
+msgid "Remove View"
+msgstr ""
+
+msgid "Do you want to remove table view?"
+msgstr ""
+
+msgid "Save view as"
+msgstr ""
+
+msgid "New view"
+msgstr ""
+
+msgid "View name"
+msgstr ""
+
+msgid "or save as"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Calendar"
+msgstr ""
+
+msgid "Timezone"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "To"
+msgstr ""
+
+msgid "Type to filter"
+msgstr ""
+
+msgid "Editorial reviews"
+msgstr ""
+
+msgid "Reader reviews"
+msgstr ""
+
+msgid "Author"
+msgstr ""
+
+msgid "Product details"
+msgstr ""
+
+msgid "Awards"
+msgstr ""
+
+msgid "Are you sure?"
+msgstr ""
+
+msgid "Confirm"
+msgstr ""
+
+msgid "Loading..."
+msgstr ""
+
+#, python-format
+msgid "Add another %(verbose_name)s"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "results"
+msgstr ""
+
+msgid "List of pages"
+msgstr ""
+
+msgid "Page Tree"
+msgstr ""
+
+msgid "Reset filter"
+msgstr ""
+
+msgid "Sites"
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"                                                Restore deleted %(name)s\n"
+"                                            "
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"                                New %(name)s\n"
+"                            "
+msgstr ""
+
+msgid "Main Navigation"
+msgstr ""
+
+msgid "Options"
+msgstr ""
+
+msgid "Paste"
+msgstr ""
+
+msgid "Successfully moved"
+msgstr ""
+
+msgid "Changes within the tree might require a refresh."
+msgstr ""
+
+msgid "Error:"
+msgstr ""
+
+msgid "This page cannot be copied because an application is attached to it. See the Page's Advanced settings to manage apphooks."
+msgstr ""
+
+msgid "Are you sure you want to § this page?"
+msgstr ""
+
+msgid "Reload"
+msgstr ""
+
+msgid "New node"
+msgstr ""
+
+msgid "nodes"
+msgstr ""
+
+msgid "Menu"
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"                            <em>There is no %(object)s around yet.</em>\n"
+"                            <br>\n"
+"                            <a href=\"%(add_url)s\" class=\"addlink\">Add %(object)s</a> now.\n"
+"                        "
+msgstr ""
+
+msgid "Duplicates"
+msgstr ""
+
+msgid "URL copied to clipboard"
+msgstr ""
+
+msgid "Go back to admin homepage"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Go back to Filer app"
+msgstr ""
+
+msgid "Filer"
+msgstr ""
+
+msgid "Go back to root folder"
+msgstr ""
+
+msgid "root"
+msgstr ""
+
+#, python-format
+msgid "Go back to '%(folder_name)s' folder"
+msgstr ""
+
+msgid "Go back to the parent folder"
+msgstr ""
+
+msgid "Folder Icon"
+msgstr ""
+
+msgid "Go back to"
+msgstr ""
+
+msgid "folder"
+msgstr ""
+
+msgid "Show menu"
+msgstr ""
+
+msgid "Change current folder details"
+msgstr ""
+
+msgid "Limit"
+msgstr ""
+
+msgid "Check it to limit the search to current folder"
+msgstr ""
+
+msgid "Limit the search to current folder"
+msgstr ""
+
+msgid "Click here to run search for entered phrase"
+msgstr ""
+
+msgid "Move"
+msgstr ""
+
+msgid "Dropdown"
+msgstr ""
+
+msgid "Adds a new Folder"
+msgstr ""
+
+msgid "New Folder"
+msgstr ""
+
+msgid "Upload Files"
+msgstr ""
+
+msgid "You have to select a folder first"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Expand"
+msgstr ""
+
+msgid "File is missing"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "File-size"
+msgstr ""
+
+msgid "Modified"
+msgstr ""
+
+msgid "Created"
+msgstr ""
+
+msgid "Owner"
+msgstr ""
+
+msgid "Logout"
+msgstr ""
+
+msgid "Continue"
+msgstr ""
+
+msgid "Move to first"
+msgstr ""
+
+msgid "Move to last"
+msgstr ""
+
+msgid "Move up"
+msgstr ""
+
+msgid "Move down"
+msgstr ""
+
+msgid "Reorder"
+msgstr ""
+
+msgid "Collapse"
+msgstr ""
+
+msgid "No results found"
+msgstr ""
+
+msgid "No choices to choose from"
+msgstr ""
+
+#, python-brace-format
+msgid "<strong>${from} - ${to}</strong> of <strong>${total}</strong><span class=\"max-xs:hidden\"> items</span>"
+msgstr ""
+
+msgid "<strong>0</strong> items"
+msgstr ""
+
+#, python-brace-format
+msgid "${value} selected"
+msgstr ""
+
+msgid "Basic Settings"
+msgstr ""
+
+msgid "Advanced Settings"
+msgstr ""
+
+msgid "Save as new"
+msgstr ""
+
+msgid "Save and add another"
+msgstr ""
+
+msgid "Save and continue editing"
+msgstr ""
+
+msgid "Add file"
+msgstr ""
+
+msgid "or move here"
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Open color picker"
+msgstr ""
+
+msgid "Close color picker"
+msgstr ""
+
+msgid "Clear the selected color"
+msgstr ""
+
+#, python-brace-format
+msgid "Saturation: {s}. Brightness: {v}."
+msgstr ""
+
+msgid "Hue slider"
+msgstr ""
+
+msgid "Opacity slider"
+msgstr ""
+
+msgid "Color value field"
+msgstr ""
+
+msgid "Color format"
+msgstr ""
+
+msgid "Color swatch"
+msgstr ""
+
+msgid "Saturation and brightness selector. Use up, down, left and right arrow keys to select."
+msgstr ""
+
+msgid "drop your file here or"
+msgstr ""
+
+msgid "No file selected"
+msgstr ""
+
+msgid "Lookup"
+msgstr ""
+
+msgid "Choose File"
+msgstr ""
+
+msgid "Wizard"
+msgstr ""
+
+msgid "Add another row"
+msgstr ""
+
+msgid "Row"
+msgstr ""
+
+msgid "New row"
+msgstr ""
+
+#, python-brace-format
+msgid "Added {name} “{object}”."
+msgstr ""
+
+msgid "Added."
+msgstr ""
+
+msgid "and"
+msgstr ""
+
+#, python-brace-format
+msgid "Changed {fields} for {name} “{object}”."
+msgstr ""
+
+#, python-brace-format
+msgid "Changed {fields}."
+msgstr ""
+
+#, python-brace-format
+msgid "Deleted {name} “{object}”."
+msgstr ""
+
+msgid "No fields changed."
+msgstr ""
+
+msgid "Finish"
+msgstr ""
+
+msgid "Next step"
+msgstr ""
+
+msgid "Please complete the first step first."
+msgstr ""
+
+msgid "Not Translated"
+msgstr ""
+
+msgid "Incomplete"
+msgstr ""
+
+msgid "Translated"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid " of "
+msgstr ""

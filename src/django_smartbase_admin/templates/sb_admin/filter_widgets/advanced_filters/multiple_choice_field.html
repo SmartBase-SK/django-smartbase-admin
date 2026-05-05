@@ -19,22 +19,27 @@
                    id="{{ filter_widget.input_id }}"
                    name="{{ filter_widget.input_name }}">
             <ul class="relative py-8">
-                {% for choice in filter_widget.choices %}
-                    <li>
-                        <div class="relative px-12 py-8">
-                            <input
-                                type="checkbox"
-                                value="{{ choice.0 }}"
-                                name="{{ filter_widget.input_name }}_dummy"
-                                class="checkbox"
-                                id="{{ filter_widget.input_id }}_{{ forloop.counter0 }}"
-                                data-label="{{ choice.1 }}"
-                            >
-                            <label for="{{ filter_widget.input_id }}_{{ forloop.counter0 }}">
-                                {{ choice.1|safe }}
-                            </label>
-                        </div>
-                    </li>
+                {% for group_label, group_choices in filter_widget.grouped_choices %}
+                    {% if group_label %}
+                        <li class="px-12 pt-12 pb-4 text-12 font-medium uppercase">{{ group_label }}</li>
+                    {% endif %}
+                    {% for choice in group_choices %}
+                        <li>
+                            <div class="relative px-12 py-8">
+                                <input
+                                    type="checkbox"
+                                    value="{{ choice.0 }}"
+                                    name="{{ filter_widget.input_name }}_dummy"
+                                    class="checkbox"
+                                    id="{{ filter_widget.input_id }}_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}"
+                                    data-label="{{ choice.1 }}"
+                                >
+                                <label for="{{ filter_widget.input_id }}_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}">
+                                    {{ choice.1|safe }}
+                                </label>
+                            </div>
+                        </li>
+                    {% endfor %}
                 {% endfor %}
             </ul>
         </div>

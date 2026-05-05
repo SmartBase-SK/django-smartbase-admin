@@ -3,7 +3,11 @@
 {% block colors %}bg-negative-50 border-negative-100 text-negative-900{% endblock %}
 
 {% block icon %}
-    <svg class="w-20 h-20 mr-12 text-negative">
-        <use xlink:href="#Info"></use>
+    <svg class="w-20 h-20 mr-12 text-negative shrink-0">
+        <use xlink:href="#Close-one"></use>
     </svg>
+{% endblock %}
+
+{% block close %}
+    {% include 'sb_admin/partials/messages/alert_close.html' with css_class="group-hover:text-negative" %}
 {% endblock %}

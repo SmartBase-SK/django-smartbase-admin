@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
@@ -76,6 +77,7 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_ajax_url(self):
         return self.get_action_url("action_get_data")
 
+    @sbadmin_action
     def action_get_data(self, request, modifier):
         return JsonResponse(data={"data": self.get_cached_data(request)})
 
@@ -691,5 +693,6 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
 class SbAdminCalendarWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/calendar_widget.html"
 
+    @sbadmin_action
     def action_get_data(self, request, modifier):
         return JsonResponse(data=self.get_cached_data(request), safe=False)
