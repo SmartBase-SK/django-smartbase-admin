@@ -99,6 +99,7 @@ export class SelectionModule extends SBAdminTableModule {
                 },
                 visible: true,
                 headerSort: false,
+                sbadminKeepDataWidth: true,
                 width: '52'
             }
         ]

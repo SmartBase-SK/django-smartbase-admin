@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-# 
+#
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-16 11:52+0200\n"
+"POT-Creation-Date: 2026-04-29 15:03+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -854,6 +854,11 @@ msgstr "Uložit a přidat další"
 msgid "Save and continue editing"
 msgstr "Uložit a pokračovat v úpravách"
 
+#, fuzzy
+#| msgid "Select all"
+msgid "Select"
+msgstr "Vybrat vše"
+
 msgid "Add file"
 msgstr "Přidat soubor"
 
@@ -969,3 +974,6 @@ msgstr "Stav"
 
 msgid " of "
 msgstr " z "
+
+msgid "Language"
+msgstr "Jazyk"

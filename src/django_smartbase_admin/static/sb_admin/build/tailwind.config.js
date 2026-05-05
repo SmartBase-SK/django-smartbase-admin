@@ -33,7 +33,7 @@ module.exports = {
             l: '0 8 24px 0px rgb(0 0 0 / 0.10)',
             none: 'none',
             nav: '0px -4px 16px 0px rgba(17, 24, 39, 0.08)',
-            focus: '0px 0px 0px 2px #FFFFFF, 0px 0px 0px 4px #009FA7'
+            focus: '0px 0px 0px 2px var(--color-light), 0px 0px 0px 4px var(--color-primary)'
         },
         container: {
             sm: '540px',

@@ -208,6 +208,10 @@
             @apply bg-light-a/50;
         }
 
+        .tabulator .tabulator-header .tabulator-frozen:before {
+            @apply bg-light-a/50;
+        }
+
         input.checkbox,
         div.checkbox > input[type="checkbox"] {
             & ~ label {
@@ -242,6 +246,10 @@ html[data-theme="dark"] {
     @extend .dark-style;
 
     .tabulator .tabulator-header {
+        @apply bg-light-a/50;
+    }
+
+    .tabulator .tabulator-header .tabulator-frozen:before {
         @apply bg-light-a/50;
     }
 
