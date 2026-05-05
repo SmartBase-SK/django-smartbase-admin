@@ -115,7 +115,7 @@ class SBAdminRowAction(SBAdminCustomAction):
     """
 
     target_view = None
-    css_class = "btn-icon"
+    css_class = "btn btn-tiny btn-icon"
     open_in_new_tab = False
     enabled_if = None
     enabled_field = None
