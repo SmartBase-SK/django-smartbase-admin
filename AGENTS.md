@@ -144,6 +144,24 @@ class ArticleAdmin(SBAdmin):
 | `filter_disabled` | bool | Disable filtering for this field |
 | `python_formatter` | callable | Format value: `(obj_id, value) -> formatted_value` |
 | `list_visible` | bool | Show/hide column in list |
+| `tabulator_options` | TabulatorFieldOptions | Per-column Tabulator settings (width, grow, max, custom SBAdmin options) |
+
+### Tabulator Options (table)
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `sbadminKeepDataWidth` | bool | Keep column natural width (prevent stretch) when using `fitDataFillAvailableSpace`. Best for icon/utility columns. |
+
+```python
+from django_smartbase_admin.engine.field import SBAdminField, TabulatorFieldOptions
+
+sbadmin_list_display = (
+    SBAdminField(
+        name="id",
+        tabulator_options=TabulatorFieldOptions(sbadminKeepDataWidth=True),
+    ),
+)
+```
 
 ### Admin Methods (like Django admin)
 
