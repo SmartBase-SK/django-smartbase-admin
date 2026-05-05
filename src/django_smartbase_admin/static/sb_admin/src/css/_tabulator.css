@@ -166,7 +166,6 @@
 }
 
 .tabulator .tabulator-frozen {
-    position: absolute !important;
     z-index: 10;
     background-color: transparent;
     &:before {
@@ -532,8 +531,6 @@
 }
 
 .tabulator-row .tabulator-cell.tabulator-frozen {
-    display: inline-block;
-    position: sticky;
     z-index: 10;
     &:before {
         @apply bg-light;
