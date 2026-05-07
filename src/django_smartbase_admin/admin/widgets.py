@@ -566,14 +566,25 @@ class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
         )
         return context
 
+    def _empty_value(self):
+        # Match the root schema type so non-array editors don't seed `[]`
+        # into the hidden input (which then fails schema validation on a
+        # plain submit without edits).
+        schema_type = (self.schema or {}).get("type")
+        if schema_type == "array":
+            return []
+        if schema_type == "object":
+            return {}
+        return None
+
     def _normalize_value(self, value):
         if value in (None, ""):
-            return []
+            return self._empty_value()
         if isinstance(value, str):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
-                return []
+                return self._empty_value()
         return value
 
     def run_schema_validation(self, value):
@@ -618,8 +629,9 @@ class SBAdminJsonEditorField(forms.JSONField):
 
     def to_python(self, value):
         if value in self.empty_values:
-            schema = getattr(self.widget, "schema", None) or {}
-            return [] if schema.get("type") == "array" else None
+            if hasattr(self.widget, "_empty_value"):
+                return self.widget._empty_value()
+            return None
         return super().to_python(value)
 
     def validate(self, value):
