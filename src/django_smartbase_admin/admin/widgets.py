@@ -108,11 +108,41 @@ class SBAdminBaseWidget(ContextMixin):
         return context
 
 
-class SBAdminTextInputWidget(SBAdminBaseWidget, forms.TextInput):
+class SBAdminInputAffixMixin:
+    def __init__(self, *args, prefix=None, suffix=None, **kwargs):
+        self.prefix = prefix
+        self.suffix = suffix
+        super().__init__(*args, **kwargs)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["prefix"] = self.prefix
+        context["widget"]["suffix"] = self.suffix
+        return context
+
+    def get_attrs_with_affix_classes(self, attrs, prefix=None, suffix=None):
+        attrs = dict(attrs or {})
+        classes = attrs.get("class", "")
+        if prefix:
+            classes = f"{classes} rounded-l-none".strip()
+        if suffix:
+            classes = f"{classes} rounded-r-none".strip()
+        attrs["class"] = classes
+        return attrs
+
+
+class SBAdminTextInputWidget(
+    SBAdminInputAffixMixin, SBAdminBaseWidget, forms.TextInput
+):
     template_name = "sb_admin/widgets/text.html"
 
-    def __init__(self, form_field=None, attrs=None):
-        super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
+    def __init__(self, form_field=None, attrs=None, prefix=None, suffix=None):
+        attrs = self.get_attrs_with_affix_classes(
+            {"class": "input", **(attrs or {})},
+            prefix=prefix,
+            suffix=suffix,
+        )
+        super().__init__(form_field, attrs=attrs, prefix=prefix, suffix=suffix)
 
 
 class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
@@ -159,12 +189,17 @@ class SBAdminURLFieldWidget(SBAdminBaseWidget, AdminURLFieldWidget):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
 
 
-class SBAdminNumberWidget(SBAdminBaseWidget, forms.NumberInput):
+class SBAdminNumberWidget(SBAdminInputAffixMixin, SBAdminBaseWidget, forms.NumberInput):
     class_name = "input"
     template_name = "sb_admin/widgets/number.html"
 
-    def __init__(self, form_field=None, attrs=None):
-        super().__init__(form_field, attrs={"class": self.class_name, **(attrs or {})})
+    def __init__(self, form_field=None, attrs=None, prefix=None, suffix=None):
+        attrs = self.get_attrs_with_affix_classes(
+            {"class": self.class_name, **(attrs or {})},
+            prefix=prefix,
+            suffix=suffix,
+        )
+        super().__init__(form_field, attrs=attrs, prefix=prefix, suffix=suffix)
 
 
 class SBAdminCheckboxWidget(SBAdminBaseWidget, forms.CheckboxInput):

@@ -72,6 +72,26 @@
         @apply h-auto;
     }
 
+    .input-affix {
+        @apply flex w-full;
+    }
+
+    .input-affix__field {
+        @apply grow min-w-0;
+    }
+
+    .input-affix__addon {
+        @apply flex items-center px-12 border border-dark-300 bg-dark-100 text-dark-700 shadow-xs;
+    }
+
+    .input-affix__prefix {
+        @apply border-r-0 rounded-l;
+    }
+
+    .input-affix__suffix {
+        @apply border-l-0 rounded-r;
+    }
+
     .input-file {
         @apply relative flex items-center;
         @apply border border-dark-300 border-dashed rounded bg-light;
