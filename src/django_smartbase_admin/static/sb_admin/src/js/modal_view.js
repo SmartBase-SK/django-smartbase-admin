@@ -20,9 +20,6 @@ var scriptsToLoad = (media.js || []).reduce(function (acc, path) {
     }
     return acc
 }, [])
-
-console.log(scriptsToLoad)
-
 Object.entries(media.css || {}).forEach(function ([medium, paths]) {
     paths.forEach(function (path) {
         var url = resolveUrl(path)

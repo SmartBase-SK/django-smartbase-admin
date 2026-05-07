@@ -34,6 +34,10 @@ import {setCookie, setDropdownLabel} from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
 
+const CKEDITOR_READY_MAX_FRAMES = 120
+const PAGE_SCROLL_MARGIN_PX = 24
+const MODAL_SCROLL_MARGIN_PX = 24
+
 class Main {
     constructor() {
         document.body.classList.add('js-ready')
@@ -78,6 +82,7 @@ class Main {
                 this.textTags.handleDynamicallyAddedTextTags(detail.target)
                 this.initInlines(detail.target)
                 this.initTooltips(detail.target)
+                this.scheduleScrollToFirstErrorField(detail.target)
             })
 
             window.htmx.on("htmx:afterSettle", (detail) => {
@@ -107,6 +112,7 @@ class Main {
         this.initAliasName()
         this.handleLocationHashFromTabs()
         this.initCollapseEventListeners()
+        this.scheduleScrollToFirstErrorField(document)
     }
 
     isDarkMode() {
@@ -186,6 +192,123 @@ class Main {
                 window.location.hash = event.target.id.split("tab_")[1]
             })
         })
+    }
+
+    hasValidationErrors(target) {
+        return Boolean(target.querySelector('.errorlist'))
+    }
+
+    findFirstErrorAnchor(target) {
+        const fieldError = target.querySelector('.field.errors')
+        if (fieldError) {
+            return fieldError
+        }
+
+        const inlineCellError = target.querySelector('.djn-inline-form.has-errors td[class*="field-"] .errorlist')
+        if (inlineCellError) {
+            return inlineCellError.closest('td[class*="field-"]') || inlineCellError
+        }
+
+        const inlineRowError = target.querySelector('.djn-inline-form.has-errors')
+        if (inlineRowError) {
+            return inlineRowError
+        }
+
+        const nonFieldError = target.querySelector('.nonfield, ul.errorlist')
+        if (nonFieldError) {
+            const wrapper = nonFieldError.closest('.field, td[class*="field-"], .djn-inline-form')
+            return wrapper || nonFieldError
+        }
+
+        return null
+    }
+
+    getFirstFocusableField(anchor) {
+        if (anchor.matches('input, select, textarea, button')) {
+            return anchor
+        }
+        return anchor.querySelector('input:not([type="hidden"]), select, textarea, button')
+    }
+
+    getTargetCKEditorIds(target) {
+        if (!target?.querySelectorAll) {
+            return []
+        }
+        return Array.from(target.querySelectorAll('textarea[data-type="ckeditortype"]'))
+            .map((textarea) => textarea.id)
+            .filter(Boolean)
+    }
+
+    areTargetCKEditorsReady(editorIds) {
+        if (!window.CKEDITOR || !editorIds.length) {
+            return true
+        }
+        return editorIds.every((editorId) => window.CKEDITOR.instances[editorId]?.status === 'ready')
+    }
+
+    scheduleScrollToFirstErrorField(target) {
+        if (!this.hasValidationErrors(target)) {
+            return
+        }
+        const editorIds = this.getTargetCKEditorIds(target)
+        if (!window.CKEDITOR || !editorIds.length) {
+            this.scrollToFirstErrorField(target)
+            return
+        }
+        let frameCount = 0
+        const waitForEditors = () => {
+            const editorsReady = this.areTargetCKEditorsReady(editorIds)
+            const reachedMaxFrames = frameCount >= CKEDITOR_READY_MAX_FRAMES
+            if (editorsReady || reachedMaxFrames) {
+                this.scrollToFirstErrorField(target)
+                return
+            }
+            frameCount += 1
+            window.requestAnimationFrame(waitForEditors)
+        }
+        window.requestAnimationFrame(waitForEditors)
+    }
+
+    scrollElementIntoViewport(anchor) {
+        const modalBody = anchor.closest('.modal-body')
+        const detailActionBar = document.querySelector('.detail-view-action-bar')
+        const actionBarHeight = detailActionBar ? detailActionBar.getBoundingClientRect().height : 0
+        const modalScrollMargin = `${MODAL_SCROLL_MARGIN_PX}px`
+        const pageScrollMarginTop = `${actionBarHeight + PAGE_SCROLL_MARGIN_PX}px`
+        const scrollMargins = modalBody
+            ? {scrollMarginTop: modalScrollMargin, scrollMarginBottom: modalScrollMargin}
+            : {scrollMarginTop: pageScrollMarginTop}
+        const previousScrollMargins = {
+            scrollMarginTop: anchor.style.scrollMarginTop,
+            scrollMarginBottom: anchor.style.scrollMarginBottom
+        }
+
+        try {
+            Object.entries(scrollMargins).forEach(([propertyName, propertyValue]) => {
+                anchor.style[propertyName] = propertyValue
+            })
+            anchor.scrollIntoView({behavior: 'instant', block: 'start', inline: 'nearest'})
+        } finally {
+            anchor.style.scrollMarginTop = previousScrollMargins.scrollMarginTop
+            anchor.style.scrollMarginBottom = previousScrollMargins.scrollMarginBottom
+        }
+    }
+
+    scrollToFirstErrorField(target) {
+        target = target || document
+        if (!this.hasValidationErrors(target)) {
+            return
+        }
+        const anchor = this.findFirstErrorAnchor(target)
+        if (!anchor) {
+            return
+        }
+        const firstField = this.getFirstFocusableField(anchor)
+        const scrollTarget = firstField || anchor
+        this.scrollElementIntoViewport(scrollTarget)
+        if (firstField) {
+            firstField.focus({preventScroll: true})
+        }
     }
 
     passwordToggleFnc(event) {
