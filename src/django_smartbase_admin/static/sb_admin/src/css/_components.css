@@ -6,6 +6,7 @@
 @import "components/_tooltip.css";
 @import "components/_query-builder.css";
 @import "components/_table.css";
+@import "components/_json-editor.css";
 
 @layer components {
     .card {
