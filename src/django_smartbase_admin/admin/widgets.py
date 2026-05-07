@@ -490,6 +490,156 @@ class SBAdminAttributesWidget(SBAdminTextInputWidget):
         return context
 
 
+class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
+    """JSON Schema editor backed by @json-editor/json-editor.
+
+    Subclasses ``TextInput`` (not ``HiddenInput``) so SBAdmin's fieldset
+    template doesn't hide the surrounding wrapper; the underlying input is
+    hidden via the ``sbadmin-json-editor-input`` CSS class instead.
+    """
+
+    template_name = "sb_admin/widgets/json_editor.html"
+    INPUT_HIDE_CLASS = "sbadmin-json-editor-input"
+    jsoneditor_cdn_url = "https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.16.0/dist/jsoneditor.min.js"
+    default_editor_options = {
+        "theme": "sbadmin",
+        "iconlib": "sbadmin",
+        "disable_edit_json": True,
+        "disable_properties": True,
+        "disable_array_delete_all_rows": True,
+        "disable_array_delete_last_row": True,
+        "disable_array_reorder": False,
+        "no_additional_properties": True,
+        "prompt_before_delete": False,
+    }
+
+    def __init__(
+        self,
+        form_field=None,
+        *,
+        schema,
+        attrs=None,
+        editor_options=None,
+        jsoneditor_cdn_url=None,
+        add_to_top=False,
+    ):
+        self.schema = schema
+        self.editor_options = {
+            **self.default_editor_options,
+            **(editor_options or {}),
+        }
+        self.add_to_top = add_to_top
+        if jsoneditor_cdn_url is not None:
+            self.jsoneditor_cdn_url = jsoneditor_cdn_url
+        super().__init__(form_field, attrs=attrs)
+
+    def format_value(self, value):
+        return json.dumps(self._normalize_value(value), cls=SBAdminJSONEncoder)
+
+    def get_context(self, name, value, attrs):
+        normalized_value = self._normalize_value(value)
+        attrs = dict(attrs or {})
+        existing_class = attrs.get("class", "")
+        if self.INPUT_HIDE_CLASS not in existing_class.split():
+            attrs["class"] = (existing_class + " " + self.INPUT_HIDE_CLASS).strip()
+        context = super().get_context(name, value, attrs)
+        widget = context["widget"]
+        widget_id = widget["attrs"].get("id") or f"id_{name}"
+        # `form_name_root` namespaces generated input `name` attrs so two
+        # editors on the same page can't collide on overlapping schema fields.
+        editor_options = {
+            **self.editor_options,
+            "form_name_root": widget_id,
+        }
+        widget.update(
+            {
+                "json_editor_cdn_url": self.jsoneditor_cdn_url,
+                "json_editor_editor_id": f"{widget_id}_editor",
+                "json_editor_schema": self.schema,
+                "json_editor_schema_id": f"{widget_id}_schema",
+                "json_editor_value": normalized_value,
+                "json_editor_value_id": f"{widget_id}_value",
+                "json_editor_options": editor_options,
+                "json_editor_options_id": f"{widget_id}_options",
+                "json_editor_add_to_top": bool(self.add_to_top),
+            }
+        )
+        return context
+
+    def _empty_value(self):
+        # Match the root schema type so non-array editors don't seed `[]`
+        # into the hidden input (which then fails schema validation on a
+        # plain submit without edits).
+        schema_type = (self.schema or {}).get("type")
+        if schema_type == "array":
+            return []
+        if schema_type == "object":
+            return {}
+        return None
+
+    def _normalize_value(self, value):
+        if value in (None, ""):
+            return self._empty_value()
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return self._empty_value()
+        return value
+
+    def run_schema_validation(self, value):
+        """Validate ``value`` against the widget's schema; raise ValidationError on failure."""
+        if value in (None, "") or not self.schema:
+            return
+        import jsonschema
+
+        validator = jsonschema.Draft7Validator(
+            self.schema, format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER
+        )
+        errors = sorted(
+            validator.iter_errors(value), key=lambda e: list(e.absolute_path)
+        )
+        if not errors:
+            return
+        details = [
+            f"{'.'.join(str(p) for p in err.absolute_path) or '(root)'}: {err.message}"
+            for err in errors
+        ]
+        raise ValidationError(details)
+
+
+class SBAdminJsonEditorField(forms.JSONField):
+    def __init__(
+        self,
+        *,
+        schema,
+        add_to_top=False,
+        editor_options=None,
+        widget=None,
+        **kwargs,
+    ):
+        if widget is None:
+            widget = SBAdminJsonEditorWidget(
+                schema=schema,
+                add_to_top=add_to_top,
+                editor_options=editor_options,
+            )
+        kwargs["widget"] = widget
+        super().__init__(**kwargs)
+
+    def to_python(self, value):
+        if value in self.empty_values:
+            if hasattr(self.widget, "_empty_value"):
+                return self.widget._empty_value()
+            return None
+        return super().to_python(value)
+
+    def validate(self, value):
+        super().validate(value)
+        if hasattr(self.widget, "run_schema_validation"):
+            self.widget.run_schema_validation(value)
+
+
 class SBAdminAutocompleteWidget(
     SBAdminBaseWidget, AutocompleteFilterWidget, forms.Widget
 ):

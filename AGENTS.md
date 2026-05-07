@@ -12,7 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
@@ -44,6 +44,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
+- **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
@@ -1127,6 +1128,38 @@ class ArticleForm(SBAdminBaseForm):
 - Default behavior is safer for required fields: blank placeholder is shown but disabled.
 - Set `disable_empty_option=False` if you explicitly want the empty option to remain selectable.
 - The setting only affects empty values (`""` / `None`) on required fields.
+
+### `SBAdminJsonEditorField` / `SBAdminJsonEditorWidget` — schema-driven JSON editor
+
+SBAdmin-themed wrapper around [`@json-editor/json-editor`](https://github.com/json-editor/json-editor) (loaded from CDN). Pair it with `SBAdminJsonEditorField` to edit an array/object value via a JSON Schema and validate it server-side against the same schema (uses `jsonschema`).
+
+```python
+from django_smartbase_admin.admin.widgets import SBAdminJsonEditorField
+
+tags_config = SBAdminJsonEditorField(
+    required=False,
+    schema={
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["name"],  # red asterisk on the label, enforced server-side
+            "headerTemplate": "{{i1}}. {{ self.name }}",
+            "properties": {
+                "name": {"type": "string", "title": "Name"},
+                "active": {"type": "boolean", "format": "checkbox", "title": "Active"},
+            },
+        },
+    },
+    add_to_top=True,  # optional: prepend new rows (root array only)
+)
+```
+
+**Key points:**
+- `required: [...]` in the schema renders a red `*` next to the label and is enforced server-side. The schema-validation logic lives on the widget (`SBAdminJsonEditorWidget.run_schema_validation`); `SBAdminJsonEditorField.validate()` simply delegates to it. Use the field for the standard wiring, or call `widget.run_schema_validation(value)` from your own field/validator if you want to keep using a plain `forms.JSONField`.
+- Reorder (move-up/move-down) is enabled by default; pass `editor_options={"disable_array_reorder": True}` to disable.
+- Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
+- `add_to_top=True` reorders the **root** array only; nested arrays still append.
+- Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
 
 ---
 
