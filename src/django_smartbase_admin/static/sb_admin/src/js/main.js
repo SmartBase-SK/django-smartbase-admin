@@ -294,6 +294,44 @@ class Main {
         }
     }
 
+    expandCollapsedAncestors(element) {
+        const collapsedAncestors = []
+        let current = element?.parentElement
+        while (current) {
+            if (current.classList?.contains('collapse') && !current.classList.contains('show')) {
+                collapsedAncestors.push(current)
+            }
+            current = current.parentElement
+        }
+        const ancestorsToExpand = collapsedAncestors.reverse()
+        if (!ancestorsToExpand.length) {
+            return Promise.resolve()
+        }
+
+        return ancestorsToExpand.reduce((promiseChain, collapseElement) => {
+            return promiseChain.then(() => {
+                return new Promise((resolve) => {
+                    if (collapseElement.classList.contains('show')) {
+                        resolve()
+                        return
+                    }
+                    const collapseInstance = Collapse.getOrCreateInstance(collapseElement)
+                    let timeoutId = null
+                    const complete = () => {
+                        collapseElement.removeEventListener('shown.bs.collapse', complete)
+                        if (timeoutId) {
+                            window.clearTimeout(timeoutId)
+                        }
+                        resolve()
+                    }
+                    collapseElement.addEventListener('shown.bs.collapse', complete, {once: true})
+                    timeoutId = window.setTimeout(complete, 450)
+                    collapseInstance.show()
+                })
+            })
+        }, Promise.resolve())
+    }
+
     scrollToFirstErrorField(target) {
         target = target || document
         if (!this.hasValidationErrors(target)) {
@@ -305,10 +343,12 @@ class Main {
         }
         const firstField = this.getFirstFocusableField(anchor)
         const scrollTarget = firstField || anchor
-        this.scrollElementIntoViewport(scrollTarget)
-        if (firstField) {
-            firstField.focus({preventScroll: true})
-        }
+        this.expandCollapsedAncestors(scrollTarget).then(() => {
+            this.scrollElementIntoViewport(scrollTarget)
+            if (firstField) {
+                firstField.focus({preventScroll: true})
+            }
+        })
     }
 
     passwordToggleFnc(event) {
