@@ -1581,7 +1581,7 @@ class ArticleAdmin(SBAdmin):
                 title=lambda row: _("Archive %(title)s") % {"title": row.get("title", "")},
                 icon="Delete",
                 view=self,
-                css_class=lambda row: "btn-icon btn-destructive",
+                css_class=lambda row: "btn btn-small btn-only-icon btn-destructive",
                 enabled_if=lambda row: row.get("status") != "archived",
             ),
             # Mode 3: plain link. MODIFIER_OBJECT_ID is replaced with the row pk.
