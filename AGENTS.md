@@ -12,7 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
@@ -145,6 +145,24 @@ class ArticleAdmin(SBAdmin):
 | `filter_disabled` | bool | Disable filtering for this field |
 | `python_formatter` | callable | Format value: `(obj_id, value) -> formatted_value` |
 | `list_visible` | bool | Show/hide column in list |
+| `tabulator_options` | TabulatorFieldOptions | Per-column Tabulator settings (width, grow, max, custom SBAdmin options) |
+
+### Tabulator Options (table)
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `sbadminKeepDataWidth` | bool | Keep column natural width (prevent stretch) when using `fitDataFillAvailableSpace`. Best for icon/utility columns. |
+
+```python
+from django_smartbase_admin.engine.field import SBAdminField, TabulatorFieldOptions
+
+sbadmin_list_display = (
+    SBAdminField(
+        name="id",
+        tabulator_options=TabulatorFieldOptions(sbadminKeepDataWidth=True),
+    ),
+)
+```
 
 ### Admin Methods (like Django admin)
 
@@ -1078,6 +1096,37 @@ class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
 - Duplicate values are prevented client-side.
 - Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
 
+### Input prefix and suffix (text and number widgets)
+
+Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or `SBAdminNumberWidget` (e.g. currency, units, URL stem). Omit both for a normal input.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import (
+    SBAdminNumberWidget,
+    SBAdminTextInputWidget,
+)
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("slug", "price", "discount")
+        widgets = {
+            "slug": SBAdminTextInputWidget(prefix="https://blog.example.com/"),
+            "price": SBAdminNumberWidget(suffix="€"),
+            "discount": SBAdminNumberWidget(prefix="-", suffix="%"),
+        }
+```
+
+**Key points:**
+- Addons are display-only; they do not change the stored field value.
+- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in and forward `prefix` / `suffix` in `__init__`).
+
 ### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
 
 When a form inherits from `SBAdminBaseForm`, widgets defined in `Meta.widgets` are initialized even if the field is not re-declared on the form class.
@@ -1532,7 +1581,7 @@ class ArticleAdmin(SBAdmin):
                 title=lambda row: _("Archive %(title)s") % {"title": row.get("title", "")},
                 icon="Delete",
                 view=self,
-                css_class=lambda row: "btn-icon btn-destructive",
+                css_class=lambda row: "btn btn-small btn-only-icon btn-destructive",
                 enabled_if=lambda row: row.get("status") != "archived",
             ),
             # Mode 3: plain link. MODIFIER_OBJECT_ID is replaced with the row pk.

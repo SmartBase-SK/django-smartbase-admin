@@ -943,10 +943,11 @@ class SBAdmin(
     ):
         if context.get("sbadmin_is_modal"):
             media = context["media"]
+            js_assets = [str(asset) for asset in getattr(media, "_js", [])]
             media_json = {
-                "js": list(getattr(media, "_js", [])),
+                "js": js_assets,
                 "css": {
-                    medium: list(paths)
+                    medium: [str(path) for path in paths]
                     for medium, paths in getattr(media, "_css", {}).items()
                 },
             }
