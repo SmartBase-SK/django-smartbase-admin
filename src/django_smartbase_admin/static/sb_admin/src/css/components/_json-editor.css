@@ -1,0 +1,81 @@
+.sbadmin-json-editor-input {
+    @apply hidden;
+}
+
+.sbadmin-json-editor {
+    @apply relative;
+
+    .je-header:not(.je-object__title) {
+        @apply mb-8;
+    }
+    
+    .je-header,
+    .je-object__title {
+        @apply flex items-center text-14 font-medium text-dark-900;
+    }
+
+    .je-object__controls {
+        @apply hidden;
+    }
+
+    .je-indented-panel {
+        @apply !p-0 !m-0 !border-0 bg-transparent;
+
+        & > .sbadmin-json-editor-buttons {
+            @apply absolute right-0 top-0;
+        }
+    }
+
+    .je-child-editor-holder {
+        @apply p-20 md:p-24 rounded border border-dark-200 relative;
+
+        .sbadmin-json-editor-buttons {
+            @apply m-20 md:m-24 absolute right-0 top-0;
+
+            .btn {
+                @apply border-none;
+                @apply px-8;
+            }
+
+            .json-editor-btn-delete {
+                float: right;
+                @apply ml-8;
+            }
+        }
+    }
+
+    .json-editor-btn-collapse{
+        @apply border;
+    }
+
+    /* Form rows */
+    .row {
+        @apply mt-16 sm:mt-24;
+    }
+
+    .form-control {
+        .je-form-input-label {
+            @apply inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium;
+        }
+
+        .je-form-input-description {
+            @apply mt-8 text-12 leading-16;
+        }
+    }
+
+    /* Asterisk for required fields. JSON Editor's html theme adds the
+       `.required` class on <label> elements of required schema properties. */
+    label.required::after {
+        content: "*";
+        @apply ml-4 text-negative;
+    }
+
+    .row > div[data-schematype="checkbox"], .row > div[data-schematype="boolean"] {
+        label {
+            @apply inline-flex text-dark-900 text-14 leading-18 font-medium;
+        }
+        .je-form-input-label {
+            @apply text-12 leading-16 text-dark-600 font-normal mb-0;
+        }
+    }
+}
