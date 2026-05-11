@@ -30,13 +30,13 @@
     .column-widget-columns {
         & > li {
             @apply relative px-12 py-8 flex items-center;
-            .checkbox.checkbox-icon:not(:checked) + label {
+            .checkbox.checkbox-icon:not(:checked) + :where(label, .label) {
                 @media (pointer:fine) {
                     opacity: 0;
                 }
             }
             &:hover {
-                .checkbox.checkbox-icon + label {
+                .checkbox.checkbox-icon + :where(label, .label) {
                     opacity: 1;
                 }
             }

@@ -12,7 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
@@ -44,6 +44,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
+- **Input with unit/currency/protocol addon?** → [Input prefix and suffix](#input-prefix-and-suffix-text-and-number-widgets)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
@@ -1094,6 +1095,37 @@ class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
 - `delimiter` controls how pasted/typed values are split.
 - Duplicate values are prevented client-side.
 - Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
+
+### Input prefix and suffix (text and number widgets)
+
+Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or `SBAdminNumberWidget` (e.g. currency, units, URL stem). Omit both for a normal input.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import (
+    SBAdminNumberWidget,
+    SBAdminTextInputWidget,
+)
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("slug", "price", "discount")
+        widgets = {
+            "slug": SBAdminTextInputWidget(prefix="https://blog.example.com/"),
+            "price": SBAdminNumberWidget(suffix="€"),
+            "discount": SBAdminNumberWidget(prefix="-", suffix="%"),
+        }
+```
+
+**Key points:**
+- Addons are display-only; they do not change the stored field value.
+- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in and forward `prefix` / `suffix` in `__init__`).
 
 ### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
 
