@@ -36,6 +36,7 @@ from django_smartbase_admin.engine.const import (
     ADVANCED_FILTER_DATA_NAME,
     IGNORE_LIST_SELECTION,
     MODIFIER_OBJECT_ID,
+    SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import import_with_injection
@@ -174,6 +175,7 @@ class SBAdminListAction(SBAdminAction):
             "PAGINATION_ACTIVE_RANGE": PAGINATION_ACTIVE_RANGE,
             "ANNOTATE_KEY": ANNOTATE_KEY,
             "CONFIG_NAME": CONFIG_NAME,
+            "AJAX_NOTIFICATIONS_KEY": SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
         }
 
         columns, id_column_name = self.get_tabulator_columns_add_id_column_if_missing()

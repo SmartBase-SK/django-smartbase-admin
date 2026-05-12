@@ -34,6 +34,7 @@ from django_smartbase_admin.engine.const import (
     OVERRIDE_CONTENT_OF_NOTIFICATION,
     FilterVersions,
     BASE_PARAMS_NAME,
+    SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
     TABLE_RELOAD_DATA_EVENT_NAME,
     TABLE_UPDATE_ROW_DATA_EVENT_NAME,
     SELECT_ALL_KEYWORD,
@@ -50,7 +51,12 @@ from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXOptions,
     SBAdminXLSXFormat,
 )
-from django_smartbase_admin.utils import is_htmx_request, render_notifications, is_modal
+from django_smartbase_admin.utils import (
+    is_htmx_request,
+    is_modal,
+    render_notifications,
+    render_notifications_if_any,
+)
 
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
@@ -897,6 +903,9 @@ class SBAdminBaseListView(SBAdminBaseView):
     def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()
+        notifications_html = render_notifications_if_any(request)
+        if notifications_html:
+            data[SB_ADMIN_AJAX_NOTIFICATIONS_KEY] = notifications_html
         return JsonResponse(data=data, safe=False)
 
     def get_sbadmin_list_filter(self, request) -> Iterable | None:

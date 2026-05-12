@@ -28,6 +28,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Nested List View](#nested-list-view-sbadmin_nested) | One-level self-referential tree rendering via Tabulator `dataTree` with `TabulatorNestedPlugin` |
 | [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node) | Multi-level tree rendering for django-treebeard `MP_Node` models — form widget, filter widget, `actions/tree_list.html` |
 | [List View Plugins](#list-view-plugins-sbadminplugin) | Protocol for reshaping the list pipeline globally — queryset hooks, per-request state, Tabulator definition |
+| [List-View AJAX Notifications](#list-view-ajax-notifications) | Surface Django messages from list-action requests via the standard notification slot; fail-soft pattern for the list query |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
@@ -60,6 +61,8 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Pick parent from a tree in a form?** → [`SBAdminTreeWidget` as a form widget](#sbadmintreewidget--form-widget-for-picking-a-node)
 - **Filter a list by tree node?** → [`SBAdminTreeFilterWidget`](#sbadmintreefilterwidget--filter-widget)
 - **Reshape list queryset / Tabulator options globally?** → [List View Plugins](#list-view-plugins-sbadminplugin)
+- **Show a Django message from a list-view request?** → [List-View AJAX Notifications](#list-view-ajax-notifications)
+- **Fail-soft empty response from a list view?** → [Failing Soft on Errors](#failing-soft-on-errors)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
@@ -3209,6 +3212,54 @@ All hooks take `request` as a keyword-style argument and accept `**kwargs` — c
 
 ---
 
+## List-View AJAX Notifications
+
+Django messages queued during a list-action request (`messages.add_message(request, level, "…")`) are auto-embedded in the JSON response and rendered into the standard notification slot — same slot used for HTMX swaps. Works for anything running inside `action_list_json`: `restrict_queryset`, plugins, row-action hooks, signal handlers. No template / JS wiring needed.
+
+### Failing Soft on Errors
+
+Without this, a list-query failure bubbles a 500 and Tabulator renders a generic "Ajax Error" with no explanation. To replace that with an actual informative notification, subclass `SBAdminListAction`, catch in `get_json_data`, queue a message, and return an empty payload — the base flow embeds the queued message automatically so the user sees *why* the list is empty.
+
+```python
+import logging
+
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Comment
+
+logger = logging.getLogger(__name__)
+
+
+class FailSoftListAction(SBAdminListAction):
+    def get_json_data(self):
+        try:
+            return super().get_json_data()
+        except Exception:
+            logger.exception("List query failed for %s", self.view.get_id())
+            messages.warning(
+                self.threadsafe_request,
+                _("The list could not be loaded. Try again."),
+            )
+            return {"last_page": 0, "data": [], "last_row": 0}
+
+
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    sbadmin_list_action_class = FailSoftListAction
+```
+
+**Key points:**
+- `self.threadsafe_request` is the active request — use it with `messages.add_message`.
+- Return shape matches `get_data()`: `{"last_page", "data", "last_row"}`.
+- Wire on a shared project base admin to enable fail-soft for every list view at once. Scope the `except` to whichever exception class fits your case.
+
+---
+
 ## Detail View Layout (Sidebar)
 
 The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
@@ -4220,6 +4271,8 @@ Code example:
 - Another key point
 ```
 
+Add ❌ BAD vs ✅ GOOD blocks **only when there's a non-obvious mistake worth calling out** — most reference / "how to wire X" sections don't need them. For pure feature descriptions, a single ✅ working example plus key points is enough.
+
 ### Checklist Before Adding
 
 - [ ] Uses demo schema models (Article, Category, Tag, Author, Comment)
@@ -4227,7 +4280,7 @@ Code example:
 - [ ] Added entry to Table of Contents with brief description
 - [ ] No generic names like `MyModel`, `RelatedModel`, `SomeField`
 - [ ] Includes "Key points" or gotchas if there are non-obvious behaviors
-- [ ] Shows both ❌ BAD and ✅ GOOD patterns for common mistakes
+- [ ] *(Optional)* ❌ BAD vs ✅ GOOD blocks **only** when readers commonly trip on a specific footgun
 
 ### Naming Conventions
 
