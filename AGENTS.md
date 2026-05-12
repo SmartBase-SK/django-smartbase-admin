@@ -1870,6 +1870,7 @@ class ArticleAdmin(SBAdmin):
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
 | "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
 | "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
+| Saved-views tab shows a spurious `*` ("changed") on a fresh URL load | A field listed in `ordering` is **not** in `sbadmin_list_display`, so Tabulator drops it from the initial sort, the actual sort then differs from `tableInitialSort`, and `tableData.sort` leaks into the form-state comparison | Add the missing field to `sbadmin_list_display` as `SBAdminField(name="<field>", list_visible=False, filter_disabled=True)` so Tabulator registers (but hides) the column |
 
 ---
 
