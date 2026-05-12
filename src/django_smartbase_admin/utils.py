@@ -3,6 +3,7 @@ from collections.abc import Iterable
 
 from django import forms
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -39,6 +40,17 @@ def to_list(item):
 
 def render_notifications(request):
     return render_to_string("sb_admin/includes/notifications.html", request=request)
+
+
+def render_notifications_if_any(request):
+    """Like ``render_notifications`` but returns ``None`` when the messages
+    queue is empty, so JSON callers can omit the key entirely."""
+    storage = messages.get_messages(request)
+    if not len(storage):
+        storage.used = False
+        return None
+    storage.used = False
+    return render_notifications(request)
 
 
 def is_modal(request):

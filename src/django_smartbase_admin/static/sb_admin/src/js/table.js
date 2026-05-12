@@ -253,6 +253,19 @@ class SBAdminTable {
         return this.tableAjaxUrl + this.getUrlParamsString()
     }
 
+    _handleAjaxNotifications(response) {
+        const html = response?.[this.constants.AJAX_NOTIFICATIONS_KEY]
+        if (!html) {
+            return
+        }
+        const slot = document.getElementById("notification-messages")
+        if (!slot) {
+            return
+        }
+        slot.innerHTML = html
+        window.htmx?.process(slot)
+    }
+
     buildTabulatorTable() {
         this.lastTableParams = {}
         Tabulator.extendModule("format", "formatters", {
@@ -335,6 +348,10 @@ class SBAdminTable {
             paginationSize: this.tableInitializePageSize,
             ajaxURLGenerator: (url, config, params) => {
                 return this.ajaxUrlGenerator(url, config, params)
+            },
+            ajaxResponse: (url, params, response) => {
+                self._handleAjaxNotifications(response)
+                return response
             },
             dataSendParams: {
                 "size": this.constants.TABLE_PARAMS_SIZE_NAME,

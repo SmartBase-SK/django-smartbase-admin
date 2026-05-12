@@ -73,6 +73,9 @@ CONFIG_NAME = "config_name"
 DETAIL_STRUCTURE_RIGHT_CLASS = "detail-structure-right"
 TRANSLATIONS_SELECTED_LANGUAGES = "translation_selected_languages"
 OVERRIDE_CONTENT_OF_NOTIFICATION = "override_notification_content"
+# JSON key carrying rendered Django-messages HTML on list-action responses;
+# read by ``SBAdminTable._handleAjaxNotifications`` in ``table.js``.
+SB_ADMIN_AJAX_NOTIFICATIONS_KEY = "sb_admin_notifications"
 FIELDSET_HIDE_HEADER_CLASS = "hide-header"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"
 SUPPORTED_FILE_TYPE_ICONS = ["doc", "docx", "csv", "xls", "xlsx", "pdf", "ppt", "zip"]
