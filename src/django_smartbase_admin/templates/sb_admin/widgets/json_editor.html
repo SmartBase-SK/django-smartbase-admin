@@ -1,0 +1,220 @@
+{{ widget.json_editor_schema|json_script:widget.json_editor_schema_id }}
+{{ widget.json_editor_value|json_script:widget.json_editor_value_id }}
+{{ widget.json_editor_options|json_script:widget.json_editor_options_id }}
+{% include "sb_admin/widgets/input.html" %}
+<div id="{{ widget.json_editor_editor_id }}" class="sbadmin-json-editor" role="group"></div>
+<script>
+    (function() {
+        const input = document.getElementById("{{ widget.attrs.id }}");
+        const holder = document.getElementById("{{ widget.json_editor_editor_id }}");
+        if (!input || !holder || holder.dataset.jsonEditorInitialized === "1") return;
+        holder.dataset.jsonEditorInitialized = "1";
+
+        const schema = JSON.parse(document.getElementById("{{ widget.json_editor_schema_id }}").textContent);
+        const startValue = JSON.parse(document.getElementById("{{ widget.json_editor_value_id }}").textContent);
+        const editorOptions = JSON.parse(document.getElementById("{{ widget.json_editor_options_id }}").textContent);
+
+        function loadJsonEditor() {
+            if (window.JSONEditor) return Promise.resolve();
+            if (!window.sbAdminJsonEditorLoader) {
+                window.sbAdminJsonEditorLoader = new Promise(function(resolve, reject) {
+                    const script = document.createElement("script");
+                    script.src = "{{ widget.json_editor_cdn_url }}";
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+            }
+            return window.sbAdminJsonEditorLoader;
+        }
+
+        function registerSbAdminTheme() {
+            if (window.JSONEditor.defaults.themes.sbadmin) return;
+
+            const ICON_MAP = {
+                add: "Plus",
+                delete: "Delete",
+                collapse: "Down",
+                expand: "Right",
+                edit: "Edit",
+                save: "Save",
+                cancel: "Close",
+                moveup: "Arrow-circle-up",
+                movedown: "Arrow-circle-down",
+                copy: "Copy",
+                clear: "Close",
+            };
+
+            function makeSvg(iconKey) {
+                const ns = "http://www.w3.org/2000/svg";
+                const svg = document.createElementNS(ns, "svg");
+                svg.setAttribute("class", "w-20 h-20");
+                svg.setAttribute("aria-hidden", "true");
+                svg.dataset.iconKey = iconKey;
+                const use = document.createElementNS(ns, "use");
+                use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#" + ICON_MAP[iconKey]);
+                svg.appendChild(use);
+                return svg;
+            }
+
+            function SbAdminIconLib() {}
+            SbAdminIconLib.prototype.getIconClass = function() { return null; };
+            SbAdminIconLib.prototype.getIcon = function(key) {
+                if (!ICON_MAP[key]) return null;
+                return makeSvg(key);
+            };
+            window.JSONEditor.defaults.iconlibs.sbadmin = SbAdminIconLib;
+
+            const HtmlTheme = window.JSONEditor.defaults.themes.html;
+
+            class SbAdminTheme extends HtmlTheme {
+                setButtonText(button, text, icon, title) {
+                    button.innerHTML = "";
+                    const iconKey = icon && icon.dataset && icon.dataset.iconKey;
+                    button.classList.remove(
+                        "btn", "btn-secondary", "btn-empty", "btn-icon",
+                        "text-negative", "flex", "items-center", "gap-8"
+                    );
+
+                    if (iconKey === "add") {
+                        button.classList.add("btn", "btn-secondary", "btn-icon");
+                        if (icon) button.appendChild(icon);
+                    } else if (iconKey === "delete") {
+                        button.classList.add("btn", "btn-empty", "btn-icon", "text-negative");
+                        if (icon) {
+                            icon.classList.add("text-negative");
+                            button.appendChild(icon);
+                        }
+                    } else if (iconKey === "moveup" || iconKey === "movedown") {
+                        button.classList.add("btn", "btn-empty", "btn-icon");
+                        if (icon) button.appendChild(icon);
+                    } else if (iconKey === "collapse" || iconKey === "expand") {
+                        button.classList.add("btn", "btn-icon");
+                        if (icon) button.appendChild(icon);
+                    } else {
+                        button.classList.add("btn", "btn-icon");
+                        if (icon) button.appendChild(icon);
+                        if (text) {
+                            const span = document.createElement("span");
+                            span.textContent = text;
+                            button.appendChild(span);
+                        }
+                    }
+
+                    if (title) {
+                        button.setAttribute("title", title);
+                        button.setAttribute("aria-label", title);
+                    }
+                }
+
+                getFormInputField(type) {
+                    const el = super.getFormInputField(type);
+                    if (type === "checkbox" || type === "radio") {
+                        el.classList.add("checkbox");
+                    } else {
+                        el.classList.add("input");
+                    }
+                    return el;
+                }
+
+                getCheckbox() {
+                    const el = super.getCheckbox();
+                    el.classList.add("checkbox");
+                    el.style = "";
+                    return el;
+                }
+
+                getCheckboxLabel(text, req) {
+                    const el = document.createElement("label");
+                    if (text) el.appendChild(document.createTextNode(text));
+                    if (req) el.classList.add("required");
+                    return el;
+                }
+
+                getFormControl(label, input, description, infoText) {
+                    const el = document.createElement("div");
+                    el.classList.add("form-control");
+                    const isToggle = input && (input.type === "checkbox" || input.type === "radio");
+                    if (isToggle) {
+                        // SBAdmin checkbox/radio CSS expects sibling <input> + <label>
+                        // pair (input is absolute+opacity:0; label draws the box
+                        // via ::before/::after). Default html theme nests the
+                        // input inside the label, which would hide the box.
+                        el.classList.add("relative");
+                        if (input) el.appendChild(input);
+                        if (label) el.appendChild(label);
+                        if (description) el.appendChild(description);
+                    } else {
+                        if (label) el.appendChild(label);
+                        if (input) el.appendChild(input);
+                        if (description) el.appendChild(description);
+                    }
+                    if (infoText) el.appendChild(infoText);
+                    return el;
+                }
+
+                getSelectInput(options, multiple) {
+                    const el = super.getSelectInput(options, multiple);
+                    el.classList.add("input");
+                    return el;
+                }
+
+                getTextareaInput() {
+                    const el = super.getTextareaInput();
+                    el.classList.add("input");
+                    return el;
+                }
+
+                getButtonHolder() {
+                    const el = super.getButtonHolder();
+                    el.classList.add("sbadmin-json-editor-buttons");
+                    return el;
+                }
+            }
+
+            window.JSONEditor.defaults.themes.sbadmin = SbAdminTheme;
+        }
+
+        const addToTop = {{ widget.json_editor_add_to_top|yesno:"true,false" }};
+
+        loadJsonEditor().then(function() {
+            registerSbAdminTheme();
+            editorOptions.schema = schema;
+            editorOptions.startval = startValue;
+            const editor = new window.JSONEditor(holder, editorOptions);
+            let ready = false;
+
+            function sync() {
+                if (!ready) return;
+                input.value = JSON.stringify(editor.getValue() || []);
+            }
+
+            editor.on("ready", function() {
+                ready = true;
+                const rootTitle = (schema && typeof schema.title === "string" && schema.title.trim()) ? schema.title.trim() : "";
+                if (rootTitle) {
+                    input.setAttribute("aria-label", rootTitle);
+                    holder.setAttribute("aria-label", rootTitle);
+                }
+                if (addToTop && editor.root && editor.root.schema && editor.root.schema.type === "array" && editor.root.add_row_button) {
+                    editor.root.add_row_button.addEventListener("click", function() {
+                        // JSON Editor appends the new row synchronously in its
+                        // own click handler. Defer one tick, then move the
+                        // freshly-added last entry to the front.
+                        setTimeout(function() {
+                            const value = editor.root.getValue();
+                            if (!Array.isArray(value) || value.length < 2) return;
+                            editor.root.setValue([value[value.length - 1]].concat(value.slice(0, -1)));
+                            if (typeof editor.root.onChange === "function") editor.root.onChange(true);
+                        }, 0);
+                    });
+                }
+                sync();
+            });
+            editor.on("change", sync);
+            const form = input.closest("form");
+            if (form) form.addEventListener("submit", sync);
+        });
+    })();
+</script>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

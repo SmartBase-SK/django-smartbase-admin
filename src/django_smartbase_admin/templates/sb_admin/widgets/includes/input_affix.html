@@ -1,0 +1,19 @@
+{% if widget.prefix or widget.suffix %}
+    <div class="input-affix">
+        {% if widget.prefix %}
+            <div class="input-affix__addon input-affix__prefix">
+                {{ widget.prefix }}
+            </div>
+        {% endif %}
+        <div class="input-affix__field">
+            {% include "sb_admin/widgets/input.html" %}
+        </div>
+        {% if widget.suffix %}
+            <div class="input-affix__addon input-affix__suffix">
+                {{ widget.suffix }}
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    {% include "sb_admin/widgets/input.html" %}
+{% endif %}

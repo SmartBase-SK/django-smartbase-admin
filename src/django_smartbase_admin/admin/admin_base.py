@@ -54,7 +54,11 @@ from django_smartbase_admin.audit.views import (
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
-from django_smartbase_admin.utils import FormFieldsetMixin, is_modal
+from django_smartbase_admin.utils import (
+    FormFieldsetMixin,
+    is_modal,
+    render_notifications,
+)
 
 parler_enabled = None
 try:
@@ -146,6 +150,7 @@ from django_smartbase_admin.engine.const import (
     OBJECT_ID_PLACEHOLDER,
     TRANSLATIONS_SELECTED_LANGUAGES,
     ROW_CLASS_FIELD,
+    TABLE_RELOAD_DATA_EVENT_NAME,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -938,10 +943,11 @@ class SBAdmin(
     ):
         if context.get("sbadmin_is_modal"):
             media = context["media"]
+            js_assets = [str(asset) for asset in getattr(media, "_js", [])]
             media_json = {
-                "js": list(getattr(media, "_js", [])),
+                "js": js_assets,
                 "css": {
-                    medium: list(paths)
+                    medium: [str(path) for path in paths]
                     for medium, paths in getattr(media, "_css", {}).items()
                 },
             }
@@ -1033,6 +1039,16 @@ class SBAdmin(
         trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
         return response
 
+    def build_action_response(
+        self, request, *, reload_table=True, hide_modal=False
+    ) -> HttpResponse:
+        response = HttpResponse(render_notifications(request))
+        if hide_modal:
+            trigger_client_event(response, "hideModal", {})
+        if reload_table:
+            trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
+        return response
+
     def response_add(self, request, obj, post_url_continue=None):
         if is_modal(request):
             return self.get_modal_save_response(request, obj)
@@ -1111,6 +1127,11 @@ class SBAdminInline(
     def get_sbadmin_inline_list_actions(self, request) -> list:
         return [*(self.sbadmin_inline_list_actions or [])]
 
+    def get_sbadmin_inline_list_actions_processed(self, request) -> list:
+        return self.process_inline_actions(
+            request, self.get_sbadmin_inline_list_actions(request)
+        )
+
     def get_action_url(self, action, modifier="template") -> str:
         return reverse(
             "sb_admin:sb_admin_base",
@@ -1126,6 +1147,9 @@ class SBAdminInline(
         form_class = self.get_formset(request, None).form
         self.initialize_form_class(form_class, request)
         form_class()
+        self.register_action_autocomplete_views(
+            request, self.get_sbadmin_inline_list_actions_processed(request)
+        )
 
     def get_parent_instance_from_request(self):
         # Try to get parent instance from request referrer
@@ -1170,7 +1194,9 @@ class SBAdminInline(
                 self.opts.model_name,
             )
         context_data = {
-            "inline_list_actions": self.get_sbadmin_inline_list_actions(request),
+            "inline_list_actions": self.get_sbadmin_inline_list_actions_processed(
+                request
+            ),
             "is_sortable_active": is_sortable_active,
             "add_url": add_url,
         }

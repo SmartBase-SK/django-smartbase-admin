@@ -15,7 +15,17 @@ export class ColumnDisplayModule extends SBAdminTableModule {
         return true
     }
 
+    isSystemColumn(col) {
+        const definition = typeof col.getDefinition === 'function' ? col.getDefinition() : col
+        return Boolean(definition?.sbadminSystemColumn)
+    }
+
     handleColumnVisibility(col, visible, collapsed, initialisation = false) {
+        if (this.isSystemColumn(col)) {
+            col.show()
+            this.table.tabulator.modules.responsiveLayout?.showColumn(col)
+            return
+        }
         if (visible) {
             col.show()
         } else {
@@ -143,13 +153,20 @@ export class ColumnDisplayModule extends SBAdminTableModule {
             return columns
         }
         let sortedColumns = []
+        const sortedFields = new Set()
         columnsData['order'].forEach((colField) => {
             columns.forEach((col) => {
                 if (col.field === colField) {
                     sortedColumns.push(col)
-                    col.visible = columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colField] !== undefined ? columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colField][this.table.constants.COLUMNS_DATA_VISIBLE_NAME] : this.defaultVisible
+                    sortedFields.add(col.field)
+                    col.visible = this.isSystemColumn(col) ? true : columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colField] !== undefined ? columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colField][this.table.constants.COLUMNS_DATA_VISIBLE_NAME] : this.defaultVisible
                 }
             })
+        })
+        columns.forEach((col) => {
+            if (!sortedFields.has(col.field)) {
+                sortedColumns.push(col)
+            }
         })
         return sortedColumns
     }
@@ -170,6 +187,9 @@ export class ColumnDisplayModule extends SBAdminTableModule {
             Object.keys(this.columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME]).forEach((colKey) => {
                 const colData = this.columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colKey]
                 const initialCol = this.table.tableInitialColumnsByField[colKey] || {}
+                if (initialCol.sbadminSystemColumn) {
+                    return
+                }
                 const initialVisible = initialCol.visible
                 const initialCollapsed = initialCol.collapsed || false
                 const currentCollapsed = colData[this.table.constants.COLUMNS_DATA_COLLAPSED_NAME] || false
@@ -198,7 +218,7 @@ export class ColumnDisplayModule extends SBAdminTableModule {
             columnsUrlDataByField[colKey] = this.columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colKey]
         })
         Object.keys(initialColumnsByField).forEach((colKey) => {
-            this.columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colKey] = columnsUrlDataByField[colKey] || initialColumnsByField[colKey]
+            this.columnsData[this.table.constants.COLUMNS_DATA_COLUMNS_NAME][colKey] = initialColumnsByField[colKey].sbadminSystemColumn ? initialColumnsByField[colKey] : columnsUrlDataByField[colKey] || initialColumnsByField[colKey]
         })
         if (this.table.tabulator) {
             this.table.tabulator.setColumns(this.sortColumns(this.table.tableColumns, this.columnsData))

@@ -12,9 +12,10 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders |
+| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
+| [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -27,6 +28,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Nested List View](#nested-list-view-sbadmin_nested) | One-level self-referential tree rendering via Tabulator `dataTree` with `TabulatorNestedPlugin` |
 | [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node) | Multi-level tree rendering for django-treebeard `MP_Node` models — form widget, filter widget, `actions/tree_list.html` |
 | [List View Plugins](#list-view-plugins-sbadminplugin) | Protocol for reshaping the list pipeline globally — queryset hooks, per-request state, Tabulator definition |
+| [List-View AJAX Notifications](#list-view-ajax-notifications) | Surface Django messages from list-action requests via the standard notification slot; fail-soft pattern for the list query |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
@@ -43,7 +45,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
+- **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
 - **Manual audit log entries?** → [Programmatic Audit Entries](#programmatic-audit-entries-_create_audit_log)
@@ -57,6 +61,8 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Pick parent from a tree in a form?** → [`SBAdminTreeWidget` as a form widget](#sbadmintreewidget--form-widget-for-picking-a-node)
 - **Filter a list by tree node?** → [`SBAdminTreeFilterWidget`](#sbadmintreefilterwidget--filter-widget)
 - **Reshape list queryset / Tabulator options globally?** → [List View Plugins](#list-view-plugins-sbadminplugin)
+- **Show a Django message from a list-view request?** → [List-View AJAX Notifications](#list-view-ajax-notifications)
+- **Fail-soft empty response from a list view?** → [Failing Soft on Errors](#failing-soft-on-errors)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
@@ -142,6 +148,24 @@ class ArticleAdmin(SBAdmin):
 | `filter_disabled` | bool | Disable filtering for this field |
 | `python_formatter` | callable | Format value: `(obj_id, value) -> formatted_value` |
 | `list_visible` | bool | Show/hide column in list |
+| `tabulator_options` | TabulatorFieldOptions | Per-column Tabulator settings (width, grow, max, custom SBAdmin options) |
+
+### Tabulator Options (table)
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `sbadminKeepDataWidth` | bool | Keep column natural width (prevent stretch) when using `fitDataFillAvailableSpace`. Best for icon/utility columns. |
+
+```python
+from django_smartbase_admin.engine.field import SBAdminField, TabulatorFieldOptions
+
+sbadmin_list_display = (
+    SBAdminField(
+        name="id",
+        tabulator_options=TabulatorFieldOptions(sbadminKeepDataWidth=True),
+    ),
+)
+```
 
 ### Admin Methods (like Django admin)
 
@@ -1075,6 +1099,37 @@ class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
 - Duplicate values are prevented client-side.
 - Works with dynamically-added rows in SBAdmin formsets and wizard formsets.
 
+### Input prefix and suffix (text and number widgets)
+
+Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or `SBAdminNumberWidget` (e.g. currency, units, URL stem). Omit both for a normal input.
+
+```python
+from django import forms
+
+from django_smartbase_admin.admin.admin_base import SBAdminBaseForm
+from django_smartbase_admin.admin.widgets import (
+    SBAdminNumberWidget,
+    SBAdminTextInputWidget,
+)
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    class Meta:
+        model = Article
+        fields = ("slug", "price", "discount")
+        widgets = {
+            "slug": SBAdminTextInputWidget(prefix="https://blog.example.com/"),
+            "price": SBAdminNumberWidget(suffix="€"),
+            "discount": SBAdminNumberWidget(prefix="-", suffix="%"),
+        }
+```
+
+**Key points:**
+- Addons are display-only; they do not change the stored field value.
+- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in and forward `prefix` / `suffix` in `__init__`).
+
 ### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
 
 When a form inherits from `SBAdminBaseForm`, widgets defined in `Meta.widgets` are initialized even if the field is not re-declared on the form class.
@@ -1125,6 +1180,38 @@ class ArticleForm(SBAdminBaseForm):
 - Default behavior is safer for required fields: blank placeholder is shown but disabled.
 - Set `disable_empty_option=False` if you explicitly want the empty option to remain selectable.
 - The setting only affects empty values (`""` / `None`) on required fields.
+
+### `SBAdminJsonEditorField` / `SBAdminJsonEditorWidget` — schema-driven JSON editor
+
+SBAdmin-themed wrapper around [`@json-editor/json-editor`](https://github.com/json-editor/json-editor) (loaded from CDN). Pair it with `SBAdminJsonEditorField` to edit an array/object value via a JSON Schema and validate it server-side against the same schema (uses `jsonschema`).
+
+```python
+from django_smartbase_admin.admin.widgets import SBAdminJsonEditorField
+
+tags_config = SBAdminJsonEditorField(
+    required=False,
+    schema={
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["name"],  # red asterisk on the label, enforced server-side
+            "headerTemplate": "{{i1}}. {{ self.name }}",
+            "properties": {
+                "name": {"type": "string", "title": "Name"},
+                "active": {"type": "boolean", "format": "checkbox", "title": "Active"},
+            },
+        },
+    },
+    add_to_top=True,  # optional: prepend new rows (root array only)
+)
+```
+
+**Key points:**
+- `required: [...]` in the schema renders a red `*` next to the label and is enforced server-side. The schema-validation logic lives on the widget (`SBAdminJsonEditorWidget.run_schema_validation`); `SBAdminJsonEditorField.validate()` simply delegates to it. Use the field for the standard wiring, or call `widget.run_schema_validation(value)` from your own field/validator if you want to keep using a plain `forms.JSONField`.
+- Reorder (move-up/move-down) is enabled by default; pass `editor_options={"disable_array_reorder": True}` to disable.
+- Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
+- `add_to_top=True` reorders the **root** array only; nested arrays still append.
+- Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
 
 ---
 
@@ -1222,16 +1309,11 @@ Add custom actions that operate on selected rows in the list view.
 ```python
 from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
-from django.http import HttpResponse
-from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
-from django_htmx.http import trigger_client_event
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.actions import SBAdminFormViewAction
-from django_smartbase_admin.engine.const import TABLE_RELOAD_DATA_EVENT_NAME
 from django_smartbase_admin.engine.modal_view import ListActionModalView
 
 from blog.models import Article, Category
@@ -1290,20 +1372,9 @@ class ArchiveArticlesView(ListActionModalView):
     form_class = ConfirmForm
     modal_title = _("Archive Selected Articles")
 
-    def process_form_valid(self, request, form):
-        selection_queryset = self.get_selection_queryset(request, form)
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
         count = selection_queryset.update(status="archived")
-
         messages.success(request, _("%d article(s) archived.") % count)
-        notifications_html = render_to_string(
-            "sb_admin/includes/notifications.html",
-            {"messages": messages.get_messages(request)},
-            request=request,
-        )
-        response = HttpResponse(notifications_html)
-        trigger_client_event(response, "hideModal", {})
-        trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
-        return response
 
 
 @admin.register(Article, site=sb_admin_site)
@@ -1430,25 +1501,221 @@ class ArticleAdmin(SBAdmin):
 ```
 
 **Key points:**
-- Always return **all** actions from `get_sbadmin_list_selection_actions` — use `has_permission_for_action` to filter visibility
+- Always return **all** possible actions from action getters — use `has_permission_for_action` or row-level enablement to filter visibility
 - Do NOT conditionally build the action list based on request — URL handlers are registered on the singleton during the first request and cached via `init_actions`
 - The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
 - `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
 - When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
+- Modal views can usually do their work in `process_form_valid_list_selection_queryset()` and let `ActionModalView` build the success response with notifications, modal close, and table reload events
 
 ### Modal Error Handling
 
 ```python
+from django_smartbase_admin.engine.modal_view import SBAdminActionError
+
+
 class AssignCategoryView(ListActionModalView):
-    def process_form_valid(self, request, form):
-        try:
-            return super().process_form_valid(request, form)
-        except ValidationError as e:
-            form.add_error(None, str(e))
-            return self.form_invalid(form)
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        if not selection_queryset.exists():
+            raise SBAdminActionError(_("No articles selected."))
+        selection_queryset.update(category=form.cleaned_data["category"])
 ```
 
-The modal template automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
+`ActionModalView.post()` catches `SBAdminActionError`, adds the message as a non-field form error, and re-renders the modal. The modal template automatically displays `form.errors` and `form.non_field_errors` in a styled alert box.
+
+---
+
+## Row Actions (Per-Row List Buttons)
+
+Use `SBAdminRowAction` for small icon buttons rendered inside each list row. Row actions are declared once, processed through `get_sbadmin_row_actions_processed()`, then materialized per row into `_row_actions` during the list data pipeline.
+
+### Three Interaction Modes
+
+Pass exactly one of `target_view`, `action_id`, or `url`:
+
+```python
+from django import forms
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminRowAction, sbadmin_action
+from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+from django_smartbase_admin.engine.modal_view import RowActionModalView, SBAdminActionError
+
+from blog.models import Article
+
+
+class PublishArticleForm(SBAdminBaseFormInit, forms.Form):
+    pass
+
+
+class PublishArticleView(RowActionModalView):
+    form_class = PublishArticleForm
+    modal_title = _("Publish Article")
+
+    def process_form_valid_object(self, request, form, obj):
+        if obj is None:
+            raise SBAdminActionError(_("Article was not found."))
+        obj.status = "published"
+        obj.save(update_fields=["status"])
+        messages.success(request, _("Article published."))
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    model = Article
+
+    def get_sbadmin_row_actions(self, request):
+        return [
+            # Mode 1: open a per-row modal. The row object is loaded by pk.
+            SBAdminRowAction(
+                target_view=PublishArticleView,
+                title=_("Publish"),
+                icon="Check-correct",
+                view=self,
+                enabled_field="status",
+                enabled_value="draft",
+            ),
+            # Mode 2: call an @sbadmin_action method without a modal.
+            SBAdminRowAction(
+                action_id="action_archive_article",
+                title=lambda row: _("Archive %(title)s") % {"title": row.get("title", "")},
+                icon="Delete",
+                view=self,
+                css_class=lambda row: "btn btn-small btn-only-icon btn-destructive",
+                enabled_if=lambda row: row.get("status") != "archived",
+            ),
+            # Mode 3: plain link. MODIFIER_OBJECT_ID is replaced with the row pk.
+            SBAdminRowAction(
+                url=f"https://example.com/articles/{MODIFIER_OBJECT_ID}/",
+                title=_("View externally"),
+                icon="Preview-open",
+                open_in_new_tab=True,
+            ),
+        ]
+
+    @sbadmin_action
+    def action_archive_article(self, request, modifier):
+        Article.objects.filter(pk=modifier).update(status="archived")
+        messages.success(request, _("Article archived."))
+        return self.build_action_response(request)
+```
+
+### Restricted Querysets in Row Modals
+
+`RowActionModalView` loads the row object through the owning admin's `get_queryset(request)` by default. This is important: the object lookup keeps normal admin queryset restrictions, role filters, tenant filters, and other `restrict_queryset` rules in force.
+
+Do not override `get_object_queryset()` just to return `Model.objects.all()` or a raw manager queryset. That bypasses the admin's restricted queryset and can expose or mutate objects the user should not reach.
+
+Only override `get_object_queryset()` when the row action intentionally resolves a different model. In that case, apply the same restriction path explicitly:
+
+```python
+class PublishArticleView(RowActionModalView):
+    form_class = PublishArticleForm
+    modal_title = _("Publish Article")
+    # No get_object_queryset override needed.
+    # Default: self.view.get_queryset(request)
+```
+
+```python
+# ❌ BAD - bypasses admin restrictions
+class PublishArticleView(RowActionModalView):
+    def get_object_queryset(self, request):
+        return Article.objects.all()
+
+
+# ✅ GOOD - preserve the admin's restricted queryset
+class PublishArticleView(RowActionModalView):
+    def get_object_queryset(self, request):
+        return self.view.get_queryset(request)
+```
+
+### Registration Gotcha
+
+Row actions follow the same registration rule as list and bulk actions: always return every possible action, then hide unavailable actions with permissions or row predicates.
+
+```python
+# ❌ BAD - If the first request cannot publish, PublishArticleView is never registered.
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_row_actions(self, request):
+        if not request.user.has_perm("blog.publish_article"):
+            return []
+        return [
+            SBAdminRowAction(
+                target_view=PublishArticleView,
+                title=_("Publish"),
+                icon="Check-correct",
+                view=self,
+            )
+        ]
+
+
+# ✅ GOOD - Always declare the action; filter visibility separately.
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_row_actions(self, request):
+        return [
+            SBAdminRowAction(
+                target_view=PublishArticleView,
+                title=_("Publish"),
+                icon="Check-correct",
+                view=self,
+                enabled_field="status",
+                enabled_value="draft",
+            )
+        ]
+
+    def has_permission_for_action(self, request, action):
+        if getattr(action, "target_view", None) == PublishArticleView:
+            return request.user.has_perm("blog.publish_article")
+        return super().has_permission_for_action(request, action)
+```
+
+### Row-Aware Attributes
+
+`title`, `icon`, and `css_class` can be static values or callables receiving the row dict. Use class attributes and override the getter methods on a subclass when the logic is reused:
+
+```python
+class DraftOnlyRowAction(SBAdminRowAction):
+    title = _("Publish")
+    icon = "Check-correct"
+    target_view = PublishArticleView
+    enabled_field = "status"
+    enabled_value = "draft"
+
+    def get_css_class(self, row):
+        return "btn-icon btn-primary" if row.get("is_featured") else "btn-icon"
+```
+
+Instantiate reusable subclasses from `get_sbadmin_row_actions()` when they need `view=self`, for example `DraftOnlyRowAction(view=self)`.
+
+Per-row enablement supports two patterns:
+
+| Option | Use When |
+|--------|----------|
+| `enabled_if` | You need custom logic. It receives the row dict and takes precedence over `enabled_field`. |
+| `enabled_field` + `enabled_value` | You need a simple equality check like `row["status"] == "draft"`. |
+
+### Processing Contract
+
+Framework consumers call processed getters, not raw getters:
+
+| Surface | Raw declaration getter | Processed consumer getter |
+|---------|------------------------|---------------------------|
+| List buttons | `get_sbadmin_list_actions()` | `get_sbadmin_list_actions_processed()` |
+| Bulk selection buttons | `get_sbadmin_list_selection_actions()` | `get_sbadmin_list_selection_actions_processed()` |
+| Row buttons | `get_sbadmin_row_actions()` | `get_sbadmin_row_actions_processed()` |
+| Detail buttons | `get_sbadmin_detail_actions()` | `get_sbadmin_detail_actions_processed()` |
+| Inline row buttons | `get_sbadmin_inline_list_actions()` | `get_sbadmin_inline_list_actions_processed()` |
+
+**Key points:**
+- Use `get_sbadmin_row_actions()` when the action needs `view=self`. URL-only actions can also be declared in the `sbadmin_row_actions` class attribute.
+- `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; row action materialization replaces it with the row pk server-side.
+- `RowActionModalView` resolves objects with `self.view.get_queryset(request)` by default. Do not override this with a raw model manager unless you also preserve queryset restrictions.
+- Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
+- Always return all possible actions from action getters and use `has_permission_for_action()` or row enablement to hide them. Conditional omission can prevent modal URL handlers from being registered.
+- Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
 
 ---
 
@@ -2945,6 +3212,54 @@ All hooks take `request` as a keyword-style argument and accept `**kwargs` — c
 
 ---
 
+## List-View AJAX Notifications
+
+Django messages queued during a list-action request (`messages.add_message(request, level, "…")`) are auto-embedded in the JSON response and rendered into the standard notification slot — same slot used for HTMX swaps. Works for anything running inside `action_list_json`: `restrict_queryset`, plugins, row-action hooks, signal handlers. No template / JS wiring needed.
+
+### Failing Soft on Errors
+
+Without this, a list-query failure bubbles a 500 and Tabulator renders a generic "Ajax Error" with no explanation. To replace that with an actual informative notification, subclass `SBAdminListAction`, catch in `get_json_data`, queue a message, and return an empty payload — the base flow embeds the queued message automatically so the user sees *why* the list is empty.
+
+```python
+import logging
+
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Comment
+
+logger = logging.getLogger(__name__)
+
+
+class FailSoftListAction(SBAdminListAction):
+    def get_json_data(self):
+        try:
+            return super().get_json_data()
+        except Exception:
+            logger.exception("List query failed for %s", self.view.get_id())
+            messages.warning(
+                self.threadsafe_request,
+                _("The list could not be loaded. Try again."),
+            )
+            return {"last_page": 0, "data": [], "last_row": 0}
+
+
+@admin.register(Comment, site=sb_admin_site)
+class CommentAdmin(SBAdmin):
+    sbadmin_list_action_class = FailSoftListAction
+```
+
+**Key points:**
+- `self.threadsafe_request` is the active request — use it with `messages.add_message`.
+- Return shape matches `get_data()`: `{"last_page", "data", "last_row"}`.
+- Wire on a shared project base admin to enable fail-soft for every list view at once. Scope the `except` to whichever exception class fits your case.
+
+---
+
 ## Detail View Layout (Sidebar)
 
 The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
@@ -3256,8 +3571,8 @@ Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions
 ### Usage
 
 ```python
-from django.contrib import admin
-from django.http import JsonResponse
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
@@ -3268,45 +3583,56 @@ from blog.models import Article
 # ❌ BAD — method is not decorated, returns 404 when called via URL
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
- def action_custom_export(self, request, modifier):
- return JsonResponse({"status": "exported"})
+    def action_archive_drafts(self, request, modifier):
+        Article.objects.filter(status="draft").update(status="archived")
+        messages.success(request, _("Draft articles archived."))
+        return self.build_action_response(request)
 
- def get_sbadmin_list_actions(self, request):
- return [
- SBAdminCustomAction(
- title="Export", view=self, action_id="action_custom_export"
- ),
- ]
+    def get_sbadmin_list_actions(self, request):
+        return [
+            SBAdminCustomAction(
+                title=_("Archive Drafts"),
+                view=self,
+                action_id="action_archive_drafts",
+            ),
+        ]
 
 
 # ✅ GOOD — method is decorated
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
- @sbadmin_action
- def action_custom_export(self, request, modifier):
- return JsonResponse({"status": "exported"})
+    @sbadmin_action
+    def action_archive_drafts(self, request, modifier):
+        Article.objects.filter(status="draft").update(status="archived")
+        messages.success(request, _("Draft articles archived."))
+        return self.build_action_response(request)
 
- def get_sbadmin_list_actions(self, request):
- return [
- SBAdminCustomAction(
- title="Export", view=self, action_id="action_custom_export"
- ),
- ]
+    def get_sbadmin_list_actions(self, request):
+        return [
+            SBAdminCustomAction(
+                title=_("Archive Drafts"),
+                view=self,
+                action_id="action_archive_drafts",
+            ),
+        ]
 
 
 # ✅ GOOD — decorator with keyword arguments
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
- @sbadmin_action(permission="delete")
- def action_bulk_archive(self, request, modifier):
- ...
+    @sbadmin_action(permission="delete")
+    def action_delete_archived(self, request, modifier):
+        Article.objects.filter(status="archived").delete()
+        messages.success(request, _("Archived articles deleted."))
+        return self.build_action_response(request)
 ```
 
 **Key points:**
 - Import from `django_smartbase_admin.engine.actions`
 - All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated
 - `SBAdminFormViewAction` modal views (see [Selection Actions](#selection-actions-bulk-actions)) are automatically marked — no decorator needed
-- `SBAdminCustomAction` with direct `action_id` (via `get_sbadmin_list_actions` or `get_sbadmin_list_selection_actions`) requires the decorator on the target method
+- `SBAdminCustomAction` or `SBAdminRowAction` with direct `action_id` requires the decorator on the target method
+- Non-modal methods that mutate data should usually return `self.build_action_response(request)` so notifications render and the table reloads
 - Subclasses that override decorated methods inherit the marker
 - `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
 
@@ -3329,6 +3655,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_nested` | dict | Opt-in one-level tree rendering via `TabulatorNestedPlugin` (see [Nested List View](#nested-list-view-sbadmin_nested)) |
 | `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
 | `sbadmin_list_actions` | list | List-level actions (not selection-based) |
+| `sbadmin_row_actions` | list | Per-row icon actions rendered in the list table (override `get_sbadmin_row_actions()`) |
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
 | `sbadmin_xlsx_options` | dict | Excel export configuration options |
 | `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |
@@ -3944,6 +4271,8 @@ Code example:
 - Another key point
 ```
 
+Add ❌ BAD vs ✅ GOOD blocks **only when there's a non-obvious mistake worth calling out** — most reference / "how to wire X" sections don't need them. For pure feature descriptions, a single ✅ working example plus key points is enough.
+
 ### Checklist Before Adding
 
 - [ ] Uses demo schema models (Article, Category, Tag, Author, Comment)
@@ -3951,7 +4280,7 @@ Code example:
 - [ ] Added entry to Table of Contents with brief description
 - [ ] No generic names like `MyModel`, `RelatedModel`, `SomeField`
 - [ ] Includes "Key points" or gotchas if there are non-obvious behaviors
-- [ ] Shows both ❌ BAD and ✅ GOOD patterns for common mistakes
+- [ ] *(Optional)* ❌ BAD vs ✅ GOOD blocks **only** when readers commonly trip on a specific footgun
 
 ### Naming Conventions
 

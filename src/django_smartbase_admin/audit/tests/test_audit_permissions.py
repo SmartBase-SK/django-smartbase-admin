@@ -260,7 +260,7 @@ class TestListHistoryButton(BasePermissionsTest):
             "django_smartbase_admin.audit.views.reverse",
             return_value="/sb-admin/audit/adminauditlog/",
         ):
-            actions = fake_view._get_sbadmin_list_actions(MagicMock())
+            actions = fake_view.get_sbadmin_list_actions_processed(MagicMock())
 
         history_actions = [a for a in actions if str(a.title) == "History"]
         self.assertEqual(len(history_actions), 1, "Expected exactly one History action")
