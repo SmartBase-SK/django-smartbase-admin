@@ -13,6 +13,27 @@
                                 data-bs-target="#save-view-modal">
                             {% trans 'Save view' %}
                         </button>
+                        {% if content_context.search_fields %}
+                            <div class="relative w-full max-w-320 max-sm:min-w-220">
+                                <input type="text"
+                                       name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                       class="input pl-38 pr-38"
+                                       form="{{ view_id }}-filter-form"
+                                       id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                                       placeholder="{{ content_context.search_field_placeholder }}">
+                                <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r pointer-events-none">
+                                    <svg class="w-20 h-20">
+                                        <use xlink:href="#Search"></use>
+                                    </svg>
+                                </div>
+                                <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                                    <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')"
+                                         class="w-20 h-20">
+                                        <use xlink:href="#Close-small"></use>
+                                    </svg>
+                                </div>
+                            </div>
+                        {% endif %}
                         <button
                             id="{{ filters_collapse_button_id }}"
                             type="button"

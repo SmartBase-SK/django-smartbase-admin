@@ -356,11 +356,26 @@ class SBAdminListAction(SBAdminAction):
             return "%s__icontains" % field_name
 
         search_fields = self.get_search_fields(request)
-        if search_fields and search_term:
-            orm_lookups = [
-                construct_search(str(search_field.filter_field))
-                for search_field in search_fields
-            ]
+        search_fields_definition = list(self.view.get_search_fields(request) or [])
+        if search_fields_definition and search_term:
+            search_field_map = {
+                field.name: str(field.filter_field) for field in search_fields
+            }
+            orm_lookups = []
+            for configured_search_field in search_fields_definition:
+                configured_search_field = str(configured_search_field)
+                if not configured_search_field:
+                    continue
+                prefix = (
+                    configured_search_field[0]
+                    if configured_search_field[0] in "^=@"
+                    else ""
+                )
+                raw_field_name = (
+                    configured_search_field[1:] if prefix else configured_search_field
+                )
+                lookup_field = search_field_map.get(raw_field_name, raw_field_name)
+                orm_lookups.append(construct_search(f"{prefix}{lookup_field}"))
             term_queries = []
             for bit in smart_split(search_term):
                 if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
