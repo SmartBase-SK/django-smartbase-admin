@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_not_required
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import URLPattern, URLResolver, path, reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.functional import LazyObject
@@ -92,6 +92,10 @@ class SBAdminSite(admin.AdminSite):
             return request.sbadmin_selected_view.get_global_context(request)
         except Exception:
             return {}
+
+    @staticmethod
+    def _stock_admin_endpoint_404(request: HttpRequest, *args, **kwargs):
+        raise Http404()
 
     def get_urls(self) -> list[URLPattern | URLResolver]:
         from django.contrib.auth.views import (
@@ -203,6 +207,21 @@ class SBAdminSite(admin.AdminSite):
                     self.admin_view(SBAdminEntrypointView.as_view()),
                     name="sb_admin_base",
                 ),
+            ]
+        )
+        # 404 stock django.contrib.admin endpoints that super().get_urls()
+        # would otherwise expose. Same path+name so reverse() still resolves.
+        stock_admin_404 = self._stock_admin_endpoint_404
+        urls.extend(
+            [
+                path("autocomplete/", stock_admin_404, name="autocomplete"),
+                path("jsi18n/", stock_admin_404, name="jsi18n"),
+                path(
+                    "r/<path:content_type_id>/<path:object_id>/",
+                    stock_admin_404,
+                    name="view_on_site",
+                ),
+                path("<str:app_label>/", stock_admin_404, name="app_list"),
             ]
         )
         urls.extend(super().get_urls())

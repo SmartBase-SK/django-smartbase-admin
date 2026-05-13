@@ -141,12 +141,13 @@ class SBAdminListAction(SBAdminAction):
         return columns_serialized, id_column_name
 
     def get_excel_columns(self):
-        values = self.get_data_queryset_values()
-        return [
-            field.serialize_xlsx()
-            for field in self.column_fields
-            if field.field in values
-        ]
+        visible_fields = self.get_visible_column_fields()
+        order = self.columns_data.get(COLUMNS_DATA_ORDER_NAME) or []
+        by_field = {field.field: field for field in visible_fields}
+        ordered = [by_field[name] for name in order if name in by_field]
+        used = {field.field for field in ordered}
+        ordered.extend(field for field in visible_fields if field.field not in used)
+        return [field.serialize_xlsx() for field in ordered]
 
     def get_template_data(self):
         context_data = self.view.get_context_data(self.threadsafe_request)
