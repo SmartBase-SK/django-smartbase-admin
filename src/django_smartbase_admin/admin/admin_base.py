@@ -29,7 +29,7 @@ from django.forms.models import (
     ModelFormMetaclass,
     modelform_factory,
 )
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch, resolve
@@ -52,7 +52,11 @@ from nested_admin.nested import (
 from django_smartbase_admin.audit.views import (
     redirect_to_audit_history,
 )
-from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
+    SBADMIN_DYNAMIC_REGION_PARAM,
+)
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import (
     FormFieldsetMixin,
@@ -338,9 +342,12 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
 
     def __init__(self, *args, **kwargs):
         self.view = kwargs.pop("view", self.view)
-        threadsafe_request = kwargs.pop(
-            "request", SBAdminThreadLocalService.get_request()
-        )
+        threadsafe_request = kwargs.pop("request", None)
+        if threadsafe_request is None:
+            try:
+                threadsafe_request = SBAdminThreadLocalService.get_request()
+            except LookupError:
+                threadsafe_request = None
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
         model = getattr(getattr(self, "_meta", None), "model", None)
@@ -356,6 +363,7 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
                 db_field=db_field,
                 request=threadsafe_request,
             )
+        self.prepare_dynamic_regions(threadsafe_request)
 
     def init_widgets_dynamic(self, request):
         for field in self.fields:
@@ -797,7 +805,10 @@ class SBAdmin(
         fieldsets = []
         object_id = obj.id if obj else None
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
-            fieldset_dict = {"fields": fieldset[1].get("fields")}
+            fields = [*(fieldset[1].get("fields") or ())]
+            for region in fieldset[1].get("dynamic_regions") or ():
+                fields.extend(region.fields)
+            fieldset_dict = {"fields": fields}
             classes = fieldset[1].get("classes")
             description = fieldset[1].get("description")
             if classes:
@@ -822,7 +833,93 @@ class SBAdmin(
                 except AttributeError:
                     pass
             fielsets_context[fieldset[0]] = fieldset[1]
+            if fieldset[0] is not None:
+                fielsets_context[str(fieldset[0])] = fieldset[1]
         return {"fieldsets_context": fielsets_context}
+
+    @sbadmin_action
+    def sbadmin_dynamic_region(self, request, modifier):
+        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM) or request.POST.get(
+            SBADMIN_DYNAMIC_REGION_PARAM
+        )
+        if not region_name:
+            return HttpResponseBadRequest(f"Missing {SBADMIN_DYNAMIC_REGION_PARAM}.")
+
+        obj = None
+        if modifier != SBADMIN_DYNAMIC_REGION_ADD_MODIFIER:
+            obj = self.get_object(request, modifier)
+            if obj is None:
+                return HttpResponse("", status=404)
+
+        form_class = self.get_form(request, obj=obj, change=bool(obj))
+        data = request.POST if request.method == "POST" else request.GET
+        form_kwargs = {
+            "initial": self._dynamic_region_initial_from_data(form_class, data, obj),
+        }
+        if obj is not None:
+            form_kwargs["instance"] = obj
+        form = form_class(**form_kwargs)
+        region = form.get_dynamic_region(region_name, request)
+        if region is None:
+            return HttpResponse("", status=404)
+
+        regions = self._dynamic_regions_for_request(form, region, request)
+        rendered_regions = []
+        for index, target_region in enumerate(regions):
+            rendered_regions.append(
+                render_to_string(
+                    "sb_admin/includes/dynamic_region.html",
+                    {
+                        "form": form,
+                        "region": target_region,
+                        "sbadmin_dynamic_region_fragment": True,
+                        "sbadmin_dynamic_region_oob": index > 0,
+                    },
+                    request=request,
+                )
+            )
+        html = "".join(rendered_regions)
+        response = HttpResponse(html)
+        trigger_client_event(
+            response,
+            "sbadminDynamicRegionUpdated",
+            {"region": region.name},
+        )
+        return response
+
+    @staticmethod
+    def _dynamic_region_initial_from_data(form_class, data, obj):
+        form_kwargs = {}
+        if obj is not None:
+            form_kwargs["instance"] = obj
+        probe_form = form_class(**form_kwargs)
+        initial = {}
+        for field_name, field in probe_form.fields.items():
+            prefixed_name = probe_form.add_prefix(field_name)
+            if prefixed_name not in data:
+                continue
+            if isinstance(field, forms.MultipleChoiceField):
+                initial[field_name] = data.getlist(prefixed_name)
+                continue
+            initial[field_name] = data.get(prefixed_name)
+        return initial
+
+    def _dynamic_regions_for_request(self, form, region, request):
+        trigger_name = request.headers.get("HX-Trigger-Name")
+        if trigger_name:
+            related_regions = [
+                candidate
+                for candidate in form.get_dynamic_regions(request)
+                if trigger_name in candidate.trigger_fields
+            ]
+        else:
+            trigger_fields = set(region.trigger_fields)
+            related_regions = [
+                candidate
+                for candidate in form.get_dynamic_regions(request)
+                if trigger_fields.intersection(candidate.trigger_fields)
+            ]
+        return related_regions or [region]
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs

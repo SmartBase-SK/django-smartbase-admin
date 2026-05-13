@@ -2,6 +2,7 @@
 
 {% block content %}
 	{% block header %}
+        {% if not skip_header %}
 		{% if fieldset.name %}
             <header class="mb-24 flex items-center">
                 <span class="text-dark-900">{{ fieldset.name }}</span>
@@ -23,9 +24,11 @@
                 </div>
             </header>
         {% endif %}
+        {% endif %}
 	{% endblock %}
 
     {% block lines %}
+        {% if not skip_lines %}
         {% for line in fieldset %}
             <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
                 {% if line.fields|length > 1 %}
@@ -50,6 +53,7 @@
                 {% if line.fields|length > 1 %}</div>{% endif %}
             </div>
         {% endfor %}
+        {% endif %}
 
     {% endblock %}
     {% block additional_fields %}
