@@ -1,54 +1,76 @@
 {% load i18n %}
 
-<ul class="py-12 px-16 flex md:flex-wrap gap-8 max-sm:overflow-x-auto">
-    {% for filter_field in filters %}
-        <li class="filter-wrapper relative max-sm:flex-shrink-0{% if not all_filters_visible %} hidden{% endif %}"
-             data-filter-input-name="{{ filter_field.filter_widget.input_name }}" {% if all_filters_visible %}data-all-filters-visible{% endif %}
-             id="{{ filter_field.filter_widget.input_id }}-wrapper">
-            <button
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
-                    {% if filter_field.filter_widget.close_dropdown_on_change %}data-sbadmin-close-on-change="1"{% endif %}
-                    class="js-filter-dropdown-button empty {% if default_button %}btn{% else %}filter-dropdown-button{% endif %}">
-                <span>
-                   {{ filter_field.title|capfirst }}: <span
-                        id="{{ filter_field.filter_widget.input_id }}-value">{{ filter_field.filter_widget.get_default_label|default_if_none:"" }}</span>
-                </span>
-                <svg class="w-16 h-16" title="{% trans 'Remove' %}" onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')">
+<div class="py-12 px-16 flex items-start gap-8 max-sm:overflow-x-auto">
+    <ul class="flex flex-wrap gap-8 flex-1 min-w-0">
+        {% for filter_field in filters %}
+            <li class="filter-wrapper relative max-sm:flex-shrink-0{% if not all_filters_visible %} hidden{% endif %}"
+                 data-filter-input-name="{{ filter_field.filter_widget.input_name }}" {% if all_filters_visible %}data-all-filters-visible{% endif %}
+                 id="{{ filter_field.filter_widget.input_id }}-wrapper">
+                <button
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        {% if filter_field.filter_widget.close_dropdown_on_change %}data-sbadmin-close-on-change="1"{% endif %}
+                        class="js-filter-dropdown-button empty {% if default_button %}btn{% else %}filter-dropdown-button{% endif %}">
+                    <span>
+                       {{ filter_field.title|capfirst }}: <span
+                            id="{{ filter_field.filter_widget.input_id }}-value">{{ filter_field.filter_widget.get_default_label|default_if_none:"" }}</span>
+                    </span>
+                    <svg class="w-16 h-16" title="{% trans 'Remove' %}" onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ filter_field.filter_field }}')">
+                        <use xlink:href="#Close-small"></use>
+                    </svg>
+                    <svg class="w-16 h-16 ml-4">
+                        <use xlink:href="#Down"></use>
+                    </svg>
+                </button>
+                {% include filter_field.filter_widget.template_name with filter_widget=filter_field.filter_widget %}
+            </li>
+        {% endfor %}
+        {% if not all_filters_visible %}
+            <li class="relative max-sm:-order-1">
+                <button
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        class="btn btn-small rounded-full bg-dark-100 shadow-none">
+                    <span>
+                       {% trans 'Add' %}
+                    </span>
+                    <svg class="w-16 h-16 ml-4">
+                        <use xlink:href="#Plus"></use>
+                    </svg>
+                </button>
+                <div class="dropdown-menu">
+                    <ul>
+                        {% for filter_field in filters %}
+                            <li>
+                                <button type="button"
+                                    onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.showFilter('{{ filter_field.filter_field }}')"
+                                        class="w-full dropdown-menu-link">{{ filter_field.title }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </li>
+        {% endif %}
+    </ul>
+    {% if show_full_text_search %}
+        <div class="relative flex-shrink-0 ml-auto max-sm:ml-0">
+            <input type="text"
+                   name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                   class="input pl-38 pr-38 w-320 max-sm:w-280"
+                   form="{{ view_id }}-filter-form"
+                   id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
+                   placeholder="{{ content_context.search_field_placeholder }}">
+            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r pointer-events-none">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Search"></use>
+                </svg>
+            </div>
+            <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
+                <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')"
+                     class="w-20 h-20">
                     <use xlink:href="#Close-small"></use>
                 </svg>
-                <svg class="w-16 h-16 ml-4">
-                    <use xlink:href="#Down"></use>
-                </svg>
-            </button>
-            {% include filter_field.filter_widget.template_name with filter_widget=filter_field.filter_widget %}
-        </li>
-    {% endfor %}
-    {% if not all_filters_visible %}
-        <li class="relative max-sm:-order-1">
-            <button
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
-                    class="btn btn-small rounded-full bg-dark-100 shadow-none">
-                <span>
-                   {% trans 'Add' %}
-                </span>
-                <svg class="w-16 h-16 ml-4">
-                    <use xlink:href="#Plus"></use>
-                </svg>
-            </button>
-            <div class="dropdown-menu">
-                <ul>
-                    {% for filter_field in filters %}
-                        <li>
-                            <button type="button"
-                                onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.showFilter('{{ filter_field.filter_field }}')"
-                                    class="w-full dropdown-menu-link">{{ filter_field.title }}</button>
-                        </li>
-                    {% endfor %}
-                </ul>
             </div>
-        </li>
+        </div>
     {% endif %}
-    <div class="lg:hidden order-1 w-8 flex-shrink-0"></div>
-</ul>
+</div>
