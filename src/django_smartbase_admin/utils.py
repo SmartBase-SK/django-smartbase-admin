@@ -8,6 +8,8 @@ from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from django_smartbase_admin.engine.dynamic_forms import SBAdminDynamicFormMixin
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,10 +82,13 @@ def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
     )
 
 
-class FormFieldsetMixin(forms.Form):
+class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
     def get_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)
         return getattr(meta, "fieldsets", tuple())
+
+    def get_fieldsets_context(self) -> dict[str | None, dict]:
+        return {name: data for name, data in self.get_fieldsets()}
 
     def fieldsets(self) -> Iterable[Fieldset]:
         if not (fieldsets := self.get_fieldsets()):
@@ -95,12 +100,17 @@ class FormFieldsetMixin(forms.Form):
             return
 
         for name, data in fieldsets:
-            yield Fieldset(
+            fields = list(data.get("fields", ()))
+            for region in data.get("dynamic_regions") or ():
+                fields.extend(region.fields)
+            fieldset = Fieldset(
                 form=self,
                 name=name,
-                fields=data.get("fields", ()),
+                fields=fields,
                 classes=data.get("classes", ""),
             )
+            fieldset.sbadmin_context = data
+            yield fieldset
 
 
 def _pluck_classes(modules, classnames):

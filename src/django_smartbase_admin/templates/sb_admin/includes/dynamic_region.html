@@ -1,0 +1,22 @@
+{% load sb_admin_tags %}
+{% sbadmin_dynamic_region_state form region as region_state %}
+
+{% if not sbadmin_dynamic_region_fragment %}
+<div class="sbadmin-dynamic-region relative" data-sbadmin-dynamic-region="{{ region.name }}">
+    {% include "sb_admin/includes/loading_absolute.html" with loading_id=region_state.loading_id additional_class="sbadmin-dynamic-region-loading" %}
+{% endif %}
+
+<div id="{{ region_state.wrapper_id }}"{% if sbadmin_dynamic_region_fragment %} class="sbadmin-dynamic-region-content"{% endif %}{% if sbadmin_dynamic_region_oob %} hx-swap-oob="outerHTML"{% endif %}>
+    {% if region_state.visible %}
+        {% if region.template %}
+            {% include region.template with form=form region=region region_state=region_state active_field_names=region_state.active_field_names %}
+        {% else %}
+            {% sbadmin_dynamic_region_fieldset form region_state as dynamic_fieldset %}
+            {% include "sb_admin/includes/inline_fieldset.html" with fieldset=dynamic_fieldset fieldset_context=None %}
+        {% endif %}
+    {% endif %}
+</div>
+
+{% if not sbadmin_dynamic_region_fragment %}
+</div>
+{% endif %}
