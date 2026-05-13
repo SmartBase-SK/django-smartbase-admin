@@ -16,3 +16,7 @@ class SBAdminConfig(AppConfig):
 
         if settings.SB_ADMIN_CONFIGURATION:
             autodiscover_modules("sb_admin", register_to=sb_admin_site)
+
+        # Register Django system checks (sbadmin.W001..W003). Imported after
+        # autodiscover so the checks see every registered admin.
+        from . import checks  # noqa: F401
