@@ -70,7 +70,10 @@ class TestW001DuplicateFilterField(TestCase):
         # Both gates in `_has_filter` (filter_disabled, missing widget) should
         # prevent a collision from being reported.
         for label, second in (
-            ("filter_disabled", _field("id_list", filter_field="id", filter_disabled=True)),
+            (
+                "filter_disabled",
+                _field("id_list", filter_field="id", filter_disabled=True),
+            ),
             ("no_widget", _field("id_list", filter_field="id", with_filter=False)),
         ):
             with self.subTest(skip=label):
