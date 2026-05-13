@@ -1,4 +1,4 @@
-import {TabulatorFull as Tabulator, Renderer} from 'tabulator-tables'
+import {TabulatorFull as Tabulator, Renderer, Module} from 'tabulator-tables'
 import {ViewsModule} from "./table_modules/views_module"
 import {SelectionModule} from "./table_modules/selection_module"
 import {ColumnDisplayModule} from "./table_modules/column_display_module"
@@ -13,6 +13,19 @@ import { HeaderTabsModule } from "./table_modules/header_tabs_module"
 import { DataTreeModule } from "./table_modules/data_tree_module"
 import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_footer_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
+import { createIcon } from "./utils"
+import { registerFitDataFillAvailableSpaceLayout } from "./tabulator_layouts/fit_data_fill_available_space"
+
+
+class SBAdminColumnOptionsModule extends Module {
+    static moduleName = "sbadminColumnOptions"
+
+    constructor(table) {
+        super(table)
+        this.registerColumnOption("sbadminKeepDataWidth", false)
+        this.registerColumnOption("sbadminSystemColumn", false)
+    }
+}
 
 
 class SBAdminTable {
@@ -240,6 +253,19 @@ class SBAdminTable {
         return this.tableAjaxUrl + this.getUrlParamsString()
     }
 
+    _handleAjaxNotifications(response) {
+        const html = response?.[this.constants.AJAX_NOTIFICATIONS_KEY]
+        if (!html) {
+            return
+        }
+        const slot = document.getElementById("notification-messages")
+        if (!slot) {
+            return
+        }
+        slot.innerHTML = html
+        window.htmx?.process(slot)
+    }
+
     buildTabulatorTable() {
         this.lastTableParams = {}
         Tabulator.extendModule("format", "formatters", {
@@ -250,8 +276,44 @@ class SBAdminTable {
                     cellContent = '-'
                 }
                 return "<a href='" + self.tableDetailUrl.replace(self.constants.OBJECT_ID_PLACEHOLDER, dataId) + "'>" + cellContent + "</a>"
+            },
+            sbadminRowActionsFormatter: function (cell) {
+                const actions = cell.getRow().getData()._row_actions || []
+                const wrapper = document.createElement('div')
+                wrapper.classList.add('row-actions-cell-inner')
+                actions.forEach((action) => {
+                    const link = document.createElement('a')
+                    link.classList.add('row-action-link')
+                    if (action.css_class) {
+                        link.classList.add(...action.css_class.split(' ').filter(Boolean))
+                    }
+                    link.title = action.title || ''
+                    link.setAttribute('aria-label', action.title || '')
+                    link.addEventListener('click', (event) => event.stopPropagation())
+                    if (action.open_in_modal) {
+                        link.setAttribute('data-bs-toggle', 'modal')
+                        link.setAttribute('data-bs-target', '#sb-admin-modal')
+                        link.setAttribute('hx-get', action.url)
+                        link.setAttribute('hx-target', '#sb-admin-modal')
+                    } else if (action.is_method_action) {
+                        link.setAttribute('hx-post', action.url)
+                        link.setAttribute('hx-swap', 'none')
+                    } else {
+                        link.href = action.url
+                        if (action.open_in_new_tab) {
+                            link.target = '_blank'
+                            link.rel = 'noopener'
+                        }
+                    }
+                    if (action.icon) {
+                        link.append(createIcon(action.icon, ['w-16', 'h-16']))
+                    }
+                    wrapper.append(link)
+                })
+                return wrapper
             }
         })
+        registerFitDataFillAvailableSpaceLayout(Tabulator, this.tabulatorOptions)
 
         this.defaultRowSelectionFormatter = Tabulator.moduleBindings.format.formatters.rowSelection
         const self = this
@@ -287,6 +349,10 @@ class SBAdminTable {
             ajaxURLGenerator: (url, config, params) => {
                 return this.ajaxUrlGenerator(url, config, params)
             },
+            ajaxResponse: (url, params, response) => {
+                self._handleAjaxNotifications(response)
+                return response
+            },
             dataSendParams: {
                 "size": this.constants.TABLE_PARAMS_SIZE_NAME,
                 "page": this.constants.TABLE_PARAMS_PAGE_NAME,
@@ -300,6 +366,7 @@ class SBAdminTable {
         tabulatorOptions['ajaxConfig']['headers']['X-CSRFToken'] = window.csrf_token
         tabulatorOptions['ajaxConfig']['headers']['X-TabulatorRequest'] = true
         tabulatorOptions = this.callModuleAction('modifyTabulatorOptions', tabulatorOptions)
+        Tabulator.registerModule(SBAdminColumnOptionsModule)
         Tabulator.registerModule(SBAjaxParamsTabulatorModifier)
         this.tabulator = new Tabulator(this.tableElSelector, tabulatorOptions)
         this.tabulator.SBTable = this

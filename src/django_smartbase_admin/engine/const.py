@@ -32,6 +32,7 @@ PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 AUTOCOMPLETE_PAGE_SIZE = 20
 XLSX_PAGE_CHUNK_SIZE = 50000
 IGNORE_LIST_SELECTION = "__all__"
+MODIFIER_OBJECT_ID = "__object_id__"
 NEW_OBJECT_ID = 0
 OBJECT_ID_PLACEHOLDER = -1
 ALL_MODEL_FIELDS = "__all__"
@@ -72,6 +73,9 @@ CONFIG_NAME = "config_name"
 DETAIL_STRUCTURE_RIGHT_CLASS = "detail-structure-right"
 TRANSLATIONS_SELECTED_LANGUAGES = "translation_selected_languages"
 OVERRIDE_CONTENT_OF_NOTIFICATION = "override_notification_content"
+# JSON key carrying rendered Django-messages HTML on list-action responses;
+# read by ``SBAdminTable._handleAjaxNotifications`` in ``table.js``.
+SB_ADMIN_AJAX_NOTIFICATIONS_KEY = "sb_admin_notifications"
 FIELDSET_HIDE_HEADER_CLASS = "hide-header"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"
 SUPPORTED_FILE_TYPE_ICONS = ["doc", "docx", "csv", "xls", "xlsx", "pdf", "ppt", "zip"]
