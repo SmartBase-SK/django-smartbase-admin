@@ -77,6 +77,15 @@
             width: 20px;
             height: 20px;
         }
+
+        &.btn {
+            border-radius: 0;
+            border-top: 0;
+            border-left: 0;
+            border-right: 0;
+            border-bottom-width: 1px;
+            border-bottom-style: solid;
+        }
     }
 
     .btn[data-bs-toggle="dropdown"] {

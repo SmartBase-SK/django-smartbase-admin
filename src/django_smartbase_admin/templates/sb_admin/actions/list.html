@@ -26,7 +26,13 @@
                             <ul>
                                 {% block dropdown_actions %}
                                     {% for list_action in content_context.list_actions %}
-                                        {% if not list_action.sub_actions %}
+                                        {% if list_action.sub_actions %}
+                                            {% for list_sub_action in list_action.sub_actions %}
+                                                <li>
+                                                    {% include list_sub_action.template with action=list_sub_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link items-center" %}
+                                                </li>
+                                            {% endfor %}
+                                        {% else %}
                                             <li>
                                                 {% include list_action.template with action=list_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link items-center" %}
                                             </li>
@@ -70,7 +76,7 @@
                                 <ul>
                                     {% for list_sub_action in list_action.sub_actions %}
                                         <li>
-                                            {% include list_action.template with action=list_sub_action view_id=view_id extra_classes="dropdown-menu-link" %}
+                                            {% include list_sub_action.template with action=list_sub_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link" %}
                                         </li>
                                     {% endfor %}
                                 </ul>

@@ -9,6 +9,7 @@ from django.test import RequestFactory, TestCase
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
+    SBAdminCustomAction,
     SBAdminFormViewAction,
     SBAdminRowAction,
 )
@@ -287,6 +288,29 @@ class RowActionIntegrationTests(TestCase):
         self.assertEqual(processed, [])
         self.assertTrue(hasattr(view, "PublishArticleView"))
         self.assertEqual(action.url, "/actions/PublishArticleView/template/")
+
+    def test_nested_form_view_actions_are_registered(self):
+        view = FakeAdminView()
+        parent = SBAdminCustomAction(
+            title="Contact",
+            view=view,
+            action_id="contact",
+            sub_actions=[
+                SBAdminFormViewAction(
+                    target_view=PublishArticleView,
+                    title="Publish",
+                    view=view,
+                    action_modifier=MODIFIER_OBJECT_ID,
+                )
+            ],
+        )
+
+        processed = view.process_detail_actions(self.request, [parent], object_id=123)
+
+        self.assertEqual(
+            processed[0].sub_actions[0].url, "/actions/PublishArticleView/123/"
+        )
+        self.assertTrue(hasattr(view, "PublishArticleView"))
 
     def test_row_action_rejects_missing_or_ambiguous_interaction_modes(self):
         with self.assertRaises(ImproperlyConfigured):
