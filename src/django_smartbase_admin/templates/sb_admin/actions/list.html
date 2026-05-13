@@ -57,30 +57,32 @@
                 {% block actions %}
                     {% for list_action in content_context.list_actions %}
                         {% if list_action.sub_actions %}
-                            <button
-                                    data-bs-toggle="dropdown"
-                                    aria-expanded="false"
-                                    data-bs-popper-placement="bottom-end"
-                                    class="btn btn-icon">
-                                {% if list_action.icon %}
-                                    <svg class="w-16 h-16 md:mr-8">
-                                        <use xlink:href="#{{ list_action.icon }}"></use>
+                            <li class="relative max-sm:hidden">
+                                <button
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false"
+                                        data-bs-popper-placement="bottom-end"
+                                        class="btn btn-icon">
+                                    {% if list_action.icon %}
+                                        <svg class="w-16 h-16 md:mr-8">
+                                            <use xlink:href="#{{ list_action.icon }}"></use>
+                                        </svg>
+                                    {% endif %}
+                                    <span>{{ list_action.title }}</span>
+                                    <svg class="w-16 h-16 ml-4 max-sm:hidden">
+                                        <use xlink:href="#Down"></use>
                                     </svg>
-                                {% endif %}
-                                <span>{{ list_action.title }}</span>
-                                <svg class="w-16 h-16 ml-4 max-sm:hidden">
-                                    <use xlink:href="#Down"></use>
-                                </svg>
-                            </button>
-                            <div class="dropdown-menu max-h-432">
-                                <ul>
-                                    {% for list_sub_action in list_action.sub_actions %}
-                                        <li>
-                                            {% include list_sub_action.template with action=list_sub_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link" %}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
+                                </button>
+                                <div class="dropdown-menu max-h-432">
+                                    <ul>
+                                        {% for list_sub_action in list_action.sub_actions %}
+                                            <li>
+                                                {% include list_sub_action.template with action=list_sub_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link" %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </li>
                         {% else %}
                             <li class="max-sm:hidden">
                                 {% include list_action.template with action=list_action view_id=view_id %}
