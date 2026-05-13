@@ -160,6 +160,8 @@ class SBAdminBaseView(object):
 
     def _register_form_view_actions(self, actions: list[SBAdminCustomAction]) -> None:
         for action in actions:
+            if action.sub_actions:
+                self._register_form_view_actions(action.sub_actions)
             target_view = getattr(action, "target_view", None)
             if target_view is None:
                 continue
@@ -175,13 +177,24 @@ class SBAdminBaseView(object):
     def _materialize_modifier_object_id(
         action: SBAdminCustomAction, object_id: int | str | None
     ) -> SBAdminCustomAction:
+        sub_actions = getattr(action, "sub_actions", None)
+        materialized_sub_actions = [
+            SBAdminBaseView._materialize_modifier_object_id(sub_action, object_id)
+            for sub_action in sub_actions or []
+        ]
         if getattr(action, "action_modifier", None) != MODIFIER_OBJECT_ID:
+            if sub_actions and materialized_sub_actions != sub_actions:
+                new_action = copy(action)
+                new_action.sub_actions = materialized_sub_actions
+                return new_action
             return action
         new_action = copy(action)
         new_action.action_modifier = (
             str(object_id) if object_id is not None else IGNORE_LIST_SELECTION
         )
         new_action.url = None
+        if sub_actions:
+            new_action.sub_actions = materialized_sub_actions
         return new_action
 
     def process_actions(
@@ -195,8 +208,18 @@ class SBAdminBaseView(object):
     ) -> list[SBAdminCustomAction]:
         result = []
         for action in actions:
-            if self.has_permission_for_action(request, action):
-                result.append(action)
+            if not self.has_permission_for_action(request, action):
+                continue
+            if action.sub_actions:
+                sub_actions = self.process_actions_permissions(
+                    request, action.sub_actions
+                )
+                if not sub_actions:
+                    continue
+                if sub_actions != action.sub_actions:
+                    action = copy(action)
+                    action.sub_actions = sub_actions
+            result.append(action)
         return result
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):

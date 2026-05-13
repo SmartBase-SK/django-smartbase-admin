@@ -68,11 +68,17 @@
                                     {% block dropdown_actions %}
                                         {% if detail_actions %}
                                             {% for action in detail_actions %}
-                                                <li>
-                                                    <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="dropdown-menu-link {{ action.css_class|default_if_none:'' }}">
-                                                        {{ action.title }}
-                                                    </a>
-                                                </li>
+                                                {% if action.sub_actions %}
+                                                    {% for sub_action in action.sub_actions %}
+                                                        <li>
+                                                            {% include sub_action.template with action=sub_action action_link_mode="detail" dropdown=True extra_classes="dropdown-menu-link" %}
+                                                        </li>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <li>
+                                                        {% include action.template with action=action action_link_mode="detail" dropdown=True extra_classes="dropdown-menu-link" %}
+                                                    </li>
+                                                {% endif %}
                                             {% endfor %}
                                         {% endif %}
 
@@ -98,16 +104,38 @@
 
                             {% if detail_actions %}
                                 {% for action in detail_actions %}
-                                    <li class="max-sm:hidden">
-                                        <a {% if action.open_in_modal %}{% include 'sb_admin/actions/partials/open_modal_attrs.html' %}{% endif %} href="{{ action.url }}" class="{{ action.css_class|default_if_none:'' }}">
-                                            {% if action.icon %}
-                                                <svg class="w-16 h-16 mr-8">
-                                                    <use href="#{{ action.icon }}"></use>
+                                    {% if action.sub_actions %}
+                                        <li class="relative max-sm:hidden">
+                                            <button
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
+                                                data-bs-popper-placement="bottom-end"
+                                                class="{{ action.css_class|default_if_none:'' }} btn-icon">
+                                                {% if action.icon %}
+                                                    <svg class="w-16 h-16 md:mr-8">
+                                                        <use href="#{{ action.icon }}"></use>
+                                                    </svg>
+                                                {% endif %}
+                                                <span>{{ action.title }}</span>
+                                                <svg class="w-16 h-16 ml-4 max-sm:hidden">
+                                                    <use xlink:href="#Down"></use>
                                                 </svg>
-                                            {% endif %}
-                                            {{ action.title }}
-                                        </a>
-                                    </li>
+                                            </button>
+                                            <div class="dropdown-menu max-h-432">
+                                                <ul>
+                                                    {% for sub_action in action.sub_actions %}
+                                                        <li>
+                                                            {% include sub_action.template with action=sub_action action_link_mode="detail" dropdown=True extra_classes="dropdown-menu-link" %}
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </li>
+                                    {% else %}
+                                        <li class="max-sm:hidden">
+                                            {% include action.template with action=action action_link_mode="detail" %}
+                                        </li>
+                                    {% endif %}
                                 {% endfor %}
                             {% endif %}
                         {% endblock %}
