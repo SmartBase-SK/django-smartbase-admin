@@ -346,14 +346,9 @@ class SBAdminListAction(SBAdminAction):
 
         # Apply keyword searches.
         def construct_search(field_name):
-            if field_name.startswith("^"):
-                return "%s__istartswith" % field_name[1:]
-            elif field_name.startswith("="):
-                return "%s__iexact" % field_name[1:]
-            elif field_name.startswith("@"):
-                return "%s__search" % field_name[1:]
-            # Otherwise, use the field with icontains.
-            return "%s__icontains" % field_name
+            prefix = field_name[0] if field_name and field_name[0] in "^=@" else ""
+            raw_field_name = field_name[1:] if prefix else field_name
+            return self.view.get_search_lookup(request, raw_field_name, prefix)
 
         search_fields = self.get_search_fields(request)
         search_fields_definition = list(self.view.get_search_fields(request) or [])

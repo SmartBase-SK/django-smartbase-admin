@@ -576,6 +576,15 @@ class SBAdminBaseListView(SBAdminBaseView):
         else:
             return []
 
+    def get_search_lookup(self, request, field_name: str, prefix: str = "") -> str:
+        if prefix == "^":
+            return f"{field_name}__istartswith"
+        if prefix == "=":
+            return f"{field_name}__iexact"
+        if prefix == "@":
+            return f"{field_name}__search"
+        return f"{field_name}__unaccent__icontains"
+
     def get_list_ordering(self, request) -> Iterable[str] | list:
         return self.ordering or []
 
