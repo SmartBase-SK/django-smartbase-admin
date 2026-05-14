@@ -70,19 +70,31 @@ class Main {
                 return true
             }
 
+            const processAfterSwap = (target) => {
+                this.initFileInputs(target)
+                this.initDropdowns(target)
+                this.initInputs(target)
+                this.autocomplete.handleDynamiclyAddedAutocomplete(target)
+                this.staticAutocomplete.handleDynamicallyAdded(target)
+                this.textTags.handleDynamicallyAddedTextTags(target)
+                this.initInlines(target)
+                this.initTooltips(target)
+                this.scheduleScrollToFirstErrorField(target)
+            }
+
             window.htmx.on("htmx:afterSwap", (detail) => {
-                if(!shouldProcessAfterSwap(detail)) {
+                if (!shouldProcessAfterSwap(detail)) {
                     return
                 }
-                this.initFileInputs(detail.target)
-                this.initDropdowns(detail.target)
-                this.initInputs(detail.target)
-                this.autocomplete.handleDynamiclyAddedAutocomplete(detail.target)
-                this.staticAutocomplete.handleDynamicallyAdded(detail.target)
-                this.textTags.handleDynamicallyAddedTextTags(detail.target)
-                this.initInlines(detail.target)
-                this.initTooltips(detail.target)
-                this.scheduleScrollToFirstErrorField(detail.target)
+                processAfterSwap(detail.target)
+            })
+
+            window.htmx.on("htmx:oobAfterSwap", (detail) => {
+                const target = detail.detail?.elt || detail.detail?.target || detail.target
+                if (!target) {
+                    return
+                }
+                processAfterSwap(target)
             })
 
             window.htmx.on("htmx:afterSettle", (detail) => {
