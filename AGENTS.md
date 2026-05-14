@@ -182,6 +182,37 @@ SBAdminField(
 )
 ```
 
+If an `SBAdminField` points at an admin method that uses `@admin.display(ordering=...)`
+and the field is filterable, **always set `filter_field` explicitly**. The
+`ordering` value is for sorting, not a reliable substitute for filter wiring.
+Without an explicit `filter_field`, pre-filtered list-view config such as the
+"All" tab can be built with the method name instead of the ORM lookup.
+
+```python
+# ❌ BAD - filter key may become "author_display" before field initialization.
+SBAdminField(
+    name="author_display",
+    annotate=F("author__name"),
+    filter_widget=AutocompleteFilterWidget(model=Author),
+)
+
+@admin.display(description=_("Author"), ordering="author")
+def author_display(self, obj_id, value, **kwargs):
+    return value
+
+# ✅ GOOD - filter key is always the intended ORM lookup.
+SBAdminField(
+    name="author_display",
+    annotate=F("author__name"),
+    filter_field="author",
+    filter_widget=AutocompleteFilterWidget(model=Author),
+)
+
+@admin.display(description=_("Author"), ordering="author")
+def author_display(self, obj_id, value, **kwargs):
+    return value
+```
+
 Gotchas:
 
 - **Two `SBAdminField`s must not resolve to the same `filter_field`** — they'd render form inputs with the same `name`/`id` and JS only reaches the first. Caught statically as `sbadmin.W001`.
