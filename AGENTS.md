@@ -42,6 +42,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 
 **Quick lookup:**
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
+- **When should I set `filter_field`?** → [When to set `filter_field`](#when-to-set-filter_field)
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
@@ -143,7 +144,7 @@ class ArticleAdmin(SBAdmin):
 | `title` | str | Column header label |
 | `annotate` | Expression | Django ORM expression (F, Concat, Case, etc.) |
 | `supporting_annotates` | dict | Additional annotations passed to admin method |
-| `filter_field` | str | Field name for filtering (if different from display) |
+| `filter_field` | str | ORM lookup the filter widget should target. Defaults to `name` — only set it to point the filter at a different column than the one displayed. See [When to set `filter_field`](#when-to-set-filter_field) |
 | `filter_widget` | FilterWidget | Custom filter widget |
 | `filter_disabled` | bool | Disable filtering for this field |
 | `python_formatter` | callable | Format value: `(obj_id, value) -> formatted_value` |
@@ -166,6 +167,26 @@ sbadmin_list_display = (
     ),
 )
 ```
+
+### When to set `filter_field`
+
+`filter_field` defaults to `name` and that default is almost always what you want. Set it only when the column displays one value but the filter should target a different ORM path:
+
+```python
+# ✅ Annotated column, filter via the underlying FK.
+SBAdminField(
+    name="author_display",
+    annotate=F("author__name"),
+    filter_field="author",
+    filter_widget=AutocompleteFilterWidget(model=Author),
+)
+```
+
+Gotchas:
+
+- **Two `SBAdminField`s must not resolve to the same `filter_field`** — they'd render form inputs with the same `name`/`id` and JS only reaches the first. Caught statically as `sbadmin.W001`.
+- **Custom widgets that hardcode their `Q(...)`** (i.e. ignore `self.field.filter_field`) shouldn't set `filter_field` at all — it would only create a collision risk without affecting the actual filter.
+- **`filter_field` is the key in `sbadmin_list_view_config["url_params"]["filterData"]`**, not `SBAdminField.name`. A mismatched key silently disables the filter on load and produces a spurious `*` on the tab. Caught statically as `sbadmin.W002`.
 
 ### Admin Methods (like Django admin)
 
@@ -1870,7 +1891,7 @@ class ArticleAdmin(SBAdmin):
 | "relation 'django_smartbase_admin_X' does not exist" | Missing migrations | Run `python manage.py migrate` |
 | "Cannot resolve keyword 'X' into field" on detail page | Using computed `SBAdminField` name in `ordering` | Override `get_list_ordering()` - see [Ordering with Computed SBAdminField](#ordering-with-computed-sbadminfield) |
 | "admin.E116: The value of 'list_filter[N]' refers to 'X', which does not refer to a Field" | Using `list_filter` with `SBAdminField` names for annotated fields | Use `sbadmin_list_filter` instead - see [Default Visible Filters](#default-visible-filters-sbadmin_list_filter-vs-list_filter) |
-| Saved-views tab shows a spurious `*` ("changed") on a fresh URL load | A field listed in `ordering` is **not** in `sbadmin_list_display`, so Tabulator drops it from the initial sort, the actual sort then differs from `tableInitialSort`, and `tableData.sort` leaks into the form-state comparison | Add the missing field to `sbadmin_list_display` as `SBAdminField(name="<field>", list_visible=False, filter_disabled=True)` so Tabulator registers (but hides) the column |
+| Spurious `*` on a `sbadmin_list_view_config` tab on first load (no user edits) | `filterData` key doesn't resolve to a real form input, two filters collide, or an `ordering` field is missing from `sbadmin_list_display` | Run `python manage.py check`; look for `sbadmin.W001` / `W002` / `W003` and follow their hints. If the checks are clean, the remaining cause is value byte-for-byte round-trip (typically `MultipleChoiceFilterWidget` declared as a plain string instead of `[{"value": …, "label": …}, …]`). |
 
 ---
 
@@ -2525,9 +2546,7 @@ class ArticleAdmin(SBAdmin):
 
 ### Filter Data for Named Tabs
 
-The keys in `filterData` should match:
-- Model field names for direct fields
-- `filter_field` value from `SBAdminField` for custom filter fields
+The keys in `filterData` must match each field's `filter_field` (which defaults to `name`). For `SBAdminField(name="id_list", filter_field="id")` the key is `"id"`, not `"id_list"`. A mismatched key silently disables the filter at load time and produces a spurious `*` on the tab — `sbadmin.W002` catches this on `manage.py check`. See [When to set `filter_field`](#when-to-set-filter_field).
 
 **Value format in `filterData` depends on the filter widget type used by the field:**
 

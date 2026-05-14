@@ -141,12 +141,13 @@ class SBAdminListAction(SBAdminAction):
         return columns_serialized, id_column_name
 
     def get_excel_columns(self):
-        values = self.get_data_queryset_values()
-        return [
-            field.serialize_xlsx()
-            for field in self.column_fields
-            if field.field in values
-        ]
+        visible_fields = self.get_visible_column_fields()
+        order = self.columns_data.get(COLUMNS_DATA_ORDER_NAME) or []
+        by_field = {field.field: field for field in visible_fields}
+        ordered = [by_field[name] for name in order if name in by_field]
+        used = {field.field for field in ordered}
+        ordered.extend(field for field in visible_fields if field.field not in used)
+        return [field.serialize_xlsx() for field in ordered]
 
     def get_template_data(self):
         context_data = self.view.get_context_data(self.threadsafe_request)
@@ -346,21 +347,31 @@ class SBAdminListAction(SBAdminAction):
 
         # Apply keyword searches.
         def construct_search(field_name):
-            if field_name.startswith("^"):
-                return "%s__istartswith" % field_name[1:]
-            elif field_name.startswith("="):
-                return "%s__iexact" % field_name[1:]
-            elif field_name.startswith("@"):
-                return "%s__search" % field_name[1:]
-            # Otherwise, use the field with icontains.
-            return "%s__icontains" % field_name
+            prefix = field_name[0] if field_name and field_name[0] in "^=@" else ""
+            raw_field_name = field_name[1:] if prefix else field_name
+            return self.view.get_search_lookup(request, raw_field_name, prefix)
 
         search_fields = self.get_search_fields(request)
-        if search_fields and search_term:
-            orm_lookups = [
-                construct_search(str(search_field.filter_field))
-                for search_field in search_fields
-            ]
+        search_fields_definition = list(self.view.get_search_fields(request) or [])
+        if search_fields_definition and search_term:
+            search_field_map = {
+                field.name: str(field.filter_field) for field in search_fields
+            }
+            orm_lookups = []
+            for configured_search_field in search_fields_definition:
+                configured_search_field = str(configured_search_field)
+                if not configured_search_field:
+                    continue
+                prefix = (
+                    configured_search_field[0]
+                    if configured_search_field[0] in "^=@"
+                    else ""
+                )
+                raw_field_name = (
+                    configured_search_field[1:] if prefix else configured_search_field
+                )
+                lookup_field = search_field_map.get(raw_field_name, raw_field_name)
+                orm_lookups.append(construct_search(f"{prefix}{lookup_field}"))
             term_queries = []
             for bit in smart_split(search_term):
                 if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
