@@ -679,6 +679,7 @@ class SBAdminAutocompleteWidget(
     SBAdminBaseWidget, AutocompleteFilterWidget, forms.Widget
 ):
     template_name = "sb_admin/widgets/autocomplete.html"
+    dynamic_region_trigger_event = "SBAutocompleteChange"
     view = None
     form = None
     field_name = None

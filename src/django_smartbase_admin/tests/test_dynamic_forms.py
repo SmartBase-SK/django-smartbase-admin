@@ -1,15 +1,14 @@
 from django import forms
 from django.contrib.admin.helpers import AdminForm
 from django.http import QueryDict
-from django.test import RequestFactory, SimpleTestCase
 from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase
 from django.utils.translation import gettext_lazy as _
-
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
 from django_smartbase_admin.engine.dynamic_forms import (
-    SBInactiveFieldPolicy,
-    SBDynamicRegion,
     SBADMIN_DYNAMIC_REGION_PARAM,
+    SBDynamicRegion,
+    SBInactiveFieldPolicy,
 )
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     get_item,
@@ -47,7 +46,7 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
                             trigger_fields=("mode",),
                             fields=("weight", "download_url", "billing_period"),
                             get_active_fields=lambda form, request, region: (
-                                ("download_url", "billing_period")
+                                (("download_url", "billing_period"),)
                                 if form.value_from_data_or_initial("mode") == "digital"
                                 else ("weight",)
                             ),
@@ -129,6 +128,36 @@ class ChoiceSwitchRegionForm(SBAdminBaseFormInit, forms.Form):
             self.fields["value"].choices = (("a", "A"), ("b", "B"))
 
         self.prepare_dynamic_regions(kwargs.get("request"))
+
+
+class DynamicRegionTriggerWidget(forms.TextInput):
+    sb_admin_widget = True
+    dynamic_region_trigger_event = "SBAutocompleteChange"
+
+    def __init__(self, form_field=None, attrs=None):
+        super().__init__(attrs=attrs)
+        self.form_field = form_field
+
+
+class DynamicRegionCustomTriggerForm(SBAdminBaseFormInit, forms.Form):
+    address = forms.CharField(widget=DynamicRegionTriggerWidget)
+    payload = forms.CharField(required=False)
+
+    class Meta:
+        fieldsets = (
+            (
+                None,
+                {
+                    "dynamic_regions": (
+                        SBDynamicRegion(
+                            name="payload",
+                            trigger_fields=("address",),
+                            fields=("payload",),
+                        ),
+                    ),
+                },
+            ),
+        )
 
 
 class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
@@ -285,6 +314,17 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(attrs["hx-swap"], "outerHTML")
         self.assertIn(SBADMIN_DYNAMIC_REGION_PARAM, attrs["hx-vals"])
 
+    def test_region_uses_widget_dynamic_trigger_event(self):
+        class ViewBackedForm(DynamicRegionCustomTriggerForm):
+            view = FakeView()
+
+        form = ViewBackedForm(request=self.request)
+
+        self.assertEqual(
+            form.fields["address"].widget.attrs["hx-trigger"],
+            "SBAutocompleteChange",
+        )
+
     def test_dynamic_region_template_renders_only_active_fields(self):
         form = DynamicRegionForm(
             data={
@@ -306,6 +346,28 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="download_url"', html)
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
+
+    def test_region_fields_must_be_flat_ownership_list(self):
+        with self.assertRaises(TypeError):
+            SBDynamicRegion(
+                name="invalid",
+                fields=(("first_name", "last_name"),),
+            )
+
+    def test_active_fields_can_define_grouped_layout(self):
+        form = DynamicRegionForm(
+            data={
+                "mode": "digital",
+                "download_url": "https://example.com/file",
+                "billing_period": "monthly",
+            },
+            request=self.request,
+        )
+        region = form.get_dynamic_region("details", self.request)
+        state = form.get_dynamic_region_state(region, self.request)
+
+        self.assertEqual(state.active_field_names, ("download_url", "billing_period"))
+        self.assertEqual(state.active_fields, (("download_url", "billing_period"),))
 
     def test_region_can_refresh_choices_for_the_same_field(self):
         form = ChoiceSwitchRegionForm(

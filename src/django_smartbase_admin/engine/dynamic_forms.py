@@ -10,7 +10,6 @@ from django.http import HttpRequest
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
-
 SBADMIN_DYNAMIC_REGION_PARAM = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_ACTION = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_ADD_MODIFIER = "add"
@@ -38,12 +37,15 @@ class SBDynamicRegion:
         *,
         name: str,
         trigger_fields: Iterable[str] = (),
-        fields: Iterable[str | Iterable[str]] = (),
+        fields: Iterable[str] = (),
         is_visible: (
             Callable[[forms.Form, HttpRequest | None, "SBDynamicRegion"], bool] | None
         ) = None,
         get_active_fields: (
-            Callable[[forms.Form, HttpRequest | None, "SBDynamicRegion"], Iterable[str]]
+            Callable[
+                [forms.Form, HttpRequest | None, "SBDynamicRegion"],
+                Iterable[str | Iterable[str]],
+            ]
             | None
         ) = None,
         inactive_field_policy: SBInactiveFieldPolicy = SBInactiveFieldPolicy.IGNORE,
@@ -51,7 +53,7 @@ class SBDynamicRegion:
     ) -> None:
         self.name = name
         self.trigger_fields = tuple(trigger_fields)
-        self.fields = tuple(self._normalize_field_item(field) for field in fields)
+        self.fields = tuple(self._normalize_field_name(field) for field in fields)
         self.is_visible_callback = is_visible
         self.get_active_fields_callback = get_active_fields
         self.inactive_field_policy = inactive_field_policy
@@ -64,20 +66,14 @@ class SBDynamicRegion:
 
     def get_active_fields(
         self, form: forms.Form, request: HttpRequest | None = None
-    ) -> Iterable[str]:
+    ) -> Iterable[str | Iterable[str]]:
         if self.get_active_fields_callback is None:
             return self.field_names
         return self.get_active_fields_callback(form, request, self)
 
     @property
     def field_names(self) -> tuple[str, ...]:
-        result: list[str] = []
-        for field in self.fields:
-            if isinstance(field, tuple):
-                result.extend(field)
-            else:
-                result.append(field)
-        return tuple(result)
+        return self.fields
 
     def get_wrapper_id(self, form: forms.Form) -> str:
         prefix = getattr(form, "prefix", None)
@@ -91,43 +87,60 @@ class SBDynamicRegion:
         self, form: forms.Form, request: HttpRequest | None = None
     ) -> SBDynamicRegionState:
         visible = self.is_visible(form, request)
-        requested_active_fields = (
-            tuple(
-                str(field_name) for field_name in self.get_active_fields(form, request)
-            )
-            if visible
-            else ()
-        )
         known_field_names = set(self.field_names)
-        active_field_names = tuple(
-            field_name
-            for field_name in requested_active_fields
-            if field_name in known_field_names and field_name in form.fields
+        requested_layout = self._normalize_active_layout(
+            self.get_active_fields(form, request) if visible else ()
         )
-        active_name_set = set(active_field_names)
+        active_field_names: list[str] = []
+        active_name_set: set[str] = set()
         active_fields: list[str | tuple[str, ...]] = []
-        for field in self.fields:
+        for field in requested_layout:
             if isinstance(field, tuple):
                 active_group = tuple(
-                    field_name for field_name in field if field_name in active_name_set
+                    field_name
+                    for field_name in field
+                    if field_name in known_field_names and field_name in form.fields
                 )
                 if active_group:
                     active_fields.append(active_group)
+                    for field_name in active_group:
+                        if field_name not in active_name_set:
+                            active_name_set.add(field_name)
+                            active_field_names.append(field_name)
                 continue
-            if field in active_name_set:
+            if field in known_field_names and field in form.fields:
                 active_fields.append(field)
+                if field not in active_name_set:
+                    active_name_set.add(field)
+                    active_field_names.append(field)
         wrapper_id = self.get_wrapper_id(form)
         return SBDynamicRegionState(
             name=self.name,
             wrapper_id=wrapper_id,
             loading_id=f"{wrapper_id}-loading",
             visible=visible,
-            active_field_names=active_field_names,
+            active_field_names=tuple(active_field_names),
             active_fields=tuple(active_fields),
         )
 
     @staticmethod
-    def _normalize_field_item(field: str | Iterable[str]) -> str | tuple[str, ...]:
+    def _normalize_field_name(field: str) -> str:
+        if not isinstance(field, str):
+            raise TypeError(
+                "SBDynamicRegion.fields must be a flat iterable of field names."
+            )
+        return field
+
+    @classmethod
+    def _normalize_active_layout(
+        cls, fields: Iterable[str | Iterable[str]]
+    ) -> tuple[str | tuple[str, ...], ...]:
+        return tuple(cls._normalize_active_layout_item(field) for field in fields)
+
+    @staticmethod
+    def _normalize_active_layout_item(
+        field: str | Iterable[str],
+    ) -> str | tuple[str, ...]:
         if isinstance(field, str):
             return field
         return tuple(str(field_name) for field_name in field)
@@ -267,9 +280,13 @@ class SBAdminDynamicFormMixin:
         for field_name in region.trigger_fields:
             if field_name not in self.fields:
                 continue
-            attrs = self.fields[field_name].widget.attrs
+            widget = self.fields[field_name].widget
+            attrs = widget.attrs
             attrs.setdefault("hx-get", endpoint)
-            attrs.setdefault("hx-trigger", "change")
+            attrs.setdefault(
+                "hx-trigger",
+                getattr(widget, "dynamic_region_trigger_event", "change"),
+            )
             attrs.setdefault("hx-target", f"#{state.wrapper_id}")
             attrs.setdefault("hx-include", "closest form")
             attrs.setdefault("hx-indicator", f"#{state.loading_id}")
