@@ -215,6 +215,37 @@ def author_display(self, obj_id, value, **kwargs):
     return value
 ```
 
+If an `SBAdminField` points at an admin method that uses `@admin.display(ordering=...)`
+and the field is filterable, **always set `filter_field` explicitly**. The
+`ordering` value is for sorting, not a reliable substitute for filter wiring.
+Without an explicit `filter_field`, pre-filtered list-view config such as the
+"All" tab can be built with the method name instead of the ORM lookup.
+
+```python
+# ❌ BAD - filter key may become "shipper_image" before field initialization.
+SBAdminField(
+    name="shipper_image",
+    annotate=F("shipper__shortcut"),
+    filter_widget=AutocompleteFilterWidget(model=Shipper),
+)
+
+@admin.display(description=_("Dopravca"), ordering="shipper")
+def shipper_image(self, obj_id, value, **kwargs):
+    return ShipperService.format_image(value)
+
+# ✅ GOOD - filter key is always the intended ORM lookup.
+SBAdminField(
+    name="shipper_image",
+    annotate=F("shipper__shortcut"),
+    filter_field="shipper",
+    filter_widget=AutocompleteFilterWidget(model=Shipper),
+)
+
+@admin.display(description=_("Dopravca"), ordering="shipper")
+def shipper_image(self, obj_id, value, **kwargs):
+    return ShipperService.format_image(value)
+```
+
 Gotchas:
 
 - **Two `SBAdminField`s must not resolve to the same `filter_field`** — they'd render form inputs with the same `name`/`id` and JS only reaches the first. Caught statically as `sbadmin.W001`.
