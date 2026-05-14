@@ -433,6 +433,32 @@ class SBAdminBaseListView(SBAdminBaseView):
     filters_version = None
     sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
+    pg_unaccent_ext_cache = {}
+
+    @classmethod
+    def _postgres_unaccent_extension_available(cls) -> bool:
+        from django.conf import settings
+        from django.db import connection
+
+        if connection.vendor != "postgresql":
+            return False
+        if "django.contrib.postgres" not in settings.INSTALLED_APPS:
+            return False
+        alias = connection.alias
+        cached = cls.pg_unaccent_ext_cache.get(alias)
+        if cached is not None:
+            return cached
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM pg_extension WHERE extname = %s LIMIT 1",
+                    ["unaccent"],
+                )
+                available = bool(cursor.fetchone())
+        except Exception:
+            available = False
+        cls.pg_unaccent_ext_cache[alias] = available
+        return available
 
     def get_sbadmin_nested(self, request) -> dict | None:
         """Return the nested config dict for this view, or ``None`` for a flat list.
@@ -583,7 +609,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             return f"{field_name}__iexact"
         if prefix == "@":
             return f"{field_name}__search"
-        return f"{field_name}__unaccent__icontains"
+        if self._postgres_unaccent_extension_available():
+            return f"{field_name}__unaccent__icontains"
+        return f"{field_name}__icontains"
 
     def get_list_ordering(self, request) -> Iterable[str] | list:
         return self.ordering or []
