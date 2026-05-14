@@ -29,7 +29,6 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
     ordering = None
     list_template_name = "sb_admin/actions/list.html"
     sub_views = None
-    field_cache = None
 
     request_data = None
 

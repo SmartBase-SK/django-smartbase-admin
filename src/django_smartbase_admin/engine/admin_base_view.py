@@ -70,7 +70,6 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 class SBAdminBaseView(object):
     global_filter_data_map = None
-    field_cache = None
     sbadmin_detail_actions = None
     menu_label: str | None = None
     add_label: str | None = None
