@@ -23,6 +23,14 @@ export class ViewsModule extends SBAdminTableModule {
     }
 
     filterParamsForCompare(params) {
+        const fullTextSearchField = this.table.constants.TABLE_PARAMS_FULL_TEXT_SEARCH
+        const filterDataName = this.table.constants.FILTER_DATA_NAME
+        if (params?.[filterDataName]?.[fullTextSearchField] === "") {
+            unset(params, `${filterDataName}.${fullTextSearchField}`)
+            if (Object.keys(params[filterDataName]).length === 0) {
+                unset(params, filterDataName)
+            }
+        }
         this.COMPARE_IGNORE_KEYS.forEach(key_to_remove => {
             unset(params, key_to_remove)
         })
