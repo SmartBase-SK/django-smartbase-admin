@@ -66,19 +66,30 @@ class TestW001DuplicateFilterField(TestCase):
         self.assertIn("filter_field='id'", result[0].msg)
         self.assertIn("id_list", result[0].msg)
 
-    def test_non_filtering_fields_skipped(self):
-        # Both gates in `_has_filter` (filter_disabled, missing widget) should
-        # prevent a collision from being reported.
-        for label, second in (
-            (
-                "filter_disabled",
+    def test_filter_disabled_fields_skipped(self):
+        # `filter_disabled=True` is the only escape hatch — the framework
+        # auto-attaches a default widget at runtime for everything else, so a
+        # missing explicit widget on the colliding field doesn't save it.
+        admin = _FakeAdmin(
+            sbadmin_list_display=(
+                _field("id"),
                 _field("id_list", filter_field="id", filter_disabled=True),
             ),
-            ("no_widget", _field("id_list", filter_field="id", with_filter=False)),
-        ):
-            with self.subTest(skip=label):
-                admin = _FakeAdmin(sbadmin_list_display=(_field("id"), second))
-                self.assertEqual(check_duplicate_filter_field_for_admin(admin), [])
+        )
+        self.assertEqual(check_duplicate_filter_field_for_admin(admin), [])
+
+    def test_collision_without_explicit_widget_still_warns(self):
+        # Regression: a field without an explicit filter_widget still gets one
+        # at runtime via init_filter_for_field, so the collision is real.
+        admin = _FakeAdmin(
+            sbadmin_list_display=(
+                _field("id"),
+                _field("id_list", filter_field="id", with_filter=False),
+            ),
+        )
+        result = check_duplicate_filter_field_for_admin(admin)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, "sbadmin.W001")
 
 
 class TestW002ViewConfigFilterKeys(TestCase):
@@ -116,6 +127,39 @@ class TestW002ViewConfigFilterKeys(TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].id, "sbadmin.W002")
         self.assertIn("'bogus'", result[0].msg)
+
+    def test_field_without_explicit_widget_is_valid_key(self):
+        # Regression for the BaseQueueAdmin `updated_at` false positive: a
+        # field declared without filter_widget still gets one at runtime, so
+        # its name is a valid filterData key.
+        admin = _FakeAdmin(
+            sbadmin_list_display=(_field("updated_at", with_filter=False),),
+            sbadmin_list_view_config=[
+                {
+                    "name": "Active",
+                    "url_params": {"filterData": {"updated_at": ""}},
+                }
+            ],
+        )
+        self.assertEqual(check_view_config_filter_keys_for_admin(admin), [])
+
+    def test_filter_disabled_field_is_not_valid_key(self):
+        # Counterpart to the above: filter_disabled=True opts out of the
+        # runtime widget, so referencing the field in filterData IS a bug.
+        admin = _FakeAdmin(
+            sbadmin_list_display=(
+                _field("computed", with_filter=False, filter_disabled=True),
+            ),
+            sbadmin_list_view_config=[
+                {
+                    "name": "Tab",
+                    "url_params": {"filterData": {"computed": ""}},
+                }
+            ],
+        )
+        result = check_view_config_filter_keys_for_admin(admin)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, "sbadmin.W002")
 
 
 class TestW003OrderingColumns(TestCase):

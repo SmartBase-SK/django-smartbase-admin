@@ -63,16 +63,17 @@ def _effective_filter_field(field: SBAdminField) -> str:
 
 
 def _has_filter(field: SBAdminField) -> bool:
-    """Whether a field will render a filter input.
+    """Whether a field will render a filter input at runtime.
 
-    The framework also auto-attaches a default ``StringFilterWidget`` for
-    model fields without an explicit ``filter_widget``. We only check fields
-    with an explicitly configured widget — that's where the footguns live and
-    where suppression of false positives outweighs detection coverage.
+    ``SBAdminField.init_filter_for_field`` (in ``engine/field.py``) always
+    attaches a filter widget unless ``filter_disabled=True`` — falling back
+    through ``StringFilterWidget`` / ``BooleanFilterWidget`` /
+    ``DateFilterWidget`` / ``AutocompleteFilterWidget`` based on the model
+    field, then to a bare ``StringFilterWidget()`` as a last resort. Anything
+    not explicitly disabled therefore renders a filter input, which is what
+    the W001/W002 collision and url-key checks need to know.
     """
-    if getattr(field, "filter_disabled", False):
-        return False
-    return getattr(field, "filter_widget", None) is not None
+    return not getattr(field, "filter_disabled", False)
 
 
 def _admin_targets():
