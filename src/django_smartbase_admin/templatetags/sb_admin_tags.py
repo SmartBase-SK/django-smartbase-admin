@@ -70,9 +70,11 @@ def sbadmin_fieldset_context(fieldsets_context, fieldset):
 
 
 @register.simple_tag
-def sbadmin_fieldset_form(adminform, fieldset):
-    if adminform is not None:
+def sbadmin_fieldset_form(adminform, fieldset, form=None):
+    if hasattr(adminform, "form"):
         return adminform.form
+    if form:
+        return form
     return getattr(fieldset, "form", None)
 
 
