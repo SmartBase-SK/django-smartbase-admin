@@ -1,10 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
+from typing import Any
 
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.db.models import (
@@ -32,6 +27,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
+from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
 from django_smartbase_admin.utils import JSONSerializableMixin
 
 
