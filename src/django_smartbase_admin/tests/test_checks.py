@@ -1,4 +1,4 @@
-"""Tests for the SBAdmin system checks (sbadmin.W001..W003).
+"""Tests for the SBAdmin system checks (sbadmin.W001..W005).
 
 Each per-admin helper is invoked directly with fabricated admin classes so we
 don't depend on the global ``sb_admin_site`` registry or full Django admin
@@ -9,11 +9,16 @@ from __future__ import annotations
 
 from unittest import TestCase
 
+from django.contrib import admin as django_admin
+
 from django_smartbase_admin.checks import (
+    check_admin_display_ordering_filter_field_for_admin,
     check_duplicate_filter_field_for_admin,
+    check_fake_inline_filter_override_for_admin,
     check_ordering_columns_for_admin,
     check_view_config_filter_keys_for_admin,
 )
+from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
 from django_smartbase_admin.engine.field import SBAdminField
 
 
@@ -28,10 +33,14 @@ class _FakeAdmin:
         sbadmin_list_display=(),
         sbadmin_list_view_config=(),
         ordering=(),
+        sbadmin_list_filter=(),
+        sbadmin_fake_inlines=(),
     ):
         self.sbadmin_list_display = sbadmin_list_display
         self.sbadmin_list_view_config = sbadmin_list_view_config
         self.ordering = ordering
+        self.sbadmin_list_filter = sbadmin_list_filter
+        self.sbadmin_fake_inlines = sbadmin_fake_inlines
 
 
 def _field(name, *, filter_field=None, with_filter=True, filter_disabled=False):
@@ -194,3 +203,132 @@ class TestW003OrderingColumns(TestCase):
                     ordering=(raw,),
                 )
                 self.assertEqual(check_ordering_columns_for_admin(admin), [])
+
+
+class _BothOverridden(SBAdminFakeInlineMixin):
+    def filter_fake_inline_identifier_by_parent_instance(self, qs, parent):
+        return qs
+
+    def filter_fake_inline_identifier_by_parent_pks(self, qs, parent_pks):
+        return qs
+
+
+class _OnlyPerParent(SBAdminFakeInlineMixin):
+    def filter_fake_inline_identifier_by_parent_instance(self, qs, parent):
+        return qs
+
+
+class _OnlyBatch(SBAdminFakeInlineMixin):
+    def filter_fake_inline_identifier_by_parent_pks(self, qs, parent_pks):
+        return qs
+
+
+class TestW004FakeInlineFilterOverride(TestCase):
+    def test_consistent_overrides_no_warning(self):
+        # Both methods overridden (or both at defaults) → batch read and
+        # change form stay consistent.
+        for inline in (SBAdminFakeInlineMixin, _BothOverridden):
+            with self.subTest(inline=inline):
+                admin = _FakeAdmin(sbadmin_fake_inlines=(inline,))
+                self.assertEqual(check_fake_inline_filter_override_for_admin(admin), [])
+
+    def test_asymmetric_override_warns(self):
+        # Either direction of one-sided override is a bug — the change
+        # form / batch reader would diverge silently otherwise.
+        for inline in (_OnlyPerParent, _OnlyBatch):
+            with self.subTest(inline=inline):
+                admin = _FakeAdmin(sbadmin_fake_inlines=(inline,))
+                result = check_fake_inline_filter_override_for_admin(admin)
+                self.assertEqual(len(result), 1)
+                self.assertEqual(result[0].id, "sbadmin.W004")
+                self.assertIn(inline.__name__, result[0].msg)
+
+
+class _DisplayOrderingAdmin:
+    """Admin shape minimal enough to drive ``check_admin_display_ordering...``.
+
+    The helper looks up ``getattr(admin, field.name)`` and reads
+    ``admin_order_field`` from it — so we just need an attribute, not a
+    full Django admin.
+    """
+
+    def __init__(
+        self,
+        *,
+        sbadmin_list_display=(),
+        sbadmin_list_filter=(),
+        methods: dict | None = None,
+    ):
+        self.sbadmin_list_display = sbadmin_list_display
+        self.sbadmin_list_filter = sbadmin_list_filter
+        for name, fn in (methods or {}).items():
+            setattr(self, name, fn)
+
+
+class TestW005AdminDisplayOrderingFilterField(TestCase):
+    def test_ordering_target_matches_name_no_warning(self):
+        # @admin.display(ordering="status") on a method named "status" —
+        # the implicit filter_field defaulting lands on the same value the
+        # name-based default would have produced. No surprise.
+        @django_admin.display(ordering="status")
+        def status(self, obj):
+            return obj.status
+
+        admin = _DisplayOrderingAdmin(
+            sbadmin_list_display=(_field("status"),),
+            sbadmin_list_filter=("status",),
+            methods={"status": status},
+        )
+        self.assertEqual(check_admin_display_ordering_filter_field_for_admin(admin), [])
+
+    def test_ordering_target_matches_filter_field_no_warning(self):
+        # Explicit filter_field="status" matches @admin.display(ordering=
+        # "status"). The explicit value wins for filtering; sort hits the
+        # same column. Documented divergence, no warning.
+        @django_admin.display(ordering="status")
+        def status_display(self, obj):
+            return obj.status
+
+        admin = _DisplayOrderingAdmin(
+            sbadmin_list_display=(_field("status_display", filter_field="status"),),
+            sbadmin_list_filter=("status_display",),
+            methods={"status_display": status_display},
+        )
+        self.assertEqual(check_admin_display_ordering_filter_field_for_admin(admin), [])
+
+    def test_ordering_target_diverges_from_name_warns(self):
+        # @admin.display(ordering="status") on "status_display" with no
+        # filter_field: filter binds to name ("status_display"); sort
+        # binds to "status". Divergence.
+        @django_admin.display(ordering="status")
+        def status_display(self, obj):
+            return obj.status
+
+        admin = _DisplayOrderingAdmin(
+            sbadmin_list_display=(_field("status_display"),),
+            sbadmin_list_filter=("status_display",),
+            methods={"status_display": status_display},
+        )
+        result = check_admin_display_ordering_filter_field_for_admin(admin)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, "sbadmin.W005")
+        self.assertIn("'status_display'", result[0].msg)
+        self.assertIn("'status'", result[0].msg)
+
+    def test_filter_field_takes_precedence_over_matching_name(self):
+        # ordering="status" matches the field's name, but filter_field is
+        # set to something else — filter binds where filter_field points,
+        # sort still hits "status". Divergence.
+        @django_admin.display(ordering="status")
+        def status(self, obj):
+            return obj.status
+
+        admin = _DisplayOrderingAdmin(
+            sbadmin_list_display=(_field("status", filter_field="status_lookup"),),
+            sbadmin_list_filter=("status",),
+            methods={"status": status},
+        )
+        result = check_admin_display_ordering_filter_field_for_admin(admin)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, "sbadmin.W005")
+        self.assertIn("'status_lookup'", result[0].msg)

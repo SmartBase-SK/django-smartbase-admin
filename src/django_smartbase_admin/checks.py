@@ -35,6 +35,16 @@ Currently checked:
   makes them diverge silently. Inlines that hit this at runtime are skipped
   by the batch reader.
 
+* ``sbadmin.W005`` — an ``SBAdminField`` listed in ``sbadmin_list_filter``
+  resolves to a view method whose ``@admin.display(ordering=X)`` (i.e.
+  ``admin_order_field=X``) doesn't line up with where the filter actually
+  binds. The filter binds to ``filter_field`` if set, otherwise to
+  ``name``; ``admin_order_field`` is meanwhile used as the sort/annotate
+  target. They must match — when ``filter_field`` is set, the rule is
+  ``ordering == filter_field`` (the explicit value wins); when
+  ``filter_field`` is unset, the rule is ``ordering == name``. Anything
+  else makes sort and filter point at different ORM columns.
+
 All warnings rather than errors; misconfigured admins still render, just with
 the symptoms above.
 """
@@ -287,11 +297,72 @@ def check_fake_inline_filter_override_for_admin(admin):
     return warnings
 
 
+def check_admin_display_ordering_filter_field_for_admin(admin):
+    """Per-admin implementation of ``sbadmin.W005``. Exposed for unit tests."""
+    warnings = []
+    filter_list = getattr(admin, "sbadmin_list_filter", None) or ()
+    if not filter_list:
+        return warnings
+
+    fields_by_name: dict[str, SBAdminField] = {}
+    for field in _iter_sbadmin_fields(admin):
+        if field.name:
+            fields_by_name[field.name] = field
+
+    for entry in filter_list:
+        if not isinstance(entry, str):
+            continue
+        field = fields_by_name.get(entry)
+        if field is None:
+            continue
+        view_method = getattr(admin, field.name, None)
+        if not callable(view_method):
+            continue
+        admin_order_field = getattr(view_method, "admin_order_field", None)
+        if not admin_order_field:
+            continue
+        # filter_field (when set) is where the filter actually binds and
+        # therefore wins — sort target must match it. When filter_field is
+        # unset, the filter falls back to name, so sort must match name.
+        expected = field.filter_field or field.name
+        if admin_order_field == expected:
+            continue
+        warnings.append(
+            Warning(
+                (
+                    f"{admin.__class__.__name__}: SBAdminField {field.name!r} "
+                    "is in sbadmin_list_filter and its method carries "
+                    f"@admin.display(ordering={admin_order_field!r}), but the "
+                    f"filter binds to {expected!r} "
+                    + (
+                        f"(filter_field={field.filter_field!r})"
+                        if field.filter_field
+                        else "(name; no filter_field set)"
+                    )
+                    + ". Sort and filter end up bound to different ORM "
+                    "columns; any caller keyed by the filter target "
+                    "(sbadmin_list_view_config's filterData, hand-written "
+                    "URLs) sorts on a column other than the one it filters."
+                ),
+                hint=(
+                    f"Set @admin.display(ordering={expected!r}) so sort "
+                    "matches the filter binding, or change filter_field to "
+                    f"{admin_order_field!r} if you actually want the filter "
+                    "on the ordering target."
+                ),
+                obj=admin.__class__,
+                id="sbadmin.W005",
+            )
+        )
+    return warnings
+
+
 _PER_ADMIN_CHECKS = (
     check_duplicate_filter_field_for_admin,
     check_view_config_filter_keys_for_admin,
     check_ordering_columns_for_admin,
     check_fake_inline_filter_override_for_admin,
+    check_admin_display_ordering_filter_field_for_admin,
 )
 
 

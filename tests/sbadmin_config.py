@@ -19,13 +19,19 @@ class MCPToolTestConfig(SBAdminRoleConfiguration):
     """Role configuration with overridable per-test view permissions.
 
     ``SBAdminRoleConfiguration`` uses a Singleton metaclass, so all tests
-    share one instance per subclass; ``view_permission_for`` is exposed as
-    a *class* attribute and test ``setUp`` mutates it per case. ``None``
-    means allow-all (the typical positive-path default); a set means
-    "only these models".
+    share one instance per subclass; ``view_permission_for`` and
+    ``restrict_qs`` are exposed as *class* attributes and test ``setUp`` /
+    ``tearDown`` mutate them per case.
+
+    * ``view_permission_for``: ``None`` means allow-all (default
+      positive-path); a set means "only these models".
+    * ``restrict_qs``: ``None`` means no row-level restriction (passthrough);
+      a callable ``(qs, model) -> qs`` narrows querysets the same way
+      production ``SBAdminRoleConfiguration.restrict_queryset`` would.
     """
 
     view_permission_for: set | None = None
+    restrict_qs = None
 
     def has_permission(
         self, request, request_data, view, model=None, obj=None, permission=None
@@ -33,6 +39,19 @@ class MCPToolTestConfig(SBAdminRoleConfiguration):
         if type(self).view_permission_for is None:
             return True
         return model in type(self).view_permission_for
+
+    def restrict_queryset(
+        self,
+        qs,
+        model,
+        request,
+        request_data,
+        global_filter=True,
+        global_filter_data_map=None,
+    ):
+        if type(self).restrict_qs is None:
+            return qs
+        return type(self).restrict_qs(qs, model)
 
 
 class EmptySBAdminConfiguration(SBAdminConfigurationBase):
