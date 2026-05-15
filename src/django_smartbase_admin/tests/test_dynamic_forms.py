@@ -10,6 +10,7 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBDynamicRegion,
     SBInactiveFieldPolicy,
 )
+from django_smartbase_admin.engine.modal_view import ActionModalView
 from django_smartbase_admin.templatetags.sb_admin_tags import (
     get_item,
     sbadmin_fieldset_context,
@@ -251,6 +252,35 @@ class FakeView:
         return f"/sb-admin/{action}/{modifier}"
 
 
+class FormWithExternalViewRegions(SBAdminBaseFormInit, forms.Form):
+    message = forms.CharField()
+
+
+class ViewWithFormSpecificRegion:
+    def get_sbadmin_fieldsets(self, request, object_id):
+        return (
+            (
+                None,
+                {
+                    "dynamic_regions": (
+                        SBDynamicRegion(
+                            name="sender_address",
+                            fields=("sender_name",),
+                            is_visible=lambda form, request, region: form.is_return_package,
+                            get_active_fields=(
+                                lambda form, request, region: form.sender_address_region_fields()
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class ExternalRegionActionModal(ActionModalView):
+    form_class = FormWithExternalViewRegions
+
+
 class DynamicFormTests(SimpleTestCase):
     def setUp(self):
         self.request = RequestFactory().get("/dynamic-form/")
@@ -271,6 +301,15 @@ class DynamicFormTests(SimpleTestCase):
             form.value_from_data_or_initial("download_url"),
             "https://example.com/file",
         )
+
+    def test_action_modal_form_does_not_use_parent_view_dynamic_regions(self):
+        modal = ExternalRegionActionModal(
+            view=ViewWithFormSpecificRegion(),
+        )
+        form = modal.get_form_class()(request=self.request)
+
+        self.assertIsInstance(form.view, ViewWithFormSpecificRegion)
+        self.assertEqual(form.get_dynamic_regions(self.request), ())
 
     def test_ignore_policy_skips_inactive_field_validation(self):
         form = DynamicRegionForm(

@@ -50,6 +50,7 @@ class ActionModalView(FormView):
             (form_class,),
             {
                 "view": self.view,
+                "sbadmin_include_view_dynamic_regions": False,
             },
         )
 
