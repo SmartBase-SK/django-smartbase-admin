@@ -61,6 +61,8 @@ class SBAdminXLSXExportService(object):
                 per_column_formats[idx] = cell_formats_dict[cell_format]
             elif isinstance(cell_format, dict):
                 per_column_formats[idx] = workbook.add_format(cell_format)
+            elif isinstance(cell_format, SBAdminXLSXFormat):
+                per_column_formats[idx] = workbook.add_format(cell_format.to_json())
         for (
             conditional_format_range,
             conditional_format,

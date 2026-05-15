@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
 
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
 from django.db.models import (
@@ -76,7 +81,7 @@ class XLSXFieldOptions(JSONSerializableMixin):
     field: str | None = None
     formatter: Formatter | None = None
     python_formatter: Callable[[int, Any], Any] | None = None
-    cell_format: str | dict | None = None
+    cell_format: str | dict | SBAdminXLSXFormat | None = None
 
     def __init__(
         self,
@@ -84,7 +89,7 @@ class XLSXFieldOptions(JSONSerializableMixin):
         field: str | None = None,
         formatter: Formatter | None = None,
         python_formatter: Callable[[int, Any], Any] | None = None,
-        cell_format: str | dict | None = None,
+        cell_format: str | dict | SBAdminXLSXFormat | None = None,
     ) -> None:
         super().__init__()
         self.title = title
