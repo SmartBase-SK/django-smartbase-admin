@@ -140,7 +140,8 @@
     div.radio > input[type="radio"]{
         @apply absolute opacity-0 top-0;
         z-index: -1;
-        & ~ :where(label, .label) {
+        & ~ label,
+        & ~ .label {
             @apply relative flex pl-32 text-14 min-h-20;
 
             &::before,
@@ -157,7 +158,8 @@
         }
 
         &:not(:disabled) {
-            &:hover + :where(label, .label) {
+            &:hover + label,
+            &:hover + .label {
                 &::before {
                     @apply border-dark-400;
                 }
@@ -167,7 +169,8 @@
                 }
             }
 
-            &:focus + :where(label, .label) {
+            &:focus + label,
+            &:focus + .label {
                 &::before {
                     @apply outline-primary;
                 }
@@ -175,7 +178,8 @@
         }
 
         &:disabled {
-            + :where(label, .label) {
+            + label,
+            + .label {
                 cursor: not-allowed;
                 &::before {
                     @apply bg-light border-dark-300 shadow-none;
@@ -184,20 +188,23 @@
         }
 
         &:checked {
-            & + :where(label, .label) {
+            & + label,
+            & + .label {
                 &::after {
                     opacity: 1;
                 }
             }
 
             &:not(:disabled) {
-                + :where(label, .label) {
+                + label,
+                + .label {
                     &::before {
                         @apply bg-primary border-primary;
                     }
                 }
 
-                &:hover + :where(label, .label) {
+                &:hover + label,
+                &:hover + .label {
                     &:before {
                         @apply bg-primary-600 border-primary-600;
                     }
@@ -212,7 +219,7 @@
 
     input.checkbox,
     div.checkbox > input[type="checkbox"] {
-        & ~ :where(label, .label) {
+        & ~ label {
             &::before {
                 @apply rounded;
             }
@@ -232,7 +239,8 @@
 
         &:checked {
             &:not(:disabled) {
-                &:hover + :where(label, .label) {
+                &:hover + label,
+                &:hover + .label {
                     &::after {
                         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.7072 7.70712L10.7072 17.7071C10.3167 18.0976 9.68349 18.0976 9.29297 17.7071L4.29297 12.7071L5.70718 11.2929L10.0001 15.5858L19.293 6.29291L20.7072 7.70712Z' fill='%23E5E7EB' fill-rule='nonzero'/%3E%3C/svg%3E%0A");
                     }
@@ -241,7 +249,8 @@
         }
 
         &:indeterminate {
-            & + :where(label, .label) {
+            & + label,
+            & + .label {
                 &::before {
                     @apply bg-primary border-primary;
                 }
@@ -251,7 +260,8 @@
                 }
             }
             &:not(:disabled) {
-                &:hover + :where(label, .label) {
+                &:hover + label,
+                &:hover + .label {
                     &:before {
                         @apply bg-primary-600 border-primary-600;
                     }
@@ -261,7 +271,8 @@
     }
 
     input.checkbox-delete {
-        + :where(label, .label) {
+        + label,
+        + .label {
             @apply text-dark-300 transition-colors;
             @apply p-8 h-full w-full flex-center;
 
@@ -276,7 +287,8 @@
         }
 
         &:checked {
-            + :where(label, .label) {
+            + label,
+            + .label {
                 @apply text-negative;
             }
         }
@@ -284,7 +296,8 @@
 
     input.radio,
     div.radio > input[type="radio"] {
-        & ~ :where(label, .label) {
+        & ~ label,
+        & ~ .label {
             &::before {
                 @apply rounded-full;
             }
@@ -301,7 +314,8 @@
 
         &:checked {
             &:not(:disabled) {
-                &:hover + :where(label, .label) {
+                &:hover + label,
+                &:hover + .label {
                     &::after {
                         opacity: 1;
                     }
@@ -312,7 +326,8 @@
 
     input.radio.radio-list,
     div.radio.radio-list > input[type="radio"] {
-        & + :where(label, .label) {
+        & + label,
+        & + .label {
             @apply px-16 py-12 flex items-center justify-between text-dark-900;
 
             &::before {
@@ -329,13 +344,15 @@
         }
 
         &:hover {
-            & + :where(label, .label) {
+            & + label,
+            & + .label {
                 @apply bg-dark-100;
             }
         }
 
         &:checked {
-            & + :where(label, .label) {
+            & + label,
+            & + .label {
                 @apply bg-dark-100;
 
                 &::after {
@@ -353,7 +370,8 @@
     }
 
     input.checkbox.checkbox-icon {
-        + :where(label, .label) {
+        + label,
+        + .label {
             @apply pl-0 text-dark-300 transition-colors;
             &:before,
             &:after {
@@ -363,14 +381,16 @@
                 @apply text-dark-700;
             }
         }
-        &:not(:checked) + :where(label, .label) {
+        &:not(:checked) + label,
+        &:not(:checked) + .label {
             > svg {
                 &:last-child {
                     @apply hidden;
                 }
             }
         }
-        &:checked + :where(label, .label) {
+        &:checked + label,
+        &:checked + .label {
             > svg {
                 &:first-child {
                     @apply hidden;
