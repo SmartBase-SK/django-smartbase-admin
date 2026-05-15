@@ -27,8 +27,16 @@ Currently checked:
   (``foo__bar``) because Tabulator can't represent them as a column field
   anyway and the right fix is widget-specific.
 
-All three are warnings rather than errors; misconfigured admins still render,
-just with the symptoms above.
+* ``sbadmin.W004`` — a fake inline (``SBAdminFakeInlineMixin``) overrides
+  only one of ``filter_fake_inline_identifier_by_parent_instance`` /
+  ``filter_fake_inline_identifier_by_parent_pks``. The change form uses the
+  per-parent hook; the batch reader (``get_data_for_parents``, MCP
+  ``list_rows`` inline hydration) uses the batch hook. Overriding only one
+  makes them diverge silently. Inlines that hit this at runtime are skipped
+  by the batch reader.
+
+All warnings rather than errors; misconfigured admins still render, just with
+the symptoms above.
 """
 
 from __future__ import annotations
@@ -36,6 +44,10 @@ from __future__ import annotations
 from django.core.checks import Tags, Warning, register
 
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.fake_inline import (
+    SBAdminFakeInlineMixin,
+    is_fake_inline_batch_safe,
+)
 from django_smartbase_admin.engine.field import SBAdminField
 
 
@@ -93,6 +105,7 @@ def _admin_targets():
                 "sbadmin_list_display",
                 "sbadmin_list_view_config",
                 "ordering",
+                "sbadmin_fake_inlines",
             )
         ):
             continue
@@ -238,10 +251,47 @@ def check_ordering_columns_for_admin(admin):
     return warnings
 
 
+def check_fake_inline_filter_override_for_admin(admin):
+    """Per-admin implementation of ``sbadmin.W004``. Exposed for unit tests."""
+    warnings = []
+    fake_inlines = getattr(admin, "sbadmin_fake_inlines", None) or ()
+    for inline_cls in fake_inlines:
+        if not isinstance(inline_cls, type) or not issubclass(
+            inline_cls, SBAdminFakeInlineMixin
+        ):
+            continue
+        if is_fake_inline_batch_safe(inline_cls):
+            continue
+        warnings.append(
+            Warning(
+                (
+                    f"{admin.__class__.__name__}: fake inline "
+                    f"{inline_cls.__name__} overrides only one of "
+                    "filter_fake_inline_identifier_by_parent_instance / "
+                    "filter_fake_inline_identifier_by_parent_pks. The change "
+                    "form and the batch reader (get_data_for_parents, used "
+                    "e.g. by MCP list_rows inline hydration) would diverge "
+                    "silently. Inlines that hit this at runtime are skipped "
+                    "by the batch reader."
+                ),
+                hint=(
+                    "Override both methods consistently (or neither). The "
+                    "per-parent method takes a parent instance; the batch "
+                    "method takes an iterable of parent pks. Both must apply "
+                    "the same filter."
+                ),
+                obj=admin.__class__,
+                id="sbadmin.W004",
+            )
+        )
+    return warnings
+
+
 _PER_ADMIN_CHECKS = (
     check_duplicate_filter_field_for_admin,
     check_view_config_filter_keys_for_admin,
     check_ordering_columns_for_admin,
+    check_fake_inline_filter_override_for_admin,
 )
 
 

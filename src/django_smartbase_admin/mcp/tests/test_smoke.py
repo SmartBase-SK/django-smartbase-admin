@@ -6,8 +6,8 @@ through on first connect:
 * RFC 8414 / 9728 discovery
 * RFC 7591 dynamic client registration
 * PKCE authorize -> code -> token (DOT-backed)
-* MCP ``initialize`` + ``tools/list`` + ``tools/call hello`` over plain
-  Django POST (no SSE session reuse — ``stateless=True`` mode)
+* MCP ``initialize`` + ``tools/list`` + ``tools/call list_admins`` over
+  plain Django POST (no SSE session reuse — ``stateless=True`` mode)
 * Unauthenticated MCP call -> 401 with ``WWW-Authenticate``
 
 The tests run against ``tests.mcp_urls``, the same combined URLconf a
@@ -130,33 +130,37 @@ class MCPOAuthSmokeTests(TestCase):
         )
         self.assertIn(r.status_code, (200, 202), (r.status_code, r.content[:200]))
 
-        # tools/list -> hello must be present.
+        # tools/list -> list_admins must be present.
         r = self._mcp_call(
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
             token=token,
         )
         self.assertEqual(r.status_code, 200, (r.status_code, r.content[:500]))
         tools = [t["name"] for t in self._parse_mcp_response(r)["result"]["tools"]]
-        self.assertIn("hello", tools, tools)
+        self.assertIn("list_admins", tools, tools)
 
-        # tools/call hello.
+        # tools/call list_admins. No SBAdmin admins are registered in
+        # this test setup, so we just assert the call succeeds and
+        # returns a list — this proves the toolset class is wired and
+        # ``self.request.user`` reaches the SBAdmin pipeline.
         r = self._mcp_call(
             {
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "tools/call",
-                "params": {
-                    "name": "hello",
-                    "arguments": {"name": "Cursor"},
-                },
+                "params": {"name": "list_admins", "arguments": {}},
             },
             token=token,
         )
         self.assertEqual(r.status_code, 200, (r.status_code, r.content[:500]))
         payload = self._parse_mcp_response(r)
-        self.assertIn("result", payload)
-        text = payload["result"]["content"][0]["text"]
-        self.assertIn("Cursor", text, text)
+        self.assertNotIn("error", payload, payload)
+        self.assertIn("result", payload, payload)
+        result = payload["result"]
+        self.assertFalse(result.get("isError"), payload)
+        # No SBAdmin admins are registered for tests, so the structured
+        # tool result is an empty list.
+        self.assertEqual(result["structuredContent"]["result"], [])
 
     # --- helpers ---------------------------------------------------------
 

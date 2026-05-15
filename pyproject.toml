@@ -15,7 +15,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
     "Framework :: Django",
-    "Framework :: Django :: 4.1",
     "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
@@ -33,7 +32,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-django = ">= 4.1, < 7.0"
+django = ">= 4.2, < 7.0"
 django-ckeditor = "^6.7.1"
 django-admin-inline-paginator = "^0.4.0"
 django-nested-admin = "^4.1.1"

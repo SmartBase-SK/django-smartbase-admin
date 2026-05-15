@@ -106,6 +106,25 @@ class SBAdminFakeInlineMixin:
         )
         return qs
 
+    def filter_fake_inline_identifier_by_parent_pks(self, inline_queryset, parent_pks):
+        """Batch filter — restrict ``inline_queryset`` to rows belonging to any
+        pk in ``parent_pks``. Used by ``get_data_for_parents`` (read-only batch
+        API for related rows; e.g. MCP ``list_rows`` inline hydration).
+
+        Default narrows by ``path_to_parent_instance_id`` — the documented
+        join authority. Override **alongside**
+        ``filter_fake_inline_identifier_by_parent_instance`` when the custom
+        filter can't be expressed as a simple ``path IN (...)`` (extra ``Q``,
+        soft-delete masks, traversal through a different join). A one-sided
+        override is flagged by ``sbadmin.W004`` and inlines that hit it at
+        runtime are skipped by the batch reader.
+        """
+        if not self.path_to_parent_instance_id:
+            raise NotImplementedError
+        return inline_queryset.filter(
+            **{f"{self.path_to_parent_instance_id}__in": list(parent_pks)}
+        )
+
     def save_new_fake_inline_instance(self, form, parent_instance, commit=True):
         # save new instance of fake inline model
         if not self.path_to_parent_instance_id:
@@ -153,3 +172,33 @@ class SBAdminFakeInlineMixin:
         return SBAdminViewService.has_permission(
             request, self, self.original_model, obj, permission
         )
+
+
+class FakeInlineFilterOverrideMismatchError(NotImplementedError):
+    """Batch read can't safely run on a fake inline whose per-parent and batch
+    filter hooks are out of sync. Raised by ``get_data_for_parents``; callers
+    that do bulk hydration (e.g. MCP ``attach_inlines``) catch it and skip."""
+
+
+def _is_fake_inline_method_overridden(cls, method_name) -> bool:
+    return getattr(cls, method_name) is not getattr(SBAdminFakeInlineMixin, method_name)
+
+
+def is_fake_inline_batch_safe(cls) -> bool:
+    """Whether ``cls``' fake-inline filter hooks are consistent enough for batch read.
+
+    Returns ``False`` only when **exactly one** of
+    ``filter_fake_inline_identifier_by_parent_instance`` and
+    ``filter_fake_inline_identifier_by_parent_pks`` is overridden — in that
+    case the change form and the batch reader would diverge silently.
+    Non-fake inlines are always safe.
+    """
+    if not issubclass(cls, SBAdminFakeInlineMixin):
+        return True
+    per_parent = _is_fake_inline_method_overridden(
+        cls, "filter_fake_inline_identifier_by_parent_instance"
+    )
+    batch = _is_fake_inline_method_overridden(
+        cls, "filter_fake_inline_identifier_by_parent_pks"
+    )
+    return per_parent == batch

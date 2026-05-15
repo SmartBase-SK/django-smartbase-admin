@@ -20,3 +20,13 @@ class SBAdminConfig(AppConfig):
         # Register Django system checks (sbadmin.W001..W003). Imported after
         # autodiscover so the checks see every registered admin.
         from . import checks  # noqa: F401
+
+        from django.core.signals import request_finished
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
+        request_finished.connect(
+            SBAdminThreadLocalService.clear_request,
+            dispatch_uid="sbadmin_clear_request_contextvar",
+        )

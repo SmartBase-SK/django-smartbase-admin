@@ -15,6 +15,20 @@ from django_smartbase_admin.engine.const import Formatter
 from django_smartbase_admin.utils import JSONSerializableMixin
 
 
+def strip_html_cell_value(value):
+    """Reduce a list-action ``Formatter.HTML`` cell to plain text.
+
+    Keeps ``<br>`` as a newline; drops template indentation. Caller must
+    skip non-string cells (datetimes, numbers) — see ``write_workbook``.
+    """
+    text = str(value)
+    text = re.sub(r"\n", "", text)
+    text = re.sub(r"\r\n", "", text)
+    text = re.sub(r"<br\s*/?>", "\n", text)
+    text = unescape(text)
+    return strip_tags(text).strip()
+
+
 class SBAdminXLSXExportService(object):
     @classmethod
     def write_workbook(cls, export_file, data, columns, options=None):
@@ -120,11 +134,7 @@ class SBAdminXLSXExportService(object):
                         and not is_datetime_like
                         and not isinstance(data_col, numbers.Number)
                     ):
-                        data_col = re.sub(r"\n", "", str(data_col))
-                        data_col = re.sub(r"\r\n", "", str(data_col))
-                        data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
-                        data_col = unescape(data_col)
-                        data_col = strip_tags(data_col).strip()
+                        data_col = strip_html_cell_value(data_col)
                 if not image_write:
                     if is_datetime_like:
                         worksheet.write_datetime(

@@ -79,7 +79,13 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
     "instructions": (
         "Read-only access to the SBAdmin admin surface. "
-        "Use `hello` to verify connectivity."
+        "Start with `list_admins` to discover which admins (and which "
+        "fields on each) the authenticated user can see; the returned "
+        "`view_id` is the handle other tools accept. Use `list_rows` to "
+        "fetch the same JSON payload the browser table renders, with "
+        "filters/pagination/sort. Use `autocomplete` to resolve filter "
+        "values for autocomplete-backed columns (e.g. find a queue id "
+        "before filtering agents by queue)."
     ),
     "stateless": True,
 }
@@ -90,8 +96,8 @@ DJANGO_MCP_ENDPOINT = "mcp/"
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 
-# SBAdmin configuration — None disables autodiscovery (not needed for tests)
-SB_ADMIN_CONFIGURATION = None
+# SBAdmin configuration for MCP smoke tests; production projects must provide one.
+SB_ADMIN_CONFIGURATION = "tests.sbadmin_config.EmptySBAdminConfiguration"
 
 # CKEditor requires an upload path setting
 CKEDITOR_UPLOAD_PATH = "/tmp/ckeditor/"
