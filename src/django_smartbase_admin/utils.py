@@ -83,15 +83,17 @@ def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
 
 
 class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
-    def get_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
+    def get_sbadmin_fieldsets(
+        self, request=None, object_id=None
+    ) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)
-        return getattr(meta, "fieldsets", tuple())
+        return getattr(meta, "sbadmin_fieldsets", tuple())
 
     def get_fieldsets_context(self) -> dict[str | None, dict]:
-        return {name: data for name, data in self.get_fieldsets()}
+        return {name: data for name, data in self.get_sbadmin_fieldsets()}
 
     def fieldsets(self) -> Iterable[Fieldset]:
-        if not (fieldsets := self.get_fieldsets()):
+        if not (fieldsets := self.get_sbadmin_fieldsets()):
             logger.warning(
                 "No fieldsets defined for form %s. Using form fields as fallback.",
                 self.__class__.__name__,

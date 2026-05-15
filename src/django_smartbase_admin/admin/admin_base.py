@@ -910,19 +910,14 @@ class SBAdmin(
 
     def _dynamic_regions_for_request(self, form, region, request):
         trigger_name = request.headers.get("HX-Trigger-Name")
-        if trigger_name:
-            related_regions = [
-                candidate
-                for candidate in form.get_dynamic_regions(request)
-                if trigger_name in candidate.trigger_fields
-            ]
-        else:
-            trigger_fields = set(region.trigger_fields)
-            related_regions = [
-                candidate
-                for candidate in form.get_dynamic_regions(request)
-                if trigger_fields.intersection(candidate.trigger_fields)
-            ]
+        if not trigger_name:
+            return [region]
+
+        related_regions = [
+            candidate
+            for candidate in form.get_dynamic_regions(request)
+            if trigger_name in candidate.trigger_fields
+        ]
         return related_regions or [region]
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:

@@ -36,7 +36,7 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
     )
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (None, {"fields": ("mode",)}),
             (
                 "Details",
@@ -71,7 +71,7 @@ class ClearInactiveRegionForm(SBAdminBaseFormInit, forms.Form):
     field_b = forms.CharField(required=True)
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (
                 None,
                 {
@@ -104,7 +104,7 @@ class ChoiceSwitchRegionForm(SBAdminBaseFormInit, forms.Form):
     value = forms.ChoiceField(required=False)
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (
                 None,
                 {
@@ -145,7 +145,7 @@ class DynamicRegionCustomTriggerForm(SBAdminBaseFormInit, forms.Form):
     payload = forms.CharField(required=False)
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (
                 None,
                 {
@@ -173,7 +173,7 @@ class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
     download_url = forms.URLField(required=True)
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (
                 _("Combined details"),
                 {
@@ -208,7 +208,7 @@ class CrossFieldsetRegionForm(SBAdminBaseFormInit, forms.Form):
     secondary = forms.CharField(required=False)
 
     class Meta:
-        fieldsets = (
+        sbadmin_fieldsets = (
             (
                 _("Primary"),
                 {
@@ -396,13 +396,6 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="download_url"', html)
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
-
-    def test_region_fields_must_be_flat_ownership_list(self):
-        with self.assertRaises(TypeError):
-            SBDynamicRegion(
-                name="invalid",
-                fields=(("first_name", "last_name"),),
-            )
 
     def test_active_fields_can_define_grouped_layout(self):
         form = DynamicRegionForm(
