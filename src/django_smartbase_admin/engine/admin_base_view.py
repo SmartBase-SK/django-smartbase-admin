@@ -237,6 +237,8 @@ class SBAdminBaseView(object):
         for field in fields_source:
             if not isinstance(field, SBAdminField):
                 field = SBAdminField(name=field)
+            else:
+                field = field.clone()
             field.init_field_static(self, configuration)
             field_cache[field.name] = field
         return field_cache

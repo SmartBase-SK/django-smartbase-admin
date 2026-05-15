@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from copy import copy
 from typing import Any
 
 from django.core.exceptions import FieldDoesNotExist, FieldError, ImproperlyConfigured
@@ -164,6 +165,12 @@ class SBAdminField(JSONSerializableMixin):
         self.python_formatter = python_formatter
         self.tabulator_options = tabulator_options
         self.xlsx_options = xlsx_options
+
+    def clone(self):
+        field = copy(self)
+        if self.filter_widget:
+            field.filter_widget = copy(self.filter_widget)
+        return field
 
     def init_filter_for_field(self, configuration):
         filter_widget = getattr(self, "filter_widget", None)
