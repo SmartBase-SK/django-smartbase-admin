@@ -53,7 +53,7 @@ class SBDynamicRegion:
     ) -> None:
         self.name = name
         self.trigger_fields = tuple(trigger_fields)
-        self.fields = tuple(self._normalize_field_name(field) for field in fields)
+        self.fields = tuple(fields)
         self.is_visible_callback = is_visible
         self.get_active_fields_callback = get_active_fields
         self.inactive_field_policy = inactive_field_policy
@@ -68,12 +68,8 @@ class SBDynamicRegion:
         self, form: forms.Form, request: HttpRequest | None = None
     ) -> Iterable[str | Iterable[str]]:
         if self.get_active_fields_callback is None:
-            return self.field_names
+            return self.fields
         return self.get_active_fields_callback(form, request, self)
-
-    @property
-    def field_names(self) -> tuple[str, ...]:
-        return self.fields
 
     def get_wrapper_id(self, form: forms.Form) -> str:
         prefix = getattr(form, "prefix", None)
@@ -87,32 +83,30 @@ class SBDynamicRegion:
         self, form: forms.Form, request: HttpRequest | None = None
     ) -> SBDynamicRegionState:
         visible = self.is_visible(form, request)
-        known_field_names = set(self.field_names)
-        requested_layout = self._normalize_active_layout(
-            self.get_active_fields(form, request) if visible else ()
-        )
+        known_field_names = set(self.fields)
+        requested_layout = self.get_active_fields(form, request) if visible else ()
         active_field_names: list[str] = []
         active_name_set: set[str] = set()
         active_fields: list[str | tuple[str, ...]] = []
         for field in requested_layout:
-            if isinstance(field, tuple):
-                active_group = tuple(
-                    field_name
-                    for field_name in field
-                    if field_name in known_field_names and field_name in form.fields
-                )
-                if active_group:
-                    active_fields.append(active_group)
-                    for field_name in active_group:
-                        if field_name not in active_name_set:
-                            active_name_set.add(field_name)
-                            active_field_names.append(field_name)
+            if isinstance(field, str):
+                if field in known_field_names and field in form.fields:
+                    active_fields.append(field)
+                    if field not in active_name_set:
+                        active_name_set.add(field)
+                        active_field_names.append(field)
                 continue
-            if field in known_field_names and field in form.fields:
-                active_fields.append(field)
-                if field not in active_name_set:
-                    active_name_set.add(field)
-                    active_field_names.append(field)
+            active_group = tuple(
+                field_name
+                for field_name in field
+                if field_name in known_field_names and field_name in form.fields
+            )
+            if active_group:
+                active_fields.append(active_group)
+                for field_name in active_group:
+                    if field_name not in active_name_set:
+                        active_name_set.add(field_name)
+                        active_field_names.append(field_name)
         wrapper_id = self.get_wrapper_id(form)
         return SBDynamicRegionState(
             name=self.name,
@@ -122,28 +116,6 @@ class SBDynamicRegion:
             active_field_names=tuple(active_field_names),
             active_fields=tuple(active_fields),
         )
-
-    @staticmethod
-    def _normalize_field_name(field: str) -> str:
-        if not isinstance(field, str):
-            raise TypeError(
-                "SBDynamicRegion.fields must be a flat iterable of field names."
-            )
-        return field
-
-    @classmethod
-    def _normalize_active_layout(
-        cls, fields: Iterable[str | Iterable[str]]
-    ) -> tuple[str | tuple[str, ...], ...]:
-        return tuple(cls._normalize_active_layout_item(field) for field in fields)
-
-    @staticmethod
-    def _normalize_active_layout_item(
-        field: str | Iterable[str],
-    ) -> str | tuple[str, ...]:
-        if isinstance(field, str):
-            return field
-        return tuple(str(field_name) for field_name in field)
 
 
 class SBAdminDynamicFormMixin:
@@ -169,8 +141,10 @@ class SBAdminDynamicFormMixin:
         self, request: HttpRequest | None = None
     ) -> tuple[SBDynamicRegion, ...]:
         regions: list[SBDynamicRegion] = []
-        for _name, data in self.get_fieldsets():
-            regions.extend(data.get("dynamic_regions") or ())
+        if hasattr(self, "get_sbadmin_fieldsets"):
+            object_id = self._sbadmin_dynamic_object_id()
+            for _name, data in self.get_sbadmin_fieldsets(request, object_id):
+                regions.extend(data.get("dynamic_regions") or ())
 
         view = getattr(self, "view", None)
         if (
@@ -216,7 +190,7 @@ class SBAdminDynamicFormMixin:
             state = self.get_dynamic_region_state(region, request)
             active_fields.update(state.active_field_names)
             inactive_by_policy[region.inactive_field_policy].update(
-                set(region.field_names) - set(state.active_field_names)
+                set(region.fields) - set(state.active_field_names)
             )
             self._bind_dynamic_region_triggers(region, state, request)
 
