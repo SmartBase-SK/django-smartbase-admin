@@ -1,5 +1,6 @@
 import datetime
 import io
+import numbers
 import re
 from copy import copy
 from html import unescape
@@ -53,6 +54,15 @@ class SBAdminXLSXExportService(object):
         cell_formats_dict = {}
         for cell_format_key, cell_format in cell_format_options.items():
             cell_formats_dict[cell_format_key] = workbook.add_format(cell_format)
+        per_column_formats = {}
+        for idx, column in enumerate(columns):
+            cell_format = column.get("cell_format")
+            if isinstance(cell_format, str):
+                per_column_formats[idx] = cell_formats_dict[cell_format]
+            elif isinstance(cell_format, dict):
+                per_column_formats[idx] = workbook.add_format(cell_format)
+            elif isinstance(cell_format, SBAdminXLSXFormat):
+                per_column_formats[idx] = workbook.add_format(cell_format.to_json())
         for (
             conditional_format_range,
             conditional_format,
@@ -84,6 +94,12 @@ class SBAdminXLSXExportService(object):
                 data_col = data_row.get(column["field"], "")
                 column_formatter = column.get("formatter", None)
                 image_write = False
+                is_datetime_like = (
+                    isinstance(data_col, datetime.datetime)
+                    or isinstance(data_col, datetime.date)
+                    or isinstance(data_col, datetime.time)
+                    or isinstance(data_col, datetime.timedelta)
+                )
                 if column_formatter == Formatter.IMAGE.value:
                     if row >= header_rows_count:
                         try:
@@ -91,27 +107,26 @@ class SBAdminXLSXExportService(object):
                                 row,
                                 col,
                                 f'=_xlfn.IMAGE("{data_col}")',
-                                cell_format=default_cell_format,
+                                cell_format=per_column_formats.get(
+                                    col, default_cell_format
+                                ),
                             )
                             image_write = True
                         except ValueError:
                             pass
                 if column_formatter == Formatter.HTML.value:
-                    # remove newlines
-                    data_col = re.sub(r"\n", "", str(data_col))
-                    data_col = re.sub(r"\r\n", "", str(data_col))
-                    # replace all possible variants of <br> with new line
-                    data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
-                    # unescape
-                    data_col = unescape(data_col)
-                    data_col = strip_tags(data_col).strip()
-                if not image_write:
                     if (
-                        isinstance(data_col, datetime.datetime)
-                        or isinstance(data_col, datetime.date)
-                        or isinstance(data_col, datetime.time)
-                        or isinstance(data_col, datetime.timedelta)
+                        data_col is not None
+                        and not is_datetime_like
+                        and not isinstance(data_col, numbers.Number)
                     ):
+                        data_col = re.sub(r"\n", "", str(data_col))
+                        data_col = re.sub(r"\r\n", "", str(data_col))
+                        data_col = re.sub(r"<br\s*/?>", "\n", str(data_col))
+                        data_col = unescape(data_col)
+                        data_col = strip_tags(data_col).strip()
+                if not image_write:
+                    if is_datetime_like:
                         worksheet.write_datetime(
                             row, col, data_col, default_cell_datetime_format
                         )
@@ -121,7 +136,7 @@ class SBAdminXLSXExportService(object):
                             col,
                             data_col,
                             (
-                                default_cell_format
+                                per_column_formats.get(col, default_cell_format)
                                 if row >= header_rows_count
                                 else header_cell_format
                             ),

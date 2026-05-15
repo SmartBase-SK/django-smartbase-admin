@@ -17,6 +17,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
 | [Common Errors](#common-errors) | Frequent errors and solutions |
@@ -44,6 +45,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Adding a column?** → [SBAdminField](#sbadminfield---list-display-columns)
 - **When should I set `filter_field`?** → [When to set `filter_field`](#when-to-set-filter_field)
 - **Extra data for formatters?** → [sbadmin_list_display_data](#sbadmin_list_display_data---extra-data-fields)
+- **XLSX custom formatting per column?** → [XLSX Export Field Formatting](#xlsx-export-field-formatting)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
@@ -1828,6 +1830,54 @@ from django_smartbase_admin.engine.field_formatter import format_array, BadgeTyp
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
 
+---
+
+## XLSX Export Field Formatting
+
+Use `XLSXFieldOptions.cell_format` to apply an Excel format to one exported column.
+
+Supported `cell_format` values:
+- `str` — key from `SBAdminXLSXOptions.cell_formats`
+- `dict` — raw xlsxwriter format props
+- `SBAdminXLSXFormat` — class-based format definition
+
+```python
+from django_smartbase_admin.engine.field import SBAdminField, XLSXFieldOptions
+from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
+
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(
+            name="price",
+            title="Price",
+            xlsx_options=XLSXFieldOptions(
+                cell_format=SBAdminXLSXFormat(
+                    num_format='#,##0.00 "€"',
+                    align="right",
+                )
+            ),
+        ),
+    )
+```
+
+Named lookup via `cell_formats`:
+
+```python
+class ArticleAdmin(SBAdmin):
+    def get_sbadmin_xlsx_options(self, request):
+        options = super().get_sbadmin_xlsx_options(request)
+        options.cell_formats = {
+            "money": {"num_format": '#,##0.00 "€"', "align": "right"},
+        }
+        return options
+
+    sbadmin_list_display = (
+        SBAdminField(
+            name="price",
+            xlsx_options=XLSXFieldOptions(cell_format="money"),
+        ),
+    )
+```
 ---
 
 ## Performance Optimization

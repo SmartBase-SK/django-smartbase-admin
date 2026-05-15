@@ -28,6 +28,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
+from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
 from django_smartbase_admin.utils import JSONSerializableMixin
 
 
@@ -77,6 +78,7 @@ class XLSXFieldOptions(JSONSerializableMixin):
     field: str | None = None
     formatter: Formatter | None = None
     python_formatter: Callable[[int, Any], Any] | None = None
+    cell_format: str | dict | SBAdminXLSXFormat | None = None
 
     def __init__(
         self,
@@ -84,12 +86,14 @@ class XLSXFieldOptions(JSONSerializableMixin):
         field: str | None = None,
         formatter: Formatter | None = None,
         python_formatter: Callable[[int, Any], Any] | None = None,
+        cell_format: str | dict | SBAdminXLSXFormat | None = None,
     ) -> None:
         super().__init__()
         self.title = title
         self.field = field
         self.formatter = formatter
         self.python_formatter = python_formatter
+        self.cell_format = cell_format
 
 
 class SBAdminField(JSONSerializableMixin):
