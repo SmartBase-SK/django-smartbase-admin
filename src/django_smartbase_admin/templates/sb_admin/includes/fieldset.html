@@ -1,8 +1,9 @@
 {% load sb_admin_tags %}
 {% sbadmin_fieldset_context fieldsets_context fieldset as fieldset_context %}
-{% sbadmin_fieldset_form adminform fieldset as dynamic_region_form %}
+{% sbadmin_fieldset_form adminform fieldset form as dynamic_region_form %}
+{% firstof fieldset_class "card sm:mb-24 relative" as resolved_fieldset_class %}
 
-<fieldset class="card sm:mb-24 relative {{ fieldset.classes }}">
+<fieldset class="{{ resolved_fieldset_class }} {{ fieldset.classes }}">
     {% if fieldset_context.dynamic_regions %}
         {% include 'sb_admin/includes/inline_fieldset.html' with skip_lines=True %}
         {% if fieldset_context.fields %}

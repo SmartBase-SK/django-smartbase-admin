@@ -148,6 +148,7 @@ class SBDynamicRegion:
 
 class SBAdminDynamicFormMixin:
     sbadmin_include_view_dynamic_regions = True
+    sbadmin_dynamic_region_endpoint_from_request = False
 
     def value_from_data_or_initial(self, field_name: str) -> Any:
         if field_name not in self.fields:
@@ -304,6 +305,8 @@ class SBAdminDynamicFormMixin:
             )
 
     def _dynamic_region_endpoint(self, request: HttpRequest | None = None) -> str:
+        if self.sbadmin_dynamic_region_endpoint_from_request and request is not None:
+            return request.path
         view = getattr(self, "view", None)
         if view is not None and hasattr(view, "get_action_url"):
             object_id = self._sbadmin_dynamic_object_id()

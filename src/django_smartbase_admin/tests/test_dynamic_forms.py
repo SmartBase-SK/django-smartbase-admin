@@ -281,6 +281,10 @@ class ExternalRegionActionModal(ActionModalView):
     form_class = FormWithExternalViewRegions
 
 
+class DynamicRegionActionModal(ActionModalView):
+    form_class = DynamicRegionForm
+
+
 class DynamicFormTests(SimpleTestCase):
     def setUp(self):
         self.request = RequestFactory().get("/dynamic-form/")
@@ -310,6 +314,13 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertIsInstance(form.view, ViewWithFormSpecificRegion)
         self.assertEqual(form.get_dynamic_regions(self.request), ())
+
+    def test_action_modal_dynamic_regions_use_current_request_path(self):
+        request = RequestFactory().get("/modal/action/")
+        modal = DynamicRegionActionModal(view=FakeView())
+        form = modal.get_form_class()(request=request)
+
+        self.assertEqual(form.fields["mode"].widget.attrs["hx-get"], "/modal/action/")
 
     def test_ignore_policy_skips_inactive_field_validation(self):
         form = DynamicRegionForm(
