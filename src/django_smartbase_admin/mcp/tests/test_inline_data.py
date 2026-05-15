@@ -229,3 +229,100 @@ class PaginatedInlineCapTests(_InlineDataTestBase):
             len(by_name["small"]["_inlines"]["FolderPermissionPaginatedInline"]), 1
         )
         self.assertNotIn("_truncated_inlines", by_name["small"])
+
+
+class FolderPermissionReadonlyInline(SBAdminTableInline):
+    """Inline with a callable readonly method — exercises the per-instance
+    projection branch of ``get_data_for_parents`` (the cheap ``.values()``
+    path doesn't apply when any selected field is a callable)."""
+
+    model = FolderPermission
+    fields = ("everybody", "inline_summary")
+    readonly_fields = ("inline_summary",)
+    extra = 0
+
+    def inline_summary(self, obj):
+        return f"inline:{obj.pk}:{obj.everybody}"
+
+
+class FolderReadonlyInlineTestAdmin(SBAdmin):
+    model = Folder
+    sbadmin_list_display = ("id", "name")
+    inlines = [FolderPermissionReadonlyInline]
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class InlineDataBehaviourTests(_InlineDataTestBase):
+    """The two non-trivial behaviours of ``get_data_for_parents`` not
+    covered by the wire-contract tests above:
+
+    * callable readonly methods on the inline are resolved per-instance
+      (any callable selection disables the cheap ``.values()`` path);
+    * ``restrict_queryset`` from the role configuration narrows the
+      inline queryset, so a parent whose children are filtered out
+      gets no ``_inlines`` entry.
+    """
+
+    admin_class = FolderReadonlyInlineTestAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+        cls.perm_open = FolderPermission.objects.create(
+            folder=cls.parent, everybody=True
+        )
+        cls.perm_closed = FolderPermission.objects.create(
+            folder=cls.parent, everybody=False
+        )
+
+    def test_callable_readonly_method_is_hydrated(self):
+        result = self._list(
+            [
+                {
+                    "inline_name": "FolderPermissionReadonlyInline",
+                    "fields": ["everybody", "inline_summary"],
+                }
+            ]
+        )
+        parent_row = next(row for row in result["data"] if row["name"] == "parent")
+        rows = parent_row["_inlines"]["FolderPermissionReadonlyInline"]
+        by_pk = {r["id"]: r for r in rows}
+        self.assertEqual(
+            by_pk[self.perm_open.pk]["inline_summary"],
+            f"inline:{self.perm_open.pk}:True",
+        )
+        self.assertEqual(
+            by_pk[self.perm_closed.pk]["inline_summary"],
+            f"inline:{self.perm_closed.pk}:False",
+        )
+
+    def test_restrict_queryset_narrows_inline_rows(self):
+        """The role configuration's ``restrict_queryset`` hook is the only
+        row-level isolation primitive — it must apply to inline queries the
+        same way it applies to the parent list."""
+
+        def restrict(qs, model):
+            if model is FolderPermission:
+                return qs.filter(everybody=True)
+            return qs
+
+        MCPToolTestConfig.restrict_qs = staticmethod(restrict)
+        try:
+            result = self._list(
+                [
+                    {
+                        "inline_name": "FolderPermissionReadonlyInline",
+                        "fields": ["everybody"],
+                    }
+                ]
+            )
+        finally:
+            MCPToolTestConfig.restrict_qs = None
+
+        parent_row = next(row for row in result["data"] if row["name"] == "parent")
+        rows = parent_row["_inlines"]["FolderPermissionReadonlyInline"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], self.perm_open.pk)
