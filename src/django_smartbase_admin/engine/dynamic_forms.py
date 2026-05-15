@@ -147,6 +147,8 @@ class SBDynamicRegion:
 
 
 class SBAdminDynamicFormMixin:
+    sbadmin_include_view_dynamic_regions = True
+
     def value_from_data_or_initial(self, field_name: str) -> Any:
         if field_name not in self.fields:
             return None
@@ -170,7 +172,11 @@ class SBAdminDynamicFormMixin:
             regions.extend(data.get("dynamic_regions") or ())
 
         view = getattr(self, "view", None)
-        if view is not None and hasattr(view, "get_sbadmin_fieldsets"):
+        if (
+            self.sbadmin_include_view_dynamic_regions
+            and view is not None
+            and hasattr(view, "get_sbadmin_fieldsets")
+        ):
             object_id = self._sbadmin_dynamic_object_id()
             try:
                 for _name, data in view.get_sbadmin_fieldsets(request, object_id):
