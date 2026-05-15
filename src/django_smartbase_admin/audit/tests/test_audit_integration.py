@@ -34,6 +34,7 @@ def make_mock_configuration(restrict_fn=None):
     config = MagicMock()
     config.restrict_queryset = restrict_fn or (lambda qs, **kwargs: qs)
     config.apply_global_filter_to_queryset = lambda qs, *a, **kw: qs
+    config.get_filter_widget = lambda field, default_widget: default_widget
     return config
 
 

@@ -70,7 +70,6 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
 class SBAdminBaseView(object):
     global_filter_data_map = None
-    field_cache = None
     sbadmin_detail_actions = None
     menu_label: str | None = None
     add_label: str | None = None
@@ -227,38 +226,22 @@ class SBAdminBaseView(object):
             raise PermissionDenied
 
     def get_field_map(self, request) -> dict[str, "SBAdminField"]:
-        return self.field_cache
+        return self.init_fields_cache(
+            self.get_sbadmin_list_display(request), request.request_data.configuration
+        )
 
     def init_fields_cache(self, fields_source, configuration, force=False):
         from django_smartbase_admin.engine.field import SBAdminField
-        from django_smartbase_admin.services.thread_local import (
-            SBAdminThreadLocalService,
-        )
 
-        try:
-            request = SBAdminThreadLocalService.get_request()
-        except LookupError:
-            request = None
-        cache_key = self.get_id()
-        if request is not None:
-            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
-            if not force and cache_key in request_field_cache:
-                self.field_cache = request_field_cache[cache_key]
-                return self.field_cache.values()
-
-        fields = []
-        self.field_cache = {}
+        field_cache = {}
         for field in fields_source:
             if not isinstance(field, SBAdminField):
                 field = SBAdminField(name=field)
+            else:
+                field = field.clone()
             field.init_field_static(self, configuration)
-            fields.append(field)
-            self.field_cache[field.name] = field
-        if request is not None:
-            request_field_cache = getattr(request, "_sbadmin_field_cache", {})
-            request_field_cache[cache_key] = self.field_cache
-            request._sbadmin_field_cache = request_field_cache
-        return fields
+            field_cache[field.name] = field
+        return field_cache
 
     def get_action_url(self, action, modifier="template"):
         raise NotImplementedError
@@ -590,9 +573,6 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         super().init_view_dynamic(request, request_data, **kwargs)
-        self.init_fields_cache(
-            self.get_sbadmin_list_display(request), request.request_data.configuration
-        )
         self.init_actions(request)
 
     def get_sbadmin_list_display(self, request) -> list[str] | list:
@@ -977,18 +957,20 @@ class SBAdminBaseListView(SBAdminBaseView):
         if not list_filter:
             return all_config
         list_fields = self.get_sbadmin_list_display(request) or []
-        initialized_fields = self.init_fields_cache(
-            list_fields, request.request_data.configuration
+        base_filter = {}
+        name_of_field = (
+            lambda field: getattr(field, "filter_field", None)
+            or getattr(field, "name", None)
+            or field
         )
-        if initialized_fields is not None:
-            list_fields = initialized_fields
-        base_filter = {
-            getattr(field, "filter_field", field): ""
-            for field in list_fields
-            if field in list_filter
-            or getattr(field, "name", None) in list_filter
-            or getattr(field, "filter_field", None) in list_filter
-        }
+        for field in list_fields:
+            if (
+                field in list_filter
+                or getattr(field, "name", None) in list_filter
+                or getattr(field, "filter_field", None) in list_filter
+            ):
+                base_filter[name_of_field(field)] = ""
+
         url_params = None
         if base_filter:
             url_params = {"filterData": base_filter}

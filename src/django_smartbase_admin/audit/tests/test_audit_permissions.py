@@ -43,7 +43,6 @@ class BasePermissionsTest(BaseAuditTest):
         AdminAuditLog.objects.all().delete()
 
         self.admin = AdminAuditLogAdmin(AdminAuditLog, MagicMock())
-        self.admin.field_cache = {}
 
         self.group_ct = ContentType.objects.get_for_model(Group)
         self.user_ct = ContentType.objects.get_for_model(User)
