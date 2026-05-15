@@ -216,11 +216,6 @@ class SBAdminSite(admin.AdminSite):
             [
                 path("autocomplete/", stock_admin_404, name="autocomplete"),
                 path("jsi18n/", stock_admin_404, name="jsi18n"),
-                path(
-                    "r/<path:content_type_id>/<path:object_id>/",
-                    stock_admin_404,
-                    name="view_on_site",
-                ),
                 path("<str:app_label>/", stock_admin_404, name="app_list"),
             ]
         )
