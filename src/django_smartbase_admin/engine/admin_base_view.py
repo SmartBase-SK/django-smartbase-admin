@@ -129,14 +129,16 @@ class SBAdminBaseView(object):
     def process_list_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
+        actions = self.process_actions_permissions(request, actions)
         self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        return actions
 
     def process_row_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
+        actions = self.process_actions_permissions(request, actions)
         self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        return actions
 
     def process_detail_actions(
         self,
@@ -148,14 +150,18 @@ class SBAdminBaseView(object):
             self._materialize_modifier_object_id(action, object_id)
             for action in actions
         ]
+        materialized_actions = self.process_actions_permissions(
+            request, materialized_actions
+        )
         self._register_form_view_actions(materialized_actions)
-        return self.process_actions_permissions(request, materialized_actions)
+        return materialized_actions
 
     def process_inline_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
+        actions = self.process_actions_permissions(request, actions)
         self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        return actions
 
     def _register_form_view_actions(self, actions: list[SBAdminCustomAction]) -> None:
         for action in actions:
@@ -199,8 +205,9 @@ class SBAdminBaseView(object):
     def process_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
+        actions = self.process_actions_permissions(request, actions)
         self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        return actions
 
     def process_actions_permissions(
         self, request, actions: list[SBAdminCustomAction]

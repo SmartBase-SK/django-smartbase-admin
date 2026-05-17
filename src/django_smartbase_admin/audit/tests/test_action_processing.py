@@ -275,7 +275,7 @@ class RowActionIntegrationTests(TestCase):
             f"/actions/PublishArticleView/{IGNORE_LIST_SELECTION}/",
         )
 
-    def test_form_view_actions_are_registered_before_permission_filtering(self):
+    def test_form_view_actions_are_not_registered_when_permission_denied(self):
         view = FakeAdminView(has_action_permission=False)
         action = SBAdminFormViewAction(
             target_view=PublishArticleView,
@@ -286,8 +286,8 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_list_actions(self.request, [action])
 
         self.assertEqual(processed, [])
-        self.assertTrue(hasattr(view, "PublishArticleView"))
-        self.assertEqual(action.url, "/actions/PublishArticleView/template/")
+        self.assertFalse(hasattr(view, "PublishArticleView"))
+        self.assertIsNone(action.url)
 
     def test_nested_form_view_actions_are_registered(self):
         view = FakeAdminView()
