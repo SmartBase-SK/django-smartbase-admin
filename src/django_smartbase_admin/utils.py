@@ -44,10 +44,16 @@ def render_notifications(request):
 
 def render_notifications_if_any(request):
     """Like ``render_notifications`` but returns ``None`` when the messages
-    queue is empty, so JSON callers can omit the key entirely."""
+    queue is empty, so JSON callers can omit the key entirely.
+
+    When ``MessageMiddleware`` hasn't run (e.g. MCP transport), Django's
+    ``get_messages`` returns a plain ``[]`` without ``.used``; guard the
+    flag-flip so the JSON pipeline still works on those requests.
+    """
     storage = messages.get_messages(request)
     if not len(storage):
-        storage.used = False
+        if hasattr(storage, "used"):
+            storage.used = False
         return None
     storage.used = False
     return render_notifications(request)

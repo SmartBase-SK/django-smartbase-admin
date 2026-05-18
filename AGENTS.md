@@ -485,7 +485,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 
 Package metadata currently targets:
 
-- Django `>= 4.1, < 7.0`
+- Django `>= 4.2, < 7.0`
 - Python `3.10` through `3.14`
 
 ### Menu Item View IDs
