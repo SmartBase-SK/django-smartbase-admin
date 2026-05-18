@@ -1,5 +1,4 @@
-{% load sb_admin_tags %}
-{% sbadmin_dynamic_region_state form region as region_state %}
+{% with form=dynamic_region.form region=dynamic_region.region region_state=dynamic_region.state dynamic_fieldset=dynamic_region.fieldset %}
 
 {% if not sbadmin_dynamic_region_fragment %}
 <div class="sbadmin-dynamic-region relative" data-sbadmin-dynamic-region="{{ region.name }}">
@@ -11,7 +10,6 @@
         {% if region.template %}
             {% include region.template with form=form region=region region_state=region_state active_field_names=region_state.active_field_names %}
         {% else %}
-            {% sbadmin_dynamic_region_fieldset form region_state as dynamic_fieldset %}
             {% include "sb_admin/includes/inline_fieldset.html" with fieldset=dynamic_fieldset fieldset_context=None skip_last_field_negative_margin=True %}
         {% endif %}
     {% endif %}
@@ -20,3 +18,4 @@
 {% if not sbadmin_dynamic_region_fragment %}
 </div>
 {% endif %}
+{% endwith %}

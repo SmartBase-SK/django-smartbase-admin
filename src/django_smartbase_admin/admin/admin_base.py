@@ -56,6 +56,7 @@ from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_a
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
     SBADMIN_DYNAMIC_REGION_PARAM,
+    SBAdminDynamicFormMixin,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import (
@@ -348,6 +349,7 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
                 threadsafe_request = SBAdminThreadLocalService.get_request()
             except LookupError:
                 threadsafe_request = None
+        self.request = threadsafe_request
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
         model = getattr(getattr(self, "_meta", None), "model", None)
@@ -805,10 +807,9 @@ class SBAdmin(
         fieldsets = []
         object_id = obj.id if obj else None
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
-            fields = [*(fieldset[1].get("fields") or ())]
-            for region in fieldset[1].get("dynamic_regions") or ():
-                fields.extend(region.fields)
-            fieldset_dict = {"fields": fields}
+            fieldset_dict = {
+                "fields": SBAdminDynamicFormMixin.get_fieldset_fields(fieldset[1])
+            }
             classes = fieldset[1].get("classes")
             description = fieldset[1].get("description")
             if classes:
@@ -822,9 +823,10 @@ class SBAdmin(
     def get_fieldsets_context(
         self, request, object_id
     ) -> dict[str, dict[str | None, dict[str, Any]]]:
-        fielsets_context = {}
+        fieldsets_context = {}
         for fieldset in self.get_sbadmin_fieldsets(request, object_id):
-            actions = fieldset[1].get("actions", [])
+            fieldset_context = dict(fieldset[1])
+            actions = list(fieldset[1].get("actions", []))
             for index, action in enumerate(actions):
                 if isinstance(action, SBAdminCustomAction):
                     continue
@@ -832,10 +834,25 @@ class SBAdmin(
                     actions[index] = getattr(self, action)()
                 except AttributeError:
                     pass
-            fielsets_context[fieldset[0]] = fieldset[1]
-            if fieldset[0] is not None:
-                fielsets_context[str(fieldset[0])] = fieldset[1]
-        return {"fieldsets_context": fielsets_context}
+            fieldset_context["actions"] = actions
+            fieldsets_context[str(fieldset[0]) if fieldset[0] is not None else None] = (
+                fieldset_context
+            )
+        return {"fieldsets_context": fieldsets_context}
+
+    def hydrate_fieldsets_context(self, context):
+        adminform = context.get("adminform")
+        fieldsets_context = context.get("fieldsets_context") or {}
+        if not adminform:
+            return
+        for fieldset in adminform:
+            key = str(fieldset.name) if fieldset.name is not None else None
+            fieldset_context = fieldsets_context.get(key)
+            if fieldset_context is None:
+                continue
+            fieldset_context["fieldset_layout"] = adminform.form.get_fieldset_layout(
+                fieldset, fieldset_context, context.get("request")
+            )
 
     @sbadmin_action
     def sbadmin_dynamic_region(self, request, modifier):
@@ -870,8 +887,9 @@ class SBAdmin(
                 render_to_string(
                     "sb_admin/includes/dynamic_region.html",
                     {
-                        "form": form,
-                        "region": target_region,
+                        "dynamic_region": form.get_dynamic_region_context(
+                            target_region, request
+                        ),
                         "sbadmin_dynamic_region_fragment": True,
                         "sbadmin_dynamic_region_oob": index > 0,
                     },
@@ -1033,6 +1051,7 @@ class SBAdmin(
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
+        self.hydrate_fieldsets_context(context)
         if context.get("sbadmin_is_modal"):
             media = context["media"]
             js_assets = [str(asset) for asset in getattr(media, "_js", [])]

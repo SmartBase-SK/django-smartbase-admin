@@ -50,8 +50,7 @@ class ActionModalView(FormView):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "form": form,
-                "region": region,
+                "dynamic_region": form.get_dynamic_region_context(region, request),
                 "sbadmin_dynamic_region_fragment": True,
             },
             request=request,
@@ -79,8 +78,7 @@ class ActionModalView(FormView):
             (form_class,),
             {
                 "view": self.view,
-                "sbadmin_include_view_dynamic_regions": False,
-                "sbadmin_dynamic_region_endpoint_from_request": True,
+                "sbadmin_standalone_dynamic_regions": True,
             },
         )
 
