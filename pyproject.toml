@@ -45,10 +45,15 @@ django-htmx = "^1.17.3"
 jsonschema = "^4.10"
 # required for django-filer
 setuptools = "^67.0.0"
+# Optional MCP dependencies: only required when wiring the MCP toolset
+# (``django_smartbase_admin.mcp``). Users who don't enable MCP can skip
+# them entirely.
+django-oauth-toolkit = {version = "^3.2", optional = true}
+djangorestframework = {version = "^3.17", optional = true}
+django-mcp-server = {version = "^0.5.7", optional = true}
 
-[tool.poetry.group.dev.dependencies]
-# No extra test packages needed — tests use unittest and Django's built-in
-# test runner. This group exists so `poetry install --with dev` is explicit.
+[tool.poetry.extras]
+mcp = ["django-oauth-toolkit", "djangorestframework", "django-mcp-server"]
 
 [build-system]
 requires = ["poetry-core"]
