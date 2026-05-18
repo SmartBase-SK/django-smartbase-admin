@@ -34,7 +34,6 @@ def dynamic_region_initial_from_data(
 
 
 class SBInactiveFieldPolicy(models.TextChoices):
-    IGNORE = "ignore", _("Ignore")
     CLEAR = "clear", _("Clear")
     PRESERVE = "preserve", _("Preserve")
 
@@ -74,7 +73,7 @@ class SBDynamicRegion:
             ]
             | None
         ) = None,
-        inactive_field_policy: SBInactiveFieldPolicy = SBInactiveFieldPolicy.IGNORE,
+        inactive_field_policy: SBInactiveFieldPolicy = SBInactiveFieldPolicy.PRESERVE,
         template: str | None = None,
     ) -> None:
         self.name = name
@@ -216,6 +215,10 @@ class SBAdminDynamicFormMixin:
         fieldset_data: dict[str, Any] | None,
         request: HttpRequest | None = None,
     ) -> tuple[dict[str, SBDynamicRegionContext | Fieldset], ...]:
+        # A fieldset can mix normal fields with SBDynamicRegion markers. When it
+        # does, build the exact render order as static Fieldset chunks separated
+        # by region contexts, so templates can render each dynamic region in
+        # place without losing the surrounding fields.
         layout = (fieldset_data or {}).get("fields") or ()
         if not any(isinstance(item, SBDynamicRegion) for item in layout):
             return ()
@@ -224,6 +227,9 @@ class SBAdminDynamicFormMixin:
         static_fields: list[str | tuple[str, ...]] = []
 
         def flush_static_fields() -> None:
+            # Consecutive static fields belong to one temporary Fieldset. Flush
+            # them whenever a dynamic region starts, then keep collecting fields
+            # after that region as a new chunk.
             if not static_fields:
                 return
             chunks.append(
@@ -308,7 +314,7 @@ class SBAdminDynamicFormMixin:
                 self.fields[field_name].required = False
                 self._clear_bound_field_value(field_name)
                 continue
-            if policy in {SBInactiveFieldPolicy.IGNORE, SBInactiveFieldPolicy.PRESERVE}:
+            if policy == SBInactiveFieldPolicy.PRESERVE:
                 inactive_field_names = getattr(
                     self, "_sbadmin_skip_inactive_field_names", set()
                 )
@@ -320,8 +326,11 @@ class SBAdminDynamicFormMixin:
             self.initial[field_name] = self.fields[field_name].initial = None
             return
         data = self.data.copy()
+        widget = self.fields[field_name].widget
         prefixed_name = self.add_prefix(field_name)
-        data[prefixed_name] = self._empty_value_for_field(self.fields[field_name])
+        data.pop(prefixed_name, None)
+        for widget_name in getattr(widget, "widgets_names", ()):
+            data.pop(f"{prefixed_name}{widget_name}", None)
         self.data = data
 
     def _bind_dynamic_region_triggers(
@@ -371,11 +380,3 @@ class SBAdminDynamicFormMixin:
         instance = getattr(self, "instance", None)
         pk = getattr(instance, "pk", None)
         return str(pk) if pk else None
-
-    @staticmethod
-    def _empty_value_for_field(field: forms.Field) -> Any:
-        if isinstance(field, forms.BooleanField):
-            return False
-        if isinstance(field, forms.MultipleChoiceField):
-            return []
-        return ""

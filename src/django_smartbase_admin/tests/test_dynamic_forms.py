@@ -56,7 +56,7 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
                                 if form["mode"].value() == "digital"
                                 else ("weight",)
                             ),
-                            inactive_field_policy=SBInactiveFieldPolicy.IGNORE,
+                            inactive_field_policy=SBInactiveFieldPolicy.PRESERVE,
                         ),
                     ),
                 },
@@ -238,7 +238,7 @@ class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
                                 if form["mode"].value() == "digital"
                                 else ("weight",)
                             ),
-                            inactive_field_policy=SBInactiveFieldPolicy.IGNORE,
+                            inactive_field_policy=SBInactiveFieldPolicy.PRESERVE,
                         ),
                         ("note",),
                     ),
@@ -475,7 +475,7 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="email"', html)
         self.assertNotIn('name="last_name"', html)
 
-    def test_ignore_policy_skips_inactive_field_validation(self):
+    def test_preserve_policy_skips_inactive_field_validation(self):
         form = DynamicRegionForm(
             data={
                 "mode": "digital",
@@ -503,6 +503,56 @@ class DynamicFormTests(SimpleTestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["field_a"], "visible")
         self.assertEqual(form.cleaned_data["field_b"], "")
+
+    def test_clear_policy_uses_django_empty_values_for_inactive_bound_data(self):
+        class TypedInactiveRegionForm(SBAdminBaseFormInit, forms.Form):
+            sbadmin_standalone_dynamic_regions = True
+
+            mode = forms.ChoiceField(choices=(("hide", "Hide"), ("show", "Show")))
+            enabled = forms.BooleanField(required=False)
+            colors = forms.MultipleChoiceField(
+                required=False,
+                choices=(("red", "Red"), ("blue", "Blue")),
+            )
+            starts_at = forms.SplitDateTimeField(required=False)
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        None,
+                        {
+                            "fields": (
+                                "mode",
+                                SBDynamicRegion(
+                                    name="typed_fields",
+                                    trigger_fields=("mode",),
+                                    fields=("enabled", "colors", "starts_at"),
+                                    get_active_fields=(
+                                        lambda form, request, region: (
+                                            ("enabled", "colors", "starts_at")
+                                            if form["mode"].value() == "show"
+                                            else ()
+                                        )
+                                    ),
+                                    inactive_field_policy=SBInactiveFieldPolicy.CLEAR,
+                                ),
+                            ),
+                        },
+                    ),
+                )
+
+        form = TypedInactiveRegionForm(
+            data=QueryDict(
+                "mode=hide&enabled=on&colors=red"
+                "&starts_at_0=2026-05-18&starts_at_1=09%3A30%3A00"
+            ),
+            request=self.request,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIs(form.cleaned_data["enabled"], False)
+        self.assertEqual(form.cleaned_data["colors"], [])
+        self.assertIsNone(form.cleaned_data["starts_at"])
 
     def test_region_binds_htmx_defaults_to_trigger_fields(self):
         class ViewBackedForm(DynamicRegionForm):
