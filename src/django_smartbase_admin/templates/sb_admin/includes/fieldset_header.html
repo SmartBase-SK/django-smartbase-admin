@@ -1,0 +1,17 @@
+{% if fieldset.name %}
+    <header class="mb-24 flex items-center">
+        <span class="text-dark-900">{{ fieldset.name }}</span>
+        {% if fieldset.description %}
+            <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Help"></use>
+                </svg>
+            </div>
+        {% endif %}
+        <div class="ml-auto flex items-center gap-4">
+            {% for action in fieldset_context.actions %}
+                <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
+            {% endfor %}
+        </div>
+    </header>
+{% endif %}

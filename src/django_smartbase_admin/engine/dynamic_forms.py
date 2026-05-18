@@ -31,6 +31,14 @@ class SBDynamicRegionState:
     active_fields: tuple[str | tuple[str, ...], ...]
 
 
+@dataclass(frozen=True)
+class SBDynamicRegionContext:
+    form: forms.Form
+    region: "SBDynamicRegion"
+    state: SBDynamicRegionState
+    fieldset: Fieldset
+
+
 class SBDynamicRegion:
     def __init__(
         self,
@@ -119,8 +127,29 @@ class SBDynamicRegion:
 
 
 class SBAdminDynamicFormMixin:
-    sbadmin_include_view_dynamic_regions = True
-    sbadmin_dynamic_region_endpoint_from_request = False
+    sbadmin_standalone_dynamic_regions = False
+
+    @staticmethod
+    def get_fieldset_fields(
+        fieldset_data: dict[str, Any],
+    ) -> tuple[str | tuple[str, ...], ...]:
+        fields: list[str | tuple[str, ...]] = []
+        for item in fieldset_data.get("fields") or ():
+            if isinstance(item, SBDynamicRegion):
+                fields.extend(item.fields)
+            else:
+                fields.append(item)
+        return tuple(fields)
+
+    @staticmethod
+    def get_fieldset_dynamic_regions(
+        fieldset_data: dict[str, Any],
+    ) -> tuple[SBDynamicRegion, ...]:
+        return tuple(
+            item
+            for item in fieldset_data.get("fields") or ()
+            if isinstance(item, SBDynamicRegion)
+        )
 
     def value_from_data_or_initial(self, field_name: str) -> Any:
         if field_name not in self.fields:
@@ -144,18 +173,18 @@ class SBAdminDynamicFormMixin:
         if hasattr(self, "get_sbadmin_fieldsets"):
             object_id = self._sbadmin_dynamic_object_id()
             for _name, data in self.get_sbadmin_fieldsets(request, object_id):
-                regions.extend(data.get("dynamic_regions") or ())
+                regions.extend(self.get_fieldset_dynamic_regions(data))
 
         view = getattr(self, "view", None)
         if (
-            self.sbadmin_include_view_dynamic_regions
+            not self.sbadmin_standalone_dynamic_regions
             and view is not None
             and hasattr(view, "get_sbadmin_fieldsets")
         ):
             object_id = self._sbadmin_dynamic_object_id()
             try:
                 for _name, data in view.get_sbadmin_fieldsets(request, object_id):
-                    regions.extend(data.get("dynamic_regions") or ())
+                    regions.extend(self.get_fieldset_dynamic_regions(data))
             except Exception:
                 pass
         return tuple(regions)
@@ -176,6 +205,65 @@ class SBAdminDynamicFormMixin:
             cache[region.name] = region.resolve(self, request)
             self._sbadmin_dynamic_region_states = cache
         return cache[region.name]
+
+    def as_dynamic_region_fieldset(self, state: SBDynamicRegionState) -> Fieldset:
+        return Fieldset(form=self, name=None, fields=state.active_fields, classes="")
+
+    def get_dynamic_region_context(
+        self, region: SBDynamicRegion, request: HttpRequest | None = None
+    ) -> SBDynamicRegionContext:
+        state = self.get_dynamic_region_state(region, request)
+        return SBDynamicRegionContext(
+            form=self,
+            region=region,
+            state=state,
+            fieldset=self.as_dynamic_region_fieldset(state),
+        )
+
+    def get_fieldset_layout(
+        self,
+        fieldset: Fieldset,
+        fieldset_data: dict[str, Any] | None,
+        request: HttpRequest | None = None,
+    ) -> tuple[dict[str, SBDynamicRegionContext | Fieldset], ...]:
+        layout = (fieldset_data or {}).get("fields") or ()
+        if not any(isinstance(item, SBDynamicRegion) for item in layout):
+            return ()
+
+        chunks: list[dict[str, SBDynamicRegionContext | Fieldset]] = []
+        static_fields: list[str | tuple[str, ...]] = []
+
+        def flush_static_fields() -> None:
+            if not static_fields:
+                return
+            chunks.append(
+                {
+                    "fieldset": Fieldset(
+                        form=self,
+                        name=getattr(fieldset, "name", None),
+                        fields=tuple(static_fields),
+                        classes=getattr(fieldset, "classes", ""),
+                        description=getattr(fieldset, "description", None),
+                    )
+                }
+            )
+            static_fields.clear()
+
+        for item in layout:
+            if isinstance(item, SBDynamicRegion):
+                flush_static_fields()
+                chunks.append(
+                    {"region": self.get_dynamic_region_context(item, request)}
+                )
+                continue
+            if isinstance(item, (list, tuple)):
+                group = tuple(field for field in item if isinstance(field, str))
+                if group:
+                    static_fields.append(group)
+                continue
+            static_fields.append(item)
+        flush_static_fields()
+        return tuple(chunks)
 
     def prepare_dynamic_regions(self, request: HttpRequest | None = None) -> None:
         regions = self.get_dynamic_regions(request)
@@ -215,9 +303,6 @@ class SBAdminDynamicFormMixin:
             return super()._clean_fields()
         finally:
             self.fields.update(inactive_fields)
-
-    def as_dynamic_region_fieldset(self, state: SBDynamicRegionState) -> Fieldset:
-        return Fieldset(form=self, name=None, fields=state.active_fields, classes="")
 
     def _apply_inactive_field_policy(
         self,
@@ -279,7 +364,7 @@ class SBAdminDynamicFormMixin:
             )
 
     def _dynamic_region_endpoint(self, request: HttpRequest | None = None) -> str:
-        if self.sbadmin_dynamic_region_endpoint_from_request and request is not None:
+        if self.sbadmin_standalone_dynamic_regions and request is not None:
             return request.path
         view = getattr(self, "view", None)
         if view is not None and hasattr(view, "get_action_url"):

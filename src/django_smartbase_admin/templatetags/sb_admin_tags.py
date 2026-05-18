@@ -2,13 +2,11 @@ import json
 import os
 
 from django import template
-from django.contrib.admin.helpers import Fieldset
 from django.contrib.admin.templatetags.admin_modify import submit_row
 from django.contrib.admin.utils import lookup_field
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.defaultfilters import json_script
-from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
@@ -49,44 +47,7 @@ def get_json_script(value, element_id):
 
 @register.simple_tag
 def get_item(dictionary, key):
-    if not dictionary:
-        return None
-    if key in dictionary:
-        return dictionary[key]
-    key_as_str = str(key)
-    if key_as_str in dictionary:
-        return dictionary[key_as_str]
-    for candidate_key, value in dictionary.items():
-        if str(candidate_key) == key_as_str:
-            return value
-    return None
-
-
-@register.simple_tag
-def sbadmin_fieldset_context(fieldsets_context, fieldset):
-    return get_item(fieldsets_context, fieldset.name) or getattr(
-        fieldset, "sbadmin_context", None
-    )
-
-
-@register.simple_tag
-def sbadmin_fieldset_form(adminform, fieldset, form=None):
-    if hasattr(adminform, "form"):
-        return adminform.form
-    if form:
-        return form
-    return getattr(fieldset, "form", None)
-
-
-@register.simple_tag
-def sbadmin_static_fieldset(form, fieldset, fieldset_context):
-    return Fieldset(
-        form=form,
-        name=getattr(fieldset, "name", None),
-        fields=(fieldset_context or {}).get("fields", ()),
-        classes=getattr(fieldset, "classes", ""),
-        description=getattr(fieldset, "description", None),
-    )
+    return dictionary.get(key, None) if dictionary else None
 
 
 @register.simple_tag(takes_context=True)
@@ -151,29 +112,6 @@ def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
         form_field.field.widget.attrs["placeholder"] = form_field.field.label
         form_field.field.label = None
     return form_field.as_widget()
-
-
-@register.simple_tag(takes_context=True)
-def sbadmin_dynamic_region(context, form, region):
-    request = context.get("request")
-    return mark_safe(
-        render_to_string(
-            "sb_admin/includes/dynamic_region.html",
-            {"form": form, "region": region},
-            request=request,
-        )
-    )
-
-
-@register.simple_tag(takes_context=True)
-def sbadmin_dynamic_region_state(context, form, region):
-    request = context.get("request")
-    return form.get_dynamic_region_state(region, request)
-
-
-@register.simple_tag
-def sbadmin_dynamic_region_fieldset(form, region_state):
-    return form.as_dynamic_region_fieldset(region_state)
 
 
 @register.simple_tag

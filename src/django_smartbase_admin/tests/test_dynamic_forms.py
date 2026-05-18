@@ -11,10 +11,6 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBInactiveFieldPolicy,
 )
 from django_smartbase_admin.engine.modal_view import ActionModalView
-from django_smartbase_admin.templatetags.sb_admin_tags import (
-    get_item,
-    sbadmin_fieldset_context,
-)
 
 
 class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
@@ -41,7 +37,7 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
             (
                 "Details",
                 {
-                    "dynamic_regions": (
+                    "fields": (
                         SBDynamicRegion(
                             name="details",
                             trigger_fields=("mode",),
@@ -75,7 +71,7 @@ class ClearInactiveRegionForm(SBAdminBaseFormInit, forms.Form):
             (
                 None,
                 {
-                    "dynamic_regions": (
+                    "fields": (
                         SBDynamicRegion(
                             name="clearable",
                             trigger_fields=("mode",),
@@ -108,8 +104,8 @@ class ChoiceSwitchRegionForm(SBAdminBaseFormInit, forms.Form):
             (
                 None,
                 {
-                    "fields": ("category",),
-                    "dynamic_regions": (
+                    "fields": (
+                        "category",
                         SBDynamicRegion(
                             name="same_field_choices",
                             trigger_fields=("category",),
@@ -149,7 +145,7 @@ class DynamicRegionCustomTriggerForm(SBAdminBaseFormInit, forms.Form):
             (
                 None,
                 {
-                    "dynamic_regions": (
+                    "fields": (
                         SBDynamicRegion(
                             name="payload",
                             trigger_fields=("address",),
@@ -171,14 +167,15 @@ class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
     )
     weight = forms.DecimalField(required=True)
     download_url = forms.URLField(required=True)
+    note = forms.CharField(required=False)
 
     class Meta:
         sbadmin_fieldsets = (
             (
                 _("Combined details"),
                 {
-                    "fields": ("mode",),
-                    "dynamic_regions": (
+                    "fields": (
+                        ("mode",),
                         SBDynamicRegion(
                             name="combined_details",
                             trigger_fields=("mode",),
@@ -190,6 +187,7 @@ class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.IGNORE,
                         ),
+                        ("note",),
                     ),
                 },
             ),
@@ -212,8 +210,8 @@ class CrossFieldsetRegionForm(SBAdminBaseFormInit, forms.Form):
             (
                 _("Primary"),
                 {
-                    "fields": ("mode",),
-                    "dynamic_regions": (
+                    "fields": (
+                        "mode",
                         SBDynamicRegion(
                             name="primary_region",
                             trigger_fields=("mode",),
@@ -229,7 +227,7 @@ class CrossFieldsetRegionForm(SBAdminBaseFormInit, forms.Form):
             (
                 _("Secondary"),
                 {
-                    "dynamic_regions": (
+                    "fields": (
                         SBDynamicRegion(
                             name="secondary_region",
                             trigger_fields=("mode",),
@@ -241,6 +239,30 @@ class CrossFieldsetRegionForm(SBAdminBaseFormInit, forms.Form):
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.CLEAR,
                         ),
+                    ),
+                },
+            ),
+        )
+
+
+class GroupedRegionIgnoredForm(SBAdminBaseFormInit, forms.Form):
+    mode = forms.CharField(required=False)
+    visible = forms.CharField(required=False)
+    ignored_a = forms.CharField(required=False)
+    ignored_b = forms.CharField(required=False)
+
+    class Meta:
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        (
+                            "mode",
+                            SBDynamicRegion(name="ignored_a", fields=("ignored_a",)),
+                            SBDynamicRegion(name="ignored_b", fields=("ignored_b",)),
+                        ),
+                        SBDynamicRegion(name="visible", fields=("visible",)),
                     ),
                 },
             ),
@@ -262,7 +284,7 @@ class ViewWithFormSpecificRegion:
             (
                 None,
                 {
-                    "dynamic_regions": (
+                    "fields": (
                         SBDynamicRegion(
                             name="sender_address",
                             fields=("sender_name",),
@@ -388,7 +410,7 @@ class DynamicFormTests(SimpleTestCase):
 
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
-            {"form": form, "region": region},
+            {"dynamic_region": form.get_dynamic_region_context(region, self.request)},
             request=self.request,
         )
 
@@ -432,8 +454,7 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "form": form,
-                "region": region,
+                "dynamic_region": form.get_dynamic_region_context(region, self.request),
                 "sbadmin_dynamic_region_fragment": True,
             },
             request=self.request,
@@ -479,22 +500,6 @@ class DynamicFormTests(SimpleTestCase):
         ]
         self.assertIn("download_url", field_names)
 
-    def test_fieldset_context_lookup_handles_lazy_translated_titles(self):
-        lazy_title = _("Translated title")
-        fieldsets_context = {lazy_title: {"dynamic_regions": ("region",)}}
-        fieldset = type(
-            "FieldsetStub", (), {"name": str(lazy_title), "sbadmin_context": None}
-        )()
-
-        self.assertEqual(
-            get_item(fieldsets_context, str(lazy_title)),
-            {"dynamic_regions": ("region",)},
-        )
-        self.assertEqual(
-            sbadmin_fieldset_context(fieldsets_context, fieldset),
-            {"dynamic_regions": ("region",)},
-        )
-
     def test_dynamic_admin_fieldset_renders_trigger_and_target_wrapper(self):
         class ViewBackedForm(CombinedDynamicFieldsetForm):
             view = FakeView()
@@ -532,6 +537,23 @@ class DynamicFormTests(SimpleTestCase):
         self.assertNotIn("htmx-indicator", html)
         self.assertIn('name="weight"', html)
         self.assertNotIn('name="download_url"', html)
+        self.assertIn('name="note"', html)
+        self.assertLess(
+            html.index('name="mode"'),
+            html.index('id="sbadmin-dynamic-region-combined-details"'),
+        )
+        self.assertLess(
+            html.index('id="sbadmin-dynamic-region-combined-details"'),
+            html.index('name="note"'),
+        )
+
+    def test_regions_inside_grouped_fields_are_ignored(self):
+        form = GroupedRegionIgnoredForm(request=self.request)
+
+        self.assertEqual(
+            tuple(region.name for region in form.get_dynamic_regions(self.request)),
+            ("visible",),
+        )
 
     def test_dynamic_region_template_can_render_oob_swap(self):
         form = CombinedDynamicFieldsetForm(request=self.request)
@@ -540,8 +562,7 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "form": form,
-                "region": region,
+                "dynamic_region": form.get_dynamic_region_context(region, self.request),
                 "sbadmin_dynamic_region_oob": True,
             },
             request=self.request,
@@ -556,8 +577,7 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "form": form,
-                "region": region,
+                "dynamic_region": form.get_dynamic_region_context(region, self.request),
                 "sbadmin_dynamic_region_fragment": True,
             },
             request=self.request,

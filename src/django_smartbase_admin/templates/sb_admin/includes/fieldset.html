@@ -1,17 +1,16 @@
 {% load sb_admin_tags %}
-{% sbadmin_fieldset_context fieldsets_context fieldset as fieldset_context %}
-{% sbadmin_fieldset_form adminform fieldset form as dynamic_region_form %}
+{% get_item fieldsets_context fieldset.name as fieldset_context %}
 {% firstof fieldset_class "card sm:mb-24 relative" as resolved_fieldset_class %}
 
 <fieldset class="{{ resolved_fieldset_class }} {{ fieldset.classes }}">
-    {% if fieldset_context.dynamic_regions %}
-        {% include 'sb_admin/includes/inline_fieldset.html' with skip_lines=True %}
-        {% if fieldset_context.fields %}
-            {% sbadmin_static_fieldset dynamic_region_form fieldset fieldset_context as static_fieldset %}
-            {% include 'sb_admin/includes/inline_fieldset.html' with fieldset=static_fieldset skip_header=True %}
-        {% endif %}
-        {% for region in fieldset_context.dynamic_regions %}
-            {% sbadmin_dynamic_region dynamic_region_form region %}
+    {% if fieldset_context.fieldset_layout %}
+        {% include "sb_admin/includes/fieldset_header.html" %}
+        {% for layout_item in fieldset_context.fieldset_layout %}
+            {% if layout_item.region %}
+                {% include 'sb_admin/includes/dynamic_region.html' with dynamic_region=layout_item.region %}
+            {% else %}
+                {% include 'sb_admin/includes/inline_fieldset.html' with fieldset=layout_item.fieldset skip_header=True %}
+            {% endif %}
         {% endfor %}
     {% else %}
         {% include 'sb_admin/includes/inline_fieldset.html' %}
