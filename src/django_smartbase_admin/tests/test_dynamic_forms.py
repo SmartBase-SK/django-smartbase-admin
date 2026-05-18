@@ -1,16 +1,21 @@
 from django import forms
 from django.contrib.admin.helpers import AdminForm
+from django.contrib.auth.models import User
 from django.http import QueryDict
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase
 from django.utils.translation import gettext_lazy as _
-from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.admin_base import (
+    SBAdmin,
+    SBAdminBaseForm,
+    SBAdminBaseFormInit,
+)
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBDynamicRegion,
     SBInactiveFieldPolicy,
 )
-from django_smartbase_admin.engine.modal_view import ActionModalView
+from django_smartbase_admin.engine.modal_view import ActionModalView, RowActionModalView
 
 
 class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
@@ -307,6 +312,40 @@ class DynamicRegionActionModal(ActionModalView):
     form_class = DynamicRegionForm
 
 
+class RowObjectDynamicRegionForm(SBAdminBaseForm):
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "email")
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        "first_name",
+                        SBDynamicRegion(
+                            name="row_details",
+                            trigger_fields=("first_name",),
+                            fields=("last_name", "email"),
+                            get_active_fields=lambda form, request, region: (
+                                ("email",)
+                                if form.value_from_data_or_initial("first_name")
+                                == "Digital"
+                                else ("last_name",)
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class RowObjectDynamicRegionModal(RowActionModalView):
+    form_class = RowObjectDynamicRegionForm
+
+    def get_object(self):
+        return User(first_name="Digital", last_name="Hidden")
+
+
 class DynamicFormTests(SimpleTestCase):
     def setUp(self):
         self.request = RequestFactory().get("/dynamic-form/")
@@ -343,6 +382,40 @@ class DynamicFormTests(SimpleTestCase):
         form = modal.get_form_class()(request=request)
 
         self.assertEqual(form.fields["mode"].widget.attrs["hx-get"], "/modal/action/")
+
+    def test_action_modal_dynamic_region_initial_is_built_from_request_data(self):
+        request = RequestFactory().get(
+            "/modal/action/",
+            {
+                SBADMIN_DYNAMIC_REGION_PARAM: "details",
+                "mode": "digital",
+            },
+        )
+        modal = DynamicRegionActionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.content.decode()
+
+        self.assertIn('name="download_url"', html)
+        self.assertIn('name="billing_period"', html)
+        self.assertNotIn('name="weight"', html)
+
+    def test_row_action_modal_dynamic_region_initial_uses_object(self):
+        request = RequestFactory().get(
+            "/modal/row/123/",
+            {
+                SBADMIN_DYNAMIC_REGION_PARAM: "row_details",
+            },
+        )
+        modal = RowObjectDynamicRegionModal(view=FakeView())
+        modal.setup(request, modifier="123")
+
+        response = modal.get(request)
+        html = response.content.decode()
+
+        self.assertIn('name="email"', html)
+        self.assertNotIn('name="last_name"', html)
 
     def test_ignore_policy_skips_inactive_field_validation(self):
         form = DynamicRegionForm(
@@ -431,7 +504,9 @@ class DynamicFormTests(SimpleTestCase):
         region = form.get_dynamic_region("details", self.request)
         state = form.get_dynamic_region_state(region, self.request)
 
-        self.assertEqual(state.active_field_names, ("download_url", "billing_period"))
+        self.assertEqual(
+            state.active_field_names, frozenset({"download_url", "billing_period"})
+        )
         self.assertEqual(state.active_fields, (("download_url", "billing_period"),))
 
     def test_region_can_refresh_choices_for_the_same_field(self):

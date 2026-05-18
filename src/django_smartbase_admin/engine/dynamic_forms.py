@@ -15,6 +15,24 @@ SBADMIN_DYNAMIC_REGION_ACTION = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_ADD_MODIFIER = "add"
 
 
+def dynamic_region_initial_from_data(
+    form_class: type[forms.Form],
+    data: Any,
+    form_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    probe_form = form_class(**(form_kwargs or {}))
+    initial = {}
+    for field_name, field in probe_form.fields.items():
+        prefixed_name = probe_form.add_prefix(field_name)
+        if prefixed_name not in data:
+            continue
+        if isinstance(field, forms.MultipleChoiceField) and hasattr(data, "getlist"):
+            initial[field_name] = data.getlist(prefixed_name)
+            continue
+        initial[field_name] = data.get(prefixed_name)
+    return initial
+
+
 class SBInactiveFieldPolicy(models.TextChoices):
     IGNORE = "ignore", _("Ignore")
     CLEAR = "clear", _("Clear")
@@ -27,7 +45,7 @@ class SBDynamicRegionState:
     wrapper_id: str
     loading_id: str
     visible: bool
-    active_field_names: tuple[str, ...]
+    active_field_names: frozenset[str]
     active_fields: tuple[str | tuple[str, ...], ...]
 
 
@@ -90,38 +108,31 @@ class SBDynamicRegion:
     def resolve(
         self, form: forms.Form, request: HttpRequest | None = None
     ) -> SBDynamicRegionState:
+        """Build visible field layout and active field names for this form."""
         visible = self.is_visible(form, request)
-        known_field_names = set(self.fields)
+        known_field_names = set(self.fields) & set(form.fields)
         requested_layout = self.get_active_fields(form, request) if visible else ()
-        active_field_names: list[str] = []
-        active_name_set: set[str] = set()
+        active_field_names: set[str] = set()
         active_fields: list[str | tuple[str, ...]] = []
         for field in requested_layout:
             if isinstance(field, str):
-                if field in known_field_names and field in form.fields:
+                if field in known_field_names:
                     active_fields.append(field)
-                    if field not in active_name_set:
-                        active_name_set.add(field)
-                        active_field_names.append(field)
+                    active_field_names.add(field)
                 continue
             active_group = tuple(
-                field_name
-                for field_name in field
-                if field_name in known_field_names and field_name in form.fields
+                field_name for field_name in field if field_name in known_field_names
             )
             if active_group:
                 active_fields.append(active_group)
-                for field_name in active_group:
-                    if field_name not in active_name_set:
-                        active_name_set.add(field_name)
-                        active_field_names.append(field_name)
+                active_field_names.update(active_group)
         wrapper_id = self.get_wrapper_id(form)
         return SBDynamicRegionState(
             name=self.name,
             wrapper_id=wrapper_id,
             loading_id=f"{wrapper_id}-loading",
             visible=visible,
-            active_field_names=tuple(active_field_names),
+            active_field_names=frozenset(active_field_names),
             active_fields=tuple(active_fields),
         )
 
