@@ -16,6 +16,10 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBInactiveFieldPolicy,
 )
 from django_smartbase_admin.engine.modal_view import ActionModalView, RowActionModalView
+from django_smartbase_admin.services.thread_local import (
+    SBAdminThreadLocalService,
+    sb_admin_request,
+)
 
 
 class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
@@ -49,12 +53,56 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
                             fields=("weight", "download_url", "billing_period"),
                             get_active_fields=lambda form, request, region: (
                                 (("download_url", "billing_period"),)
-                                if form.value_from_data_or_initial("mode") == "digital"
+                                if form["mode"].value() == "digital"
                                 else ("weight",)
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.IGNORE,
                         ),
                     ),
+                },
+            ),
+        )
+
+
+class MetaFieldsetsForm(SBAdminBaseFormInit, forms.Form):
+    sbadmin_standalone_dynamic_regions = True
+
+    title = forms.CharField()
+    subtitle = forms.CharField(required=False)
+
+    class Meta:
+        fieldsets = (
+            (
+                "Content",
+                {
+                    "fields": ("title", "subtitle"),
+                    "classes": ("wide",),
+                    "description": "Editorial fields",
+                },
+            ),
+        )
+
+
+class MetaFieldsetsWithSBAdminOverrideForm(SBAdminBaseFormInit, forms.Form):
+    sbadmin_standalone_dynamic_regions = True
+
+    title = forms.CharField()
+    subtitle = forms.CharField(required=False)
+
+    class Meta:
+        fieldsets = (
+            (
+                "Django",
+                {
+                    "fields": ("title",),
+                },
+            ),
+        )
+        sbadmin_fieldsets = (
+            (
+                "SBAdmin",
+                {
+                    "fields": ("subtitle",),
                 },
             ),
         )
@@ -83,7 +131,7 @@ class ClearInactiveRegionForm(SBAdminBaseFormInit, forms.Form):
                             fields=("field_a", "field_b"),
                             get_active_fields=lambda form, request, region: (
                                 ("field_b",)
-                                if form.value_from_data_or_initial("mode") == "b"
+                                if form["mode"].value() == "b"
                                 else ("field_a",)
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.CLEAR,
@@ -124,7 +172,7 @@ class ChoiceSwitchRegionForm(SBAdminBaseFormInit, forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.value_from_data_or_initial("category") == "numbers":
+        if self["category"].value() == "numbers":
             self.fields["value"].choices = (("1", "One"), ("2", "Two"))
         else:
             self.fields["value"].choices = (("a", "A"), ("b", "B"))
@@ -187,7 +235,7 @@ class CombinedDynamicFieldsetForm(SBAdminBaseFormInit, forms.Form):
                             fields=("weight", "download_url"),
                             get_active_fields=lambda form, request, region: (
                                 ("download_url",)
-                                if form.value_from_data_or_initial("mode") == "digital"
+                                if form["mode"].value() == "digital"
                                 else ("weight",)
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.IGNORE,
@@ -238,9 +286,7 @@ class CrossFieldsetRegionForm(SBAdminBaseFormInit, forms.Form):
                             trigger_fields=("mode",),
                             fields=("secondary",),
                             get_active_fields=lambda form, request, region: (
-                                ("secondary",)
-                                if form.value_from_data_or_initial("mode") == "full"
-                                else ()
+                                ("secondary",) if form["mode"].value() == "full" else ()
                             ),
                             inactive_field_policy=SBInactiveFieldPolicy.CLEAR,
                         ),
@@ -328,8 +374,7 @@ class RowObjectDynamicRegionForm(SBAdminBaseForm):
                             fields=("last_name", "email"),
                             get_active_fields=lambda form, request, region: (
                                 ("email",)
-                                if form.value_from_data_or_initial("first_name")
-                                == "Digital"
+                                if form["first_name"].value() == "Digital"
                                 else ("last_name",)
                             ),
                         ),
@@ -349,23 +394,33 @@ class RowObjectDynamicRegionModal(RowActionModalView):
 class DynamicFormTests(SimpleTestCase):
     def setUp(self):
         self.request = RequestFactory().get("/dynamic-form/")
+        self.request_token = sb_admin_request.set(self.request)
 
-    def test_value_from_data_or_initial_uses_prefixed_bound_data(self):
-        form = DynamicRegionForm(
-            data={
-                "demo-mode": "digital",
-                "demo-download_url": "https://example.com/file",
-                "demo-billing_period": "monthly",
-            },
-            prefix="demo",
-            request=self.request,
-        )
+    def tearDown(self):
+        sb_admin_request.reset(self.request_token)
 
-        self.assertEqual(form.value_from_data_or_initial("mode"), "digital")
+    def test_form_fieldsets_can_use_meta_fieldsets(self):
+        form = MetaFieldsetsForm(request=self.request)
+        fieldsets = list(form.fieldsets())
+
+        self.assertEqual(form.get_sbadmin_fieldsets(), MetaFieldsetsForm.Meta.fieldsets)
+        self.assertEqual(len(fieldsets), 1)
+        self.assertEqual(fieldsets[0].name, "Content")
+        self.assertEqual(fieldsets[0].fields, ("title", "subtitle"))
+        self.assertEqual(fieldsets[0].classes, "wide")
+        self.assertEqual(fieldsets[0].description, "Editorial fields")
+
+    def test_form_fieldsets_prefers_meta_sbadmin_fieldsets(self):
+        form = MetaFieldsetsWithSBAdminOverrideForm(request=self.request)
+        fieldsets = list(form.fieldsets())
+
         self.assertEqual(
-            form.value_from_data_or_initial("download_url"),
-            "https://example.com/file",
+            form.get_sbadmin_fieldsets(),
+            MetaFieldsetsWithSBAdminOverrideForm.Meta.sbadmin_fieldsets,
         )
+        self.assertEqual(len(fieldsets), 1)
+        self.assertEqual(fieldsets[0].name, "SBAdmin")
+        self.assertEqual(fieldsets[0].fields, ("subtitle",))
 
     def test_action_modal_form_does_not_use_parent_view_dynamic_regions(self):
         modal = ExternalRegionActionModal(
@@ -378,6 +433,7 @@ class DynamicFormTests(SimpleTestCase):
 
     def test_action_modal_dynamic_regions_use_current_request_path(self):
         request = RequestFactory().get("/modal/action/")
+        SBAdminThreadLocalService.set_request(request)
         modal = DynamicRegionActionModal(view=FakeView())
         form = modal.get_form_class()(request=request)
 
@@ -391,6 +447,7 @@ class DynamicFormTests(SimpleTestCase):
                 "mode": "digital",
             },
         )
+        SBAdminThreadLocalService.set_request(request)
         modal = DynamicRegionActionModal(view=FakeView())
         modal.setup(request)
 
@@ -408,6 +465,7 @@ class DynamicFormTests(SimpleTestCase):
                 SBADMIN_DYNAMIC_REGION_PARAM: "row_details",
             },
         )
+        SBAdminThreadLocalService.set_request(request)
         modal = RowObjectDynamicRegionModal(view=FakeView())
         modal.setup(request, modifier="123")
 
@@ -456,7 +514,7 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(attrs["hx-get"], "/sb-admin/sbadmin_dynamic_region/add")
         self.assertEqual(attrs["hx-target"], "#sbadmin-dynamic-region-details")
         self.assertEqual(attrs["hx-include"], "closest form")
-        self.assertEqual(attrs["hx-swap"], "outerHTML")
+        self.assertEqual(attrs["hx-swap"], "none")
         self.assertIn(SBADMIN_DYNAMIC_REGION_PARAM, attrs["hx-vals"])
 
     def test_region_uses_widget_dynamic_trigger_event(self):
@@ -552,6 +610,31 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertEqual(initial, {"category": "letters", "value": "1"})
 
+    def test_dynamic_region_initial_uses_widget_data_extraction(self):
+        class WidgetValueForm(forms.Form):
+            colors = forms.MultipleChoiceField(
+                choices=(("red", "Red"), ("blue", "Blue"))
+            )
+            starts_at = forms.SplitDateTimeField()
+
+        data = QueryDict(
+            "colors=red&colors=blue&starts_at_0=2026-05-18&starts_at_1=09%3A30%3A00"
+        )
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            WidgetValueForm,
+            data,
+            None,
+        )
+
+        self.assertEqual(
+            initial,
+            {
+                "colors": ["red", "blue"],
+                "starts_at": ["2026-05-18", "09:30:00"],
+            },
+        )
+
     def test_admin_form_can_include_inactive_region_fields(self):
         form = DynamicRegionForm(request=self.request)
         fieldsets = [
@@ -630,7 +713,7 @@ class DynamicFormTests(SimpleTestCase):
             ("visible",),
         )
 
-    def test_dynamic_region_template_can_render_oob_swap(self):
+    def test_dynamic_region_fragment_renders_oob_swap(self):
         form = CombinedDynamicFieldsetForm(request=self.request)
         region = form.get_dynamic_region("combined_details", self.request)
 
@@ -638,7 +721,7 @@ class DynamicFormTests(SimpleTestCase):
             "sb_admin/includes/dynamic_region.html",
             {
                 "dynamic_region": form.get_dynamic_region_context(region, self.request),
-                "sbadmin_dynamic_region_oob": True,
+                "sbadmin_dynamic_region_fragment": True,
             },
             request=self.request,
         )

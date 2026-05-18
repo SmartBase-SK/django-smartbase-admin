@@ -22,14 +22,14 @@ def dynamic_region_initial_from_data(
 ) -> dict[str, Any]:
     probe_form = form_class(**(form_kwargs or {}))
     initial = {}
+    files = {}
     for field_name, field in probe_form.fields.items():
         prefixed_name = probe_form.add_prefix(field_name)
-        if prefixed_name not in data:
+        if field.widget.value_omitted_from_data(data, files, prefixed_name):
             continue
-        if isinstance(field, forms.MultipleChoiceField) and hasattr(data, "getlist"):
-            initial[field_name] = data.getlist(prefixed_name)
-            continue
-        initial[field_name] = data.get(prefixed_name)
+        initial[field_name] = field.widget.value_from_datadict(
+            data, files, prefixed_name
+        )
     return initial
 
 
@@ -167,10 +167,8 @@ class SBAdminDynamicFormMixin:
             return None
         field = self.fields[field_name]
         if self.is_bound:
-            data = self.data.copy()
-            files = self.files
             return field.widget.value_from_datadict(
-                data, files, self.add_prefix(field_name)
+                self.data.copy(), self.files, self.add_prefix(field_name)
             )
         if field_name in self.initial:
             return self.initial[field_name]
@@ -181,9 +179,9 @@ class SBAdminDynamicFormMixin:
         self, request: HttpRequest | None = None
     ) -> tuple[SBDynamicRegion, ...]:
         regions: list[SBDynamicRegion] = []
+        object_id = self._sbadmin_dynamic_object_id()
         if hasattr(self, "get_sbadmin_fieldsets"):
-            object_id = self._sbadmin_dynamic_object_id()
-            for _name, data in self.get_sbadmin_fieldsets(request, object_id):
+            for _name, data in self.get_sbadmin_fieldsets():
                 regions.extend(self.get_fieldset_dynamic_regions(data))
 
         view = getattr(self, "view", None)
@@ -192,12 +190,9 @@ class SBAdminDynamicFormMixin:
             and view is not None
             and hasattr(view, "get_sbadmin_fieldsets")
         ):
-            object_id = self._sbadmin_dynamic_object_id()
-            try:
-                for _name, data in view.get_sbadmin_fieldsets(request, object_id):
-                    regions.extend(self.get_fieldset_dynamic_regions(data))
-            except Exception:
-                pass
+            for _name, data in view.get_sbadmin_fieldsets(request, object_id):
+                regions.extend(self.get_fieldset_dynamic_regions(data))
+
         return tuple(regions)
 
     def get_dynamic_region(
@@ -367,7 +362,7 @@ class SBAdminDynamicFormMixin:
             attrs.setdefault("hx-target", f"#{state.wrapper_id}")
             attrs.setdefault("hx-include", "closest form")
             attrs.setdefault("hx-indicator", f"#{state.loading_id}")
-            attrs.setdefault("hx-swap", "outerHTML")
+            attrs.setdefault("hx-swap", "none")
             attrs.setdefault("hx-sync", "closest form:replace")
             attrs.setdefault(
                 "hx-vals",

@@ -875,11 +875,12 @@ class SBAdmin(
 
         form_class = self.get_form(request, obj=obj, change=bool(obj))
         data = request.POST if request.method == "POST" else request.GET
-        form_kwargs = {
-            "initial": self._dynamic_region_initial_from_data(form_class, data, obj),
-        }
+        form_kwargs = {}
         if obj is not None:
             form_kwargs["instance"] = obj
+        form_kwargs["initial"] = self._dynamic_region_initial_from_data(
+            form_class, data, obj
+        )
         form = form_class(**form_kwargs)
         region = form.get_dynamic_region(region_name, request)
         if region is None:
@@ -887,7 +888,7 @@ class SBAdmin(
 
         regions = self._dynamic_regions_for_request(form, region, request)
         rendered_regions = []
-        for index, target_region in enumerate(regions):
+        for target_region in regions:
             rendered_regions.append(
                 render_to_string(
                     "sb_admin/includes/dynamic_region.html",
@@ -896,7 +897,6 @@ class SBAdmin(
                             target_region, request
                         ),
                         "sbadmin_dynamic_region_fragment": True,
-                        "sbadmin_dynamic_region_oob": index > 0,
                     },
                     request=request,
                 )
