@@ -162,36 +162,20 @@ class SBAdminDynamicFormMixin:
             if isinstance(item, SBDynamicRegion)
         )
 
-    def value_from_data_or_initial(self, field_name: str) -> Any:
-        if field_name not in self.fields:
-            return None
-        field = self.fields[field_name]
-        if self.is_bound:
-            return field.widget.value_from_datadict(
-                self.data.copy(), self.files, self.add_prefix(field_name)
-            )
-        if field_name in self.initial:
-            return self.initial[field_name]
-        initial = field.initial
-        return initial() if callable(initial) else initial
-
     def get_dynamic_regions(
         self, request: HttpRequest | None = None
     ) -> tuple[SBDynamicRegion, ...]:
         regions: list[SBDynamicRegion] = []
         object_id = self._sbadmin_dynamic_object_id()
-        if hasattr(self, "get_sbadmin_fieldsets"):
-            for _name, data in self.get_sbadmin_fieldsets():
-                regions.extend(self.get_fieldset_dynamic_regions(data))
-
-        view = getattr(self, "view", None)
-        if (
-            not self.sbadmin_standalone_dynamic_regions
-            and view is not None
-            and hasattr(view, "get_sbadmin_fieldsets")
-        ):
-            for _name, data in view.get_sbadmin_fieldsets(request, object_id):
-                regions.extend(self.get_fieldset_dynamic_regions(data))
+        if self.sbadmin_standalone_dynamic_regions:
+            # in custom formview
+            fieldsets = self.get_sbadmin_fieldsets()
+        else:
+            # in admin base form
+            view = getattr(self, "view", None)
+            fieldsets = view.get_sbadmin_fieldsets(request, object_id)
+        for _name, data in fieldsets:
+            regions.extend(self.get_fieldset_dynamic_regions(data))
 
         return tuple(regions)
 
@@ -362,7 +346,7 @@ class SBAdminDynamicFormMixin:
             attrs.setdefault("hx-target", f"#{state.wrapper_id}")
             attrs.setdefault("hx-include", "closest form")
             attrs.setdefault("hx-indicator", f"#{state.loading_id}")
-            attrs.setdefault("hx-swap", "none")
+            attrs.setdefault("hx-swap", "outerHTML")
             attrs.setdefault("hx-sync", "closest form:replace")
             attrs.setdefault(
                 "hx-vals",
