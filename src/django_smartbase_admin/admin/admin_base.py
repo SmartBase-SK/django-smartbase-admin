@@ -932,9 +932,6 @@ class SBAdmin(
             if not 0 <= target_idx < len(window_pks):
                 return None
             target_page = (from_item + target_idx) // page_size + 1
-            # ``all_params`` is nested ``{view_id: {tableParams: {page: ...}}}`` —
-            # shallow-merge each level so the next list_action reads the
-            # updated page from the right slot.
             view_params = all_params.get(view_id, {})
             new_all_params = {
                 **all_params,
