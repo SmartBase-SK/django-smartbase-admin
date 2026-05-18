@@ -2,32 +2,14 @@
 
 {% block content %}
 	{% block header %}
-		{% if fieldset.name %}
-            <header class="mb-24 flex items-center">
-                <span class="text-dark-900">{{ fieldset.name }}</span>
-                {% block description %}
-                    {% if fieldset.description %}
-                        <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
-                            <svg class="w-20 h-20">
-                                <use xlink:href="#Help"></use>
-                            </svg>
-                        </div>
-                    {% endif %}
-                {% endblock %}
-                <div class="ml-auto flex items-center gap-4">
-                    {% block actions %}
-                        {% for action in fieldset_context.actions %}
-                            <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
-                        {% endfor %}
-                    {% endblock %}
-                </div>
-            </header>
+        {% if not skip_header %}
+            {% include "sb_admin/includes/fieldset_header.html" %}
         {% endif %}
 	{% endblock %}
 
     {% block lines %}
         {% for line in fieldset %}
-            <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
+            <div class="field{% if forloop.last and not skip_last_field_negative_margin %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
                 {% if line.fields|length > 1 %}
                     <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
 
@@ -50,7 +32,6 @@
                 {% if line.fields|length > 1 %}</div>{% endif %}
             </div>
         {% endfor %}
-
     {% endblock %}
     {% block additional_fields %}
 

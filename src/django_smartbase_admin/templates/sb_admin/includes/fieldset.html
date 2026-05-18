@@ -1,8 +1,20 @@
 {% load sb_admin_tags %}
 {% get_item fieldsets_context fieldset.name as fieldset_context %}
+{% firstof fieldset_class "card sm:mb-24 relative" as resolved_fieldset_class %}
 
-<fieldset class="card sm:mb-24 relative {{ fieldset.classes }}">
-    {% include 'sb_admin/includes/inline_fieldset.html' %}
+<fieldset class="{{ resolved_fieldset_class }} {{ fieldset.classes }}">
+    {% if fieldset_context.fieldset_layout %}
+        {% include "sb_admin/includes/fieldset_header.html" %}
+        {% for layout_item in fieldset_context.fieldset_layout %}
+            {% if layout_item.region %}
+                {% include 'sb_admin/includes/dynamic_region.html' with dynamic_region=layout_item.region %}
+            {% else %}
+                {% include 'sb_admin/includes/inline_fieldset.html' with fieldset=layout_item.fieldset skip_header=True %}
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        {% include 'sb_admin/includes/inline_fieldset.html' %}
+    {% endif %}
 
     {% block after_fieldset %}
     {% endblock %}

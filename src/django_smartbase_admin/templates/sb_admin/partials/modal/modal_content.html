@@ -32,9 +32,7 @@
                             {% endif %}
                             {% block modal_form_body %}
                                 {% for fieldset in form.fieldsets %}
-                                    <fieldset class="relative {{ fieldset.classes }}">
-                                        {% include 'sb_admin/includes/inline_fieldset.html' %}
-                                    </fieldset>
+                                    {% include 'sb_admin/includes/fieldset.html' with fieldsets_context=form.get_fieldsets_context fieldset_class="relative" %}
                                 {% endfor %}
                             {% endblock %}
                         </form>

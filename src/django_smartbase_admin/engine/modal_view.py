@@ -1,11 +1,12 @@
 from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.views.generic import FormView
 from django_htmx.http import trigger_client_event
-from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     TABLE_RELOAD_DATA_EVENT_NAME,
 )
+from django_smartbase_admin.engine.dynamic_forms import SBADMIN_DYNAMIC_REGION_PARAM
 from django_smartbase_admin.utils import (
     render_notifications as render_notifications_html,
 )
@@ -42,6 +43,33 @@ class ActionModalView(FormView):
     def process_form_valid(self, request, form):
         return self.build_success_response(request)
 
+    def build_dynamic_region_response(self, request, form, region_name):
+        region = form.get_dynamic_region(region_name, request)
+        if region is None:
+            return HttpResponse("", status=404)
+        html = render_to_string(
+            "sb_admin/includes/dynamic_region.html",
+            {
+                "dynamic_region": form.get_dynamic_region_context(region, request),
+                "sbadmin_dynamic_region_fragment": True,
+            },
+            request=request,
+        )
+        response = HttpResponse(html)
+        trigger_client_event(
+            response,
+            "sbadminDynamicRegionUpdated",
+            {"region": region.name},
+        )
+        return response
+
+    def get(self, request, *args, **kwargs):
+        if region_name := request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM):
+            return self.build_dynamic_region_response(
+                request, self.get_form(), region_name
+            )
+        return super().get(request, *args, **kwargs)
+
     def get_form_class(self):
         form_class = super().get_form_class()
 
@@ -50,6 +78,7 @@ class ActionModalView(FormView):
             (form_class,),
             {
                 "view": self.view,
+                "sbadmin_standalone_dynamic_regions": True,
             },
         )
 
