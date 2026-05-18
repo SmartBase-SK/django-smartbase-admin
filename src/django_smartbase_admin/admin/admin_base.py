@@ -61,6 +61,7 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBAdminDynamicFormMixin,
+    dynamic_region_initial_from_data,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import (
@@ -914,17 +915,7 @@ class SBAdmin(
         form_kwargs = {}
         if obj is not None:
             form_kwargs["instance"] = obj
-        probe_form = form_class(**form_kwargs)
-        initial = {}
-        for field_name, field in probe_form.fields.items():
-            prefixed_name = probe_form.add_prefix(field_name)
-            if prefixed_name not in data:
-                continue
-            if isinstance(field, forms.MultipleChoiceField):
-                initial[field_name] = data.getlist(prefixed_name)
-                continue
-            initial[field_name] = data.get(prefixed_name)
-        return initial
+        return dynamic_region_initial_from_data(form_class, data, form_kwargs)
 
     def _dynamic_regions_for_request(self, form, region, request):
         trigger_name = request.headers.get("HX-Trigger-Name")

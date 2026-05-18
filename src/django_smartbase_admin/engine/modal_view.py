@@ -1,3 +1,4 @@
+from django import forms
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.views.generic import FormView
@@ -6,7 +7,10 @@ from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     TABLE_RELOAD_DATA_EVENT_NAME,
 )
-from django_smartbase_admin.engine.dynamic_forms import SBADMIN_DYNAMIC_REGION_PARAM
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBADMIN_DYNAMIC_REGION_PARAM,
+    dynamic_region_initial_from_data,
+)
 from django_smartbase_admin.utils import (
     render_notifications as render_notifications_html,
 )
@@ -63,10 +67,28 @@ class ActionModalView(FormView):
         )
         return response
 
+    def get_dynamic_region_form(self, request):
+        form_class = self.get_form_class()
+        form_kwargs = self.get_form_kwargs()
+        probe_kwargs = {
+            key: value
+            for key, value in form_kwargs.items()
+            if key not in {"data", "files"}
+        }
+        form_kwargs["initial"] = {
+            **form_kwargs.get("initial", {}),
+            **dynamic_region_initial_from_data(
+                form_class, request.GET, form_kwargs=probe_kwargs
+            ),
+        }
+        form_kwargs.pop("data", None)
+        form_kwargs.pop("files", None)
+        return form_class(**form_kwargs)
+
     def get(self, request, *args, **kwargs):
         if region_name := request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM):
             return self.build_dynamic_region_response(
-                request, self.get_form(), region_name
+                request, self.get_dynamic_region_form(request), region_name
             )
         return super().get(request, *args, **kwargs)
 
@@ -140,6 +162,13 @@ class RowActionModalView(ActionModalView):
                     self.get_object_queryset(self.request).filter(pk=modifier).first()
                 )
         return self._resolved_object
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        obj = self.get_object()
+        if obj is not None and issubclass(self.get_form_class(), forms.ModelForm):
+            kwargs["instance"] = obj
+        return kwargs
 
     def dispatch(self, request, *args, **kwargs):
         modifier = kwargs.get("modifier")
