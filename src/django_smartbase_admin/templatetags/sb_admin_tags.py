@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.defaultfilters import json_script
 from django.templatetags.static import static
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.text import get_text_list
 from django.utils.translation import gettext
@@ -192,12 +193,16 @@ def get_change_message_legacy(log_entry):
             return change_message
         messages = []
         for sub_message in change_message:
+            # format_html escapes the interpolated values ({name}, {object},
+            # {fields}) so attacker-controlled object.__str__ can't inject HTML
+            # into the admin history view.
             if "added" in sub_message:
                 if sub_message["added"]:
                     sub_message["added"]["name"] = gettext(sub_message["added"]["name"])
                     messages.append(
-                        gettext("Added {name} “{object}”.").format(
-                            **sub_message["added"]
+                        format_html(
+                            gettext("Added {name} “{object}”."),
+                            **sub_message["added"],
                         )
                     )
                 else:
@@ -216,20 +221,25 @@ def get_change_message_legacy(log_entry):
                         sub_message["changed"]["name"]
                     )
                     messages.append(
-                        gettext("Changed {fields} for {name} “{object}”.").format(
-                            **sub_message["changed"]
+                        format_html(
+                            gettext("Changed {fields} for {name} “{object}”."),
+                            **sub_message["changed"],
                         )
                     )
                 else:
                     messages.append(
-                        gettext("Changed {fields}.").format(**sub_message["changed"])
+                        format_html(
+                            gettext("Changed {fields}."),
+                            **sub_message["changed"],
+                        )
                     )
 
             elif "deleted" in sub_message:
                 sub_message["deleted"]["name"] = gettext(sub_message["deleted"]["name"])
                 messages.append(
-                    gettext("Deleted {name} “{object}”.").format(
-                        **sub_message["deleted"]
+                    format_html(
+                        gettext("Deleted {name} “{object}”."),
+                        **sub_message["deleted"],
                     )
                 )
 
