@@ -4,6 +4,7 @@ import numbers
 import re
 from copy import copy
 from html import unescape
+from urllib.parse import urlparse
 
 import xlsxwriter
 from django.http import HttpResponse
@@ -13,6 +14,31 @@ from django.utils.translation import gettext_lazy
 
 from django_smartbase_admin.engine.const import Formatter
 from django_smartbase_admin.utils import JSONSerializableMixin
+
+
+_IMAGE_FORMULA_ALLOWED_SCHEMES = ("http", "https")
+
+
+def _safe_image_formula_url(value):
+    """Return an escaped URL suitable for ``=_xlfn.IMAGE("…")`` or ``None``.
+
+    Rejects non-strings, empty values, and schemes outside http/https so a
+    malicious URL field can't beacon out from the recipient's Excel or
+    inject ``javascript:`` / ``file://`` semantics into a formula. Embedded
+    quotes are doubled (Excel's in-string quote escape) so the URL can't
+    break out of the formula's string literal.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return None
+    if parsed.scheme.lower() not in _IMAGE_FORMULA_ALLOWED_SCHEMES:
+        return None
+    if not parsed.netloc:
+        return None
+    return value.replace('"', '""')
 
 
 def strip_html_cell_value(value):
@@ -40,6 +66,16 @@ class SBAdminXLSXExportService(object):
                 "in_memory": True,
                 "remove_timezone": True,
                 "default_date_format": default_date_format,
+                # Defense against CSV/formula injection: xlsxwriter's default
+                # ``worksheet.write()`` auto-promotes strings starting with
+                # ``=``/``+``/``-``/``@`` to formulas and strings looking like
+                # URLs to hyperlinks. Attacker-controlled text (a name field,
+                # comment, etc.) must never be silently re-interpreted in the
+                # recipient's Excel. Columns that legitimately need formulas
+                # opt in via ``XLSXFieldOptions.cell_writer`` and call
+                # ``write_formula`` / ``write_url`` explicitly.
+                "strings_to_formulas": False,
+                "strings_to_urls": False,
             },
         )
         worksheet = workbook.add_worksheet()
@@ -107,27 +143,41 @@ class SBAdminXLSXExportService(object):
             for column in columns:
                 data_col = data_row.get(column["field"], "")
                 column_formatter = column.get("formatter", None)
-                image_write = False
+                cell_writer = column.get("cell_writer", None)
+                custom_write = False
                 is_datetime_like = (
                     isinstance(data_col, datetime.datetime)
                     or isinstance(data_col, datetime.date)
                     or isinstance(data_col, datetime.time)
                     or isinstance(data_col, datetime.timedelta)
                 )
-                if column_formatter == Formatter.IMAGE.value:
+                effective_cell_format = (
+                    per_column_formats.get(col, default_cell_format)
+                    if row >= header_rows_count
+                    else header_cell_format
+                )
+                if cell_writer is not None and row >= header_rows_count:
+                    try:
+                        cell_writer(
+                            worksheet, row, col, data_col, effective_cell_format
+                        )
+                        custom_write = True
+                    except (ValueError, TypeError):
+                        pass
+                elif column_formatter == Formatter.IMAGE.value:
                     if row >= header_rows_count:
-                        try:
-                            worksheet.write_formula(
-                                row,
-                                col,
-                                f'=_xlfn.IMAGE("{data_col}")',
-                                cell_format=per_column_formats.get(
-                                    col, default_cell_format
-                                ),
-                            )
-                            image_write = True
-                        except ValueError:
-                            pass
+                        safe_url = _safe_image_formula_url(data_col)
+                        if safe_url is not None:
+                            try:
+                                worksheet.write_formula(
+                                    row,
+                                    col,
+                                    f'=_xlfn.IMAGE("{safe_url}")',
+                                    cell_format=effective_cell_format,
+                                )
+                                custom_write = True
+                            except ValueError:
+                                pass
                 if column_formatter == Formatter.HTML.value:
                     if (
                         data_col is not None
@@ -135,7 +185,7 @@ class SBAdminXLSXExportService(object):
                         and not isinstance(data_col, numbers.Number)
                     ):
                         data_col = strip_html_cell_value(data_col)
-                if not image_write:
+                if not custom_write:
                     if is_datetime_like:
                         worksheet.write_datetime(
                             row, col, data_col, default_cell_datetime_format
@@ -145,11 +195,7 @@ class SBAdminXLSXExportService(object):
                             row,
                             col,
                             data_col,
-                            (
-                                per_column_formats.get(col, default_cell_format)
-                                if row >= header_rows_count
-                                else header_cell_format
-                            ),
+                            effective_cell_format,
                         )
                 col += 1
             row += 1

@@ -22,6 +22,7 @@ from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
     PermissionDenied,
+    ValidationError,
 )
 from django.db import models
 from django.db.models import QuerySet, Q, Model, Window
@@ -155,6 +156,8 @@ from django_smartbase_admin.engine.const import (
     TRANSLATIONS_SELECTED_LANGUAGES,
     ROW_CLASS_FIELD,
     TABLE_RELOAD_DATA_EVENT_NAME,
+    TABLE_PARAMS_NAME,
+    TABLE_PARAMS_PAGE_NAME,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -880,47 +883,77 @@ class SBAdmin(
     def get_additional_filter_for_previous_next_context(self, request, object_id) -> Q:
         return Q()
 
-    def get_previous_next_context(self, request, object_id) -> dict | dict[str, Any]:
+    def get_previous_next_context(self, request, object_id) -> dict[str, Any]:
         if not self.sbadmin_previous_next_buttons_enabled or not object_id:
             return {}
-        changelist_filters = request.GET.get("_changelist_filters", "")
+
+        raw_filters = request.GET.get("_changelist_filters", "")
         try:
             all_params = json.loads(
-                urllib.parse.parse_qs(urllib.parse.unquote(changelist_filters))[
-                    "params"
-                ][0]
+                urllib.parse.parse_qs(urllib.parse.unquote(raw_filters))["params"][0]
             )
-        except:
+        except Exception:
             all_params = {}
+
         list_action = self.sbadmin_list_action_class(
             self, request, all_params=all_params
         )
         additional_filter = self.get_additional_filter_for_previous_next_context(
             request, object_id
         )
-        all_ids = list(
-            list_action.build_final_data_count_queryset(
-                additional_filter, apply_plugins=False
-            )
-            .order_by(*list_action.get_order_by_from_request())
-            .values_list("id", flat=True)
+
+        view_id = self.get_id()
+        try:
+            page_num = int(list_action.table_params.get(TABLE_PARAMS_PAGE_NAME, 1))
+        except (TypeError, ValueError):
+            page_num = 1
+        page_size = list_action.page_size
+
+        ordering = list(list_action.get_order_by_from_request() or ["pk"])
+
+        # Page window + one row of overhang on each side so prev/next crosses
+        # the page boundary without a second query.
+        from_item = max(0, (page_num - 1) * page_size - 1)
+        to_item = page_num * page_size + 1
+        base_qs = list_action.build_final_data_count_queryset(
+            additional_filter, apply_plugins=False
         )
-        index = all_ids.index(int(object_id))
-        previous_id = all_ids[-1] if index == 0 else all_ids[index - 1]
-        next_id = all_ids[0] if index == len(all_ids) - 1 else all_ids[index + 1]
+        window_pks = list(
+            base_qs.order_by(*ordering).values_list("pk", flat=True)[from_item:to_item]
+        )
+
+        try:
+            current_pk = self.model._meta.pk.to_python(object_id)
+            local_idx = window_pks.index(current_pk)
+        except (ValidationError, ValueError, TypeError):
+            return {}
+
+        def neighbor_url(target_idx):
+            if not 0 <= target_idx < len(window_pks):
+                return None
+            target_page = (from_item + target_idx) // page_size + 1
+            # ``all_params`` is nested ``{view_id: {tableParams: {page: ...}}}`` —
+            # shallow-merge each level so the next list_action reads the
+            # updated page from the right slot.
+            view_params = all_params.get(view_id, {})
+            new_all_params = {
+                **all_params,
+                view_id: {
+                    **view_params,
+                    TABLE_PARAMS_NAME: {
+                        **view_params.get(TABLE_PARAMS_NAME, {}),
+                        TABLE_PARAMS_PAGE_NAME: target_page,
+                    },
+                },
+            }
+            new_filters = urllib.parse.urlencode({"params": json.dumps(new_all_params)})
+            return f"{self.get_detail_url(window_pks[target_idx])}?_changelist_filters={new_filters}"
+
         return {
-            "previous_url": (
-                f"{self.get_detail_url(previous_id)}?_changelist_filters={changelist_filters}"
-                if previous_id
-                else None
-            ),
-            "current_index": index + 1,
-            "all_objects_count": len(all_ids),
-            "next_url": (
-                f"{self.get_detail_url(next_id)}?_changelist_filters={changelist_filters}"
-                if next_id
-                else None
-            ),
+            "previous_url": neighbor_url(local_idx - 1),
+            "next_url": neighbor_url(local_idx + 1),
+            "current_index": from_item + local_idx + 1,
+            "all_objects_count": base_qs.count(),
         }
 
     def add_view(self, request, form_url="", extra_context=None):

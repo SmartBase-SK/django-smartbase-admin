@@ -630,7 +630,8 @@ class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
         import jsonschema
 
         validator = jsonschema.Draft7Validator(
-            self.schema, format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER
+            self._get_validation_schema(),
+            format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
         errors = sorted(
             validator.iter_errors(value), key=lambda e: list(e.absolute_path)
@@ -642,6 +643,34 @@ class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
             for err in errors
         ]
         raise ValidationError(details)
+
+    def _get_validation_schema(self):
+        """Schema copy with ``additionalProperties: false`` injected (mirrors json-editor's ``no_additional_properties``)."""
+        cached = getattr(self, "_validation_schema_cache", None)
+        if cached is not None:
+            return cached
+        hardened = self._harden_schema_no_additional_properties(self.schema)
+        self._validation_schema_cache = hardened
+        return hardened
+
+    @staticmethod
+    def _harden_schema_no_additional_properties(schema):
+        if not isinstance(schema, dict):
+            return schema
+        recurse = SBAdminJsonEditorWidget._harden_schema_no_additional_properties
+        out = {}
+        for key, value in schema.items():
+            if key == "properties" and isinstance(value, dict):
+                out[key] = {k: recurse(v) for k, v in value.items()}
+            elif key == "items" and isinstance(value, dict):
+                out[key] = recurse(value)
+            else:
+                out[key] = value
+        if (
+            out.get("type") == "object" or "properties" in out
+        ) and "additionalProperties" not in out:
+            out["additionalProperties"] = False
+        return out
 
 
 class SBAdminJsonEditorField(forms.JSONField):

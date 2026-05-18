@@ -3278,10 +3278,12 @@ Hooks are called in this order by `SBAdminListAction`:
 Cross-hook state goes through `get_request_data_plugin_store(request)`. It returns a per-request, per-plugin-class scratch dict keyed by `cls.__name__`, so sibling plugins don't collide:
 
 ```python
+from django.utils.safestring import mark_safe
+
 from django_smartbase_admin.plugins.base import SBAdminPlugin
 
 
-class SoftDeleteDimmingPlugin(SBAdminPlugin):
+class SoftDeleteStrikethroughPlugin(SBAdminPlugin):
     @classmethod
     def modify_base_queryset(cls, action, request, qs, values, **kwargs):
         # Store-only — observe, don't reshape.
@@ -3294,11 +3296,16 @@ class SoftDeleteDimmingPlugin(SBAdminPlugin):
         store = cls.get_request_data_plugin_store(request)
         if not store.get("had_deleted_at"):
             return data
+        # Mutate the visible ``name`` column; the hidden ``deleted_at`` is
+        # available here (filter pulled it into ``.values()``) but is then
+        # stripped from the JSON by ``_strip_to_visible_keys``.
         for row in data:
-            if row.get("deleted_at"):
-                row["_css_class"] = "row-dimmed"
+            if row.get("deleted_at") and row.get("name"):
+                row["name"] = mark_safe(f"<s>{row['name']}</s>")
         return data
 ```
+
+> **Why not `row["_css_class"]`?** SBAdmin ships no row formatter that reads it, and `_strip_to_visible_keys` drops anything not in `action.allowed_framework_keys`. For per-row CSS, wrap a visible column in `<span class="...">…</span>`, or register your own key + Tabulator `rowFormatter` in your project.
 
 ### Hook Signature Conventions
 

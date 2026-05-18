@@ -258,13 +258,20 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         try:
             from cms.plugin_pool import plugin_pool
 
+            from django_smartbase_admin.integration.django_cms import (
+                DjangoCMSPluginSBAdmin,
+            )
+
             for name, view in plugin_pool.plugins.items():
-                if hasattr(view, "get_id"):
-                    view_instance = view(view.model, sb_admin_site)
-                    self.view_map[view_instance.get_id()] = view_instance
-                    view_instance.init_view_static(
-                        self, view_instance.model, sb_admin_site
-                    )
+                if not (
+                    isinstance(view, type)
+                    and issubclass(view, DjangoCMSPluginSBAdmin)
+                    and hasattr(view, "get_id")
+                ):
+                    continue
+                view_instance = view(view.model, sb_admin_site)
+                self.view_map[view_instance.get_id()] = view_instance
+                view_instance.init_view_static(self, view_instance.model, sb_admin_site)
         except ImportError:
             pass
 
@@ -317,8 +324,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         if model:
             if action.action_id == Action.BULK_DELETE.value:
                 return view.has_delete_permission(request, obj)
+            permission = getattr(action, "permission", None) or "change"
             return self.has_permission(
-                request, request_data, view, model, obj, required
+                request, request_data, view, model, obj, permission
             )
         return request.user.is_staff
 
