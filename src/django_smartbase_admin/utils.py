@@ -91,14 +91,6 @@ class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
             meta, "fieldsets", tuple()
         )
 
-    def get_fieldsets_context(self) -> dict[str | None, dict]:
-        return {
-            (
-                str(fieldset.name) if fieldset.name is not None else None
-            ): fieldset.sbadmin_context
-            for fieldset in self.fieldsets()
-        }
-
     def fieldsets(self) -> Iterable[Fieldset]:
         if not (fieldsets := self.get_sbadmin_fieldsets()):
             logger.warning(
@@ -116,11 +108,6 @@ class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
                 classes=data.get("classes", ""),
                 description=data.get("description"),
             )
-            context = dict(data)
-            context["fieldset_layout"] = self.get_fieldset_layout(
-                fieldset, context, getattr(self, "request", None)
-            )
-            fieldset.sbadmin_context = context
             yield fieldset
 
 

@@ -9,8 +9,10 @@ from django.db import models
 from django.http import HttpRequest
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 
 SBADMIN_DYNAMIC_REGION_PARAM = "sbadmin_dynamic_region"
+SBADMIN_DYNAMIC_REGION_PREFIX_PARAM = "sbadmin_dynamic_region_prefix"
 SBADMIN_DYNAMIC_REGION_ACTION = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_ADD_MODIFIER = "add"
 
@@ -139,6 +141,19 @@ class SBDynamicRegion:
 class SBAdminDynamicFormMixin:
     sbadmin_standalone_dynamic_regions = False
 
+    def __init__(self, *args, **kwargs):
+        threadsafe_request = kwargs.pop("request", None)
+        if threadsafe_request is None:
+            threadsafe_request = getattr(self, "request", None)
+        if threadsafe_request is None:
+            try:
+                threadsafe_request = SBAdminThreadLocalService.get_request()
+            except LookupError:
+                threadsafe_request = None
+        self.request = threadsafe_request
+        super().__init__(*args, **kwargs)
+        self.prepare_dynamic_regions(threadsafe_request)
+
     @staticmethod
     def get_fieldset_fields(
         fieldset_data: dict[str, Any],
@@ -166,13 +181,19 @@ class SBAdminDynamicFormMixin:
     ) -> tuple[SBDynamicRegion, ...]:
         regions: list[SBDynamicRegion] = []
         object_id = self._sbadmin_dynamic_object_id()
+        view = getattr(self, "view", None)
         if self.sbadmin_standalone_dynamic_regions:
-            # in custom formview
+            # Standalone form views own their dynamic region layout.
+            fieldsets = self.get_sbadmin_fieldsets()
+        elif view is not None and hasattr(view, "get_sbadmin_fieldsets"):
+            # Admin forms use the current admin view layout for add/change.
+            fieldsets = view.get_sbadmin_fieldsets(request, object_id)
+        elif hasattr(self, "get_sbadmin_fieldsets"):
+            # Plain SBAdmin forms can still declare regions on their own Meta.
             fieldsets = self.get_sbadmin_fieldsets()
         else:
-            # in admin base form
-            view = getattr(self, "view", None)
-            fieldsets = view.get_sbadmin_fieldsets(request, object_id)
+            # Non-SBAdmin forms have no dynamic regions.
+            fieldsets = ()
         for _name, data in fieldsets:
             regions.extend(self.get_fieldset_dynamic_regions(data))
 
@@ -208,6 +229,51 @@ class SBAdminDynamicFormMixin:
             state=state,
             fieldset=self.as_dynamic_region_fieldset(state),
         )
+
+    @staticmethod
+    def get_fieldset_key(name: Any) -> str | None:
+        return str(name) if name is not None else None
+
+    def get_fieldsets_for_context(
+        self, request: HttpRequest | None = None
+    ) -> Iterable[tuple[str | None, dict[str, Any]]]:
+        view = getattr(self, "view", None)
+        if self.sbadmin_standalone_dynamic_regions and hasattr(
+            self, "get_sbadmin_fieldsets"
+        ):
+            return self.get_sbadmin_fieldsets()
+        if view is not None and hasattr(view, "get_sbadmin_fieldsets"):
+            object_id = self._sbadmin_dynamic_object_id()
+            return view.get_sbadmin_fieldsets(request, object_id)
+        if hasattr(self, "get_sbadmin_fieldsets"):
+            return self.get_sbadmin_fieldsets()
+        return ()
+
+    def get_fieldset_data_map(
+        self, request: HttpRequest | None = None
+    ) -> dict[str | None, dict[str, Any]]:
+        fieldset_data_map = getattr(self, "_sbadmin_fieldset_data_map", None)
+        if fieldset_data_map is None:
+            fieldset_data_map = {
+                self.get_fieldset_key(name): data
+                for name, data in self.get_fieldsets_for_context(request)
+            }
+            self._sbadmin_fieldset_data_map = fieldset_data_map
+        return fieldset_data_map
+
+    def get_fieldset_context(
+        self, fieldset: Fieldset, request: HttpRequest | None = None
+    ) -> dict[str, Any]:
+        fieldset_key = self.get_fieldset_key(fieldset.name)
+        fieldset_data = self.get_fieldset_data_map(request).get(fieldset_key)
+        if fieldset_data is None:
+            return {}
+        return {
+            "fieldset": fieldset,
+            "fieldset_layout": self.get_fieldset_layout(
+                fieldset, fieldset_data, request
+            ),
+        }
 
     def get_fieldset_layout(
         self,
@@ -355,11 +421,14 @@ class SBAdminDynamicFormMixin:
             attrs.setdefault("hx-target", f"#{state.wrapper_id}")
             attrs.setdefault("hx-include", "closest form")
             attrs.setdefault("hx-indicator", f"#{state.loading_id}")
-            attrs.setdefault("hx-swap", "outerHTML")
+            attrs.setdefault("hx-swap", "none")
             attrs.setdefault("hx-sync", "closest form:replace")
+            hx_vals = {SBADMIN_DYNAMIC_REGION_PARAM: region.name}
+            if self.prefix is not None:
+                hx_vals[SBADMIN_DYNAMIC_REGION_PREFIX_PARAM] = self.prefix
             attrs.setdefault(
                 "hx-vals",
-                json.dumps({SBADMIN_DYNAMIC_REGION_PARAM: region.name}),
+                json.dumps(hx_vals),
             )
 
     def _dynamic_region_endpoint(self, request: HttpRequest | None = None) -> str:

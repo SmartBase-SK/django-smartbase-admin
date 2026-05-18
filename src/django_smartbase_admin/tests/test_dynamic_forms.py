@@ -1,17 +1,26 @@
+import json
+
 from django import forms
 from django.contrib.admin.helpers import AdminForm
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
+from django.db import models
 from django.http import QueryDict
+from django.urls import path
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.admin.admin_base import (
     SBAdmin,
     SBAdminBaseForm,
     SBAdminBaseFormInit,
+    SBAdminStackedInline,
 )
+from django_smartbase_admin.admin.widgets import SBAdminHiddenWidget
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
+    SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
+    SBAdminDynamicFormMixin,
     SBDynamicRegion,
     SBInactiveFieldPolicy,
 )
@@ -20,6 +29,62 @@ from django_smartbase_admin.services.thread_local import (
     SBAdminThreadLocalService,
     sb_admin_request,
 )
+from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
+
+
+dynamic_region_admin_site = AdminSite(name="admin")
+
+
+class DynamicRegionDemoModel(models.Model):
+    username = models.CharField(max_length=150)
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class DynamicRegionInlineParent(models.Model):
+    title = models.CharField(max_length=150)
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class DynamicRegionInlineChild(models.Model):
+    parent = models.ForeignKey(DynamicRegionInlineParent, on_delete=models.CASCADE)
+    mode = models.CharField(
+        max_length=20,
+        choices=(
+            ("basic", "Basic"),
+            ("advanced", "Advanced"),
+        ),
+        default="basic",
+    )
+    summary = models.CharField(max_length=150, blank=True)
+    notes = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class DynamicRegionTestConfiguration:
+    def get_form_field_widget_class(self, view, request, form_field, db_field, default):
+        if db_field and db_field.name == "parent":
+            return SBAdminHiddenWidget
+        return default
+
+    def apply_global_filter_to_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def restrict_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def has_permission(self, *args, **kwargs):
+        return True
 
 
 class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
@@ -176,8 +241,6 @@ class ChoiceSwitchRegionForm(SBAdminBaseFormInit, forms.Form):
             self.fields["value"].choices = (("1", "One"), ("2", "Two"))
         else:
             self.fields["value"].choices = (("a", "A"), ("b", "B"))
-
-        self.prepare_dynamic_regions(kwargs.get("request"))
 
 
 class DynamicRegionTriggerWidget(forms.TextInput):
@@ -391,7 +454,145 @@ class RowObjectDynamicRegionModal(RowActionModalView):
         return User(first_name="Digital", last_name="Hidden")
 
 
+class AdminFieldsetsDynamicRegionAdmin(SBAdmin):
+    sbadmin_tabs = {"Profile": ("Profile",)}
+    sbadmin_fieldsets = (
+        (
+            "Profile",
+            {
+                "fields": (
+                    "username",
+                    SBDynamicRegion(
+                        name="profile",
+                        trigger_fields=("username",),
+                        fields=("first_name", "last_name"),
+                        get_active_fields=lambda form, request, region: (
+                            ("last_name",)
+                            if form["username"].value() == "company"
+                            else ("first_name",)
+                        ),
+                    ),
+                ),
+            },
+        ),
+    )
+
+    def get_action_url(self, action, modifier="template"):
+        return (
+            "/admin/django_smartbase_admin/dynamicregiondemomodel/"
+            f"{action}/{modifier}/"
+        )
+
+    def get_global_context(self, request, object_id=None):
+        return {
+            "admin_title": "Test admin",
+            "const": {},
+            "request_data": type(
+                "RequestData",
+                (),
+                {
+                    "menu_items": (),
+                    "global_filter_instance": None,
+                },
+            )(),
+            "username_data": {
+                "full_name": "Test user",
+                "initials": "TU",
+            },
+            "user_config": type("UserConfig", (), {"color_scheme": "light"})(),
+            "view_id": self.get_id(),
+        }
+
+    def has_add_permission(self, request, obj=None):
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        return True
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return True
+
+
+class DynamicRegionStackedInline(SBAdminStackedInline):
+    model = DynamicRegionInlineChild
+    extra = 1
+    max_num = 1
+    sbadmin_fieldsets = (
+        (
+            "Inline details",
+            {
+                "fields": (
+                    "mode",
+                    SBDynamicRegion(
+                        name="inline_details",
+                        trigger_fields=("mode",),
+                        fields=("summary", "notes"),
+                        get_active_fields=lambda form, request, region: (
+                            ("notes",)
+                            if form["mode"].value() == "advanced"
+                            else ("summary",)
+                        ),
+                    ),
+                ),
+            },
+        ),
+    )
+
+    def get_action_url(self, action, modifier="template"):
+        return (
+            "/admin/django_smartbase_admin/dynamicregioninlineparent/"
+            f"inline/{action}/{modifier}/"
+        )
+
+    def has_add_permission(self, request, obj=None):
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        return True
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return True
+
+
+class InlineDynamicRegionParentAdmin(AdminFieldsetsDynamicRegionAdmin):
+    sbadmin_tabs = {"Parent": ("Parent", DynamicRegionStackedInline)}
+    inlines = (DynamicRegionStackedInline,)
+    sbadmin_fieldsets = (
+        (
+            "Parent",
+            {
+                "fields": ("title",),
+            },
+        ),
+    )
+
+    def get_action_url(self, action, modifier="template"):
+        return (
+            "/admin/django_smartbase_admin/dynamicregioninlineparent/"
+            f"{action}/{modifier}/"
+        )
+
+
+dynamic_region_admin_site.register(
+    DynamicRegionDemoModel, AdminFieldsetsDynamicRegionAdmin
+)
+dynamic_region_admin_site.register(
+    DynamicRegionInlineParent, InlineDynamicRegionParentAdmin
+)
+urlpatterns = [
+    path("admin/", dynamic_region_admin_site.urls),
+]
+
+
 class DynamicFormTests(SimpleTestCase):
+    databases = {"default"}
+
     def setUp(self):
         self.request = RequestFactory().get("/dynamic-form/")
         self.request_token = sb_admin_request.set(self.request)
@@ -474,6 +675,134 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertIn('name="email"', html)
         self.assertNotIn('name="last_name"', html)
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_model_admin_fieldsets_dynamic_regions_render_add_view(self):
+        model_admin = dynamic_region_admin_site._registry[DynamicRegionDemoModel]
+        request = RequestFactory().get(
+            "/admin/django_smartbase_admin/dynamicregiondemomodel/add/",
+            HTTP_SEC_FETCH_SITE="same-origin",
+            HTTP_SEC_FETCH_DEST="iframe",
+        )
+        request.user = User(username="test", is_staff=True, is_superuser=True)
+        request_token = sb_admin_request.set(request)
+
+        try:
+            response = model_admin.add_view(request)
+            response.render()
+        finally:
+            sb_admin_request.reset(request_token)
+
+        adminform_fieldsets = list(response.context_data["adminform"])
+        form_class = response.context_data["adminform"].form.__class__
+        fieldset_context = adminform_fieldsets[0].form.get_fieldset_context(
+            adminform_fieldsets[0],
+            request,
+        )
+        fieldset_layout = fieldset_context["fieldset_layout"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [fieldset.name for fieldset in adminform_fieldsets], ["Profile"]
+        )
+        self.assertEqual(
+            response.context_data["tabs_context"], {"Profile": ("Profile",)}
+        )
+        tabular_context = get_tabular_context(
+            response.context_data["adminform"],
+            response.context_data["inline_admin_formsets"],
+            response.context_data["tabs_context"],
+        )
+        self.assertEqual(
+            [item["type"] for item in tabular_context["context"]["Profile"]["content"]],
+            ["fieldset"],
+        )
+        self.assertTrue(issubclass(form_class, SBAdminDynamicFormMixin))
+        self.assertFalse(issubclass(form_class, SBAdminBaseFormInit))
+        self.assertEqual(fieldset_layout[0]["fieldset"].fields, ("username",))
+        self.assertEqual(
+            fieldset_layout[1]["region"].state.wrapper_id,
+            "sbadmin-dynamic-region-profile",
+        )
+        self.assertEqual(
+            fieldset_layout[1]["region"].state.active_fields, ("first_name",)
+        )
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_stacked_inline_fieldsets_dynamic_regions_render_add_view(self):
+        model_admin = dynamic_region_admin_site._registry[DynamicRegionInlineParent]
+        request = RequestFactory().get(
+            "/admin/django_smartbase_admin/dynamicregioninlineparent/add/",
+            HTTP_SEC_FETCH_SITE="same-origin",
+            HTTP_SEC_FETCH_DEST="iframe",
+        )
+        request.request_data = type(
+            "RequestData",
+            (),
+            {
+                "configuration": DynamicRegionTestConfiguration(),
+                "global_filter_instance": None,
+            },
+        )()
+        request.user = User(username="test", is_staff=True, is_superuser=True)
+        request_token = sb_admin_request.set(request)
+
+        try:
+            response = model_admin.add_view(request)
+            response.render()
+        finally:
+            sb_admin_request.reset(request_token)
+
+        inline_admin_formsets = response.context_data["inline_admin_formsets"]
+        inline_form = list(inline_admin_formsets[0])[0].form
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(issubclass(inline_form.__class__, SBAdminDynamicFormMixin))
+        self.assertIn('data-sbadmin-dynamic-region="inline_details"', html)
+        self.assertIn('hx-target="#sbadmin-dynamic-region-', html)
+        self.assertIn('-0-summary"', html)
+        self.assertNotIn('-0-notes"', html)
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_stacked_inline_dynamic_region_fragment_uses_form_prefix(self):
+        model_admin = dynamic_region_admin_site._registry[DynamicRegionInlineParent]
+        request = RequestFactory().get(
+            "/admin/django_smartbase_admin/dynamicregioninlineparent/inline/"
+            "sbadmin_dynamic_region/add/",
+            data={
+                SBADMIN_DYNAMIC_REGION_PARAM: "inline_details",
+                SBADMIN_DYNAMIC_REGION_PREFIX_PARAM: "children-0",
+                "children-0-mode": "advanced",
+            },
+            HTTP_HX_TRIGGER_NAME="children-0-mode",
+        )
+        request.request_data = type(
+            "RequestData",
+            (),
+            {
+                "configuration": DynamicRegionTestConfiguration(),
+                "global_filter_instance": None,
+            },
+        )()
+        request.user = User(username="test", is_staff=True, is_superuser=True)
+        request_token = sb_admin_request.set(request)
+
+        try:
+            inline = model_admin.get_inline_instances(request, None)[0]
+            response = inline.sbadmin_dynamic_region(request, "add")
+        finally:
+            sb_admin_request.reset(request_token)
+
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            'id="sbadmin-dynamic-region-children-0-inline-details"',
+            html,
+        )
+        self.assertIn('name="children-0-notes"', html)
+        self.assertNotIn('name="children-0-summary"', html)
 
     def test_preserve_policy_skips_inactive_field_validation(self):
         form = DynamicRegionForm(
@@ -565,7 +894,26 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(attrs["hx-target"], "#sbadmin-dynamic-region-details")
         self.assertEqual(attrs["hx-include"], "closest form")
         self.assertEqual(attrs["hx-swap"], "none")
-        self.assertIn(SBADMIN_DYNAMIC_REGION_PARAM, attrs["hx-vals"])
+        hx_vals = json.loads(attrs["hx-vals"])
+        self.assertEqual(hx_vals[SBADMIN_DYNAMIC_REGION_PARAM], "details")
+        self.assertNotIn(SBADMIN_DYNAMIC_REGION_PREFIX_PARAM, hx_vals)
+
+    def test_region_binds_form_prefix_only_when_present(self):
+        class ViewBackedForm(DynamicRegionForm):
+            view = FakeView()
+
+        form = ViewBackedForm(prefix="children-0", request=self.request)
+        attrs = form.fields["mode"].widget.attrs
+        hx_vals = json.loads(attrs["hx-vals"])
+
+        self.assertEqual(
+            attrs["hx-target"],
+            "#sbadmin-dynamic-region-children-0-details",
+        )
+        self.assertEqual(
+            hx_vals[SBADMIN_DYNAMIC_REGION_PREFIX_PARAM],
+            "children-0",
+        )
 
     def test_region_uses_widget_dynamic_trigger_event(self):
         class ViewBackedForm(DynamicRegionCustomTriggerForm):
@@ -655,7 +1003,7 @@ class DynamicFormTests(SimpleTestCase):
         initial = SBAdmin._dynamic_region_initial_from_data(
             ChoiceSwitchRegionForm,
             data,
-            None,
+            {},
         )
 
         self.assertEqual(initial, {"category": "letters", "value": "1"})
@@ -674,7 +1022,7 @@ class DynamicFormTests(SimpleTestCase):
         initial = SBAdmin._dynamic_region_initial_from_data(
             WidgetValueForm,
             data,
-            None,
+            {},
         )
 
         self.assertEqual(
@@ -729,7 +1077,6 @@ class DynamicFormTests(SimpleTestCase):
             {
                 "adminform": admin_form,
                 "fieldset": next(iter(admin_form)),
-                "fieldsets_context": form.get_fieldsets_context(),
             },
             request=self.request,
         )
@@ -818,7 +1165,6 @@ class DynamicFormTests(SimpleTestCase):
                     {
                         "adminform": admin_form,
                         "fieldset": fieldset,
-                        "fieldsets_context": form.get_fieldsets_context(),
                     },
                     request=self.request,
                 )

@@ -13,6 +13,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
@@ -49,6 +50,11 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
+- **Show/hide fields based on another form field?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
+- **Refresh choices or layout without reloading the whole form?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
+- **Dynamic form sections in stacked inlines?** → [Dynamic regions in stacked inlines](#dynamic-regions-in-stacked-inlines)
+- **Dynamic form sections in action/row modals?** → [Dynamic regions in action modals](#dynamic-regions-in-action-modals)
+- **Dynamic regions in custom form views?** → [Dynamic regions in custom views](#dynamic-regions-in-custom-views)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
@@ -1297,6 +1303,447 @@ tags_config = SBAdminJsonEditorField(
 - Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
 - `add_to_top=True` reorders the **root** array only; nested arrays still append.
 - Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
+
+---
+
+## Dynamic Regions (`SBDynamicRegion`)
+
+Use dynamic regions when one form control should refresh a section of fields without reloading the whole admin page or modal. Typical cases:
+
+- An `Article.status` selection changes which publishing fields are visible.
+- An `Article.category` selection changes choices for related `Tag` or `Author` fields.
+- A normal `SBAdmin` add/change form needs a dependent section.
+- A stacked inline row needs fields that depend on another field in the same row.
+- A row action modal needs a different set of inputs based on the selected `Article`.
+- A custom `Category` widget should refresh only the dependent part of the form.
+
+Dynamic regions are server-rendered. SBAdmin adds HTMX attributes to the trigger field, requests a region fragment, and swaps only the target wrapper. The refreshed form is initialized from the current request data, so callbacks should read current values from bound fields (`form["field"].value()`), not from `cleaned_data`.
+
+### Imports
+
+```python
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBDynamicRegion,
+    SBInactiveFieldPolicy,
+)
+```
+
+Use forms based on `SBAdminBaseFormInit` / `SBAdminBaseForm`; these call `prepare_dynamic_regions(request)` during initialization.
+
+### Where to use dynamic regions
+
+Use the same `SBDynamicRegion` marker in these places:
+
+| Use case | Where to define the region | Endpoint behavior |
+|----------|----------------------------|-------------------|
+| Normal model admin add/change form | `SBAdmin.sbadmin_fieldsets`, or the form's `Meta.sbadmin_fieldsets` | SBAdmin uses the admin `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add` action. |
+| Stacked inline row | `SBAdminStackedInline.sbadmin_fieldsets`, or the inline form's `Meta.sbadmin_fieldsets` | SBAdmin injects the inline form prefix into `hx-vals`, so only the changed inline row is refreshed. |
+| Action modal | The modal `form_class.Meta.sbadmin_fieldsets` | `ActionModalView`, `ListActionModalView`, and `RowActionModalView` use the current modal URL. |
+| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `?sbadmin_dynamic_region=<name>` and renders the dynamic-region fragment. |
+
+### Basic tutorial: switch fields by article status
+
+Put `SBDynamicRegion` directly inside `Meta.sbadmin_fieldsets["fields"]` at the exact render position. The region owns every field it may render through `fields=...`; `get_active_fields` returns the subset/layout that should be rendered for the current state.
+
+```python
+from django.contrib import admin
+from django import forms
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBDynamicRegion,
+    SBInactiveFieldPolicy,
+)
+
+from blog.models import Article
+
+
+class ArticleForm(SBAdminBaseForm):
+    status = forms.ChoiceField(
+        choices=(
+            ("draft", "Draft"),
+            ("published", "Published"),
+            ("archived", "Archived"),
+        ),
+        initial="draft",
+    )
+
+    class Meta:
+        model = Article
+        fields = ("title", "status", "category", "author")
+        sbadmin_fieldsets = (
+            (None, {"fields": ("title", "status")}),
+            (
+                "Publishing",
+                {
+                    "fields": (
+                        SBDynamicRegion(
+                            name="publishing_fields",
+                            trigger_fields=("status",),
+                            fields=("category", "author"),
+                            get_active_fields=lambda form, request, region: (
+                                (("category", "author"),)
+                                if form["status"].value() == "published"
+                                else ("category",)
+                            ),
+                            inactive_field_policy=SBInactiveFieldPolicy.PRESERVE,
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    form = ArticleForm
+```
+
+What this does:
+
+- `status` gets HTMX trigger attributes automatically.
+- The initial render shows only `category` for draft articles.
+- Switching `status` to `published` refreshes the `publishing_fields` wrapper and renders `category` + `author` on one row because `get_active_fields` returns a grouped tuple.
+- Hidden fields stay in `form.fields`, but inactive fields are handled according to `inactive_field_policy`.
+
+You can also define the same region directly on the admin class if the fields are all normal model fields:
+
+```python
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_fieldsets = (
+        (None, {"fields": ("title", "status")}),
+        (
+            "Publishing",
+            {
+                "fields": (
+                    SBDynamicRegion(
+                        name="publishing_fields",
+                        trigger_fields=("status",),
+                        fields=("category", "author"),
+                        get_active_fields=lambda form, request, region: (
+                            (("category", "author"),)
+                            if form["status"].value() == "published"
+                            else ("category",)
+                        ),
+                    ),
+                ),
+            },
+        ),
+    )
+```
+
+### Dynamic regions in stacked inlines
+
+Define inline regions directly on the `SBAdminStackedInline` when the trigger and controlled fields belong to the inline model. SBAdmin wraps inline formsets with dynamic-region support and includes the current inline form prefix in the refresh request.
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminStackedInline
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.dynamic_forms import SBDynamicRegion
+
+from blog.models import Article, ArticleMeta
+
+
+class ArticleMetaInline(SBAdminStackedInline):
+    model = ArticleMeta
+    extra = 0
+    max_num = 1
+    sbadmin_fieldsets = (
+        (
+            "Metadata",
+            {
+                "fields": (
+                    "heading",
+                    SBDynamicRegion(
+                        name="metadata_description",
+                        trigger_fields=("heading",),
+                        fields=("description",),
+                        is_visible=lambda form, request, region: bool(
+                            form["heading"].value()
+                        ),
+                    ),
+                ),
+            },
+        ),
+    )
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    inlines = (ArticleMetaInline,)
+```
+
+If the inline needs extra non-model trigger fields, define a custom inline form based on `SBAdminBaseForm` and put the region in that form's `Meta.sbadmin_fieldsets`; then assign it with `form = ArticleMetaInlineForm` on the inline.
+
+### `SBDynamicRegion` options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `str` | Required unique region name. Used in `sbadmin_dynamic_region`, wrapper IDs, and client events. |
+| `trigger_fields` | iterable of field names | Fields that trigger a refresh. SBAdmin binds HTMX attrs to these widgets. |
+| `fields` | iterable of field names | All fields controlled by this region. Only these fields can become active. |
+| `is_visible` | callable | Optional `(form, request, region) -> bool`. If false, the whole region renders empty. |
+| `get_active_fields` | callable | Optional `(form, request, region) -> iterable`. Return active field names or grouped iterables. Defaults to all `fields`. |
+| `inactive_field_policy` | `SBInactiveFieldPolicy` | `PRESERVE` by default. Controls cleaning/submission behavior for inactive fields. |
+| `template` | `str` | Optional custom template instead of the default inline fieldset renderer. |
+
+Unknown field names in `get_active_fields` are ignored. A grouped tuple/list such as `("category", "author")` renders those fields together, same as grouped fields in normal Django admin fieldsets.
+
+### Inactive field policies
+
+Inactive fields are fields listed in `region.fields` but not returned by `get_active_fields`.
+
+Use `SBInactiveFieldPolicy.PRESERVE` when hidden values should remain untouched. SBAdmin temporarily skips validation/cleaning for inactive fields, so required hidden fields do not block submission and do not appear in `cleaned_data`.
+
+```python
+SBDynamicRegion(
+    name="publishing_fields",
+    trigger_fields=("status",),
+    fields=("category", "author"),
+    get_active_fields=lambda form, request, region: (
+        ("category", "author")
+        if form["status"].value() == "published"
+        else ("category",)
+    ),
+    inactive_field_policy=SBInactiveFieldPolicy.PRESERVE,
+)
+```
+
+Use `SBInactiveFieldPolicy.CLEAR` when hidden values must be erased. SBAdmin marks the inactive field non-required and removes bound data using the widget's normal data names, including multi-widget suffixes such as `_0` / `_1`.
+
+```python
+SBDynamicRegion(
+    name="review_fields",
+    trigger_fields=("status",),
+    fields=("category", "author"),
+    get_active_fields=lambda form, request, region: (
+        ("category", "author")
+        if form["status"].value() == "published"
+        else ("category",)
+    ),
+    inactive_field_policy=SBInactiveFieldPolicy.CLEAR,
+)
+```
+
+### Region callbacks
+
+Callbacks receive `(form, request, region)`. Prefer current form values:
+
+```python
+def article_review_fields(form, request, region):
+    if form["status"].value() == "published":
+        return ("category", "author")
+    return ("category",)
+```
+
+Do not rely on `cleaned_data` in these callbacks. Dynamic-region refreshes are GET requests that build an unbound form with `initial` values extracted from the current request data through each widget's `value_from_datadict()`.
+
+### HTMX trigger wiring
+
+Each `trigger_fields` widget receives HTMX attributes automatically:
+
+- `hx-get`: current modal/form path for standalone forms, or the admin `sbadmin_dynamic_region` action URL for admin forms.
+- `hx-trigger`: `"change"` by default.
+- `hx-target`: the dynamic region wrapper ID.
+- `hx-include`: `closest form`, so current unsaved form values are sent.
+- `hx-indicator`: the region loader ID.
+- `hx-vals`: includes `{"sbadmin_dynamic_region": "<region name>"}`.
+
+To use a custom trigger event, set `dynamic_region_trigger_event` on the widget:
+
+```python
+from django import forms
+
+
+class CategoryAutocompleteWidget(forms.TextInput):
+    sb_admin_widget = True
+    dynamic_region_trigger_event = "SBAutocompleteChange"
+```
+
+If several regions share the same trigger field, the admin dynamic-region action returns all related regions for that trigger so cross-fieldset dependent regions stay in sync.
+
+### Dynamic regions in action modals
+
+The common non-change-form use case is an action modal. Define the dynamic regions on the modal form; `ActionModalView`, `ListActionModalView`, and `RowActionModalView` wrap the form as a standalone dynamic-region form and use the current modal URL as the refresh endpoint.
+
+```python
+from django import forms
+from django.utils.translation import gettext_lazy as _
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.engine.dynamic_forms import SBDynamicRegion
+from django_smartbase_admin.engine.modal_view import ListActionModalView
+
+from blog.models import Category
+
+
+class AssignCategoryForm(SBAdminBaseFormInit, forms.Form):
+    status = forms.ChoiceField(
+        choices=(("draft", "Draft"), ("published", "Published"))
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        "status",
+                        SBDynamicRegion(
+                            name="category_region",
+                            trigger_fields=("status",),
+                            fields=("category",),
+                            is_visible=lambda form, request, region: (
+                                form["status"].value() == "published"
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class AssignCategoryView(ListActionModalView):
+    form_class = AssignCategoryForm
+    modal_title = _("Assign Category")
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        category = form.cleaned_data.get("category")
+        if category is not None:
+            selection_queryset.update(category=category)
+```
+
+Row action modals can initialize dynamic regions from the row object through the form instance. Use `get_object()` / form `instance` in the usual modal pattern, then let callbacks read current bound values.
+
+### Dynamic regions in custom views
+
+For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small GET branch that renders `sb_admin/includes/dynamic_region.html` for `?sbadmin_dynamic_region=<name>`.
+
+```python
+from django import forms
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.views.generic.edit import FormView
+from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBADMIN_DYNAMIC_REGION_PARAM,
+    SBDynamicRegion,
+    dynamic_region_initial_from_data,
+)
+
+
+class ImportProductsForm(SBAdminBaseFormInit, forms.Form):
+    sbadmin_standalone_dynamic_regions = True
+
+    source = forms.ChoiceField(
+        choices=(("file", "File"), ("url", "URL")),
+        initial="file",
+    )
+    upload = forms.FileField(required=False)
+    remote_url = forms.URLField(required=False)
+
+    class Meta:
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        "source",
+                        SBDynamicRegion(
+                            name="source_details",
+                            trigger_fields=("source",),
+                            fields=("upload", "remote_url"),
+                            get_active_fields=lambda form, request, region: (
+                                ("remote_url",)
+                                if form["source"].value() == "url"
+                                else ("upload",)
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class ImportProductsView(FormView):
+    template_name = "blog/import_products.html"
+    form_class = ImportProductsForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get(self, request, *args, **kwargs):
+        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM)
+        if region_name:
+            return self.render_dynamic_region(request, region_name)
+        return super().get(request, *args, **kwargs)
+
+    def render_dynamic_region(self, request, region_name):
+        form_class = self.get_form_class()
+        form = form_class(
+            request=request,
+            initial=dynamic_region_initial_from_data(form_class, request.GET),
+        )
+        region = form.get_dynamic_region(region_name, request)
+        if region is None:
+            return HttpResponse("", status=404)
+        html = render_to_string(
+            "sb_admin/includes/dynamic_region.html",
+            {
+                "dynamic_region": form.get_dynamic_region_context(region, request),
+                "sbadmin_dynamic_region_fragment": True,
+            },
+            request=request,
+        )
+        return HttpResponse(html)
+```
+
+Render the form with SBAdmin fieldsets so the dynamic region marker is converted into its wrapper:
+
+```django
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for fieldset in form.fieldsets %}
+        {% include "sb_admin/includes/fieldset.html" %}
+    {% endfor %}
+</form>
+```
+
+### Custom region templates
+
+Pass `template="path/to/template.html"` to take over rendering for the region. The template receives:
+
+- `form`
+- `region`
+- `region_state`
+- `active_field_names`
+
+```python
+SBDynamicRegion(
+    name="article_publish_fields",
+    trigger_fields=("status",),
+    fields=("category", "author"),
+    template="blog/includes/article_publish_fields.html",
+)
+```
+
+The default template renders `region_state.active_fields` with `sb_admin/includes/inline_fieldset.html`. Fragment responses render the wrapper with `hx-swap-oob="outerHTML"` and omit the loader; the full page render wraps the region with a loader.
+
+### Placement rules and gotchas
+
+- Put `SBDynamicRegion` directly in a fieldset's `fields` tuple. Regions nested inside grouped fields like `("status", SBDynamicRegion(...))` are ignored.
+- Keep `region.name` unique within a form.
+- Every field that may render must be declared in `fields=...`; `get_active_fields` cannot activate fields outside that list.
+- Use `Meta.sbadmin_fieldsets` when defining regions. `Meta.fieldsets` is supported for normal standalone fieldsets, but `sbadmin_fieldsets` is the explicit SBAdmin layout hook.
+- For model admin change/add forms, the region endpoint is `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add`.
+- For standalone/modal forms, the endpoint is the current request path.
 
 ---
 
@@ -4133,6 +4580,7 @@ python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.Tes
 
 | File | What it tests |
 |------|---------------|
+| `src/django_smartbase_admin/tests/test_dynamic_forms.py` | Dynamic regions, fieldset layout splitting, inactive field policies, modal dynamic-region responses |
 | `src/django_smartbase_admin/audit/tests/test_diff.py` | Unit tests for `compute_diff`, `compute_bulk_diff`, `compute_bulk_snapshot` |
 | `src/django_smartbase_admin/audit/tests/test_audit_integration.py` | Integration tests for audit logging (CRUD, bulk ops, inlines, M2M, request grouping) |
 | `tests/settings.py` | Minimal Django settings for standalone test runs |
@@ -4140,10 +4588,11 @@ python runtests.py django_smartbase_admin.audit.tests.test_audit_integration.Tes
 
 ### Adding New Tests
 
-1. Place test files in `src/django_smartbase_admin/audit/tests/`
-2. Use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks)
-3. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation
-4. Tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally
+1. Place feature-level tests near the feature, e.g. dynamic-region tests in `src/django_smartbase_admin/tests/test_dynamic_forms.py`.
+2. Place audit tests in `src/django_smartbase_admin/audit/tests/`.
+3. For audit integration tests, use `BaseAuditTest` from `test_audit_integration.py` as base class (installs/uninstalls manager hooks).
+4. Use `MockSBAdminContext` and `NoAdminContext` context managers for SBAdmin request simulation.
+5. Audit integration tests use `TransactionTestCase` because audit hooks patch `Model.save()` / `QuerySet.update()` globally.
 
 ---
 
