@@ -644,7 +644,7 @@ class AdminAuditLogAdmin(SBAdmin):
 
     _OBJECT_HISTORY_FILTER_CACHE_KEY = "_audit_object_history_filter"
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_list_json(self, request, modifier, page_size=None):
         """Override to ensure object_history filter is cached before processing rows."""
         from django.http import JsonResponse

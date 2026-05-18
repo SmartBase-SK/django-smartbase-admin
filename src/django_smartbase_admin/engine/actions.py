@@ -6,16 +6,26 @@ from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
 def sbadmin_action(func=None, **kwargs):
     """Mark a view method as callable via SBAdmin URL dispatch.
 
-    Any keyword arguments are stored on the function as ``_sbadmin_action_attrs``
-    for future use by ``delegate_to_action`` (e.g. permission, methods).
+    Keyword arguments are stored on the function as ``_sbadmin_action_attrs``
+    and propagated to the synthetic ``SBAdminCustomAction`` that
+    ``delegate_to_action`` passes to ``has_permission_for_action``.
+
+    Supported kwargs:
+
+    - ``permission`` (str): Django model permission codename to require on the
+      view's model (e.g. ``"add"``, ``"change"``, ``"delete"``, ``"view"``).
+      The default ``has_action_permission`` requires ``"change"`` for any
+      ``@sbadmin_action`` that does not declare a permission explicitly, so
+      read-only endpoints (autocomplete, list_json, xlsx export, config, …)
+      must opt in with ``permission="view"``.
 
     Usage::
 
-        @sbadmin_action
+        @sbadmin_action(permission="view")
         def action_list_json(self, request, modifier): ...
 
         @sbadmin_action(permission="delete")
-        def action_bulk_delete(self, request, modifier): ...
+        def action_delete_archived(self, request, modifier): ...
     """
 
     def decorator(fn):
@@ -39,6 +49,7 @@ class SBAdminCustomAction(object):
     open_in_modal = False
     open_in_new_tab = False
     template = None
+    permission = None
 
     def __init__(
         self,
@@ -55,6 +66,7 @@ class SBAdminCustomAction(object):
         icon=None,
         open_in_new_tab=None,
         template=None,
+        permission=None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -70,6 +82,7 @@ class SBAdminCustomAction(object):
         self.icon = icon
         self.open_in_new_tab = open_in_new_tab
         self.template = template or "sb_admin/actions/partials/action_link.html"
+        self.permission = permission
         self.resolve_url()
 
     def resolve_url(self):

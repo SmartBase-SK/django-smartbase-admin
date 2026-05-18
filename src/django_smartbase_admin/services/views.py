@@ -148,11 +148,13 @@ class SBAdminViewService(object):
         ):
             raise Http404
 
+        action_attrs = getattr(action_function, "_sbadmin_action_attrs", {}) or {}
         action_obj = SBAdminCustomAction(
             title=action_name,
             view=view,
             action_id=action_name,
             action_modifier=request_data.modifier,
+            permission=action_attrs.get("permission"),
         )
         if not view.has_permission_for_action(request, action_obj):
             raise PermissionDenied

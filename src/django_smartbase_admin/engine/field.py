@@ -79,6 +79,11 @@ class XLSXFieldOptions(JSONSerializableMixin):
     formatter: Formatter | None = None
     python_formatter: Callable[[int, Any], Any] | None = None
     cell_format: str | dict | SBAdminXLSXFormat | None = None
+    # Per-cell writer hook. Signature: (worksheet, row, col, value, cell_format) -> None.
+    # When set, replaces the default ``worksheet.write()`` for this column, letting the
+    # column owner opt in to ``write_formula`` / ``write_url`` / ``write_rich_string`` etc.
+    # Formula text must be server-controlled — never interpolate untrusted values without escaping.
+    cell_writer: Callable[..., None] | None = None
 
     def __init__(
         self,
@@ -87,6 +92,7 @@ class XLSXFieldOptions(JSONSerializableMixin):
         formatter: Formatter | None = None,
         python_formatter: Callable[[int, Any], Any] | None = None,
         cell_format: str | dict | SBAdminXLSXFormat | None = None,
+        cell_writer: Callable[..., None] | None = None,
     ) -> None:
         super().__init__()
         self.title = title
@@ -94,6 +100,7 @@ class XLSXFieldOptions(JSONSerializableMixin):
         self.formatter = formatter
         self.python_formatter = python_formatter
         self.cell_format = cell_format
+        self.cell_writer = cell_writer
 
 
 class SBAdminField(JSONSerializableMixin):

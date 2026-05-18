@@ -217,6 +217,17 @@ class SBAdminSite(admin.AdminSite):
                 path("autocomplete/", stock_admin_404, name="autocomplete"),
                 path("jsi18n/", stock_admin_404, name="jsi18n"),
                 path("<str:app_label>/", stock_admin_404, name="app_list"),
+                # Stock Django ``r/<ct>/<id>/`` looks up objects via the
+                # unrestricted ContentType manager and redirects to
+                # ``obj.get_absolute_url()`` — bypasses ``restrict_queryset``.
+                # SBAdmin's ``view_on_site_redirect`` is the gated entry point;
+                # keep the URL name registered so ``reverse("admin:view_on_site")``
+                # in third-party code still resolves, but always 404.
+                path(
+                    "r/<int:content_type_id>/<path:object_id>/",
+                    stock_admin_404,
+                    name="view_on_site",
+                ),
             ]
         )
         urls.extend(super().get_urls())

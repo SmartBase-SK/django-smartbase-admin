@@ -22,7 +22,7 @@ class DjangoCMSPluginSBAdmin(SBAdmin):
         return inline_instances
 
     def get_sbadmin_fieldsets(self, request, object_id=None):
-        obj = self.model.objects.get(pk=object_id) if object_id else None
+        obj = self.get_queryset(request).get(pk=object_id) if object_id else None
         fieldsets = self.sbadmin_fieldsets or [
             (
                 None,

@@ -13,6 +13,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils.translation import gettext_lazy as _
 
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
 if TYPE_CHECKING:
@@ -53,7 +54,7 @@ class SBAdminWizardStep:
 
     @property
     def request(self):
-        return self.wizard.request
+        return SBAdminThreadLocalService.get_request()
 
     def get_title(self) -> str:
         return str(self.title)

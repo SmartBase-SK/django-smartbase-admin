@@ -1,3 +1,5 @@
+import {sanitizeHtml} from './sanitize'
+
 const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
     let value = $inputEl.val()
     if (value !== undefined) {
@@ -266,7 +268,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                         if (column.hide_zero && value === 0) {
                             value = ""
                         }
-                        $tdList.eq(1 + tableConfig.nodeColumnIdx + index).html(value)
+                        $tdList.eq(1 + tableConfig.nodeColumnIdx + index).html(sanitizeHtml(value))
                     })
                 },
                 init: function (event, data) {
@@ -326,7 +328,7 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                     body: order
                 }).then(response => response.json())
                     .then(res => {
-                        document.getElementById("notification-messages").innerHTML = res.messages
+                        document.getElementById("notification-messages").innerHTML = sanitizeHtml(res.messages)
                         window.htmx.process(document.getElementById("notification-messages"))
                     })
             }
