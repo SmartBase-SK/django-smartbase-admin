@@ -77,11 +77,13 @@ def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
 
 
 class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
-    def get_sbadmin_fieldsets(
-        self, request=None, object_id=None
-    ) -> Iterable[tuple[str | None, dict]]:
+    def get_sbadmin_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)
-        return getattr(meta, "sbadmin_fieldsets", tuple())
+        if meta is None:
+            return tuple()
+        return getattr(meta, "sbadmin_fieldsets", None) or getattr(
+            meta, "fieldsets", tuple()
+        )
 
     def get_fieldsets_context(self) -> dict[str | None, dict]:
         return {
@@ -106,6 +108,7 @@ class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
                 name=name,
                 fields=self.get_fieldset_fields(data),
                 classes=data.get("classes", ""),
+                description=data.get("description"),
             )
             context = dict(data)
             context["fieldset_layout"] = self.get_fieldset_layout(
