@@ -265,11 +265,11 @@
                                 hx-encoding="multipart/form-data"
                                 hx-vals='{
                                     "sbadmin_is_modal": 1,
-                                    "sb_admin_source_field": "{{ request.GET.sb_admin_source_field }}",
+                                    "sb_admin_source_field": "{{ request.GET.sb_admin_source_field|escapejs }}",
                                     "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
-                                    "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field }}",
-                                    "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk | default:"" }}",
-                                    "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label }}"
+                                    "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field|escapejs }}",
+                                    "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk|default:""|escapejs }}",
+                                    "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label|escapejs }}"
                                 }'
                                 class="btn btn-primary flex-grow flex items-center justify-center">
                             <svg class="w-20 h-20 mr-8">

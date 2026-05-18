@@ -318,8 +318,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             if action.action_id == Action.BULK_DELETE.value:
                 return view.has_delete_permission(request, obj)
             return self.has_permission(
-                request, request_data, view, model, obj, "view"
-            ) or self.has_permission(request, request_data, view, model, obj, "change")
+                request, request_data, view, model, obj, required
+            )
         return request.user.is_staff
 
     def has_permission(

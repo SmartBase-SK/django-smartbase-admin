@@ -6,8 +6,9 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.test import RequestFactory, TestCase
 
-from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.services.views import SBAdminViewService
 
 PATCH_FROM_REQUEST = (
@@ -95,6 +96,55 @@ class TestDelegateToAction(TestCase):
         base_view = SBAdminBaseView.__new__(SBAdminBaseView)
         inner = base_view.delegate_to_action_view(mock_action)
         self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
+
+    @patch(PATCH_FROM_REQUEST)
+    def test_decorator_permission_propagated_to_action(self, mock_from_request):
+        @sbadmin_action(permission="delete")
+        def restricted_action(request, modifier):
+            return HttpResponse("ok")
+
+        view = MagicMock()
+        view.restricted_action = restricted_action
+        view.has_permission_for_action.return_value = True
+        view.init_view_dynamic = MagicMock()
+
+        rd = _make_request_data("restricted_action")
+        rd.selected_view = view
+        mock_from_request.return_value = rd
+
+        SBAdminViewService.delegate_to_action(
+            self.factory.get("/"),
+            view="v",
+            action="restricted_action",
+            modifier="template",
+        )
+
+        action_arg = view.has_permission_for_action.call_args.args[1]
+        self.assertEqual(action_arg.permission, "delete")
+
+
+class TestDefaultActionPermission(TestCase):
+    """Custom actions with no explicit ``permission`` must default to
+    requiring ``change`` — read-only endpoints opt out via
+    ``@sbadmin_action(permission="view")``."""
+
+    def test_default_requires_change(self):
+        config = SBAdminRoleConfiguration()
+        action = SBAdminCustomAction.__new__(SBAdminCustomAction)
+        action.action_id = "some_action"
+        action.permission = None
+
+        with patch.object(config, "has_permission") as has_perm:
+            config.has_action_permission(
+                MagicMock(),
+                MagicMock(),
+                MagicMock(),
+                MagicMock(),
+                None,
+                action,
+            )
+
+        self.assertEqual(has_perm.call_args.args[-1], "change")
 
 
 class TestSbadminActionDecorator(TestCase):

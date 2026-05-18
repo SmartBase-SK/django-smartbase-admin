@@ -247,7 +247,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
             return response
         return None
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def list(self, request, modifier):
         language_choice_change_response = self.handle_language_choice_change(request)
         if language_choice_change_response:

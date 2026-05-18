@@ -74,6 +74,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
+- **What permission does my custom action require?** → [Permission defaults](#permission-defaults)
 - **Inline for model without FK to parent?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
 - **Cross-database or unmanaged inline?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
 - **Multiple inlines for the same model?** → [Fake Inlines](#fake-inlines-sbadminfakeinlinemixin)
@@ -798,6 +799,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | Method | Purpose | Documented in |
 |--------|---------|---------------|
 | `has_permission()` | Replace Django model permissions with custom system | [Custom Permission System](#custom-permission-system-has_permission) |
+| `has_action_permission()` | Decide which Django permission a URL-callable action needs (default: `"change"`, unless `@sbadmin_action(permission=...)` is set) | [Permission defaults](#permission-defaults) |
 | `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 
@@ -3669,6 +3671,21 @@ Override default logo by placing files in your static directory:
 
 Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions go through `delegate_to_action`, which checks for this decorator and runs `has_permission_for_action` before dispatching.
 
+### Permission defaults
+
+The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"` to the decorator. `BULK_DELETE` is special-cased through `has_delete_permission`.
+
+| Action kind | Decorator | Default check |
+|-------------|-----------|---------------|
+| Read-only (list/json/autocomplete/xlsx/config/dashboard data) | `@sbadmin_action(permission="view")` | `has_permission(..., "view")` |
+| State-changing custom action | `@sbadmin_action` (bare) | `has_permission(..., "change")` |
+| Mutation needing a stronger permission | `@sbadmin_action(permission="delete")` (or `"add"`) | `has_permission(..., <kwarg>)` |
+| `Action.BULK_DELETE.value` | bare | `view.has_delete_permission(request, obj)` |
+
+The kwarg is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
+
+Built-in read-only endpoints already carry `permission="view"`: `action_list`, `action_list_json`, `action_autocomplete` (on admins, filter widgets, and the tree widget), `action_xlsx_export`, `action_config`, dashboard widget `action_get_data`, audit log `action_list_json`, translations `list`. The reorder family (`action_table_reorder`, `action_table_data_edit`, `action_list_json_reorder`, `action_enter_reorder`) is intentionally left at the default — entering reorder mode is treated as a mutation.
+
 ### Usage
 
 ```python
@@ -3730,14 +3747,15 @@ class ArticleAdmin(SBAdmin):
 
 **Key points:**
 - Import from `django_smartbase_admin.engine.actions`
-- All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated
+- All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated — read-only ones carry `permission="view"` (see [Permission defaults](#permission-defaults))
+- Bare `@sbadmin_action` on a custom method requires the **`change`** permission by default; pass `permission="view"` for read-only endpoints
 - `SBAdminFormViewAction` modal views (see [Selection Actions](#selection-actions-bulk-actions)) are automatically marked — no decorator needed
 - `SBAdminCustomAction` or `SBAdminRowAction` with direct `action_id` requires the decorator on the target method
 - Non-modal methods that mutate data should usually return `self.build_action_response(request)` so notifications render and the table reloads
 - Subclasses that override decorated methods inherit the marker
-- `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
+- `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_action_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
 
-**Source:** `django_smartbase_admin/engine/actions.py` — `sbadmin_action`; `django_smartbase_admin/services/views.py` — `SBAdminViewService.delegate_to_action`
+**Source:** `django_smartbase_admin/engine/actions.py` — `sbadmin_action`, `SBAdminCustomAction.permission`; `django_smartbase_admin/services/views.py` — `SBAdminViewService.delegate_to_action`; `django_smartbase_admin/engine/configuration.py` — `SBAdminRoleConfiguration.has_action_permission`
 
 ---
 

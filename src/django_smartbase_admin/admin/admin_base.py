@@ -1065,18 +1065,36 @@ class SBAdmin(
 
     @classmethod
     def set_generic_relation_from_parent(cls, request, obj):
-        parent_model_path = request.POST.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
-        parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+        from django_smartbase_admin.admin.site import sb_admin_site
 
-        if parent_model_path and parent_pk:
-            prefix, app_label, model_name, field, parent_model = (
-                parent_model_path.split("_", 5)
-            )
+        parent_path = request.POST.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
+        parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+        if not (parent_path and parent_pk):
+            return
+
+        # Token: ``modal_<app>_<model>_<field>_<parent_model>``; rsplit
+        # tolerates underscores in app labels / model names.
+        try:
+            _, _, app_label, model_name = parent_path.rsplit("_", 3)
             content_type = ContentType.objects.get(
-                app_label=app_label, model=parent_model
+                app_label=app_label, model=model_name
             )
-            obj.content_type = content_type
-            obj.object_id = int(parent_pk)
+            parent_model = content_type.model_class()
+        except (ValueError, ContentType.DoesNotExist):
+            raise PermissionDenied
+
+        # Route through the registered parent admin so has_view_permission
+        # and restrict_queryset gate the lookup.
+        parent_admin = sb_admin_site._registry.get(parent_model)
+        if (
+            parent_admin is None
+            or not parent_admin.has_view_permission(request)
+            or not parent_admin.get_queryset(request).filter(pk=parent_pk).exists()
+        ):
+            raise PermissionDenied
+
+        obj.content_type = content_type
+        obj.object_id = int(parent_pk)
 
     def save_model(self, request, obj, form, change):
         if self.sbadmin_is_generic_model and SBADMIN_IS_MODAL_VAR in request.POST:
