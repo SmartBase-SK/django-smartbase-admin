@@ -12,9 +12,7 @@ from django_smartbase_admin.engine.field import SBAdminField
 
 class _DashboardWidget(SBAdminDashboardListWidget):
     model = User
-    sbadmin_list_display = (
-        SBAdminField(name="display_name", annotate=F("username")),
-    )
+    sbadmin_list_display = (SBAdminField(name="display_name", annotate=F("username")),)
 
     def has_view_or_change_permission(self, request, obj=None):
         return True
