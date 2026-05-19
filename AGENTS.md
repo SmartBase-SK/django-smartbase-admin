@@ -31,6 +31,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Tree Widget & Tree List View](#tree-widget--tree-list-view-treebeard-mp_node) | Multi-level tree rendering for django-treebeard `MP_Node` models — form widget, filter widget, `actions/tree_list.html` |
 | [List View Plugins](#list-view-plugins-sbadminplugin) | Protocol for reshaping the list pipeline globally — queryset hooks, per-request state, Tabulator definition |
 | [List-View AJAX Notifications](#list-view-ajax-notifications) | Surface Django messages from list-action requests via the standard notification slot; fail-soft pattern for the list query |
+| [Fieldset Options](#fieldset-options) | Supported keys for `fieldsets` / `sbadmin_fieldsets`, including descriptions, classes, dynamic regions, and collapse |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Logo Customization](#logo-customization) | Override logo via static files |
@@ -72,6 +73,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Reshape list queryset / Tabulator options globally?** → [List View Plugins](#list-view-plugins-sbadminplugin)
 - **Show a Django message from a list-view request?** → [List-View AJAX Notifications](#list-view-ajax-notifications)
 - **Fail-soft empty response from a list view?** → [Failing Soft on Errors](#failing-soft-on-errors)
+- **Collapse a form fieldset?** → [Fieldset Options](#fieldset-options)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
@@ -3839,6 +3841,61 @@ class CommentAdmin(SBAdmin):
 
 ---
 
+## Fieldset Options
+
+Use `fieldsets` or `sbadmin_fieldsets` to control form layout in normal admin add/change views, stacked inlines, and modal/action forms. Each fieldset is a `(name, options)` tuple. `name` may be `None` to omit the title text, but names should be unique when the form has multiple fieldsets.
+
+```python
+from django.contrib import admin
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+
+from blog.models import Article
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_fieldsets = (
+        (
+            "Content",
+            {
+                "fields": ("title", "body", ("category", "author")),
+                "description": "Editorial content and ownership.",
+            },
+        ),
+        (
+            "Advanced",
+            {
+                "fields": ("status",),
+                "classes": ("wide",),
+                "collapsible": True,
+                "default_collapsed": True,
+            },
+        ),
+    )
+```
+
+Supported option keys:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `fields` | iterable | Field names to render. Group a row with a nested tuple/list such as `("category", "author")`. SBAdmin also accepts `SBDynamicRegion` markers here. |
+| `classes` | list/tuple/string | Extra classes on the rendered `<fieldset>`. Use `DETAIL_STRUCTURE_RIGHT_CLASS` here for sidebar fieldsets. |
+| `description` | string | Tooltip/help text next to the fieldset title. Escape user-controlled HTML before passing it here. |
+| `collapsible` | bool | Render the fieldset body inside Bootstrap collapse and add a header toggle. Defaults to `False`. |
+| `default_collapsed` | bool | Initial closed state for a collapsible fieldset. Defaults to `False`; ignored unless `collapsible=True`. |
+
+**Key points:**
+- Use `sbadmin_fieldsets` when you need SBAdmin-only behavior such as dynamic regions or collapsible fieldsets. Plain Django `fieldsets` still works for basic `fields`, `classes`, and `description`.
+- `collapsible=True` uses Bootstrap collapse; do not activate it with `classes=["collapse"]`.
+- `default_collapsed=True` starts the fieldset closed. Existing JS opens collapsed ancestors when focusing validation errors.
+- SBAdmin looks up fieldset metadata by the tuple's first value (`name`). Avoid multiple fieldsets with the same name, including multiple `None` fieldsets, when using dynamic regions or collapse metadata.
+- The collapse id is generated from `sbadmin-fieldset`, the form prefix when present, and the fieldset name when present. Prefixed inline rows therefore get separate collapse ids.
+
+**Source:** `django_smartbase_admin/admin/admin_base.py`, `django_smartbase_admin/engine/dynamic_forms.py`, `django_smartbase_admin/templates/sb_admin/includes/fieldset_header.html`
+
+---
+
 ## Detail View Layout (Sidebar)
 
 The detail/change view in SBAdmin supports a two-column layout: main content on the left and a sidebar on the right. Use this for metadata, status info, or secondary fields that shouldn't take up full width.
@@ -3960,7 +4017,7 @@ class ArticleAdmin(SBAdmin):
 
 ### Combining with Collapse
 
-Sidebar fieldsets can also be collapsible:
+Sidebar fieldsets can also be collapsible. Keep sidebar placement in `classes`, and use the explicit collapse metadata for Bootstrap collapse:
 
 ```python
 sbadmin_fieldsets = [
@@ -3969,7 +4026,9 @@ sbadmin_fieldsets = [
         "Advanced Options",
         {
             "fields": ["seo_title", "seo_description"],
-            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS, "collapse"],
+            "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            "collapsible": True,
+            "default_collapsed": True,
         },
     ),
 ]
@@ -3977,8 +4036,9 @@ sbadmin_fieldsets = [
 
 **Key points:**
 - Fieldsets are rendered in order - put main content fieldsets first, then sidebar fieldsets
-- Use `None` as fieldset title to hide the header entirely
+- Use `None` as fieldset title to omit the title text; fieldsets with a description, actions, or collapse button still render a header row for those controls
 - Import `DETAIL_STRUCTURE_RIGHT_CLASS` from `django_smartbase_admin.engine.const`
+- Use `collapsible=True`, not `classes=["collapse"]`, to enable fieldset collapse
 - Custom HTML fields need `mark_safe()` and should escape user content with `escape()`
 - Sidebar is hidden in modal views (only shown in full page detail view)
 

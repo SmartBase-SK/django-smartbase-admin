@@ -281,6 +281,14 @@ class SBAdminDynamicFormMixin:
             self._sbadmin_fieldset_data_map = fieldset_data_map
         return fieldset_data_map
 
+    def get_fieldset_collapse_id(self, fieldset: Fieldset) -> str:
+        pieces = ["sbadmin-fieldset"]
+        if self.prefix:
+            pieces.append(str(self.prefix))
+        if fieldset.name:
+            pieces.append(str(fieldset.name))
+        return slugify("-".join(pieces)).replace("_", "-")
+
     def get_fieldset_context(
         self, fieldset: Fieldset, request: HttpRequest | None = None
     ) -> dict[str, Any]:
@@ -288,11 +296,17 @@ class SBAdminDynamicFormMixin:
         fieldset_data = self.get_fieldset_data_map(request).get(fieldset_key)
         if fieldset_data is None:
             return {}
+        collapsible = bool(fieldset_data.get("collapsible", False))
+        default_collapsed = bool(fieldset_data.get("default_collapsed", False))
         return {
             "fieldset": fieldset,
             "fieldset_layout": self.get_fieldset_layout(
                 fieldset, fieldset_data, request
             ),
+            "collapsible": collapsible,
+            "default_collapsed": default_collapsed,
+            "collapse_id": self.get_fieldset_collapse_id(fieldset),
+            "collapse_open": collapsible and not default_collapsed,
         }
 
     def get_fieldset_layout(

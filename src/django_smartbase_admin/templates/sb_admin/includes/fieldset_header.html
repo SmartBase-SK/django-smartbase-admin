@@ -1,6 +1,8 @@
-{% if fieldset.name %}
-    <header class="mb-24 flex items-center">
-        <span class="text-dark-900">{{ fieldset.name }}</span>
+{% if fieldset.name or fieldset.description or fieldset_context.actions or fieldset_context.collapsible %}
+    <header class="{% if fieldset_context.collapsible %}!mb-0{% else %}mb-24{% endif %} flex items-center">
+        {% if fieldset.name %}
+            <span class="text-dark-900">{{ fieldset.name }}</span>
+        {% endif %}
         {% if fieldset.description %}
             <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
                 <svg class="w-20 h-20">
@@ -8,10 +10,24 @@
                 </svg>
             </div>
         {% endif %}
-        <div class="ml-auto flex items-center gap-4">
-            {% for action in fieldset_context.actions %}
-                <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
-            {% endfor %}
-        </div>
+        {% if fieldset_context.actions or fieldset_context.collapsible %}
+            <div class="ml-auto flex items-center gap-4">
+                {% for action in fieldset_context.actions %}
+                    <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
+                {% endfor %}
+                {% if fieldset_context.collapsible %}
+                    <button type="button"
+                            class="btn btn-empty btn-only-icon collapse-btn{% if not fieldset_context.collapse_open %} collapsed{% endif %}"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#{{ fieldset_context.collapse_id }}"
+                            aria-controls="{{ fieldset_context.collapse_id }}"
+                            aria-expanded="{{ fieldset_context.collapse_open|yesno:"true,false" }}">
+                        <svg class="w-20 h-20">
+                            <use xlink:href="#Down"></use>
+                        </svg>
+                    </button>
+                {% endif %}
+            </div>
+        {% endif %}
     </header>
 {% endif %}

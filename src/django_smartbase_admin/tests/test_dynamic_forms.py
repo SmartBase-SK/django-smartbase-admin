@@ -603,6 +603,43 @@ class DynamicFormTests(SimpleTestCase):
     def tearDown(self):
         sb_admin_request.reset(self.request_token)
 
+    def render_fieldset(self, form, index=0):
+        fieldsets = []
+        for fieldset in form.fieldsets():
+            fieldset_data = {
+                "fields": fieldset.fields,
+                "classes": fieldset.classes,
+            }
+            if fieldset.description:
+                fieldset_data["description"] = fieldset.description
+            fieldsets.append((fieldset.name, fieldset_data))
+        admin_form = AdminForm(
+            form,
+            fieldsets,
+            prepopulated_fields={},
+            readonly_fields=[],
+        )
+        fieldset = list(admin_form)[index]
+        return render_to_string(
+            "sb_admin/includes/fieldset.html",
+            {
+                "adminform": admin_form,
+                "fieldset": fieldset,
+            },
+            request=self.request,
+        )
+
+    def assert_collapse_body(self, html, collapse_id, *expected_classes):
+        self.assertRegex(
+            html,
+            rf'id="{collapse_id}" class="[^"]*\bcollapse\b[^"]*"',
+        )
+        collapse_class = html.split(f'id="{collapse_id}" class="', 1)[1].split('"', 1)[
+            0
+        ]
+        for expected_class in expected_classes:
+            self.assertIn(expected_class, collapse_class.split())
+
     def test_form_fieldsets_can_use_meta_fieldsets(self):
         form = MetaFieldsetsForm(request=self.request)
         fieldsets = list(form.fieldsets())
@@ -625,6 +662,136 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(len(fieldsets), 1)
         self.assertEqual(fieldsets[0].name, "SBAdmin")
         self.assertEqual(fieldsets[0].fields, ("subtitle",))
+
+    def test_collapsible_fieldset_defaults_open(self):
+        class CollapsibleFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("title",),
+                            "collapsible": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(CollapsibleFieldsetForm(request=self.request))
+
+        self.assertIn('data-bs-toggle="collapse"', html)
+        self.assertIn('data-bs-target="#sbadmin-fieldset-details"', html)
+        self.assertIn('aria-controls="sbadmin-fieldset-details"', html)
+        self.assertIn('aria-expanded="true"', html)
+        self.assert_collapse_body(
+            html,
+            "sbadmin-fieldset-details",
+            "sbadmin-fieldset-collapse",
+            "show",
+        )
+
+    def test_collapsible_fieldset_can_default_closed(self):
+        class CollapsibleFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Advanced",
+                        {
+                            "fields": ("title",),
+                            "collapsible": True,
+                            "default_collapsed": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(CollapsibleFieldsetForm(request=self.request))
+
+        self.assertIn('data-bs-target="#sbadmin-fieldset-advanced"', html)
+        self.assertIn('aria-expanded="false"', html)
+        self.assertIn("collapse-btn collapsed", html)
+        self.assert_collapse_body(
+            html,
+            "sbadmin-fieldset-advanced",
+            "sbadmin-fieldset-collapse",
+        )
+        collapse_class = html.split('id="sbadmin-fieldset-advanced" class="', 1)[
+            1
+        ].split('"', 1)[0]
+        self.assertNotIn(
+            "show",
+            collapse_class.split(),
+        )
+
+    def test_non_collapsible_fieldset_does_not_render_collapse_markup(self):
+        html = self.render_fieldset(MetaFieldsetsForm(request=self.request))
+
+        self.assertNotIn('data-bs-toggle="collapse"', html)
+        self.assertNotIn("sbadmin-fieldset-collapse", html)
+
+    def test_collapsible_unnamed_fieldset_id_uses_prefix_only(self):
+        class CollapsibleUnnamedFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+            subtitle = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        None,
+                        {
+                            "fields": ("title", "subtitle"),
+                            "collapsible": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(
+            CollapsibleUnnamedFieldsetForm(prefix="inline-0", request=self.request)
+        )
+
+        self.assertIn('data-bs-target="#sbadmin-fieldset-inline-0"', html)
+        self.assert_collapse_body(
+            html,
+            "sbadmin-fieldset-inline-0",
+            "sbadmin-fieldset-collapse",
+            "show",
+        )
+
+    def test_collapsible_fieldset_preserves_dynamic_region_order(self):
+        class CollapsibleCombinedDynamicFieldsetForm(CombinedDynamicFieldsetForm):
+            view = FakeView()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        CombinedDynamicFieldsetForm.Meta.sbadmin_fieldsets[0][0],
+                        {
+                            **CombinedDynamicFieldsetForm.Meta.sbadmin_fieldsets[0][1],
+                            "collapsible": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(
+            CollapsibleCombinedDynamicFieldsetForm(request=self.request)
+        )
+
+        self.assert_collapse_body(
+            html,
+            "sbadmin-fieldset-combined-details",
+            "sbadmin-fieldset-collapse",
+            "show",
+        )
+        self.assertLess(
+            html.index('name="mode"'),
+            html.index('id="sbadmin-dynamic-region-combined-details"'),
+        )
+        self.assertLess(
+            html.index('id="sbadmin-dynamic-region-combined-details"'),
+            html.index('name="note"'),
+        )
 
     def test_action_modal_form_does_not_use_parent_view_dynamic_regions(self):
         modal = ExternalRegionActionModal(
@@ -785,6 +952,7 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(issubclass(inline_form.__class__, SBAdminDynamicFormMixin))
+        self.assertIn("js-stacked-inline-collapse", html)
         self.assertIn('data-sbadmin-dynamic-region="inline_details"', html)
         self.assertIn('hx-target="#sbadmin-dynamic-region-', html)
         self.assertIn('-0-summary"', html)
