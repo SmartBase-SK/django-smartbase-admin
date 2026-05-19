@@ -132,6 +132,11 @@
                 @apply hidden;
             }
         }
+        &.input-file--readonly {
+            &:not(.filled):hover {
+                @apply border-dark-300 bg-light;
+            }
+        }
     }
 
     input.checkbox,

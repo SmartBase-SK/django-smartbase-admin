@@ -149,4 +149,25 @@
     .choices__placeholder {
         @apply text-dark m-0 p-0;
     }
+
+    &.choices--readonly {
+
+        .choices__input,
+        .choices__input.choices__input--cloned {
+            @apply hidden;
+        }
+
+        .choices__button {
+            @apply hidden;
+        }
+
+        .choices__inner {
+            @apply bg-dark-50 border-dark-200 shadow-none;
+        }
+
+        &:not(.is-disabled) .choices__inner:hover,
+        &.is-focused .choices__inner {
+            @apply border-dark-200 outline-transparent shadow-none;
+        }
+    }
 }

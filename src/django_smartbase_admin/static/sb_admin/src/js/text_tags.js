@@ -1,10 +1,11 @@
 import Choices from "choices.js"
 
-import {choicesJSOptions} from "./choices"
+import { choicesJSOptions } from "./choices"
 
 
 const TEXT_TAGS_SELECTOR = "input.js-sbadmin-text-tags"
 const TEXT_TAGS_OUTER_CLASS = "choices--sbadmin-text-tags"
+const TEXT_TAGS_READONLY_CLASS = "choices--readonly"
 
 export default class TextTags {
     constructor() {
@@ -21,12 +22,16 @@ export default class TextTags {
         })
     }
 
+    isReadonly(inputEl) {
+        return inputEl.readOnly || inputEl.hasAttribute("readonly")
+    }
+
     getTagsOptions(inputEl) {
         const base = choicesJSOptions(inputEl)
         const delimiter = inputEl.dataset.choicesDelimiter || ","
         const placeholder = inputEl.getAttribute("placeholder") || ""
         const hasPlaceholder = Boolean(placeholder)
-        return {
+        const options = {
             ...base,
             allowHTML: false,
             delimiter,
@@ -39,6 +44,17 @@ export default class TextTags {
             placeholder: hasPlaceholder,
             placeholderValue: hasPlaceholder ? placeholder : undefined,
         }
+        if (this.isReadonly(inputEl)) {
+            return {
+                ...options,
+                editItems: false,
+                paste: false,
+                removeItemButton: false,
+                placeholder: false,
+                placeholderValue: undefined,
+            }
+        }
+        return options
     }
 
     initTextTags(inputEl) {
@@ -50,5 +66,8 @@ export default class TextTags {
         }
         const instance = new Choices(inputEl, this.getTagsOptions(inputEl))
         instance.containerOuter.element.classList.add(TEXT_TAGS_OUTER_CLASS)
+        if (this.isReadonly(inputEl)) {
+            instance.containerOuter.element.classList.add(TEXT_TAGS_READONLY_CLASS)
+        }
     }
 }
