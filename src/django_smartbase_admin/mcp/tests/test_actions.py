@@ -27,7 +27,6 @@ from django_smartbase_admin.mcp.tests._common import (
     build_mcp_request,
 )
 
-
 # Local URLconf so ``reverse("sb_admin:...")`` works inside tests —
 # both ``init_view_dynamic`` (action URL resolution) and the list/
 # autocomplete pipelines reach for it.

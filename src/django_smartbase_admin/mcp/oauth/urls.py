@@ -31,7 +31,6 @@ from django.urls import include, path
 
 from django_smartbase_admin.mcp.oauth import views
 
-
 urlpatterns = [
     # MCP-required discovery endpoints (DOT does not ship these).
     path(

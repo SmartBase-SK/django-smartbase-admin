@@ -1,7 +1,8 @@
 {% load sb_admin_tags %}
-{% get_item fieldsets_context fieldset.name as fieldset_context %}
+{% firstof fieldset_class "card sm:mb-24 relative" as resolved_fieldset_class %}
+{% resolve_fieldset_context fieldset request as fieldset_context %}
 
-<fieldset class="card sm:mb-24 relative {{ fieldset.classes }}">
+<fieldset class="{{ resolved_fieldset_class }} {{ fieldset_context.fieldset.classes }}">
     {% include 'sb_admin/includes/inline_fieldset.html' %}
 
     {% block after_fieldset %}

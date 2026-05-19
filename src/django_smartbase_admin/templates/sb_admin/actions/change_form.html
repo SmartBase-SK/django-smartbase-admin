@@ -193,7 +193,7 @@
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %} pt-20" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %}{% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %} pt-20{% endif %}" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
                      aria-labelledby="tab_{{ tab|slugify }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">

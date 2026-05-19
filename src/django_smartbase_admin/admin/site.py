@@ -5,7 +5,16 @@ from typing import Any
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.contrib.auth.decorators import login_not_required
+
+try:
+    from django.contrib.auth.decorators import login_not_required
+except ImportError:
+
+    def login_not_required(view_func):
+        view_func.login_required = False
+        return view_func
+
+
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import URLPattern, URLResolver, path, reverse, reverse_lazy
 from django.utils.decorators import method_decorator

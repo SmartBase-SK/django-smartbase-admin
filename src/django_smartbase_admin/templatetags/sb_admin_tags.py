@@ -115,6 +115,16 @@ def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
 
 
 @register.simple_tag
+def resolve_fieldset_context(fieldset, request=None):
+    form = getattr(fieldset, "form", None)
+    if form is not None and hasattr(form, "get_fieldset_context"):
+        fieldset_context = form.get_fieldset_context(fieldset, request)
+        if fieldset_context:
+            return fieldset_context
+    return {"fieldset": fieldset}
+
+
+@register.simple_tag
 def get_tabular_context(fieldsets, inlines, tabs):
     default_tabs = False
     any_error = False

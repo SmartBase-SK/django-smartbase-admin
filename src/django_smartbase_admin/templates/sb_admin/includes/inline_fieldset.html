@@ -1,57 +1,36 @@
 {% load sb_admin_tags %}
 
 {% block content %}
-	{% block header %}
-		{% if fieldset.name %}
-            <header class="mb-24 flex items-center">
-                <span class="text-dark-900">{{ fieldset.name }}</span>
-                {% block description %}
-                    {% if fieldset.description %}
-                        <div class="js-tooltip ml-8" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ fieldset.description|safe }}">
-                            <svg class="w-20 h-20">
-                                <use xlink:href="#Help"></use>
-                            </svg>
-                        </div>
-                    {% endif %}
-                {% endblock %}
-                <div class="ml-auto flex items-center gap-4">
-                    {% block actions %}
-                        {% for action in fieldset_context.actions %}
-                            <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
-                        {% endfor %}
-                    {% endblock %}
-                </div>
-            </header>
+    {% if not fieldset_context.fieldset %}
+        {% resolve_fieldset_context fieldset request as fieldset_context %}
+    {% endif %}
+
+    {% block header %}
+        {% if not skip_header %}
+            {% include "sb_admin/includes/fieldset_header.html" %}
         {% endif %}
-	{% endblock %}
-
-    {% block lines %}
-        {% for line in fieldset %}
-            <div class="field{% if forloop.last %} -mb-24{% endif %}{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
-                {% if line.fields|length > 1 %}
-                    <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
-
-                {% for field in line %}
-                    <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden or field.field|is_row_class_field %} hidden{% endif %}">
-                        {% if field.is_readonly %}
-                            {% call_method field "contents" request %}
-                        {% else %}
-                            {{ field.field }}
-                            {% if not line.fields|length == 1 %}{{ field.errors }}{% endif %}
-                        {% endif %}
-                    </div>
-                {% endfor %}
-
-                {% if line.fields|length == 1 and line.errors %}
-                    <div class="-mt-16 mb-24">
-                        {{ line.errors }}
-                    </div>
-                {% endif %}
-                {% if line.fields|length > 1 %}</div>{% endif %}
-            </div>
-        {% endfor %}
-
     {% endblock %}
+
+    {% block fieldset_body %}
+        {% if fieldset_context.collapsible %}
+            <div id="{{ fieldset_context.collapse_id }}" class="collapse pt-24 sbadmin-fieldset-collapse{% if fieldset_context.collapse_open %} show{% endif %}">
+        {% endif %}
+            {% if fieldset_context.fieldset_layout %}
+                {% for layout_item in fieldset_context.fieldset_layout %}
+                    {% if layout_item.region %}
+                        {% include 'sb_admin/includes/dynamic_region.html' with dynamic_region=layout_item.region %}
+                    {% else %}
+                        {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=layout_item.fieldset %}
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=fieldset_context.fieldset %}
+            {% endif %}
+        {% if fieldset_context.collapsible %}
+            </div>
+        {% endif %}
+    {% endblock %}
+
     {% block additional_fields %}
 
     {% endblock %}

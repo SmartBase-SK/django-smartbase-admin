@@ -19,7 +19,6 @@ from django_smartbase_admin.engine.filter_widgets import (
     ChoiceFilterWidget,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

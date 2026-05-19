@@ -8,6 +8,8 @@ from django.contrib.admin.helpers import Fieldset
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from django_smartbase_admin.engine.dynamic_forms import SBAdminDynamicFormMixin
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,13 +82,17 @@ def sb_admin_filer_directory_listing_url_for_file(file_obj) -> str:
     )
 
 
-class FormFieldsetMixin(forms.Form):
-    def get_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
+class FormFieldsetMixin(SBAdminDynamicFormMixin, forms.Form):
+    def get_sbadmin_fieldsets(self) -> Iterable[tuple[str | None, dict]]:
         meta = getattr(self, "Meta", None)
-        return getattr(meta, "fieldsets", tuple())
+        if meta is None:
+            return tuple()
+        return getattr(meta, "sbadmin_fieldsets", None) or getattr(
+            meta, "fieldsets", tuple()
+        )
 
     def fieldsets(self) -> Iterable[Fieldset]:
-        if not (fieldsets := self.get_fieldsets()):
+        if not (fieldsets := self.get_sbadmin_fieldsets()):
             logger.warning(
                 "No fieldsets defined for form %s. Using form fields as fallback.",
                 self.__class__.__name__,
@@ -95,12 +101,14 @@ class FormFieldsetMixin(forms.Form):
             return
 
         for name, data in fieldsets:
-            yield Fieldset(
+            fieldset = Fieldset(
                 form=self,
                 name=name,
-                fields=data.get("fields", ()),
+                fields=self.get_fieldset_fields(data),
                 classes=data.get("classes", ""),
+                description=data.get("description"),
             )
+            yield fieldset
 
 
 def _pluck_classes(modules, classnames):

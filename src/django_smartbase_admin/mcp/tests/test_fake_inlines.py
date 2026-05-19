@@ -32,7 +32,6 @@ from django_smartbase_admin.mcp.tests._common import (
     build_mcp_request,
 )
 
-
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
 

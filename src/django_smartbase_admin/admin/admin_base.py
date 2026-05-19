@@ -32,7 +32,7 @@ from django.forms.models import (
     _get_foreign_key,
     modelform_factory,
 )
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch, resolve
@@ -55,8 +55,15 @@ from nested_admin.nested import (
 from django_smartbase_admin.audit.views import (
     redirect_to_audit_history,
 )
-from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+from django_smartbase_admin.engine.dynamic_forms import (
+    SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
+    SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
+    SBADMIN_DYNAMIC_REGION_PARAM,
+    SBAdminDynamicFormMixin,
+    dynamic_region_initial_from_data,
+)
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import (
     FormFieldsetMixin,
@@ -247,14 +254,13 @@ class SBAdminFormFieldWidgetsMixin:
         if not widget:
             return form_field
         choices = getattr(form_field, "choices", None)
-        if choices:
-            form_field.widget = widget(form_field=form_field, choices=choices)
-            return form_field
         widget_attrs = form_field.widget.attrs
         widget_attrs.pop(
             "class", None
         )  # remove origin classes to prevent override our custom widget class
         kwargs = {}
+        if choices:
+            kwargs["choices"] = choices
         if isinstance(form_field, RichTextFormField):
             kwargs["config_name"] = getattr(
                 form_field.widget, "config_name", None
@@ -345,6 +351,7 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
         threadsafe_request = kwargs.pop(
             "request", SBAdminThreadLocalService.get_request()
         )
+        self.request = threadsafe_request
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
         model = getattr(getattr(self, "_meta", None), "model", None)
@@ -516,6 +523,7 @@ if parler_enabled:
 
 
 class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
+    sbadmin_fieldsets = None
     sbadmin_fake_inlines = None
     all_base_fields_form = None
 
@@ -571,6 +579,135 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     def initialize_form_class(self, form, request) -> None:
         if form:
             form.view = self
+
+    def get_dynamic_form_class(self, form):
+        if issubclass(form, SBAdminDynamicFormMixin):
+            return form
+        return type(
+            f"SBAdminDynamic{form.__name__}",
+            (SBAdminDynamicFormMixin, form),
+            {
+                "__module__": form.__module__,
+            },
+        )
+
+    def get_form(self, request, obj=None, **kwargs):
+        self.initialize_all_base_fields_form(request)
+        form = super().get_form(request, obj, **kwargs)
+        form = self.get_dynamic_form_class(form)
+        self.initialize_form_class(form, request)
+        return form
+
+    def get_sbadmin_fieldsets(
+        self, request, object_id=None
+    ) -> list[tuple[str | None, dict[str, Any]]]:
+        return self.sbadmin_fieldsets or self.fieldsets or []
+
+    def get_fieldsets(
+        self, request, obj=None
+    ) -> list[tuple[str | None, dict[str, Any]]]:
+        sbadmin_fieldsets = self.get_sbadmin_fieldsets(
+            request, getattr(obj, "id", None)
+        )
+        if not sbadmin_fieldsets:
+            return super().get_fieldsets(request, obj)
+        fieldsets = []
+        for fieldset in sbadmin_fieldsets:
+            fieldset_dict = {
+                "fields": SBAdminDynamicFormMixin.get_fieldset_fields(fieldset[1])
+            }
+            classes = fieldset[1].get("classes")
+            description = fieldset[1].get("description")
+            if classes:
+                fieldset_dict["classes"] = classes
+            if description:
+                fieldset_dict["description"] = description
+            fieldsets.append((fieldset[0], fieldset_dict))
+        return fieldsets
+
+    def get_dynamic_region_object(self, request, modifier):
+        if modifier == SBADMIN_DYNAMIC_REGION_ADD_MODIFIER:
+            return None
+        if hasattr(self, "get_object"):
+            return self.get_object(request, modifier)
+        try:
+            return self.get_queryset(request).get(pk=modifier)
+        except self.model.DoesNotExist:
+            return None
+
+    def get_dynamic_region_form_class(self, request, obj=None):
+        return self.get_form(request, obj=obj, change=bool(obj))
+
+    def get_dynamic_region_form_kwargs(self, request, form_class, data, obj=None):
+        form_kwargs = {}
+        if obj is not None:
+            form_kwargs["instance"] = obj
+        prefix = data.get(SBADMIN_DYNAMIC_REGION_PREFIX_PARAM)
+        if prefix:
+            form_kwargs["prefix"] = prefix
+        form_kwargs["initial"] = self._dynamic_region_initial_from_data(
+            form_class, data, form_kwargs
+        )
+        return form_kwargs
+
+    @sbadmin_action
+    def sbadmin_dynamic_region(self, request, modifier):
+        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM) or request.POST.get(
+            SBADMIN_DYNAMIC_REGION_PARAM
+        )
+        if not region_name:
+            return HttpResponseBadRequest(f"Missing {SBADMIN_DYNAMIC_REGION_PARAM}.")
+
+        obj = self.get_dynamic_region_object(request, modifier)
+        if modifier != SBADMIN_DYNAMIC_REGION_ADD_MODIFIER and obj is None:
+            return HttpResponse("", status=404)
+
+        form_class = self.get_dynamic_region_form_class(request, obj)
+        data = request.POST if request.method == "POST" else request.GET
+        form_kwargs = self.get_dynamic_region_form_kwargs(
+            request, form_class, data, obj
+        )
+        form = form_class(**form_kwargs)
+        region = form.get_dynamic_region(region_name, request)
+        if region is None:
+            return HttpResponse("", status=404)
+
+        regions = SBAdminDynamicFormMixin.dynamic_regions_for_request(
+            form, region, request
+        )
+        rendered_regions = []
+        for target_region in regions:
+            rendered_regions.append(
+                render_to_string(
+                    "sb_admin/includes/dynamic_region.html",
+                    {
+                        "dynamic_region": form.get_dynamic_region_context(
+                            target_region, request
+                        ),
+                        "sbadmin_dynamic_region_fragment": True,
+                    },
+                    request=request,
+                )
+            )
+        html = "".join(rendered_regions)
+        response = HttpResponse(html)
+        trigger_client_event(
+            response,
+            "sbadminDynamicRegionUpdated",
+            {"region": region.name},
+        )
+        return response
+
+    @staticmethod
+    def _dynamic_region_initial_from_data(form_class, data, form_kwargs):
+        if form_kwargs is None:
+            form_kwargs = {}
+        elif not isinstance(form_kwargs, dict):
+            obj = form_kwargs
+            form_kwargs = {}
+            if obj is not None:
+                form_kwargs["instance"] = obj
+        return dynamic_region_initial_from_data(form_class, data, form_kwargs)
 
     def initialize_all_base_fields_form(self, request) -> None:
         params = {
@@ -756,7 +893,6 @@ class SBAdmin(
     )
     object_history_template = "sb_admin/actions/object_history.html"
 
-    sbadmin_fieldsets = None
     sbadmin_previous_next_buttons_enabled = False
     sbadmin_tabs = None
     request_data = None
@@ -772,19 +908,13 @@ class SBAdmin(
     def get_sbadmin_list_filter(self, request) -> Iterable:
         return self.sbadmin_list_filter or self.get_list_filter(request)
 
-    def get_form(self, request, obj=None, **kwargs):
-        self.initialize_all_base_fields_form(request)
-        form = super().get_form(request, obj, **kwargs)
-        self.initialize_form_class(form, request)
-        return form
-
     def get_id(self) -> str:
         return self.get_model_path()
 
     def get_sbadmin_fieldsets(
         self, request, object_id=None
     ) -> list[tuple[str | None, dict[str, Any]]]:
-        fieldsets = self.sbadmin_fieldsets or self.fieldsets
+        fieldsets = super().get_sbadmin_fieldsets(request, object_id)
         if fieldsets:
             return fieldsets
         raise ImproperlyConfigured(
@@ -794,39 +924,6 @@ class SBAdmin(
     def register_autocomplete_views(self, request):
         super().register_autocomplete_views(request)
         self.get_form(request)()
-
-    def get_fieldsets(
-        self, request, obj=None
-    ) -> list[tuple[str | None, dict[str, Any]]]:
-        fieldsets = []
-        object_id = obj.id if obj else None
-        for fieldset in self.get_sbadmin_fieldsets(request, object_id):
-            fieldset_dict = {"fields": fieldset[1].get("fields")}
-            classes = fieldset[1].get("classes")
-            description = fieldset[1].get("description")
-            if classes:
-                fieldset_dict["classes"] = classes
-            if description:
-                fieldset_dict["description"] = description
-            fieldset_django = (fieldset[0], fieldset_dict)
-            fieldsets.append(fieldset_django)
-        return fieldsets
-
-    def get_fieldsets_context(
-        self, request, object_id
-    ) -> dict[str, dict[str | None, dict[str, Any]]]:
-        fielsets_context = {}
-        for fieldset in self.get_sbadmin_fieldsets(request, object_id):
-            actions = fieldset[1].get("actions", [])
-            for index, action in enumerate(actions):
-                if isinstance(action, SBAdminCustomAction):
-                    continue
-                try:
-                    actions[index] = getattr(self, action)()
-                except AttributeError:
-                    pass
-            fielsets_context[fieldset[0]] = fieldset[1]
-        return {"fieldsets_context": fielsets_context}
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
@@ -926,7 +1023,6 @@ class SBAdmin(
     def add_view(self, request, form_url="", extra_context=None):
         extra_context = extra_context or {}
         extra_context.update(self.get_global_context(request, None))
-        extra_context.update(self.get_fieldsets_context(request, None))
         extra_context.update(self.get_tabs_context(request, None))
         return self.changeform_view(request, None, form_url, extra_context)
 
@@ -934,7 +1030,6 @@ class SBAdmin(
         extra_context = extra_context or {}
         extra_context.update(self.get_change_view_context(request, object_id))
         extra_context.update(self.get_global_context(request, object_id))
-        extra_context.update(self.get_fieldsets_context(request, object_id))
         extra_context.update(self.get_tabs_context(request, object_id))
         extra_context.update(self.get_previous_next_context(request, object_id))
         return super().change_view(request, object_id, form_url, extra_context)
@@ -1244,6 +1339,9 @@ class SBAdminInline(
         self.threadsafe_request = request
         self.parent_instance = obj
 
+    def get_dynamic_region_form_class(self, request, obj=None):
+        return self.get_formset(request, None).form
+
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name == self.sortable_field_name:
@@ -1256,7 +1354,9 @@ class SBAdminInline(
         formset = super().get_formset(request, obj, **kwargs)
         formset.parent_change = bool(obj)
         form_class = formset.form
+        form_class = self.get_dynamic_form_class(form_class)
         self.initialize_form_class(form_class, request)
+        formset.form = form_class
         return formset
 
     # ------------------------------------------------------------------

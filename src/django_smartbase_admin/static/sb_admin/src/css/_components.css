@@ -9,6 +9,11 @@
 @import "components/_json-editor.css";
 
 @layer components {
+    fieldset, .stacked-row {
+        > *:last-child {
+            @apply -mb-24;
+        }
+    }
     .card {
         --level: 1;
         @apply bg-bg-elevated sm:rounded border border-dark-200 p-20 md:p-24 max-xs:border-b-0 max-xs:py-32 min-w-0;
@@ -458,14 +463,32 @@
       }
 
     .page-loading {
-        display: none;
-       &.htmx-request {
-            display: block;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition-property: opacity;
+        transition-duration: 120ms;
+        transition-timing-function: ease-in;
+        transition-delay: 0ms;
+
+       &.htmx-request,
+       .htmx-request & {
+            opacity: .75;
+            visibility: visible;
+            pointer-events: auto;
+            transition-delay: 200ms;
        }
       .loader,
       .loader:after {
         width: 42px;
         height: 42px;
+      }
+      .loader {
+        animation-play-state: paused;
+      }
+      &.htmx-request .loader,
+      .htmx-request & .loader {
+        animation-play-state: running;
       }
 
     }

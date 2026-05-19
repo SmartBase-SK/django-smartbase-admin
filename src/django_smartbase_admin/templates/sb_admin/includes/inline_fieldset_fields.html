@@ -1,0 +1,28 @@
+{% load sb_admin_tags %}
+
+{% block lines %}
+    {% for line in fieldset %}
+        <div class="field{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
+            {% if line.fields|length > 1 %}
+                <div class="flex max-xs:flex-wrap gap-x-16">{% endif %}
+
+            {% for field in line %}
+                <div class="mb-16 sm:mb-24 max-xs:w-full sm:flex-1{% if field.field.is_hidden or field.field|is_row_class_field %} hidden{% endif %}">
+                    {% if field.is_readonly %}
+                        {% call_method field "contents" request %}
+                    {% else %}
+                        {{ field.field }}
+                        {% if not line.fields|length == 1 %}{{ field.errors }}{% endif %}
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            {% if line.fields|length == 1 and line.errors %}
+                <div class="-mt-16 mb-24">
+                    {{ line.errors }}
+                </div>
+            {% endif %}
+            {% if line.fields|length > 1 %}</div>{% endif %}
+        </div>
+    {% endfor %}
+{% endblock %}
