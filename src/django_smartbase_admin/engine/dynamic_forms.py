@@ -447,7 +447,8 @@ class SBAdminDynamicFormMixin:
                 continue
             widget = self.fields[field_name].widget
             attrs = widget.attrs
-            attrs.setdefault("hx-get", endpoint)
+            attrs.pop("hx-get", None)
+            attrs.setdefault("hx-post", endpoint)
             attrs.setdefault(
                 "hx-trigger",
                 getattr(widget, "dynamic_region_trigger_event", "change"),

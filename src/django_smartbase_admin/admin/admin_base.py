@@ -32,7 +32,7 @@ from django.forms.models import (
     _get_foreign_key,
     modelform_factory,
 )
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch, resolve
@@ -652,9 +652,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
 
     @sbadmin_action
     def sbadmin_dynamic_region(self, request, modifier):
-        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM) or request.POST.get(
-            SBADMIN_DYNAMIC_REGION_PARAM
-        )
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+
+        region_name = request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM)
         if not region_name:
             return HttpResponseBadRequest(f"Missing {SBADMIN_DYNAMIC_REGION_PARAM}.")
 
@@ -663,7 +664,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             return HttpResponse("", status=404)
 
         form_class = self.get_dynamic_region_form_class(request, obj)
-        data = request.POST if request.method == "POST" else request.GET
+        data = request.POST
         form_kwargs = self.get_dynamic_region_form_kwargs(
             request, form_class, data, obj
         )
