@@ -29,7 +29,6 @@ from django_smartbase_admin.mcp.tests._common import (
     build_mcp_request,
 )
 
-
 FOLDER_STATUS_CHOICES = (
     ("draft", "Draft"),
     ("published", "Published"),

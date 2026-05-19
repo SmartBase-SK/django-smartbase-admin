@@ -15,7 +15,6 @@ from django_smartbase_admin.engine.request import SBAdminViewRequestData
 
 from tests.sbadmin_config import MCPToolTestConfig
 
-
 __all__ = ["MCPToolTestConfig", "build_mcp_request"]
 
 

@@ -11,7 +11,6 @@ clients), additionally include ``django_smartbase_admin.mcp.oauth.urls``.
 
 from django.urls import include, path
 
-
 urlpatterns = [
     # MCP JSON-RPC endpoint. Path is controlled by ``DJANGO_MCP_ENDPOINT``
     # (default ``"mcp"``; we set ``"mcp/"`` so it matches our discovery

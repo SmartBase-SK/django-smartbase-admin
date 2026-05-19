@@ -28,7 +28,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from oauth2_provider.models import get_application_model
 
-
 SUPPORTED_SCOPE = "sbadmin:read"
 
 

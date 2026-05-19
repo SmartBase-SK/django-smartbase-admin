@@ -31,7 +31,6 @@ from django_smartbase_admin.services.thread_local import (
 )
 from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
 
-
 dynamic_region_admin_site = AdminSite(name="admin")
 
 

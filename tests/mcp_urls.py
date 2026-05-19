@@ -6,7 +6,6 @@ bundled OAuth 2.1 Authorization Server.
 
 from django.urls import include, path
 
-
 urlpatterns = [
     path("", include("django_smartbase_admin.mcp.urls")),
     path("", include("django_smartbase_admin.mcp.oauth.urls")),
