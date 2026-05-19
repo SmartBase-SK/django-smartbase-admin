@@ -219,7 +219,7 @@
 
     input.checkbox,
     div.checkbox > input[type="checkbox"] {
-        & ~ label {
+        & ~ label, & ~ .label {
             &::before {
                 @apply rounded;
             }
