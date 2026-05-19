@@ -421,6 +421,10 @@ class DynamicRegionActionModal(ActionModalView):
     form_class = DynamicRegionForm
 
 
+class CrossFieldsetDynamicRegionModal(ActionModalView):
+    form_class = CrossFieldsetRegionForm
+
+
 class RowObjectDynamicRegionForm(SBAdminBaseForm):
     class Meta:
         model = User
@@ -658,6 +662,29 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="download_url"', html)
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
+
+    def test_action_modal_dynamic_region_response_includes_related_regions(self):
+        request = RequestFactory().get(
+            "/modal/action/",
+            {
+                SBADMIN_DYNAMIC_REGION_PARAM: "primary_region",
+                "mode": "full",
+            },
+            HTTP_HX_TRIGGER_NAME="mode",
+        )
+        SBAdminThreadLocalService.set_request(request)
+        modal = CrossFieldsetDynamicRegionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="sbadmin-dynamic-region-primary-region"', html)
+        self.assertIn('id="sbadmin-dynamic-region-secondary-region"', html)
+        self.assertIn('name="primary"', html)
+        self.assertIn('name="secondary"', html)
+        self.assertEqual(html.count('hx-swap-oob="outerHTML"'), 2)
 
     def test_row_action_modal_dynamic_region_initial_uses_object(self):
         request = RequestFactory().get(

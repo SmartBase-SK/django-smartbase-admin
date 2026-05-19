@@ -9,6 +9,7 @@ from django_smartbase_admin.engine.const import (
 )
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
+    SBAdminDynamicFormMixin,
     dynamic_region_initial_from_data,
 )
 from django_smartbase_admin.utils import (
@@ -51,14 +52,23 @@ class ActionModalView(FormView):
         region = form.get_dynamic_region(region_name, request)
         if region is None:
             return HttpResponse("", status=404)
-        html = render_to_string(
-            "sb_admin/includes/dynamic_region.html",
-            {
-                "dynamic_region": form.get_dynamic_region_context(region, request),
-                "sbadmin_dynamic_region_fragment": True,
-            },
-            request=request,
-        )
+        rendered_regions = []
+        for target_region in SBAdminDynamicFormMixin.dynamic_regions_for_request(
+            form, region, request
+        ):
+            rendered_regions.append(
+                render_to_string(
+                    "sb_admin/includes/dynamic_region.html",
+                    {
+                        "dynamic_region": form.get_dynamic_region_context(
+                            target_region, request
+                        ),
+                        "sbadmin_dynamic_region_fragment": True,
+                    },
+                    request=request,
+                )
+            )
+        html = "".join(rendered_regions)
         response = HttpResponse(html)
         trigger_client_event(
             response,

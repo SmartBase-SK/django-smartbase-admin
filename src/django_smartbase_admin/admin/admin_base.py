@@ -55,7 +55,7 @@ from nested_admin.nested import (
 from django_smartbase_admin.audit.views import (
     redirect_to_audit_history,
 )
-from django_smartbase_admin.engine.actions import SBAdminCustomAction
+from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
@@ -348,12 +348,9 @@ class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
 
     def __init__(self, *args, **kwargs):
         self.view = kwargs.pop("view", self.view)
-        threadsafe_request = kwargs.pop("request", None)
-        if threadsafe_request is None:
-            try:
-                threadsafe_request = SBAdminThreadLocalService.get_request()
-            except LookupError:
-                threadsafe_request = None
+        threadsafe_request = kwargs.pop(
+            "request", SBAdminThreadLocalService.get_request()
+        )
         self.request = threadsafe_request
         super().__init__(*args, **kwargs)
         self.init_widgets_dynamic(threadsafe_request)
@@ -675,7 +672,9 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if region is None:
             return HttpResponse("", status=404)
 
-        regions = self._dynamic_regions_for_request(form, region, request)
+        regions = SBAdminDynamicFormMixin.dynamic_regions_for_request(
+            form, region, request
+        )
         rendered_regions = []
         for target_region in regions:
             rendered_regions.append(
@@ -709,23 +708,6 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             if obj is not None:
                 form_kwargs["instance"] = obj
         return dynamic_region_initial_from_data(form_class, data, form_kwargs)
-
-    def _dynamic_regions_for_request(self, form, region, request):
-        trigger_name = request.headers.get("HX-Trigger-Name")
-        if not trigger_name:
-            return [region]
-
-        def matches_trigger(field_name):
-            return trigger_name == field_name or trigger_name.endswith(f"-{field_name}")
-
-        related_regions = [
-            candidate
-            for candidate in form.get_dynamic_regions(request)
-            if any(
-                matches_trigger(field_name) for field_name in candidate.trigger_fields
-            )
-        ]
-        return related_regions or [region]
 
     def initialize_all_base_fields_form(self, request) -> None:
         params = {

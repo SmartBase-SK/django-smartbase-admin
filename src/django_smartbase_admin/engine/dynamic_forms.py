@@ -155,6 +155,26 @@ class SBAdminDynamicFormMixin:
         self.prepare_dynamic_regions(threadsafe_request)
 
     @staticmethod
+    def dynamic_regions_for_request(
+        form: forms.Form, region: SBDynamicRegion, request: HttpRequest
+    ) -> list[SBDynamicRegion]:
+        trigger_name = request.headers.get("HX-Trigger-Name")
+        if not trigger_name:
+            return [region]
+
+        def matches_trigger(field_name):
+            return trigger_name == field_name or trigger_name.endswith(f"-{field_name}")
+
+        related_regions = [
+            candidate
+            for candidate in form.get_dynamic_regions(request)
+            if any(
+                matches_trigger(field_name) for field_name in candidate.trigger_fields
+            )
+        ]
+        return related_regions or [region]
+
+    @staticmethod
     def get_fieldset_fields(
         fieldset_data: dict[str, Any],
     ) -> tuple[str | tuple[str, ...], ...]:
