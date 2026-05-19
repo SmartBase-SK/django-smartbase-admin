@@ -10,7 +10,7 @@
         {% if region.template %}
             {% include region.template with form=form region=region region_state=region_state active_field_names=region_state.active_field_names %}
         {% else %}
-            {% include "sb_admin/includes/inline_fieldset_fields.html" with fieldset=dynamic_fieldset skip_last_field_negative_margin=True %}
+            {% include "sb_admin/includes/inline_fieldset_fields.html" with fieldset=dynamic_fieldset %}
         {% endif %}
     {% endif %}
 </div>

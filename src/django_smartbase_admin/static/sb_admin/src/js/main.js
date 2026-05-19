@@ -610,7 +610,7 @@ class Main {
         }
     }
     isCurrentlyCollapsed(parentWrapper) {
-        const collapseElements = parentWrapper.querySelectorAll('.collapse')
+        const collapseElements = parentWrapper.querySelectorAll('.js-stacked-inline-collapse')
         return Array.from(collapseElements).every(el => {
             if(el.closest('.djn-empty-form')) {
                 return true
@@ -645,14 +645,14 @@ class Main {
 
         document.addEventListener('shown.bs.collapse', (e) => {
             const parentWrapper = e.target.closest('.djn-fieldset')
-            if (parentWrapper) {
+            if (parentWrapper && e.target.classList.contains('js-stacked-inline-collapse')) {
                 debouncedUpdateCollapseAllButton(parentWrapper)
             }
         })
         
         document.addEventListener('hidden.bs.collapse', (e) => {
             const parentWrapper = e.target.closest('.djn-fieldset')
-            if (parentWrapper) {
+            if (parentWrapper && e.target.classList.contains('js-stacked-inline-collapse')) {
                 debouncedUpdateCollapseAllButton(parentWrapper)
             }
         })
@@ -673,7 +673,7 @@ class Main {
     collapseStackedInlineButtons(event) {
         const collapseStackedInline = event.target.closest('.js-collapse-stacked-inline')
         if(collapseStackedInline) {
-            const collapseEl = event.target.closest('.djn-inline-form').querySelector('.collapse')
+            const collapseEl = event.target.closest('.djn-inline-form').querySelector('.js-stacked-inline-collapse')
             const instance = Collapse.getOrCreateInstance(collapseEl)
             instance.toggle()
             collapseStackedInline.setAttribute('aria-expanded', collapseStackedInline.getAttribute('aria-expanded') !== 'true')
@@ -683,7 +683,7 @@ class Main {
         if (collapseAll) {
             event.preventDefault()
             const parentWrapper = collapseAll.closest('.djn-fieldset')
-            const collapseElements = parentWrapper.querySelectorAll('.collapse')
+            const collapseElements = parentWrapper.querySelectorAll('.js-stacked-inline-collapse')
             const collapseTriggers = parentWrapper.querySelectorAll('.js-collapse-stacked-inline')
             const isCurrentlyCollapsed = this.isCurrentlyCollapsed(parentWrapper)
 
