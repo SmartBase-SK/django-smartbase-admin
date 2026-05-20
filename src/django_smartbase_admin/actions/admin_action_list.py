@@ -108,6 +108,13 @@ class SBAdminListAction(SBAdminAction):
         self.init_column_fields()
         self.tabulator_definition = tabulator_definition
         self.list_actions = list_actions
+        # Non-column row keys that survive ``_strip_to_visible_keys``.
+        # Plugins emitting their own row keys extend this set.
+        self.allowed_framework_keys: set[str] = {
+            "_row_actions",
+            "_children",
+            "_sbadmin_tree_last_child",
+        }
 
     def get_columns(self) -> list[str]:
         return self.view.get_list_display(self.threadsafe_request)
@@ -571,7 +578,21 @@ class SBAdminListAction(SBAdminAction):
         }
 
     def get_json_data(self):
-        return self.get_data()
+        data = self.get_data()
+        self._strip_to_visible_keys(data.get("data") or [])
+        return data
+
+    def _strip_to_visible_keys(self, rows: list[dict[str, Any]]) -> None:
+        """Keep PK + visible columns + ``allowed_framework_keys``; drop the rest."""
+        if not rows:
+            return
+        allowed = {field.field for field in self.get_visible_column_fields()}
+        allowed.add(self.get_pk_field().name)
+        allowed |= self.allowed_framework_keys
+        for row in rows:
+            for key in list(row.keys()):
+                if key not in allowed:
+                    row.pop(key, None)
 
     def get_graph_data(self, order_by=None, annotate_x=None, annotate_y=None):
         order_by = order_by or []

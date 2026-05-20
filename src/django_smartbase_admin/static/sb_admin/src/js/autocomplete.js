@@ -1,6 +1,7 @@
 import Choices from "choices.js"
 import {createIcon, filterInputValueChangedUtil, syncDropdownMenuWidth} from "./utils"
 import {choicesJSListeners, choicesJSOptions} from "./choices"
+import {sanitizeHtml} from "./sanitize"
 import debounce from "lodash/debounce"
 
 export default class Autocomplete {
@@ -342,7 +343,7 @@ export default class Autocomplete {
             selectEl.dispatchEvent(new CustomEvent('selectItem', {
                 detail: {value: id, label: label},
             }))
-            document.getElementById(`${field}-value`).textContent = label
+            document.getElementById(`${field}-value`).innerHTML = sanitizeHtml(label)
         }
     }
 

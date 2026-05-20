@@ -1,3 +1,5 @@
+import {sanitizeHtml} from './sanitize'
+
 export const createIcon = (iconId, classes = ['w-24', 'h-24']) => {
     const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svgEl.classList.add(...classes)
@@ -114,7 +116,7 @@ export const setDropdownLabel = (dropdownMenuEl, dropdownLabelEl) => {
             'label': label?label.innerHTML:''
         }
     })
-    dropdownLabelEl.innerHTML = getResultLabel(fields)
+    dropdownLabelEl.innerHTML = sanitizeHtml(getResultLabel(fields))
 }
 
 export const syncDropdownMenuWidth = (wrapperEl, wrapperElButton) => {
@@ -144,28 +146,28 @@ export const filterInputValueChangedUtil = (field) => {
     }
     const label = field.dataset.label
     if(label) {
-        valueElem.innerHTML = label
+        valueElem.innerHTML = sanitizeHtml(label)
         return valueElem
     }
     const valueOrObject = getObjectOrValue(field.value)
     if ((field.value === "" || field.value === "[]")) {
         if(field.dataset.emptyLabel) {
-            valueElem.innerHTML = field.dataset.emptyLabel
+            valueElem.innerHTML = sanitizeHtml(field.dataset.emptyLabel)
         } else {
             valueElem.innerHTML = ''
         }
         return valueElem
     }
     if (typeof valueOrObject === 'object') {
-        valueElem.innerHTML = getResultLabel(valueOrObject, separator)
+        valueElem.innerHTML = sanitizeHtml(getResultLabel(valueOrObject, separator))
     } else {
         try {
             // select
-            valueElem.innerHTML = field.options[field.selectedIndex].text
+            valueElem.innerHTML = sanitizeHtml(field.options[field.selectedIndex].text)
         } catch (e) {
             const label = document.querySelector(`label[for=${field.id}]`)
             if(label) {
-                valueElem.innerHTML = label.innerText
+                valueElem.textContent = label.innerText
             } else {
                 let radioLabel
                 try {
@@ -175,9 +177,9 @@ export const filterInputValueChangedUtil = (field) => {
                     radioLabel = null
                 }
                 if (radioLabel) {
-                    valueElem.innerHTML = radioLabel.innerText
+                    valueElem.textContent = radioLabel.innerText
                 } else {
-                    valueElem.innerHTML = valueOrObject
+                    valueElem.textContent = valueOrObject
                 }
             }
         }

@@ -1,6 +1,16 @@
 import Choices from "choices.js"
 import {createIcon} from "./utils"
+import {sanitizeHtml} from "./sanitize"
 
+
+// Sanitize label fields before the Choices.js default templates render
+// them with allowHTML=true. Server-trusted markup from label_lambda (badges,
+// icons) survives DOMPurify; URL-reflected payloads do not.
+const withSanitizedLabel = (obj) => (
+    obj && typeof obj.label === 'string'
+        ? {...obj, label: sanitizeHtml(obj.label)}
+        : obj
+)
 
 export const choicesJSOptions = (choiceInput) => ({
     'allowHTML': true,
@@ -15,7 +25,7 @@ export const choicesJSOptions = (choiceInput) => ({
     callbackOnCreateTemplates: () => {
         return {
             item: (templateOptions, item, removeItemButton) => {
-                const originalItem = Choices.defaults.templates.item.call(this, templateOptions, item, removeItemButton)
+                const originalItem = Choices.defaults.templates.item.call(this, templateOptions, withSanitizedLabel(item), removeItemButton)
                 if (removeItemButton) {
                     originalItem.children[0].innerHTML = ''
                     originalItem.children[0].appendChild(createIcon('Close-small', []))
@@ -23,7 +33,8 @@ export const choicesJSOptions = (choiceInput) => ({
                 return originalItem
             },
             choice: (templateOptions, choice, selectText) => {
-                const originalItem = Choices.defaults.templates.choice.call(this, templateOptions, choice, selectText)
+                const safeChoice = withSanitizedLabel(choice)
+                const originalItem = Choices.defaults.templates.choice.call(this, templateOptions, safeChoice, selectText)
                 if(!choiceInput.hasAttribute('multiple')) {
                     return originalItem
                 }
@@ -38,7 +49,7 @@ export const choicesJSOptions = (choiceInput) => ({
 
                 const label = document.createElement('label')
                 label.htmlFor = input.id
-                label.innerHTML = choice.label
+                label.innerHTML = safeChoice.label
                 originalItem.innerHTML = ''
                 originalItem.appendChild(input)
                 originalItem.appendChild(label)

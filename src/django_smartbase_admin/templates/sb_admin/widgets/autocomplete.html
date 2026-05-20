@@ -59,9 +59,9 @@
     {% include 'sb_admin/widgets/includes/help_text.html' %}
     <script>
         setTimeout(function () {
-            const field = "{{ widget.attrs.preselect_field }}"
-            const id = {{ widget.attrs.preselect_field_value |default:-1}}
-            const label = "{{ widget.attrs.preselect_field_label|default:'' }}"
+            const field = "{{ widget.attrs.preselect_field|escapejs }}"
+            const id = "{{ widget.attrs.preselect_field_value|default:-1|escapejs }}"
+            const label = "{{ widget.attrs.preselect_field_label|default:''|escapejs }}"
             if (field && field !== "None" && window.SBAdmin.autocomplete) {
                 window.SBAdmin.autocomplete.selectAutocompleteItem(field, id, label);
             }

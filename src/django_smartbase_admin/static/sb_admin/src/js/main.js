@@ -55,7 +55,7 @@ class Main {
             window.htmx.process(e.target)
         })
         document.addEventListener('openUrl', (e) => {
-            window.open(e.detail.url, e.detail?.target || '_blank')
+            window.open(e.detail.url, e.detail?.target || '_blank', 'noopener')
         })
 
         if (window.htmx) {
@@ -196,7 +196,7 @@ class Main {
 
     handleLocationHashFromTabs() {
         if (window.location.hash) {
-            document.querySelector(`#tab_${window.location.hash.slice(1)}`)?.click()
+            document.querySelector(`#tab_${CSS.escape(window.location.hash.slice(1))}`)?.click()
         }
         const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]:not([data-bs-disable-history])')
         tabEls.forEach(tab => {
@@ -606,7 +606,7 @@ class Main {
             window.SBAdminTable[table_id].executeListAction(action_url, no_params, open_in_new_tab)
         } else {
             if (open_in_new_tab) {
-                window.open(action_url, '_blank')
+                window.open(action_url, '_blank', 'noopener')
             } else {
                 window.location.href = action_url
             }

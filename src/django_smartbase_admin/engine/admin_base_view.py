@@ -259,7 +259,7 @@ class SBAdminBaseView(object):
                 form_class.view = self
                 form_class()
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
         autocomplete_view = request.request_data.configuration.autocomplete_map.get(
             modifier
@@ -821,7 +821,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         return self.sbadmin_xlsx_options
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_xlsx_export(self, request, modifier) -> HttpResponse:
         action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data(request)
@@ -853,7 +853,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             return redirect(self.get_menu_view_url(request))
         return response
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_config(self, request, config_id=None):
         config_id = config_id if config_id != "None" else None
 
@@ -897,7 +897,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         redirect_to = urllib.parse.urlunparse(url)
         return redirect_to
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_list(
         self,
         request,
@@ -939,7 +939,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             extra_context,
         )
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()

@@ -11,6 +11,7 @@ from django.http import HttpResponse
 from django.views.generic import TemplateView
 
 from django_smartbase_admin.engine.admin_view import SBAdminView
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.views.sbadmin_wizard_step import SBAdminWizardStep
 
 
@@ -34,7 +35,6 @@ class SBAdminWizardView(SBAdminView, TemplateView):
     wizard_complete_field: str | None = None
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
-        self.request = request
         super().init_view_dynamic(request, request_data=request_data, **kwargs)
         self.register_autocomplete_views(request)
 
@@ -68,7 +68,8 @@ class SBAdminWizardView(SBAdminView, TemplateView):
         step.check_permission(request)
 
     def get_current_step(self) -> int:
-        raw = self.request.GET.get("step") or self.request.POST.get("step")
+        request = SBAdminThreadLocalService.get_request()
+        raw = request.GET.get("step") or request.POST.get("step")
         try:
             s = int(raw) if raw is not None else 1
         except ValueError:
@@ -118,8 +119,9 @@ class SBAdminWizardView(SBAdminView, TemplateView):
         context = step.get_context_data(
             context, step_n=step_n, steps_total=len(self.wizard_steps), **kwargs
         )
-        if getattr(self.request, "sbadmin_selected_view", None):
-            context.update(self.get_global_context(self.request))
+        request = SBAdminThreadLocalService.get_request()
+        if getattr(request, "sbadmin_selected_view", None):
+            context.update(self.get_global_context(request))
         return context
 
     def get(self, request, *args, **kwargs) -> HttpResponse:

@@ -267,6 +267,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             children = children_by_parent.get(root_id)
             if children:
                 children[-1][LAST_CHILD_FIELD] = True
+                action._strip_to_visible_keys(children)
                 root_row[CHILDREN_FIELD] = children
             else:
                 root_row.pop(CHILDREN_FIELD, None)

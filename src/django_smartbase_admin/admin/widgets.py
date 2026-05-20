@@ -15,6 +15,7 @@ from django.contrib.postgres.forms import RangeWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
+    PermissionDenied,
     ValidationError,
 )
 from django.db.models import ForeignKey, OneToOneField
@@ -629,7 +630,8 @@ class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
         import jsonschema
 
         validator = jsonschema.Draft7Validator(
-            self.schema, format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER
+            self._get_validation_schema(),
+            format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
         errors = sorted(
             validator.iter_errors(value), key=lambda e: list(e.absolute_path)
@@ -641,6 +643,34 @@ class SBAdminJsonEditorWidget(SBAdminBaseWidget, forms.TextInput):
             for err in errors
         ]
         raise ValidationError(details)
+
+    def _get_validation_schema(self):
+        """Schema copy with ``additionalProperties: false`` injected (mirrors json-editor's ``no_additional_properties``)."""
+        cached = getattr(self, "_validation_schema_cache", None)
+        if cached is not None:
+            return cached
+        hardened = self._harden_schema_no_additional_properties(self.schema)
+        self._validation_schema_cache = hardened
+        return hardened
+
+    @staticmethod
+    def _harden_schema_no_additional_properties(schema):
+        if not isinstance(schema, dict):
+            return schema
+        recurse = SBAdminJsonEditorWidget._harden_schema_no_additional_properties
+        out = {}
+        for key, value in schema.items():
+            if key == "properties" and isinstance(value, dict):
+                out[key] = {k: recurse(v) for k, v in value.items()}
+            elif key == "items" and isinstance(value, dict):
+                out[key] = recurse(value)
+            else:
+                out[key] = value
+        if (
+            out.get("type") == "object" or "properties" in out
+        ) and "additionalProperties" not in out:
+            out["additionalProperties"] = False
+        return out
 
 
 class SBAdminJsonEditorField(forms.JSONField):
@@ -832,9 +862,20 @@ class SBAdminAutocompleteWidget(
             if parsed_value and related_model_admin.has_view_or_change_permission(
                 request
             ):
-                context["widget"]["attrs"]["related_edit_url"] = (
-                    related_model_admin.get_detail_url(parsed_value)
-                )
+                # Only emit the edit URL when the PK is reachable through the
+                # related admin's restricted queryset. Without this check the
+                # rendered HTML would leak the existence of row-restricted
+                # records (tenant scoping, soft-delete, etc.) any time a
+                # parent form had a pre-set FK pointing outside the user's
+                # allowed set.
+                if (
+                    related_model_admin.get_queryset(request)
+                    .filter(pk=parsed_value)
+                    .exists()
+                ):
+                    context["widget"]["attrs"]["related_edit_url"] = (
+                        related_model_admin.get_detail_url(parsed_value)
+                    )
             if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
                     related_model_admin.get_new_url(request)
@@ -884,19 +925,12 @@ class SBAdminAutocompleteWidget(
         return False
 
     def get_forward_data(self, request, name):
-        """
-        Parse forward data from request.request_data.request_post.
-
-        For each field in self.forward, use name as base field name and replace
-        in it current field name with forward field name, return dict.
-
-        Args:
-            request: The request object
-            name: The base field name (e.g., "product__category")
-
-        Returns:
-            dict: Forward data with keys being forward field names and values
-                  from request data
+        """Resolve ``self.forward`` field names against the submitted form
+        prefix and return ``{forward_field: raw_post_value}``. FK values are
+        validated against the source field's (restricted) queryset before
+        being returned, so any downstream consumer — ``filter_search_lambda``,
+        ``Model.objects.create`` via ``get_forward_data_to_create``,
+        ``validate`` — only ever sees PKs the user is allowed to reference.
         """
         forward_data = {}
         if not getattr(self, "forward", None):
@@ -906,27 +940,63 @@ class SBAdminAutocompleteWidget(
         if not post_data:
             return forward_data
 
-        # For each field in self.forward list
-        for forward_field in self.forward:
-            # Replace only from end of name, separated by last -
-            # Example: if name="prefix-field_name", self.field_name="field_name",
-            # forward_field="parent" -> result="prefix-parent"
-            name_parts = name.split("-")
+        form = getattr(self, "form", None)
+        form_model = getattr(form, "model", None)
 
-            # Replace only if the last part matches self.field_name
-            if name_parts and name_parts[-1] == self.field_name:
-                # Replace the last part with forward_field and join back
-                name_parts[-1] = forward_field
-                forward_field_name = "-".join(name_parts)
-            else:
-                # If last part doesn't match, don't create forward field name
+        for forward_field in self.forward:
+            name_parts = name.split("-")
+            if not (name_parts and name_parts[-1] == self.field_name):
+                continue
+            name_parts[-1] = forward_field
+            forward_field_name = "-".join(name_parts)
+            if forward_field_name not in post_data:
                 continue
 
-            # Get value from post_data if it exists
-            if forward_field_name in post_data:
-                forward_data[forward_field] = post_data.get(forward_field_name)
+            raw_value = post_data.get(forward_field_name)
+            self._validate_forwarded_value(
+                request, form, form_model, forward_field, raw_value
+            )
+            forward_data[forward_field] = raw_value
 
         return forward_data
+
+    def _validate_forwarded_value(
+        self, request, form, form_model, field_name, raw_value
+    ):
+        if form is None or form_model is None:
+            return
+        try:
+            model_field = form_model._meta.get_field(field_name)
+        except FieldDoesNotExist:
+            return
+        if not isinstance(model_field, (ForeignKey, OneToOneField)):
+            return
+
+        parsed = self.parse_value_from_input(request, raw_value)
+        if parsed is None:
+            return
+        if not isinstance(parsed, list):
+            parsed = [parsed]
+        pks = [p for p in parsed if p]
+        if not pks:
+            return
+
+        source_field = form.fields.get(field_name)
+        get_qs = getattr(getattr(source_field, "widget", None), "get_queryset", None)
+        qs = (
+            get_qs(request)
+            if callable(get_qs)
+            else getattr(source_field, "queryset", None)
+        )
+        # Fail closed: the form model declares this as a FK but we can't
+        # locate a queryset to validate against, so we can't prove the PK
+        # is reachable for the current user.
+        if qs is None or qs.filter(pk__in=pks).count() != len(pks):
+            raise ValidationError(
+                self.form_field.error_messages["invalid_choice"],
+                code="invalid_choice",
+                params={"value": raw_value},
+            )
 
     def get_forward_data_to_create(self, request, forward_data):
         forward_data_to_create = {}
@@ -1008,6 +1078,7 @@ class SBAdminAutocompleteWidget(
             # TODO: multiselect creation
             return self.form_field.to_python(value)
         else:
+            self._check_create_permission(request, queryset.model)
             forward_data_to_create = self.get_forward_data_to_create(
                 request, forward_data
             )
@@ -1026,6 +1097,21 @@ class SBAdminAutocompleteWidget(
                     code="invalid_choice",
                     params={"value": value},
                 )
+
+    def _check_create_permission(self, request, model):
+        # Route through the registered SBAdmin admin so SBAdminRoleConfiguration
+        # .has_permission applies; fall back to Django model permission for
+        # models without an SBAdmin admin registered.
+        admin = sb_admin_site._registry.get(model)
+        if admin is not None:
+            if admin.has_add_permission(request):
+                return
+        else:
+            user = getattr(request, "user", None)
+            perm = f"{model._meta.app_label}.add_{model._meta.model_name}"
+            if user is not None and user.has_perm(perm):
+                return
+        raise PermissionDenied
 
     def validate(self, value, queryset, request, forward_data, is_create=False):
         is_create_value = (
