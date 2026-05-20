@@ -1039,7 +1039,7 @@ class SBAdmin(
                     },
                 },
             }
-            new_filters = urllib.parse.urlencode({"params": json.dumps(new_all_params)})
+            new_filters = urllib.parse.urlencode({"params": SBAdminViewService.json_dumps_for_url(new_all_params)})
             return f"{self.get_detail_url(window_pks[target_idx])}?_changelist_filters={new_filters}"
 
         return {

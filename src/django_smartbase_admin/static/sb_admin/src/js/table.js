@@ -15,7 +15,7 @@ import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_f
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 import { createIcon } from "./utils"
 import { registerFitDataFillAvailableSpaceLayout } from "./tabulator_layouts/fit_data_fill_available_space"
-import {decodeParamsFromUrl, encodeParamsForUrl} from "./url_params_codec"
+import {decodeParamsFromUrl, encodeParamsForUrl, parseParamsPayload} from "./url_params_codec"
 
 
 class SBAdminColumnOptionsModule extends Module {
@@ -87,7 +87,7 @@ class SBAdminTable {
         const viewButton = document.querySelector(`.js-view-button[data-view-id="${urlParams.get("selectedView")}"]`)
         let paramsFromUrl
         if(viewButton) {
-            paramsFromUrl = {[this.viewId]: JSON.parse(viewButton.dataset.params)}
+            paramsFromUrl = {[this.viewId]: parseParamsPayload(viewButton.dataset.params)}
         } else {
             paramsFromUrl = decodeParamsFromUrl(urlParams.get(this.constants.BASE_PARAMS_NAME))
         }

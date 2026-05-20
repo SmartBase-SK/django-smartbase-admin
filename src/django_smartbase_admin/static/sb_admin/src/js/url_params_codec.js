@@ -26,3 +26,13 @@ export const decodeParamsFromUrl = (value) => {
         return {}
     }
 }
+
+export const parseParamsPayload = (value) => {
+    if (!value) {
+        return {}
+    }
+    if (typeof value === 'object') {
+        return value && !Array.isArray(value) ? value : {}
+    }
+    return decodeParamsFromUrl(value)
+}
