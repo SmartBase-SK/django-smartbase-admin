@@ -838,7 +838,11 @@ class SBAdminBaseListView(SBAdminBaseView):
                 self.get_action_url("action_bulk_delete")
                 + "?"
                 + urllib.parse.urlencode(
-                    {BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(action.all_params)}
+                    {
+                        BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(
+                            action.all_params
+                        )
+                    }
                 )
             )
         if not action.selection_data:

@@ -20,7 +20,10 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
-from django_smartbase_admin.services.url_params_codec import dumps_for_url, loads_from_url
+from django_smartbase_admin.services.url_params_codec import (
+    dumps_for_url,
+    loads_from_url,
+)
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 if TYPE_CHECKING:
