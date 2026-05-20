@@ -92,6 +92,12 @@ class TestListAction(SBAdminListAction):
         self.tabulator_definition = {}
         self.list_actions = None
         self.advanced_filter_data = {}
+        self.columns_data = {}
+        self.allowed_framework_keys = {
+            "_row_actions",
+            "_children",
+            "_sbadmin_tree_last_child",
+        }
 
     def get_pk_field(self):
         return SimpleNamespace(name="id")

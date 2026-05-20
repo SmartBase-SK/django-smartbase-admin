@@ -258,7 +258,7 @@ export class TableParamsModule extends SBAdminTableModule {
         this.table.constants.PAGE_SIZE_OPTIONS.forEach((pageSize) => {
             const pageSizeEl = document.createElement('li')
             pageSizeEl.classList.add('dropdown-menu-link')
-            pageSizeEl.innerHTML = pageSize
+            pageSizeEl.textContent = pageSize
             pageSizeEl.onclick = () => {
                 this.table.tabulator.setPageSize(pageSize)
             }
@@ -279,7 +279,7 @@ export class TableParamsModule extends SBAdminTableModule {
         pageSizeButton.setAttribute('data-bs-offset', '[0,8]')
 
         const pageSizeEl = document.createElement('span')
-        pageSizeEl.innerHTML = currentPageSize
+        pageSizeEl.textContent = currentPageSize
 
         pageSizeButton.appendChild(pageSizeEl)
         pageSizeButton.appendChild(createIcon('Down',['w-20', 'h-20', 'ml-8']))

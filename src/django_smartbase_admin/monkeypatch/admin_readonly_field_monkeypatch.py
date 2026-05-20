@@ -28,7 +28,8 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
         )
 
     def contents(self, request=None):
-        if self.model_admin.admin_site.name != sb_admin_site.name:
+        admin_site = getattr(self.model_admin, "admin_site", None)
+        if getattr(admin_site, "name", None) != sb_admin_site.name:
             return super().contents()
 
         field, obj, model_admin = (

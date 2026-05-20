@@ -494,39 +494,64 @@ class DateFilterWidget(SBAdminFilterWidget):
         return isinstance(model_field, fields.DateField)
 
     @classmethod
-    def get_range_from_value(cls, filter_value):
-        """
-        Get date-range from string filter value
+    def _days_to_date(cls, days):
+        try:
+            return timezone.now() + timedelta(days=int(days))
+        except (TypeError, ValueError, OverflowError):
+            return None
 
-        :returns: array, is_range
+    @classmethod
+    def _parse_date_string(cls, value):
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            return datetime.strptime(value, cls.DATE_FORMAT)
+        except (ValueError, TypeError):
+            return None
+
+    @classmethod
+    def get_range_from_value(cls, filter_value):
+        """Get date-range from string filter value.
+
+        Fail-soft: any malformed input (empty list, non-numeric "in the
+        last" magnitudes, unparseable date strings, overflow) returns
+        ``[None, None]`` and the caller treats it as "no filter". This
+        keeps the list view available instead of 500'ing when a user
+        bookmarks a half-typed URL or an attacker probes the operator.
+
+        :returns: ``[date_from, date_to]`` — both entries may be ``None``.
         """
         if filter_value is None:
             return [None, None]
-        date_format = cls.DATE_FORMAT
-        if type(filter_value) is list:
-            if type(filter_value[0]) is int:
+        if isinstance(filter_value, list):
+            if len(filter_value) < 2:
+                return [None, None]
+            first = filter_value[0]
+            if isinstance(first, (int, float)):
                 return [
-                    timezone.now() + timedelta(days=filter_value[0]),
-                    timezone.now() + timedelta(days=filter_value[1]),
+                    cls._days_to_date(filter_value[0]),
+                    cls._days_to_date(filter_value[1]),
                 ]
             return [
-                datetime.strptime(filter_value[0], date_format),
-                datetime.strptime(filter_value[1], date_format),
+                cls._parse_date_string(filter_value[0]),
+                cls._parse_date_string(filter_value[1]),
             ]
+        if not isinstance(filter_value, str):
+            return [None, None]
         try:
             days_range = json.loads(filter_value)
+        except (json.JSONDecodeError, ValueError):
+            days_range = None
+        if isinstance(days_range, list) and len(days_range) >= 2:
+            return [cls._days_to_date(days_range[0]), cls._days_to_date(days_range[1])]
+        date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
+        if len(date_range) == 2:
             return [
-                timezone.now() + timedelta(days=days_range[0]),
-                timezone.now() + timedelta(days=days_range[1]),
+                cls._parse_date_string(date_range[0]),
+                cls._parse_date_string(date_range[1]),
             ]
-        except json.decoder.JSONDecodeError:
-            date_range = filter_value.split(cls.DATE_RANGE_SPLIT)
-            if len(date_range) == 2:
-                date_from = datetime.strptime(date_range[0], date_format)
-                date_to = datetime.strptime(date_range[1], date_format)
-                return [date_from, date_to]
-            date_value = datetime.strptime(filter_value, date_format)
-            return [date_value, date_value]
+        single = cls._parse_date_string(filter_value)
+        return [single, single]
 
     @classmethod
     def get_value_from_date_or_range(cls, date_or_range):
@@ -538,10 +563,19 @@ class DateFilterWidget(SBAdminFilterWidget):
         date_to = datetime.strftime(date_or_range[1], cls.DATE_FORMAT)
         return [date_from, date_to]
 
+    # Fail-closed sentinel for invalid filter input. The user submitted a
+    # filter rule, so silently dropping it (``Q()``) would show the full
+    # table and mislead the user into thinking the filter applied — risky
+    # when the resulting set drives bulk actions / exports. ``pk__in=[]``
+    # is Django's canonical "match nothing" — the ORM short-circuits it.
+    _EMPTY_RESULT_Q = Q(pk__in=[])
+
     def parse_value_from_input(self, request, filter_value):
         return self.get_range_from_value(filter_value)
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
+        if not filter_value or filter_value[0] is None or filter_value[1] is None:
+            return self._EMPTY_RESULT_Q
         date_from = filter_value[0]
         # add one day to include all 'to' date hours, this is needed instead of casting datetime to date in DB
         date_to = filter_value[1] + timedelta(days=1)
@@ -551,6 +585,17 @@ class DateFilterWidget(SBAdminFilterWidget):
                 f"{self.field.filter_field}__lte": date_to,
             }
         )
+
+    def get_advanced_filter_query_for_parsed_value(
+        self, request, parsed_value, original_query, rule
+    ):
+        # Caller built ``Q(field__range=[None, None])`` which would 500 at
+        # SQL. Replace with ``pk__in=[]`` so the response is an empty (but
+        # safe) result set — the user still sees their filter is active
+        # but no spurious rows leak through.
+        if not parsed_value or all(v is None for v in parsed_value):
+            return self._EMPTY_RESULT_Q
+        return original_query
 
 
 class AutocompleteFilterWidget(
@@ -637,7 +682,7 @@ class AutocompleteFilterWidget(
             Action.AUTOCOMPLETE.value, modifier=self.get_id()
         )
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
         result = self.search(request, request.request_data.request_post)
         return JsonResponse({"data": result})
@@ -877,7 +922,7 @@ class SBAdminTreeWidgetMixin:
             self.template_name = "sb_admin/widgets/tree_select_inline.html"
         super().__init__(*args, **kwargs)
 
-    @sbadmin_action
+    @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
         result = self.format_tree_data(request, self.get_queryset(request))
         return JsonResponse(data=result, safe=False)

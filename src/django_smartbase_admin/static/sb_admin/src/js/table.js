@@ -428,7 +428,7 @@ class SBAdminTable {
                 action_url += params
             }
             if (open_in_new_tab) {
-                window.open(action_url, '_blank')
+                window.open(action_url, '_blank', 'noopener')
             } else {
                 window.location.href = action_url
             }
