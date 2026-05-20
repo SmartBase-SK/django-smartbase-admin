@@ -459,7 +459,7 @@ class DateFilterWidget(SBAdminFilterWidget):
             selected_shortcut_value = self.get_shortcuts()[
                 self.default_value_shortcut_index
             ]["value"]
-            return SBAdminViewService.json_dumps_for_url(
+            return SBAdminViewService.json_dumps_and_replace(
                 self.get_value_from_date_or_range(selected_shortcut_value)
             )
         return super().get_default_value()

@@ -43,6 +43,7 @@ easy-thumbnails = {extras = ["svg"], version = "^2.8.5"}
 django-htmx = "^1.17.3"
 # JSON Schema validation server-side for SBAdminJsonEditorField
 jsonschema = "^4.10"
+lzstring = "^1.0.4"
 # required for django-filer
 setuptools = "^67.0.0"
 # Optional MCP dependencies: only required when wiring the MCP toolset

@@ -190,7 +190,9 @@ class SBAdminTools(MCPToolset):
         }
         set_request_payload(
             request,
-            get={BASE_PARAMS_NAME: json.dumps(params_payload)},
+            get={
+                BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(params_payload)
+            },
             method="GET",
         )
 

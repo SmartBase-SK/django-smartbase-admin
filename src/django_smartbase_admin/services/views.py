@@ -20,6 +20,7 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
+from django_smartbase_admin.services.url_params_codec import dumps_for_url, loads_from_url
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 if TYPE_CHECKING:
@@ -29,11 +30,15 @@ if TYPE_CHECKING:
 class SBAdminViewService(object):
     @classmethod
     def json_dumps_for_url(cls, data):
-        return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
+        return dumps_for_url(data)
+
+    @classmethod
+    def json_loads_from_url(cls, value: str | None) -> dict:
+        return loads_from_url(value)
 
     @classmethod
     def json_dumps_and_replace(cls, data):
-        return cls.json_dumps_for_url(data)
+        return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
 
     @classmethod
     def build_list_url(cls, view_id, url_params):

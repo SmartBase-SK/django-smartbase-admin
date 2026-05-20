@@ -15,6 +15,7 @@ import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_f
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 import { createIcon } from "./utils"
 import { registerFitDataFillAvailableSpaceLayout } from "./tabulator_layouts/fit_data_fill_available_space"
+import {decodeParamsFromUrl, encodeParamsForUrl} from "./url_params_codec"
 
 
 class SBAdminColumnOptionsModule extends Module {
@@ -88,7 +89,7 @@ class SBAdminTable {
         if(viewButton) {
             paramsFromUrl = {[this.viewId]: JSON.parse(viewButton.dataset.params)}
         } else {
-            paramsFromUrl = JSON.parse(urlParams.get(this.constants.BASE_PARAMS_NAME)) || {}
+            paramsFromUrl = decodeParamsFromUrl(urlParams.get(this.constants.BASE_PARAMS_NAME))
         }
         return paramsFromUrl
     }
@@ -237,7 +238,7 @@ class SBAdminTable {
     }
 
     paramsObjectToUrlString(params) {
-        return "?" + this.constants.BASE_PARAMS_NAME + "=" + encodeURIComponent(JSON.stringify(params))
+        return "?" + this.constants.BASE_PARAMS_NAME + "=" + encodeURIComponent(encodeParamsForUrl(params))
     }
 
     getUrlParamsString() {
@@ -396,7 +397,7 @@ class SBAdminTable {
             fetch(action_url, {
                 method: "POST",
                 headers: headers,
-                body: JSON.stringify(JSON.parse(urlParams.get(this.constants.BASE_PARAMS_NAME)) || {})
+                body: JSON.stringify(decodeParamsFromUrl(urlParams.get(this.constants.BASE_PARAMS_NAME)))
             })
                 .then(function(response) {
                     if (!response.ok) {
