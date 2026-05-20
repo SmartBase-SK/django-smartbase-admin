@@ -17,7 +17,6 @@ from django.urls import path, resolve, reverse
 
 from django_smartbase_admin.admin.site import SBAdminSite, sb_admin_site
 
-
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
 
