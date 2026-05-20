@@ -14,11 +14,11 @@ jobs:
       with:
         node-version: 18.x
     - name: Run install
-      uses: borales/actions-yarn@v4
+      uses: borales/actions-yarn@97ba8bebfe5b549bb7999261698a52a81fd62f1b # v4.2.0
       with:
         cmd: install # will run `yarn install` command    
     - name: Build production bundle
-      uses: borales/actions-yarn@v4
+      uses: borales/actions-yarn@97ba8bebfe5b549bb7999261698a52a81fd62f1b # v4.2.0
       with:
         cmd: build
     - name: Set up Python
