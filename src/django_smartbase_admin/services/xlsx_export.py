@@ -15,7 +15,6 @@ from django.utils.translation import gettext_lazy
 from django_smartbase_admin.engine.const import Formatter
 from django_smartbase_admin.utils import JSONSerializableMixin
 
-
 _IMAGE_FORMULA_ALLOWED_SCHEMES = ("http", "https")
 
 
