@@ -542,6 +542,9 @@ class Main {
 
             const deleteButton = fileInput.querySelector('.js-input-file-delete')
             deleteButton?.addEventListener('click', () => {
+                if (input?.disabled || delete_checkbox?.disabled) {
+                    return
+                }
                 input.value = ""
                 input.dispatchEvent(new Event('change'))
                 if (delete_checkbox) {
