@@ -808,10 +808,10 @@ class DynamicFormTests(SimpleTestCase):
         modal = DynamicRegionActionModal(view=FakeView())
         form = modal.get_form_class()(request=request)
 
-        self.assertEqual(form.fields["mode"].widget.attrs["hx-get"], "/modal/action/")
+        self.assertEqual(form.fields["mode"].widget.attrs["hx-post"], "/modal/action/")
 
     def test_action_modal_dynamic_region_initial_is_built_from_request_data(self):
-        request = RequestFactory().get(
+        request = RequestFactory().post(
             "/modal/action/",
             {
                 SBADMIN_DYNAMIC_REGION_PARAM: "details",
@@ -822,7 +822,7 @@ class DynamicFormTests(SimpleTestCase):
         modal = DynamicRegionActionModal(view=FakeView())
         modal.setup(request)
 
-        response = modal.get(request)
+        response = modal.post(request)
         html = response.content.decode()
 
         self.assertIn('name="download_url"', html)
@@ -830,7 +830,7 @@ class DynamicFormTests(SimpleTestCase):
         self.assertNotIn('name="weight"', html)
 
     def test_action_modal_dynamic_region_response_includes_related_regions(self):
-        request = RequestFactory().get(
+        request = RequestFactory().post(
             "/modal/action/",
             {
                 SBADMIN_DYNAMIC_REGION_PARAM: "primary_region",
@@ -842,7 +842,7 @@ class DynamicFormTests(SimpleTestCase):
         modal = CrossFieldsetDynamicRegionModal(view=FakeView())
         modal.setup(request)
 
-        response = modal.get(request)
+        response = modal.post(request)
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
@@ -853,7 +853,7 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(html.count('hx-swap-oob="outerHTML"'), 2)
 
     def test_row_action_modal_dynamic_region_initial_uses_object(self):
-        request = RequestFactory().get(
+        request = RequestFactory().post(
             "/modal/row/123/",
             {
                 SBADMIN_DYNAMIC_REGION_PARAM: "row_details",
@@ -863,7 +863,7 @@ class DynamicFormTests(SimpleTestCase):
         modal = RowObjectDynamicRegionModal(view=FakeView())
         modal.setup(request, modifier="123")
 
-        response = modal.get(request)
+        response = modal.post(request)
         html = response.content.decode()
 
         self.assertIn('name="email"', html)
@@ -961,7 +961,7 @@ class DynamicFormTests(SimpleTestCase):
     @override_settings(ROOT_URLCONF=__name__)
     def test_stacked_inline_dynamic_region_fragment_uses_form_prefix(self):
         model_admin = dynamic_region_admin_site._registry[DynamicRegionInlineParent]
-        request = RequestFactory().get(
+        request = RequestFactory().post(
             "/admin/django_smartbase_admin/dynamicregioninlineparent/inline/"
             "sbadmin_dynamic_region/add/",
             data={
@@ -1084,7 +1084,7 @@ class DynamicFormTests(SimpleTestCase):
         form = ViewBackedForm(request=self.request)
         attrs = form.fields["mode"].widget.attrs
 
-        self.assertEqual(attrs["hx-get"], "/sb-admin/sbadmin_dynamic_region/add")
+        self.assertEqual(attrs["hx-post"], "/sb-admin/sbadmin_dynamic_region/add")
         self.assertEqual(attrs["hx-target"], "#sbadmin-dynamic-region-details")
         self.assertEqual(attrs["hx-include"], "closest form")
         self.assertEqual(attrs["hx-swap"], "none")
