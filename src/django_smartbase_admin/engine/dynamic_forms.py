@@ -259,6 +259,8 @@ class SBAdminDynamicFormMixin:
         if view is None:
             return ()
         obj = getattr(self, "instance", None)
+        if isinstance(obj, models.Model) and obj.pk is None:
+            obj = None
         if hasattr(view, "get_readonly_fields"):
             return tuple(view.get_readonly_fields(request, obj))
         return tuple(getattr(view, "readonly_fields", ()))

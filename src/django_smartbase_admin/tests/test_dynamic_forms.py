@@ -1221,6 +1221,38 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn("Summary for demo", html)
         self.assertNotIn('name="readonly_summary"', html)
 
+    def test_dynamic_region_readonly_fields_treat_unsaved_instance_as_add(self):
+        class AddAwareReadonlyRegionView(ReadonlyDynamicRegionView):
+            def get_readonly_fields(self, request, obj=None):
+                return ("readonly_summary",) if obj else ()
+
+        tracking_view = AddAwareReadonlyRegionView()
+
+        class AddAwareReadonlyRegionForm(ReadonlyDynamicRegionForm):
+            view = tracking_view
+
+        add_form = AddAwareReadonlyRegionForm(
+            instance=DynamicRegionDemoModel(username="demo"),
+            request=self.request,
+        )
+        add_region = add_form.get_dynamic_region("readonly_details", self.request)
+        add_state = add_form.get_dynamic_region_state(add_region, self.request)
+
+        change_form = AddAwareReadonlyRegionForm(
+            instance=DynamicRegionDemoModel(id=1, username="demo"),
+            request=self.request,
+        )
+        change_region = change_form.get_dynamic_region("readonly_details", self.request)
+        change_state = change_form.get_dynamic_region_state(change_region, self.request)
+
+        self.assertEqual(add_form.get_dynamic_region_readonly_fields(self.request), ())
+        self.assertEqual(add_state.active_fields, ())
+        self.assertEqual(
+            change_form.get_dynamic_region_readonly_fields(self.request),
+            ("readonly_summary",),
+        )
+        self.assertEqual(change_state.active_fields, ("readonly_summary",))
+
     def test_deferred_dynamic_region_renders_lazy_loader_until_fragment(self):
         form = DeferredDynamicRegionForm(request=self.request)
         region = form.get_dynamic_region("lazy_details", self.request)
