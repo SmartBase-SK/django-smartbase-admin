@@ -13,7 +13,36 @@
         {% if fieldset_context.actions or fieldset_context.collapsible %}
             <div class="ml-auto flex items-center gap-4">
                 {% for action in fieldset_context.actions %}
-                    <a href="{{ action.url }}" class="btn btn-small">{{ action.title }}</a>
+                    {% if action.sub_actions %}
+                        <div class="relative">
+                            <button
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-bs-popper-placement="bottom-end"
+                                class="{{ action.css_class|default_if_none:'' }} btn-small btn-icon">
+                                {% if action.icon %}
+                                    <svg class="w-16 h-16 md:mr-8">
+                                        <use xlink:href="#{{ action.icon }}"></use>
+                                    </svg>
+                                {% endif %}
+                                <span>{{ action.title }}</span>
+                                <svg class="w-16 h-16 ml-4 hidden md:block">
+                                    <use xlink:href="#Down"></use>
+                                </svg>
+                            </button>
+                            <div class="dropdown-menu max-h-432">
+                                <ul>
+                                    {% for sub_action in action.sub_actions %}
+                                        <li>
+                                            {% include sub_action.template with action=sub_action action_link_mode="detail" dropdown=True extra_classes="dropdown-menu-link" %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    {% else %}
+                        {% include action.template with action=action action_link_mode="detail" extra_classes="btn-small" %}
+                    {% endif %}
                 {% endfor %}
                 {% if fieldset_context.collapsible %}
                     <button type="button"

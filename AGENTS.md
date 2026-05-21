@@ -17,6 +17,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
+| [Object Action Views](#object-action-views-sbadmin_object_action_views) | Register detail/fieldset object modal endpoints independently from visible action buttons |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
 | [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
@@ -58,6 +59,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Dynamic regions in custom form views?** → [Dynamic regions in custom views](#dynamic-regions-in-custom-views)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
+- **Detail/fieldset modal URL 404 on cold request?** → [Object Action Views](#object-action-views-sbadmin_object_action_views)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
 - **Manual audit log entries?** → [Programmatic Audit Entries](#programmatic-audit-entries-_create_audit_log)
@@ -1343,7 +1345,7 @@ Use the same `SBDynamicRegion` marker in these places:
 | Normal model admin add/change form | `SBAdmin.sbadmin_fieldsets`, or the form's `Meta.sbadmin_fieldsets` | SBAdmin uses the admin `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add` action. |
 | Stacked inline row | `SBAdminStackedInline.sbadmin_fieldsets`, or the inline form's `Meta.sbadmin_fieldsets` | SBAdmin injects the inline form prefix into `hx-vals`, so only the changed inline row is refreshed. |
 | Action modal | The modal `form_class.Meta.sbadmin_fieldsets` | `ActionModalView`, `ListActionModalView`, and `RowActionModalView` use the current modal URL. |
-| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `sbadmin_dynamic_region=<name>` POSTs and renders the dynamic-region fragment. |
+| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, with `sbadmin_dynamic_region_source=SBDynamicRegionSource.FORM` passed when constructing the form | Your view handles `sbadmin_dynamic_region=<name>` POSTs and renders the dynamic-region fragment. |
 
 ### Basic tutorial: switch fields by article status
 
@@ -1644,7 +1646,7 @@ Row action modals can initialize dynamic regions from the row object through the
 
 ### Dynamic regions in custom views
 
-For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small POST branch that renders `sb_admin/includes/dynamic_region.html` when `sbadmin_dynamic_region=<name>` is present.
+For a standalone form view outside an SBAdmin modal, pass `request`, `sbadmin_dynamic_region_source=SBDynamicRegionSource.FORM`, and usually `sbadmin_dynamic_region_endpoint=request.path` when constructing the form. Add a small POST branch that renders `sb_admin/includes/dynamic_region.html` when `sbadmin_dynamic_region=<name>` is present.
 
 ```python
 from django import forms
@@ -1655,13 +1657,12 @@ from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBDynamicRegion,
+    SBDynamicRegionSource,
     dynamic_region_initial_from_data,
 )
 
 
 class ImportProductsForm(SBAdminBaseFormInit, forms.Form):
-    sbadmin_standalone_dynamic_regions = True
-
     source = forms.ChoiceField(
         choices=(("file", "File"), ("url", "URL")),
         initial="file",
@@ -1698,7 +1699,13 @@ class ImportProductsView(FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["request"] = self.request
+        kwargs.update(
+            {
+                "request": self.request,
+                "sbadmin_dynamic_region_source": SBDynamicRegionSource.FORM,
+                "sbadmin_dynamic_region_endpoint": self.request.path,
+            }
+        )
         return kwargs
 
     def post(self, request, *args, **kwargs):
@@ -1711,6 +1718,8 @@ class ImportProductsView(FormView):
         form_class = self.get_form_class()
         form = form_class(
             request=request,
+            sbadmin_dynamic_region_source=SBDynamicRegionSource.FORM,
+            sbadmin_dynamic_region_endpoint=request.path,
             initial=dynamic_region_initial_from_data(form_class, request.POST),
         )
         region = form.get_dynamic_region(region_name, request)
@@ -1777,6 +1786,7 @@ Custom templates should use `dynamic_region.is_fragment` to detect fragment rend
 - Every field that may render must be declared in `fields=...`; `get_active_fields` cannot activate fields outside that list.
 - Use `Meta.sbadmin_fieldsets` when defining regions. `Meta.fieldsets` is supported for normal standalone fieldsets, but `sbadmin_fieldsets` is the explicit SBAdmin layout hook.
 - For model admin change/add forms, the region endpoint is `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add`.
+- `sbadmin_standalone_dynamic_regions` is no longer supported. Use `SBDynamicRegionSource.FORM` when the form should read its own `Meta.sbadmin_fieldsets` instead of the parent admin view's fieldsets.
 - For standalone/modal forms, the endpoint is the current request path.
 
 ---
@@ -2069,6 +2079,7 @@ class ArticleAdmin(SBAdmin):
 **Key points:**
 - Always return **all** possible actions from action getters — use `has_permission_for_action` or row-level enablement to filter visibility
 - Do NOT conditionally build the action list based on request — URL handlers are registered on the singleton during the first request and cached via `init_actions`
+- Detail and fieldset object modal actions that are intentionally object/state-dependent should list their `target_view` in [`sbadmin_object_action_views`](#object-action-views-sbadmin_object_action_views) so direct modal URLs dispatch without relying on visible-button rendering.
 - The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
 - `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
 - When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
@@ -2282,6 +2293,94 @@ Framework consumers call processed getters, not raw getters:
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
 - Always return all possible actions from action getters and use `has_permission_for_action()` or row enablement to hide them. Conditional omission can prevent modal URL handlers from being registered.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
+
+---
+
+## Object Action Views (`sbadmin_object_action_views`)
+
+Use `sbadmin_object_action_views` to register modal view endpoints that operate on one object but are rendered from detail or fieldset context.
+
+This property is **registration-only**. It lists target view classes so cold direct URLs such as `/admin/blog_article/PublishArticleView/123` dispatch even before the detail page or fieldset action has been rendered in the current process. Visible buttons still belong in `get_sbadmin_detail_actions()` or fieldset `"actions"` where the real object id, fieldset, and object state are available.
+
+```python
+from django import forms
+from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+from django_smartbase_admin.engine.modal_view import RowActionModalView
+
+from blog.models import Article
+
+
+class PublishArticleForm(SBAdminBaseFormInit, forms.Form):
+    pass
+
+
+class PublishArticleView(RowActionModalView):
+    form_class = PublishArticleForm
+    modal_title = _("Publish Article")
+
+    def process_form_valid_object(self, request, form, obj):
+        obj.status = "published"
+        obj.save(update_fields=["status"])
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_object_action_views = [PublishArticleView]
+
+    def get_sbadmin_detail_actions(self, request, object_id=None):
+        actions = [*(super().get_sbadmin_detail_actions(request, object_id) or [])]
+        if object_id is None:
+            return actions
+        actions.append(
+            SBAdminFormViewAction(
+                target_view=PublishArticleView,
+                title=_("Publish"),
+                view=self,
+                action_modifier=object_id,
+                open_in_modal=True,
+            )
+        )
+        return actions
+```
+
+Fieldset actions use the same registry:
+
+```python
+class ArticleAdmin(SBAdmin):
+    sbadmin_object_action_views = [PublishArticleView]
+
+    sbadmin_fieldsets = (
+        (
+            "Publishing",
+            {
+                "fields": ("status",),
+                "actions": (
+                    SBAdminFormViewAction(
+                        target_view=PublishArticleView,
+                        title=_("Publish"),
+                        action_modifier=MODIFIER_OBJECT_ID,
+                        open_in_modal=True,
+                    ),
+                ),
+            },
+        ),
+    )
+```
+
+**Key points:**
+- Register only target view classes in `sbadmin_object_action_views`; do not duplicate titles, icons, fieldset placement, or visibility rules there.
+- Use `get_sbadmin_detail_actions()` and fieldset `"actions"` for visible buttons. Those paths still receive the concrete object id and still run through `has_permission_for_action()`.
+- Use `action_modifier=MODIFIER_OBJECT_ID` in static fieldset actions, or pass the concrete `object_id` when building actions dynamically.
+- Do not make `init_actions()` infer an object id from `request.request_data.modifier`. In SBAdmin action URLs, `modifier` can be an object id, but it can also be `template`, `add`, an autocomplete id, a config name, or another action-specific token.
+- `sbadmin_object_action_views` is for object-scope modal target views. List actions, bulk selection actions, and row actions continue to self-register through their processed action getters.
+
+**Source:** `django_smartbase_admin/engine/admin_base_view.py` — `sbadmin_object_action_views`, `register_object_action_views`, `_register_form_view_action`
 
 ---
 
@@ -3921,6 +4020,7 @@ Supported option keys:
 | `fields` | iterable | Field names to render. Group a row with a nested tuple/list such as `("category", "author")`. SBAdmin also accepts `SBDynamicRegion` markers here. |
 | `classes` | list/tuple/string | Extra classes on the rendered `<fieldset>`. Use `DETAIL_STRUCTURE_RIGHT_CLASS` here for sidebar fieldsets. |
 | `description` | string | Tooltip/help text next to the fieldset title. Escape user-controlled HTML before passing it here. |
+| `actions` | iterable | Header actions rendered next to the fieldset title. Actions use the same `SBAdminCustomAction` / `SBAdminFormViewAction` objects and `has_permission_for_action` filtering as detail actions. |
 | `collapsible` | bool | Render the fieldset body inside Bootstrap collapse and add a header toggle. Defaults to `False`. |
 | `default_collapsed` | bool | Initial closed state for a collapsible fieldset. Defaults to `False`; ignored unless `collapsible=True`. |
 
@@ -3928,10 +4028,11 @@ Supported option keys:
 - Use `sbadmin_fieldsets` when you need SBAdmin-only behavior such as dynamic regions or collapsible fieldsets. Plain Django `fieldsets` still works for basic `fields`, `classes`, and `description`.
 - `collapsible=True` uses Bootstrap collapse; do not activate it with `classes=["collapse"]`.
 - `default_collapsed=True` starts the fieldset closed. Existing JS opens collapsed ancestors when focusing validation errors.
+- Fieldset actions are detail-style links. Use `action_modifier=MODIFIER_OBJECT_ID` when the action should receive the current object id, and list any modal `target_view` in `sbadmin_object_action_views` so cold direct dispatch works before the fieldset has rendered.
 - SBAdmin looks up fieldset metadata by the tuple's first value (`name`). Avoid multiple fieldsets with the same name, including multiple `None` fieldsets, when using dynamic regions or collapse metadata.
 - The collapse id is generated from `sbadmin-fieldset`, the form prefix when present, and the fieldset name when present. Prefixed inline rows therefore get separate collapse ids.
 
-**Source:** `django_smartbase_admin/admin/admin_base.py`, `django_smartbase_admin/engine/dynamic_forms.py`, `django_smartbase_admin/templates/sb_admin/includes/fieldset_header.html`
+**Source:** `django_smartbase_admin/admin/admin_base.py`, `django_smartbase_admin/engine/admin_base_view.py`, `django_smartbase_admin/engine/dynamic_forms.py`, `django_smartbase_admin/templates/sb_admin/includes/fieldset_header.html`
 
 ---
 
@@ -4362,6 +4463,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
 | `sbadmin_tabs` | dict | Organize fieldsets and inlines into tabs (see [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)) |
 | `sbadmin_detail_actions` | list | Actions shown on detail/change page |
+| `sbadmin_object_action_views` | list[type] | Object-scope modal target views registered for cold direct dispatch from detail/fieldset actions |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
 

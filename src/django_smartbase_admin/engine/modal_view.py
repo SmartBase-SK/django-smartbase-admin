@@ -10,6 +10,7 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBAdminDynamicFormMixin,
+    SBDynamicRegionSource,
     dynamic_region_initial_from_data,
 )
 from django_smartbase_admin.utils import (
@@ -97,19 +98,18 @@ class ActionModalView(FormView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-    def get_form_class(self):
-        form_class = super().get_form_class()
-
-        fake_form_class = type(
-            form_class.__name__,
-            (form_class,),
-            {
-                "view": self.view,
-                "sbadmin_standalone_dynamic_regions": True,
-            },
-        )
-
-        return fake_form_class
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+        if issubclass(form_class, SBAdminDynamicFormMixin):
+            kwargs.update(
+                {
+                    "view": self.view,
+                    "sbadmin_dynamic_region_source": SBDynamicRegionSource.FORM,
+                    "sbadmin_dynamic_region_endpoint": self.request.path,
+                }
+            )
+        return kwargs
 
     def post(self, request, *args, **kwargs):
         if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):

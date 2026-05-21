@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
@@ -126,6 +126,20 @@ class RowList:
 
     def __iter__(self):
         return iter(self.rows)
+
+
+class ObjectActionViewRegistrationTests(SimpleTestCase):
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+
+    def test_object_action_views_register_dispatch_without_visible_action(self):
+        view = FakeAdminView()
+        view.sbadmin_object_action_views = [PublishArticleView]
+
+        view.register_object_action_views(self.request)
+
+        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertTrue(getattr(view.PublishArticleView, "_is_sbadmin_action", False))
 
 
 class RowActionIntegrationTests(TestCase):

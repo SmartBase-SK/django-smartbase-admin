@@ -71,6 +71,7 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 class SBAdminBaseView(object):
     global_filter_data_map = None
     sbadmin_detail_actions = None
+    sbadmin_object_action_views = None
     menu_label: str | None = None
     add_label: str | None = None
     change_label: str | None = None
@@ -118,10 +119,11 @@ class SBAdminBaseView(object):
         )
 
     def delegate_to_action_view(self, processed_action):
+        return self.delegate_to_target_view(processed_action.target_view)
+
+    def delegate_to_target_view(self, target_view):
         def inner_view(request, modifier):
-            return processed_action.target_view.as_view(view=self)(
-                request, modifier=modifier
-            )
+            return target_view.as_view(view=self)(request, modifier=modifier)
 
         inner_view._is_sbadmin_action = True
         return inner_view
@@ -164,13 +166,24 @@ class SBAdminBaseView(object):
             target_view = getattr(action, "target_view", None)
             if target_view is None:
                 continue
-            action_id = target_view.__name__
-            if not hasattr(self, action_id):
-                setattr(self, action_id, self.delegate_to_action_view(action))
+            action_id = self._register_form_view_action(target_view)
             action.action_id = action_id
             action.url = self.get_action_url(
                 action_id, modifier=action.action_modifier or "template"
             )
+
+    def _register_form_view_action(self, target_view) -> str:
+        action_id = target_view.__name__
+        if not hasattr(self, action_id):
+            setattr(self, action_id, self.delegate_to_target_view(target_view))
+        return action_id
+
+    def get_sbadmin_object_action_views(self, request) -> Iterable[type] | None:
+        return self.sbadmin_object_action_views
+
+    def register_object_action_views(self, request) -> None:
+        for target_view in self.get_sbadmin_object_action_views(request) or []:
+            self._register_form_view_action(target_view)
 
     @staticmethod
     def _materialize_modifier_object_id(
@@ -252,12 +265,17 @@ class SBAdminBaseView(object):
     def register_action_autocomplete_views(
         self, request, actions: Iterable[SBAdminCustomAction] | None
     ) -> None:
+
         for action in actions or []:
             target_view = getattr(action, "target_view", None)
             form_class = getattr(target_view, "form_class", None)
-            if form_class:
-                form_class.view = self
-                form_class()
+            if not form_class:
+                continue
+
+            if hasattr(target_view, "get_form_class"):
+                target_view(view=self).get_form_class()()
+            else:
+                form_class(view=self)
 
     @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
@@ -301,6 +319,35 @@ class SBAdminBaseView(object):
         return self.process_detail_actions(
             request,
             [*(self.get_sbadmin_detail_actions(request, object_id) or [])],
+            object_id,
+        )
+
+    def get_sbadmin_fieldset_actions(
+        self,
+        request,
+        fieldset,
+        fieldset_data: dict[str, Any],
+        object_id: int | str | None = None,
+    ) -> Iterable[SBAdminCustomAction] | None:
+        return fieldset_data.get("actions")
+
+    def get_sbadmin_fieldset_actions_processed(
+        self,
+        request,
+        fieldset,
+        fieldset_data: dict[str, Any],
+        object_id: int | str | None = None,
+    ) -> list[SBAdminCustomAction]:
+        return self.process_detail_actions(
+            request,
+            [
+                *(
+                    self.get_sbadmin_fieldset_actions(
+                        request, fieldset, fieldset_data, object_id
+                    )
+                    or []
+                )
+            ],
             object_id,
         )
 
@@ -567,8 +614,12 @@ class SBAdminBaseListView(SBAdminBaseView):
     def init_actions(self, request) -> None:
         if self.sbadmin_actions_initialized:
             return
+
         self.get_sbadmin_list_selection_actions_processed(request)
         self.get_sbadmin_list_actions_processed(request)
+        self.get_sbadmin_row_actions_processed(request)
+        self.register_object_action_views(request)
+
         self.sbadmin_actions_initialized = True
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
@@ -585,13 +636,6 @@ class SBAdminBaseListView(SBAdminBaseView):
             request.request_data.configuration,
             force=True,
         )
-        all_actions = [
-            *self.get_sbadmin_list_selection_actions_processed(request),
-            *self.get_sbadmin_list_actions_processed(request),
-            *self.get_sbadmin_row_actions_processed(request),
-            *self.get_sbadmin_detail_actions_processed(request),
-        ]
-        self.register_action_autocomplete_views(request, all_actions)
 
     def get_list_display(self, request) -> list[str]:
         return [

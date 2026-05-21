@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 from django import forms
 from django.contrib.admin.helpers import AdminForm
@@ -18,10 +19,17 @@ from django_smartbase_admin.admin.admin_base import (
 )
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminHiddenWidget
+from django_smartbase_admin.engine.actions import (
+    SBAdminCustomAction,
+    SBAdminFormViewAction,
+)
+from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
+from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
     SBAdminDynamicFormMixin,
+    SBDynamicRegionSource,
     SBDynamicRegion,
     SBInactiveFieldPolicy,
 )
@@ -130,7 +138,7 @@ class DynamicRegionForm(SBAdminBaseFormInit, forms.Form):
 
 
 class MetaFieldsetsForm(SBAdminBaseFormInit, forms.Form):
-    sbadmin_standalone_dynamic_regions = True
+    sbadmin_dynamic_region_source = SBDynamicRegionSource.FORM
 
     title = forms.CharField()
     subtitle = forms.CharField(required=False)
@@ -149,7 +157,7 @@ class MetaFieldsetsForm(SBAdminBaseFormInit, forms.Form):
 
 
 class MetaFieldsetsWithSBAdminOverrideForm(SBAdminBaseFormInit, forms.Form):
-    sbadmin_standalone_dynamic_regions = True
+    sbadmin_dynamic_region_source = SBDynamicRegionSource.FORM
 
     title = forms.CharField()
     subtitle = forms.CharField(required=False)
@@ -386,6 +394,17 @@ class GroupedRegionIgnoredForm(SBAdminBaseFormInit, forms.Form):
 class FakeView:
     def get_action_url(self, action, modifier="template"):
         return f"/sb-admin/{action}/{modifier}"
+
+
+class FakeFieldsetActionView(SBAdminBaseView):
+    def __init__(self, denied_action_id=None):
+        self.denied_action_id = denied_action_id
+
+    def get_action_url(self, action, modifier="template"):
+        return f"/sb-admin/{action}/{modifier}"
+
+    def has_permission_for_action(self, request, action):
+        return getattr(action, "action_id", None) != self.denied_action_id
 
 
 class ReadonlyDynamicRegionView(FakeView):
@@ -853,20 +872,110 @@ class DynamicFormTests(SimpleTestCase):
             html.index('name="note"'),
         )
 
+    def test_fieldset_actions_are_permission_filtered(self):
+        view = FakeFieldsetActionView(denied_action_id="hidden")
+        visible_action = SBAdminCustomAction(
+            title="Visible",
+            view=view,
+            action_id="visible",
+        )
+        hidden_action = SBAdminCustomAction(
+            title="Hidden",
+            view=view,
+            action_id="hidden",
+        )
+
+        class FieldsetActionsForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("title",),
+                            "actions": (visible_action, hidden_action),
+                        },
+                    ),
+                )
+
+        FieldsetActionsForm.view = view
+        html = self.render_fieldset(FieldsetActionsForm(request=self.request))
+
+        self.assertIn("Visible", html)
+        self.assertIn("/sb-admin/visible/template", html)
+        self.assertNotIn("Hidden", html)
+        self.assertNotIn("/sb-admin/hidden/template", html)
+
+    def test_fieldset_form_view_actions_are_registered_with_current_object(self):
+        class FieldsetModalView(ActionModalView):
+            form_class = forms.Form
+
+        view = FakeFieldsetActionView()
+        action = SBAdminFormViewAction(
+            target_view=FieldsetModalView,
+            title="Open modal",
+            view=view,
+            open_in_modal=True,
+            action_modifier=MODIFIER_OBJECT_ID,
+        )
+
+        class FieldsetActionsForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("title",),
+                            "actions": (action,),
+                        },
+                    ),
+                )
+
+        FieldsetActionsForm.view = view
+        form = FieldsetActionsForm(request=self.request)
+        form.instance = SimpleNamespace(pk=42)
+
+        html = self.render_fieldset(form)
+
+        self.assertTrue(hasattr(view, "FieldsetModalView"))
+        self.assertIn("/sb-admin/FieldsetModalView/42", html)
+        self.assertIn('data-bs-toggle="modal"', html)
+
     def test_action_modal_form_does_not_use_parent_view_dynamic_regions(self):
         modal = ExternalRegionActionModal(
             view=ViewWithFormSpecificRegion(),
         )
-        form = modal.get_form_class()(request=self.request)
+        modal.setup(self.request)
+        form = modal.get_form()
 
         self.assertIsInstance(form.view, ViewWithFormSpecificRegion)
         self.assertEqual(form.get_dynamic_regions(self.request), ())
+
+    def test_action_autocomplete_registration_uses_action_modal_form_wrapper(self):
+        class ActionRegistrationView(
+            FakeFieldsetActionView, ViewWithFormSpecificRegion
+        ):
+            pass
+
+        FormWithExternalViewRegions.view = None
+        view = ActionRegistrationView()
+
+        view.register_action_autocomplete_views(
+            self.request,
+            [SimpleNamespace(target_view=ExternalRegionActionModal)],
+        )
+
+        self.assertIsNone(FormWithExternalViewRegions.view)
 
     def test_action_modal_dynamic_regions_use_current_request_path(self):
         request = RequestFactory().get("/modal/action/")
         SBAdminThreadLocalService.set_request(request)
         modal = DynamicRegionActionModal(view=FakeView())
-        form = modal.get_form_class()(request=request)
+        modal.setup(request)
+        form = modal.get_form()
 
         self.assertEqual(form.fields["mode"].widget.attrs["hx-post"], "/modal/action/")
 
@@ -1089,7 +1198,7 @@ class DynamicFormTests(SimpleTestCase):
 
     def test_clear_policy_uses_django_empty_values_for_inactive_bound_data(self):
         class TypedInactiveRegionForm(SBAdminBaseFormInit, forms.Form):
-            sbadmin_standalone_dynamic_regions = True
+            sbadmin_dynamic_region_source = SBDynamicRegionSource.FORM
 
             mode = forms.ChoiceField(choices=(("hide", "Hide"), ("show", "Show")))
             enabled = forms.BooleanField(required=False)
