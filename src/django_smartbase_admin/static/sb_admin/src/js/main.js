@@ -30,7 +30,7 @@ import Autocomplete from "./autocomplete"
 import StaticAutocomplete from "./static_autocomplete"
 import ChoicesJS from "./choices"
 import TextTags from "./text_tags"
-import {setCookie, setDropdownLabel} from "./utils"
+import {setCookie, setDropdownLabel, shouldProcessAfterSwap} from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
 
@@ -59,17 +59,6 @@ class Main {
         })
 
         if (window.htmx) {
-            const shouldProcessAfterSwap = (detail) => {
-                const requestEl = detail.detail.requestConfig.elt.closest('[hx-swap]')
-                if (requestEl && requestEl.getAttribute('hx-swap') === "none") {
-                    // do not process afterSwap if none swap is performed
-                    // this should prevent double processing of afterSwap for first oob-swapped element
-                    // which in case of hx-swap=none is returned here in the detail.target
-                    return false
-                }
-                return true
-            }
-
             const processAfterSwap = (target) => {
                 this.initFileInputs(target)
                 this.initDropdowns(target)

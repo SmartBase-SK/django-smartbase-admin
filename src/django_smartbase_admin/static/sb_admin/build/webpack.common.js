@@ -15,6 +15,7 @@ const entries = {
     tree_widget_style: './src/django_smartbase_admin/static/sb_admin/src/css/tree_widget.css',
     calendar_style: './src/django_smartbase_admin/static/sb_admin/src/css/calendar.css',
     modal_view: './src/django_smartbase_admin/static/sb_admin/src/js/modal_view.js',
+    sbadmin_formset: './src/django_smartbase_admin/static/sb_admin/src/js/sbadmin_formset.js',
 }
 
 const projectRoot = process.env.PWD || process.cwd()
