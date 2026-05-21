@@ -6,9 +6,9 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.db import models
 from django.http import QueryDict
-from django.urls import path
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import path
 from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.admin.admin_base import (
     SBAdmin,
@@ -16,6 +16,7 @@ from django_smartbase_admin.admin.admin_base import (
     SBAdminBaseFormInit,
     SBAdminStackedInline,
 )
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminHiddenWidget
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
@@ -387,6 +388,22 @@ class FakeView:
         return f"/sb-admin/{action}/{modifier}"
 
 
+class ReadonlyDynamicRegionView(FakeView):
+    admin_site = sb_admin_site
+
+    def get_empty_value_display(self):
+        return "-"
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("readonly_summary",)
+
+    def readonly_summary(self, obj):
+        return f"Summary for {obj.username}"
+
+
+ReadonlyDynamicRegionView.readonly_summary.short_description = "Summary"
+
+
 class FormWithExternalViewRegions(SBAdminBaseFormInit, forms.Form):
     message = forms.CharField()
 
@@ -405,6 +422,49 @@ class ViewWithFormSpecificRegion:
                             get_active_fields=(
                                 lambda form, request, region: form.sender_address_region_fields()
                             ),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class ReadonlyDynamicRegionForm(SBAdminBaseForm):
+    view = ReadonlyDynamicRegionView()
+
+    class Meta:
+        model = DynamicRegionDemoModel
+        fields = ("username",)
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        SBDynamicRegion(
+                            name="readonly_details",
+                            fields=("readonly_summary",),
+                        ),
+                    ),
+                },
+            ),
+        )
+
+
+class DeferredDynamicRegionForm(SBAdminBaseFormInit, forms.Form):
+    view = FakeView()
+
+    details = forms.CharField(required=False)
+
+    class Meta:
+        sbadmin_fieldsets = (
+            (
+                None,
+                {
+                    "fields": (
+                        SBDynamicRegion(
+                            name="lazy_details",
+                            fields=("details",),
+                            defer_trigger="load",
                         ),
                     ),
                 },
@@ -1142,6 +1202,88 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
 
+    def test_dynamic_region_can_render_admin_readonly_fields(self):
+        form = ReadonlyDynamicRegionForm(
+            instance=DynamicRegionDemoModel(username="demo"),
+            request=self.request,
+        )
+        region = form.get_dynamic_region("readonly_details", self.request)
+        state = form.get_dynamic_region_state(region, self.request)
+
+        html = render_to_string(
+            "sb_admin/includes/dynamic_region.html",
+            {"dynamic_region": form.get_dynamic_region_context(region, self.request)},
+            request=self.request,
+        )
+
+        self.assertEqual(state.active_fields, ("readonly_summary",))
+        self.assertIn("Summary", html)
+        self.assertIn("Summary for demo", html)
+        self.assertNotIn('name="readonly_summary"', html)
+
+    def test_dynamic_region_readonly_fields_treat_unsaved_instance_as_add(self):
+        class AddAwareReadonlyRegionView(ReadonlyDynamicRegionView):
+            def get_readonly_fields(self, request, obj=None):
+                return ("readonly_summary",) if obj else ()
+
+        tracking_view = AddAwareReadonlyRegionView()
+
+        class AddAwareReadonlyRegionForm(ReadonlyDynamicRegionForm):
+            view = tracking_view
+
+        add_form = AddAwareReadonlyRegionForm(
+            instance=DynamicRegionDemoModel(username="demo"),
+            request=self.request,
+        )
+        add_region = add_form.get_dynamic_region("readonly_details", self.request)
+        add_state = add_form.get_dynamic_region_state(add_region, self.request)
+
+        change_form = AddAwareReadonlyRegionForm(
+            instance=DynamicRegionDemoModel(id=1, username="demo"),
+            request=self.request,
+        )
+        change_region = change_form.get_dynamic_region("readonly_details", self.request)
+        change_state = change_form.get_dynamic_region_state(change_region, self.request)
+
+        self.assertEqual(add_form.get_dynamic_region_readonly_fields(self.request), ())
+        self.assertEqual(add_state.active_fields, ())
+        self.assertEqual(
+            change_form.get_dynamic_region_readonly_fields(self.request),
+            ("readonly_summary",),
+        )
+        self.assertEqual(change_state.active_fields, ("readonly_summary",))
+
+    def test_deferred_dynamic_region_renders_lazy_loader_until_fragment(self):
+        form = DeferredDynamicRegionForm(request=self.request)
+        region = form.get_dynamic_region("lazy_details", self.request)
+
+        initial_html = render_to_string(
+            "sb_admin/includes/dynamic_region.html",
+            {"dynamic_region": form.get_dynamic_region_context(region, self.request)},
+            request=self.request,
+        )
+        fragment_html = render_to_string(
+            "sb_admin/includes/dynamic_region.html",
+            {
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, self.request, is_fragment=True
+                ),
+            },
+            request=self.request,
+        )
+
+        self.assertIn('hx-post="/sb-admin/sbadmin_dynamic_region/add"', initial_html)
+        self.assertIn('hx-trigger="load"', initial_html)
+        self.assertIn('hx-target="#sbadmin-dynamic-region-lazy-details"', initial_html)
+        self.assertIn('hx-swap="none"', initial_html)
+        self.assertIn(
+            "&quot;sbadmin_dynamic_region&quot;: &quot;lazy_details&quot;", initial_html
+        )
+        self.assertNotIn('name="details"', initial_html)
+        self.assertIn('hx-swap-oob="outerHTML"', fragment_html)
+        self.assertIn('name="details"', fragment_html)
+        self.assertNotIn('hx-trigger="load"', fragment_html)
+
     def test_active_fields_can_define_grouped_layout(self):
         form = DynamicRegionForm(
             data={
@@ -1179,8 +1321,9 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "dynamic_region": form.get_dynamic_region_context(region, self.request),
-                "sbadmin_dynamic_region_fragment": True,
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, self.request, is_fragment=True
+                ),
             },
             request=self.request,
         )
@@ -1311,8 +1454,9 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "dynamic_region": form.get_dynamic_region_context(region, self.request),
-                "sbadmin_dynamic_region_fragment": True,
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, self.request, is_fragment=True
+                ),
             },
             request=self.request,
         )
@@ -1326,8 +1470,9 @@ class DynamicFormTests(SimpleTestCase):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "dynamic_region": form.get_dynamic_region_context(region, self.request),
-                "sbadmin_dynamic_region_fragment": True,
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, self.request, is_fragment=True
+                ),
             },
             request=self.request,
         )

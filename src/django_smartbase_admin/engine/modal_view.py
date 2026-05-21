@@ -61,9 +61,8 @@ class ActionModalView(FormView):
                     "sb_admin/includes/dynamic_region.html",
                     {
                         "dynamic_region": form.get_dynamic_region_context(
-                            target_region, request
+                            target_region, request, is_fragment=True
                         ),
-                        "sbadmin_dynamic_region_fragment": True,
                     },
                     request=request,
                 )

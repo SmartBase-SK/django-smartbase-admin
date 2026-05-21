@@ -1343,7 +1343,7 @@ Use the same `SBDynamicRegion` marker in these places:
 | Normal model admin add/change form | `SBAdmin.sbadmin_fieldsets`, or the form's `Meta.sbadmin_fieldsets` | SBAdmin uses the admin `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add` action. |
 | Stacked inline row | `SBAdminStackedInline.sbadmin_fieldsets`, or the inline form's `Meta.sbadmin_fieldsets` | SBAdmin injects the inline form prefix into `hx-vals`, so only the changed inline row is refreshed. |
 | Action modal | The modal `form_class.Meta.sbadmin_fieldsets` | `ActionModalView`, `ListActionModalView`, and `RowActionModalView` use the current modal URL. |
-| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `?sbadmin_dynamic_region=<name>` and renders the dynamic-region fragment. |
+| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `sbadmin_dynamic_region=<name>` POSTs and renders the dynamic-region fragment. |
 
 ### Basic tutorial: switch fields by article status
 
@@ -1492,6 +1492,7 @@ If the inline needs extra non-model trigger fields, define a custom inline form 
 | `get_active_fields` | callable | Optional `(form, request, region) -> iterable`. Return active field names or grouped iterables. Defaults to all `fields`. |
 | `inactive_field_policy` | `SBInactiveFieldPolicy` | `PRESERVE` by default. Controls cleaning/submission behavior for inactive fields. |
 | `template` | `str` | Optional custom template instead of the default inline fieldset renderer. |
+| `defer_trigger` | `str \| None` | Optional HTMX trigger for self-loading regions, e.g. `"load"`. Initial render emits trigger attrs and skips default inline fields until the fragment response. |
 
 Unknown field names in `get_active_fields` are ignored. A grouped tuple/list such as `("category", "author")` renders those fields together, same as grouped fields in normal Django admin fieldsets.
 
@@ -1542,17 +1543,19 @@ def article_review_fields(form, request, region):
     return ("category",)
 ```
 
-Do not rely on `cleaned_data` in these callbacks. Dynamic-region refreshes are GET requests that build an unbound form with `initial` values extracted from the current request data through each widget's `value_from_datadict()`.
+Do not rely on `cleaned_data` in these callbacks. Dynamic-region refreshes are POST requests that build an unbound form with `initial` values extracted from the current request data through each widget's `value_from_datadict()`.
 
 ### HTMX trigger wiring
 
 Each `trigger_fields` widget receives HTMX attributes automatically:
 
-- `hx-get`: current modal/form path for standalone forms, or the admin `sbadmin_dynamic_region` action URL for admin forms.
+- `hx-post`: current modal/form path for standalone forms, or the admin `sbadmin_dynamic_region` action URL for admin forms.
 - `hx-trigger`: `"change"` by default.
 - `hx-target`: the dynamic region wrapper ID.
 - `hx-include`: `closest form`, so current unsaved form values are sent.
 - `hx-indicator`: the region loader ID.
+- `hx-swap`: `none`; dynamic-region fragments use out-of-band wrapper replacement.
+- `hx-sync`: `closest form:replace` for field-triggered regions and `this:replace` for deferred self-loading regions.
 - `hx-vals`: includes `{"sbadmin_dynamic_region": "<region name>"}`.
 
 To use a custom trigger event, set `dynamic_region_trigger_event` on the widget:
@@ -1567,6 +1570,21 @@ class CategoryAutocompleteWidget(forms.TextInput):
 ```
 
 If several regions share the same trigger field, the admin dynamic-region action returns all related regions for that trigger so cross-fieldset dependent regions stay in sync.
+
+### Deferred self-loading regions
+
+Use `defer_trigger="load"` when a region should request its content after the page is visible, for example a slow read-only detail widget.
+
+```python
+SBDynamicRegion(
+    name="tracking_preview",
+    fields=("tracking_preview",),
+    defer_trigger="load",
+    template="blog/includes/tracking_preview_region.html",
+)
+```
+
+On the initial render, `dynamic_region.is_deferred_initial` is true and `dynamic_region.trigger_attrs` contains the wrapper's HTMX attrs. The default renderer skips inline fields while deferred; a custom template may render a skeleton or placeholder. On the fragment render, `dynamic_region.is_fragment` is true and inline fields should be rendered normally.
 
 ### Dynamic regions in action modals
 
@@ -1626,7 +1644,7 @@ Row action modals can initialize dynamic regions from the row object through the
 
 ### Dynamic regions in custom views
 
-For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small GET branch that renders `sb_admin/includes/dynamic_region.html` for `?sbadmin_dynamic_region=<name>`.
+For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small POST branch that renders `sb_admin/includes/dynamic_region.html` when `sbadmin_dynamic_region=<name>` is present.
 
 ```python
 from django import forms
@@ -1683,17 +1701,17 @@ class ImportProductsView(FormView):
         kwargs["request"] = self.request
         return kwargs
 
-    def get(self, request, *args, **kwargs):
-        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM)
+    def post(self, request, *args, **kwargs):
+        region_name = request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM)
         if region_name:
             return self.render_dynamic_region(request, region_name)
-        return super().get(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
 
     def render_dynamic_region(self, request, region_name):
         form_class = self.get_form_class()
         form = form_class(
             request=request,
-            initial=dynamic_region_initial_from_data(form_class, request.GET),
+            initial=dynamic_region_initial_from_data(form_class, request.POST),
         )
         region = form.get_dynamic_region(region_name, request)
         if region is None:
@@ -1701,8 +1719,9 @@ class ImportProductsView(FormView):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "dynamic_region": form.get_dynamic_region_context(region, request),
-                "sbadmin_dynamic_region_fragment": True,
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, request, is_fragment=True
+                ),
             },
             request=request,
         )
@@ -1724,6 +1743,7 @@ Render the form with SBAdmin fieldsets so the dynamic region marker is converted
 
 Pass `template="path/to/template.html"` to take over rendering for the region. The template receives:
 
+- `dynamic_region`
 - `form`
 - `region`
 - `region_state`
@@ -1739,6 +1759,16 @@ SBDynamicRegion(
 ```
 
 The default template renders `region_state.active_fields` with `sb_admin/includes/inline_fieldset.html`. Fragment responses render the wrapper with `hx-swap-oob="outerHTML"` and omit the loader; the full page render wraps the region with a loader.
+
+Custom templates should use `dynamic_region.is_fragment` to detect fragment renders and `dynamic_region.is_deferred_initial` to detect initial deferred placeholders. Do not use a separate `sbadmin_dynamic_region_fragment` template variable.
+
+```django
+{% if dynamic_region.is_deferred_initial %}
+    {% include "blog/includes/tracking_preview_skeleton.html" %}
+{% else %}
+    {% include "sb_admin/includes/inline_fieldset_fields.html" with fieldset=dynamic_fieldset %}
+{% endif %}
+```
 
 ### Placement rules and gotchas
 
