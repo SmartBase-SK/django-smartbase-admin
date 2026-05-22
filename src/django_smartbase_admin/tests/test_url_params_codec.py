@@ -4,7 +4,9 @@ from django.test import SimpleTestCase
 
 from django_smartbase_admin.services.url_params_codec import (
     dumps_for_url,
+    extract_params_from_changelist_filters,
     loads_from_url,
+    parse_changelist_filters,
 )
 
 
@@ -30,3 +32,11 @@ class UrlParamsCodecTests(SimpleTestCase):
         self.assertEqual(loads_from_url(None), {})
         self.assertEqual(loads_from_url("not-valid"), {})
         self.assertEqual(loads_from_url("w"), {})
+
+    def test_changelist_filters_preserves_plus(self):
+        token = "N4Igz+compressed+token"
+        raw_filters = f"params={token}"
+        self.assertEqual(
+            extract_params_from_changelist_filters(raw_filters), token
+        )
+        self.assertEqual(parse_changelist_filters(""), {})

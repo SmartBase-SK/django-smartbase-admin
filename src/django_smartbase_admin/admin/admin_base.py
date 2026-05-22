@@ -985,11 +985,7 @@ class SBAdmin(
             return {}
 
         raw_filters = request.GET.get("_changelist_filters", "")
-        try:
-            parsed = urllib.parse.parse_qs(urllib.parse.unquote(raw_filters))
-            all_params = SBAdminViewService.json_loads_from_url(parsed["params"][0])
-        except Exception:
-            all_params = {}
+        all_params = SBAdminViewService.parse_changelist_filters(raw_filters)
 
         list_action = self.sbadmin_list_action_class(
             self, request, all_params=all_params

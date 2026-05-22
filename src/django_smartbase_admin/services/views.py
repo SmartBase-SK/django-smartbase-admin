@@ -23,6 +23,7 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 from django_smartbase_admin.services.url_params_codec import (
     dumps_for_url,
     loads_from_url,
+    parse_changelist_filters,
 )
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
@@ -38,6 +39,10 @@ class SBAdminViewService(object):
     @classmethod
     def json_loads_from_url(cls, value: str | None) -> dict:
         return loads_from_url(value)
+
+    @classmethod
+    def parse_changelist_filters(cls, raw_filters: str) -> dict:
+        return parse_changelist_filters(raw_filters)
 
     @classmethod
     def json_dumps_and_replace(cls, data):
