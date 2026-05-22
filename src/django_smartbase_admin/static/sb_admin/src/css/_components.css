@@ -367,7 +367,7 @@
         margin-top: 1px;
         overflow-x: auto;
         &.show {
-            z-index: 1;
+            z-index: 11
         }
     }
 
