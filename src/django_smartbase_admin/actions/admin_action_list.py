@@ -2,6 +2,7 @@ import json
 import math
 from typing import Any, TYPE_CHECKING
 
+from django.contrib.admin.utils import lookup_spawns_duplicates
 from django.db.models import Q, Field
 from django.utils import timezone
 from django.utils.html import escape
@@ -389,6 +390,11 @@ class SBAdminListAction(SBAdminAction):
                 )
                 term_queries.append(or_queries)
             queryset = queryset.filter(Q.create(term_queries))
+            if any(
+                lookup_spawns_duplicates(self.view.model._meta, search_spec)
+                for search_spec in orm_lookups
+            ):
+                queryset = queryset.distinct()
         return queryset
 
     def is_search_query(self):
