@@ -36,7 +36,5 @@ class UrlParamsCodecTests(SimpleTestCase):
     def test_changelist_filters_preserves_plus(self):
         token = "N4Igz+compressed+token"
         raw_filters = f"params={token}"
-        self.assertEqual(
-            extract_params_from_changelist_filters(raw_filters), token
-        )
+        self.assertEqual(extract_params_from_changelist_filters(raw_filters), token)
         self.assertEqual(parse_changelist_filters(""), {})
