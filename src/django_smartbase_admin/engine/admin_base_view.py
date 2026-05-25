@@ -236,7 +236,11 @@ class SBAdminBaseView(object):
         new_action.action_modifier = (
             "template" if object_id is not None else IGNORE_LIST_SELECTION
         )
-        new_action.url = None
+        is_lazy_url = getattr(action, "target_view", None) is not None or (
+            getattr(action, "view", None) and getattr(action, "action_id", None)
+        )
+        if is_lazy_url:
+            new_action.url = None
         if sub_actions:
             new_action.sub_actions = materialized_sub_actions
         return new_action
@@ -672,7 +676,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         return HttpResponse(status=200, content=render_notifications(request))
 
     def init_actions(self, request) -> None:
-
         self.get_sbadmin_list_selection_actions_processed(request)
         self.get_sbadmin_list_actions_processed(request)
         self.get_sbadmin_row_actions_processed(request)
