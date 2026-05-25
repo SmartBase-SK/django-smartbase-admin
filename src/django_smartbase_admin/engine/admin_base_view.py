@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
-from django.http import HttpResponse, Http404, JsonResponse, HttpRequest
+from django.http import HttpResponse, JsonResponse, HttpRequest
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse
@@ -71,7 +71,6 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 class SBAdminBaseView(object):
     global_filter_data_map = None
     sbadmin_detail_actions = None
-    sbadmin_object_action_views = None
     menu_label: str | None = None
     add_label: str | None = None
     change_label: str | None = None
@@ -177,13 +176,6 @@ class SBAdminBaseView(object):
         if not hasattr(self, action_id):
             setattr(self, action_id, self.delegate_to_target_view(target_view))
         return action_id
-
-    def get_sbadmin_object_action_views(self, request) -> Iterable[type] | None:
-        return self.sbadmin_object_action_views
-
-    def register_object_action_views(self, request) -> None:
-        for target_view in self.get_sbadmin_object_action_views(request) or []:
-            self._register_form_view_action(target_view)
 
     @staticmethod
     def _materialize_modifier_object_id(
@@ -618,7 +610,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         self.get_sbadmin_list_selection_actions_processed(request)
         self.get_sbadmin_list_actions_processed(request)
         self.get_sbadmin_row_actions_processed(request)
-        self.register_object_action_views(request)
 
         self.sbadmin_actions_initialized = True
 
