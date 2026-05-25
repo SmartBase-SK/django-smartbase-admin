@@ -21,6 +21,7 @@ def _make_request_data(action_name, modifier="template"):
     rd = MagicMock()
     rd.action = action_name
     rd.modifier = modifier
+    rd.object_id = None
     return rd
 
 
@@ -96,6 +97,7 @@ class TestDelegateToAction(TestCase):
         base_view = SBAdminBaseView.__new__(SBAdminBaseView)
         inner = base_view.delegate_to_action_view(mock_action)
         self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
+        self.assertTrue(getattr(inner, "_sbadmin_keep_route_modifier_argument", False))
 
     @patch(PATCH_FROM_REQUEST)
     def test_decorator_permission_propagated_to_action(self, mock_from_request):
@@ -121,6 +123,38 @@ class TestDelegateToAction(TestCase):
 
         action_arg = view.has_permission_for_action.call_args.args[1]
         self.assertEqual(action_arg.permission, "delete")
+
+    @patch(PATCH_FROM_REQUEST)
+    def test_object_id_is_passed_to_method_action_for_template_modifier(
+        self, mock_from_request
+    ):
+        seen = {}
+
+        @sbadmin_action
+        def row_action(request, modifier):
+            seen["modifier"] = modifier
+            return HttpResponse("ok")
+
+        view = MagicMock()
+        view.row_action = row_action
+        view.has_permission_for_action.return_value = True
+        view.init_view_dynamic = MagicMock()
+
+        rd = _make_request_data("row_action", modifier="template")
+        rd.object_id = "123"
+        rd.selected_view = view
+        mock_from_request.return_value = rd
+
+        response = SBAdminViewService.delegate_to_action(
+            self.factory.get("/"),
+            view="v",
+            action="row_action",
+            modifier="template",
+            object_id="123",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(seen["modifier"], "123")
 
 
 class TestDefaultActionPermission(TestCase):

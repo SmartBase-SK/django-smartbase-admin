@@ -83,34 +83,25 @@ class SBAdminCustomAction(object):
         self.open_in_new_tab = open_in_new_tab
         self.template = template or "sb_admin/actions/partials/action_link.html"
         self.permission = permission
-        self.resolve_url()
+        self.validate_configuration()
 
-    def resolve_url(self):
+    def validate_configuration(self):
         if self.sub_actions:
-            for sub_action in self.sub_actions:
-                sub_action.resolve_url()
             return
-        if not (self.url or (self.view and self.action_id)):
+        if not (
+            self.url
+            or (self.view and self.action_id)
+            or getattr(self, "target_view", None) is not None
+        ):
             raise ImproperlyConfigured(
-                "You must provide either url or view and action_id"
+                "You must provide either url, target_view, or view and action_id"
             )
-
-        if not self.url and not self.action_modifier:
-            self.url = self.view.get_action_url(self.action_id)
-        if not self.url and self.action_modifier is not None:
-            self.url = self.view.get_action_url(self.action_id, self.action_modifier)
 
 
 class SBAdminFormViewAction(SBAdminCustomAction):
     def __init__(self, target_view, *args, **kwargs) -> None:
         self.target_view = target_view
         super().__init__(*args, **kwargs)
-
-    def resolve_url(self):
-        """
-        self.url and self.action_id is resolved in side django_smartbase_admin.engine.admin_base_view.SBAdminBaseView.process_actions
-        """
-        pass
 
 
 class SBAdminRowAction(SBAdminCustomAction):
@@ -172,7 +163,6 @@ class SBAdminRowAction(SBAdminCustomAction):
                 "SBAdminRowAction requires exactly one of: target_view, action_id, url"
             )
 
-        # Set before super().__init__ calls resolve_url().
         self.target_view = resolved_target_view
 
         super().__init__(
@@ -194,11 +184,6 @@ class SBAdminRowAction(SBAdminCustomAction):
         self.enabled_value = (
             enabled_value if enabled_value is not None else self.enabled_value
         )
-
-    def resolve_url(self):
-        if self.target_view is not None:
-            return
-        super().resolve_url()
 
     def resolve_row_value(self, value, row):
         if callable(value):

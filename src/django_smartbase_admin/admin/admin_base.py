@@ -739,14 +739,10 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
         extra_context.update(self.get_global_context(request))
         return super().changelist_view(request, extra_context)
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
 
@@ -956,16 +952,12 @@ class SBAdmin(
     def get_menu_label(self) -> str:
         return self.menu_label or self.model._meta.verbose_name_plural
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         if not hasattr(self, action):
             raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
     def get_detail_url(self, object_id=None) -> str:
@@ -1279,14 +1271,10 @@ class SBAdminInline(
             request, self.get_sbadmin_inline_list_actions(request)
         )
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
     def register_autocomplete_views(self, request) -> None:

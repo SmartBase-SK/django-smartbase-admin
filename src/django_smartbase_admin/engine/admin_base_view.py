@@ -8,7 +8,7 @@ from typing import Any, TYPE_CHECKING
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import F
 from django.http import HttpResponse, JsonResponse, HttpRequest
 from django.shortcuts import redirect
@@ -125,19 +125,26 @@ class SBAdminBaseView(object):
             return target_view.as_view(view=self)(request, modifier=modifier)
 
         inner_view._is_sbadmin_action = True
+        inner_view._sbadmin_keep_route_modifier_argument = True
         return inner_view
 
     def process_list_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        resolved_actions = self._resolve_action_urls(actions)
+        return self.process_actions_permissions(request, resolved_actions)
 
     def process_row_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        materialized_actions = [
+            self._materialize_modifier_object_id(action, MODIFIER_OBJECT_ID)
+            for action in actions
+        ]
+        resolved_actions = self._resolve_action_urls(
+            materialized_actions, MODIFIER_OBJECT_ID
+        )
+        return self.process_actions_permissions(request, resolved_actions)
 
     def process_detail_actions(
         self,
@@ -149,33 +156,66 @@ class SBAdminBaseView(object):
             self._materialize_modifier_object_id(action, object_id)
             for action in actions
         ]
-        self._register_form_view_actions(materialized_actions)
-        return self.process_actions_permissions(request, materialized_actions)
+        resolved_actions = self._resolve_action_urls(materialized_actions, object_id)
+        return self.process_actions_permissions(request, resolved_actions)
 
     def process_inline_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        resolved_actions = self._resolve_action_urls(actions)
+        return self.process_actions_permissions(request, resolved_actions)
 
-    def _register_form_view_actions(self, actions: list[SBAdminCustomAction]) -> None:
-        for action in actions:
-            if action.sub_actions:
-                self._register_form_view_actions(action.sub_actions)
-            target_view = getattr(action, "target_view", None)
-            if target_view is None:
-                continue
-            action_id = self._register_form_view_action(target_view)
-            action.action_id = action_id
-            action.url = self.get_action_url(
-                action_id, modifier=action.action_modifier or "template"
+    def _resolve_action_urls(
+        self, actions: list[SBAdminCustomAction], object_id: int | str | None = None
+    ) -> list[SBAdminCustomAction]:
+        return [self._resolve_action_url(action, object_id) for action in actions]
+
+    def _resolve_action_url(
+        self, action: SBAdminCustomAction, object_id: int | str | None = None
+    ) -> SBAdminCustomAction:
+        if action.sub_actions:
+            resolved_sub_actions = self._resolve_action_urls(
+                action.sub_actions, object_id
             )
+            if resolved_sub_actions != action.sub_actions:
+                action = copy(action)
+                action.sub_actions = resolved_sub_actions
+            return action
+        target_view = getattr(action, "target_view", None)
+        if target_view is not None:
+            resolved_action = copy(action)
+            action_id = self._register_form_view_action(
+                target_view, getattr(action, "action_id", None)
+            )
+            resolved_action.action_id = action_id
+            resolved_action.url = self.get_action_url(
+                action_id,
+                modifier=self._get_action_modifier(action),
+                object_id=object_id,
+            )
+            return resolved_action
+        if action.url:
+            return action
+        if getattr(action, "view", None) and getattr(action, "action_id", None):
+            resolved_action = copy(action)
+            resolved_action.url = self.get_action_url(
+                action.action_id,
+                modifier=self._get_action_modifier(action),
+                object_id=object_id,
+            )
+            return resolved_action
+        return action
 
-    def _register_form_view_action(self, target_view) -> str:
-        action_id = target_view.__name__
+    def _register_form_view_action(self, target_view, action_id=None) -> str:
+        action_id = action_id or getattr(target_view, "action_id", None)
+        action_id = action_id or target_view.__name__
         if not hasattr(self, action_id):
             setattr(self, action_id, self.delegate_to_target_view(target_view))
         return action_id
+
+    @staticmethod
+    def _get_action_modifier(action: SBAdminCustomAction) -> str:
+        return getattr(action, "action_modifier", None) or "template"
 
     @staticmethod
     def _materialize_modifier_object_id(
@@ -194,7 +234,7 @@ class SBAdminBaseView(object):
             return action
         new_action = copy(action)
         new_action.action_modifier = (
-            str(object_id) if object_id is not None else IGNORE_LIST_SELECTION
+            "template" if object_id is not None else IGNORE_LIST_SELECTION
         )
         new_action.url = None
         if sub_actions:
@@ -204,8 +244,8 @@ class SBAdminBaseView(object):
     def process_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        self._register_form_view_actions(actions)
-        return self.process_actions_permissions(request, actions)
+        resolved_actions = self._resolve_action_urls(actions)
+        return self.process_actions_permissions(request, resolved_actions)
 
     def process_actions_permissions(
         self, request, actions: list[SBAdminCustomAction]
@@ -248,7 +288,19 @@ class SBAdminBaseView(object):
             field_cache[field.name] = field
         return field_cache
 
-    def get_action_url(self, action, modifier="template"):
+    def get_action_url_kwargs(
+        self, action, modifier="template", object_id=None
+    ) -> dict:
+        kwargs = {
+            "view": self.get_id(),
+            "action": action,
+            "modifier": modifier,
+        }
+        if object_id is not None:
+            kwargs["object_id"] = object_id
+        return kwargs
+
+    def get_action_url(self, action, modifier="template", object_id=None):
         raise NotImplementedError
 
     def register_autocomplete_views(self, request):
@@ -342,6 +394,22 @@ class SBAdminBaseView(object):
             ],
             object_id,
         )
+
+    def get_sbadmin_fieldsets_actions_processed(
+        self, request, object_id: int | str | None = None
+    ) -> None:
+        if not hasattr(self, "get_sbadmin_fieldsets"):
+            return
+        try:
+            fieldsets = self.get_sbadmin_fieldsets(request, object_id) or []
+        except ImproperlyConfigured as exc:
+            if "missing definition of fieldsets or sbadmin_fieldsets" not in str(exc):
+                raise
+            return
+        for fieldset, fieldset_data in fieldsets:
+            self.get_sbadmin_fieldset_actions_processed(
+                request, fieldset, fieldset_data, object_id
+            )
 
     def get_color_scheme_context(self, request):
         from django_smartbase_admin.views.user_config_view import ColorSchemeForm
@@ -604,14 +672,14 @@ class SBAdminBaseListView(SBAdminBaseView):
         return HttpResponse(status=200, content=render_notifications(request))
 
     def init_actions(self, request) -> None:
-        if self.sbadmin_actions_initialized:
-            return
 
         self.get_sbadmin_list_selection_actions_processed(request)
         self.get_sbadmin_list_actions_processed(request)
         self.get_sbadmin_row_actions_processed(request)
-
-        self.sbadmin_actions_initialized = True
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        if object_id is not None:
+            self.get_sbadmin_detail_actions_processed(request, object_id)
+            self.get_sbadmin_fieldsets_actions_processed(request, object_id)
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         super().init_view_dynamic(request, request_data, **kwargs)
@@ -1052,15 +1120,10 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.get_action_url(Action.LIST_JSON.value)
 
     def get_detail_url(self) -> str:
-        url = reverse(
-            "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": Action.DETAIL.value,
-                "modifier": "template",
-            },
+        return self.get_action_url(
+            Action.DETAIL.value,
+            object_id=OBJECT_ID_PLACEHOLDER,
         )
-        return f"{url}/{OBJECT_ID_PLACEHOLDER}"
 
     def get_config_url(self, request, config_name=None) -> str:
         return self.get_action_url(Action.CONFIG.value, config_name)

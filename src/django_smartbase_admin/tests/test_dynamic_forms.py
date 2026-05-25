@@ -392,16 +392,22 @@ class GroupedRegionIgnoredForm(SBAdminBaseFormInit, forms.Form):
 
 
 class FakeView:
-    def get_action_url(self, action, modifier="template"):
-        return f"/sb-admin/{action}/{modifier}"
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = f"/sb-admin/{action}/{modifier}"
+        if object_id is not None:
+            url = f"{url}/{object_id}"
+        return url
 
 
 class FakeFieldsetActionView(SBAdminBaseView):
     def __init__(self, denied_action_id=None):
         self.denied_action_id = denied_action_id
 
-    def get_action_url(self, action, modifier="template"):
-        return f"/sb-admin/{action}/{modifier}"
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = f"/sb-admin/{action}/{modifier}"
+        if object_id is not None:
+            url = f"{url}/{object_id}"
+        return url
 
     def has_permission_for_action(self, request, action):
         return getattr(action, "action_id", None) != self.denied_action_id
@@ -559,11 +565,14 @@ class AdminFieldsetsDynamicRegionAdmin(SBAdmin):
         ),
     )
 
-    def get_action_url(self, action, modifier="template"):
-        return (
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = (
             "/admin/django_smartbase_admin/dynamicregiondemomodel/"
             f"{action}/{modifier}/"
         )
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
 
     def get_global_context(self, request, object_id=None):
         return {
@@ -623,11 +632,14 @@ class DynamicRegionStackedInline(SBAdminStackedInline):
         ),
     )
 
-    def get_action_url(self, action, modifier="template"):
-        return (
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = (
             "/admin/django_smartbase_admin/dynamicregioninlineparent/"
             f"inline/{action}/{modifier}/"
         )
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
 
     def has_add_permission(self, request, obj=None):
         return True
@@ -654,11 +666,14 @@ class InlineDynamicRegionParentAdmin(AdminFieldsetsDynamicRegionAdmin):
         ),
     )
 
-    def get_action_url(self, action, modifier="template"):
-        return (
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = (
             "/admin/django_smartbase_admin/dynamicregioninlineparent/"
             f"{action}/{modifier}/"
         )
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
 
 
 dynamic_region_admin_site.register(
@@ -941,7 +956,7 @@ class DynamicFormTests(SimpleTestCase):
         html = self.render_fieldset(form)
 
         self.assertTrue(hasattr(view, "FieldsetModalView"))
-        self.assertIn("/sb-admin/FieldsetModalView/42", html)
+        self.assertIn("/sb-admin/FieldsetModalView/template/42", html)
         self.assertIn('data-bs-toggle="modal"', html)
 
     def test_action_modal_form_does_not_use_parent_view_dynamic_regions(self):

@@ -162,14 +162,21 @@ class RowActionModalView(ActionModalView):
     def get_object_queryset(self, request):
         return self.view.get_queryset(request)
 
+    def get_object_id(self):
+        if hasattr(self.request, "request_data"):
+            object_id = getattr(self.request.request_data, "object_id", None)
+            if object_id is not None:
+                return object_id
+        return self.kwargs.get("modifier")
+
     def get_object(self):
         if not hasattr(self, "_resolved_object"):
-            modifier = self.kwargs.get("modifier")
-            if modifier in (None, IGNORE_LIST_SELECTION):
+            object_id = self.get_object_id()
+            if object_id in (None, IGNORE_LIST_SELECTION):
                 self._resolved_object = None
             else:
                 self._resolved_object = (
-                    self.get_object_queryset(self.request).filter(pk=modifier).first()
+                    self.get_object_queryset(self.request).filter(pk=object_id).first()
                 )
         return self._resolved_object
 
@@ -181,8 +188,8 @@ class RowActionModalView(ActionModalView):
         return kwargs
 
     def dispatch(self, request, *args, **kwargs):
-        modifier = kwargs.get("modifier")
-        if modifier not in (None, IGNORE_LIST_SELECTION) and self.get_object() is None:
+        object_id = self.get_object_id()
+        if object_id not in (None, IGNORE_LIST_SELECTION) and self.get_object() is None:
             return HttpResponse(self.not_found_message, status=404)
         return super().dispatch(request, *args, **kwargs)
 

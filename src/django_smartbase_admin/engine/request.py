@@ -1,5 +1,4 @@
 from django.http import Http404
-from django.middleware.csrf import get_token
 
 from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY
 from django_smartbase_admin.services.configuration import SBAdminConfigurationService
@@ -66,7 +65,7 @@ class SBAdminViewRequestData(object):
             view=kwargs.get("view"),
             action=kwargs.get("action"),
             modifier=kwargs.get("modifier"),
-            object_id=kwargs.get("id") or kwargs.get("object_id"),
+            object_id=kwargs.get("object_id"),
             user=request.user,
             request_meta=request.META,
             request_get=request.GET,
