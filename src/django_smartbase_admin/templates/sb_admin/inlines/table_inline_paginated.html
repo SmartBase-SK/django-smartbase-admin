@@ -1,5 +1,5 @@
 {% extends 'sb_admin/inlines/table_inline.html' %}
-{% load i18n paginated_inline %}
+{% load i18n paginated_inline sb_paginated_inline %}
 
 {% block card_content %}
     {{ block.super }}
@@ -14,35 +14,19 @@
                         <svg class="w-20 h-20"><use xlink:href="#Left"></use></svg>
                     </{% if page_obj.has_previous %}a{% else %}button{% endif %}>
 
-                    {% if page_obj.number|add:"-5" > 0 %}
-                        <a class="tabulator-page"
-                           href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key 0 %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}">1</a>
-                    {% endif %}
-
-                    {% if page_obj.number|add:"-5" > 1 %}
-                        <span class="tabulator-page">&hellip;</span>
-                    {% endif %}
-
-                    {% for page_num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == page_num %}
-                            <span class="tabulator-page active">{{ page_num }}</span>
-                        {% else %}
-                            {% if page_num > page_obj.number|add:"-5" and page_num < page_obj.number|add:"5" %}
+                    {% tabulator_style_inline_pages page_obj as pagination_items %}
+                    {% for item in pagination_items %}
+                        {% if item.kind == "page" %}
+                            {% if item.active %}
+                                <span class="tabulator-page active">{{ item.number }}</span>
+                            {% else %}
                                 <a class="tabulator-page"
-                                   href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_num %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}">{{ page_num }}</a>
+                                   href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key item.number %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}">{{ item.number }}</a>
                             {% endif %}
+                        {% elif item.kind == "ellipsis" %}
+                            <button type="button" class="tabulator-page" disabled><svg class="w-20 h-20 mt-8"><use xlink:href="#More"></use></svg></button>
                         {% endif %}
                     {% endfor %}
-
-                    {% if page_obj.number|add:"5" < page_obj.paginator.num_pages %}
-                        <span class="tabulator-page">&hellip;</span>
-                    {% endif %}
-
-                    {% if page_obj.number|add:"4" < page_obj.paginator.num_pages %}
-                        <a class="tabulator-page"
-                           href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.paginator.num_pages %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}">{{ page_obj.paginator.num_pages }}</a>
-                    {% endif %}
-
 
                     <{% if page_obj.has_next %}a href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.next_page_number %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"{% else %}button type="button" disabled{% endif %} class="tabulator-page">
                         <svg class="w-20 h-20"><use xlink:href="#Right"></use></svg>
