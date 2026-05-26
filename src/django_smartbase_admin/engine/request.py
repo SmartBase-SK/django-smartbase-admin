@@ -20,6 +20,7 @@ class SBAdminViewRequestData(object):
     selected_view = None
     session = None
     additional_data = None
+    autocomplete_map = None
 
     def __init__(
         self,
@@ -48,6 +49,10 @@ class SBAdminViewRequestData(object):
         self.global_filter = global_filter or {}
         self.session = session or {}
         self.additional_data = {}
+        self.autocomplete_map = {}
+
+    def register_autocomplete_view(self, view) -> None:
+        self.autocomplete_map[view.get_id()] = view
 
     def refresh_selected_view(self, request):
         self.configuration = SBAdminConfigurationService.get_configuration(self)
@@ -58,6 +63,7 @@ class SBAdminViewRequestData(object):
         except KeyError:
             raise Http404
         self.configuration.init_configuration_dynamic(request, self)
+        self.autocomplete_map = {}
 
     @classmethod
     def from_request_and_kwargs(cls, request, **kwargs):

@@ -307,7 +307,18 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.init_menu_items()
 
     def dynamically_register_autocomplete_view(self, view):
-        self.autocomplete_map[view.get_id()] = view
+        """Register into the current request map when a request is active."""
+        try:
+            from django_smartbase_admin.services.thread_local import (
+                SBAdminThreadLocalService,
+            )
+
+            request = SBAdminThreadLocalService.get_request()
+        except LookupError:
+            return
+        request_data = getattr(request, "request_data", None)
+        if request_data is not None:
+            request_data.register_autocomplete_view(view)
 
     def restrict_queryset(
         self,

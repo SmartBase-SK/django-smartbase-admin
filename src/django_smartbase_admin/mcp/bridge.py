@@ -5,6 +5,7 @@ from __future__ import annotations
 import numbers
 
 from django.http import QueryDict
+from django.utils.datastructures import MultiValueDict
 
 from django_smartbase_admin.engine.const import (
     COLUMNS_DATA_COLUMNS_NAME,
@@ -34,10 +35,18 @@ def ensure_sbadmin_request_data(request) -> None:
     if not hasattr(request, "session"):
         request.session = {}
 
+    # Tag the request so the audit manager can stamp ``source="mcp"`` on
+    # any AdminAuditLog row produced during this call — including manual
+    # ``create_audit_log`` calls inside MCP-triggered queue/row actions.
+    request._sbadmin_audit_source = "mcp"
+
+    # Always bind the contextvar — test fixtures pre-attach
+    # ``request_data`` but don't bind the thread-local, and the audit
+    # manager keys ``_is_in_admin_context`` off the contextvar.
+    SBAdminThreadLocalService.set_request(request)
+
     if getattr(request, "request_data", None) is not None:
         return
-
-    SBAdminThreadLocalService.set_request(request)
 
     request_data = SBAdminViewRequestData(
         view=None,
@@ -60,10 +69,12 @@ def ensure_sbadmin_request_data(request) -> None:
 def _to_querydict(mapping: dict) -> QueryDict:
     """Build a ``QueryDict`` from a flat ``{str: scalar}`` mapping.
 
-    ``QueryDict`` only stores strings — callers pass either already-encoded
-    JSON or simple scalars, but coerce defensively so a stray ``int`` /
-    ``bool`` doesn't reach the wsgi-shaped ``request.GET`` / ``POST``
-    consumers downstream.
+    Stringifies scalars defensively: this builds the GET/POST surface
+    consumed by the wsgi-shaped list pipeline (filters, search,
+    autocomplete), where downstream parsers assume string values. The
+    write path in :mod:`service` constructs its own ``QueryDict`` of
+    native Python that ``Field.to_python`` accepts directly — that
+    contract is independent of this helper.
     """
     qd = QueryDict(mutable=True)
     for key, value in mapping.items():
@@ -96,21 +107,52 @@ def build_columns_data(admin, request, fields: list[str]) -> dict:
     }
 
 
+def set_request_post(
+    request, post_qd: QueryDict, files: MultiValueDict | None = None
+) -> None:
+    """Force ``request.POST`` / ``request.FILES`` on a DRF ``Request``.
+
+    DRF re-exposes ``POST`` / ``FILES`` as read-only properties backed
+    by parser-cache attrs (``_data`` / ``_files``), so pre-populating
+    the cache is the only way to make ``request.POST`` read our
+    ``QueryDict`` — assigning to ``request.POST`` raises
+    ``AttributeError: property has no setter``. ``method`` and ``GET``
+    on the DRF wrapper aren't class-level descriptors, so plain
+    ``request.method = ...`` / ``request.GET = ...`` work via the
+    instance ``__dict__``.
+
+    ``Request.POST`` also gates on ``is_form_media_type(content_type)``
+    and returns an empty ``QueryDict`` otherwise; we set
+    ``CONTENT_TYPE`` on the underlying request so the cache is read.
+    """
+    if files is None:
+        files = MultiValueDict()
+    request._data = post_qd
+    request._full_data = post_qd
+    request._files = files
+    request._request.META["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
+
+
 def set_request_payload(request, *, get=None, post=None, method=None) -> None:
     """Mirror tool-supplied params onto both ``request_data`` and ``request``.
 
     SBAdmin actions read from ``request.request_data.request_get`` /
-    ``.request_post`` / ``.request_method``; we keep ``request.GET`` /
-    ``.POST`` / ``.method`` in sync for code that reaches for the raw
-    ``HttpRequest``.
+    ``.request_post`` / ``.request_method`` — the canonical pipeline
+    channel. We also mirror onto the DRF wrapper so ``has_*_permission``,
+    middleware, and Django admin code that touch ``request.GET`` /
+    ``POST`` / ``method`` see the same values.
     """
     rd = request.request_data
+
     if get is not None:
         rd.request_get = get
         request.GET = _to_querydict(get)
     if post is not None:
         rd.request_post = post
-        request.POST = _to_querydict(post)
+        if isinstance(post, QueryDict):
+            set_request_post(request, post)
+        else:
+            set_request_post(request, _to_querydict(post))
     if method is not None:
         rd.request_method = method
         request.method = method

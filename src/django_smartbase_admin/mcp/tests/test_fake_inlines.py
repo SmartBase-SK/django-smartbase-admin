@@ -27,6 +27,7 @@ from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -83,6 +84,7 @@ class _FakeInlineTestBase(TestCase):
 
     def setUp(self):
         super().setUp()
+        SBAdminThreadLocalService.clear_request()
         self._original_admin = sb_admin_site._registry.pop(Folder, None)
         sb_admin_site.register(Folder, self.admin_class)
         MCPToolTestConfig().init_view_map()
@@ -101,6 +103,7 @@ class SafeFakeInlineTests(_FakeInlineTestBase):
 
     @classmethod
     def setUpTestData(cls):
+        SBAdminThreadLocalService.clear_request()
         cls.alpha = Folder.objects.create(name="alpha_fake")
         cls.lonely = Folder.objects.create(name="lonely_fake")
         FolderPermission.objects.create(folder=cls.alpha, everybody=True)
@@ -143,6 +146,7 @@ class UnsafeFakeInlineTests(_FakeInlineTestBase):
 
     @classmethod
     def setUpTestData(cls):
+        SBAdminThreadLocalService.clear_request()
         cls.alpha = Folder.objects.create(name="alpha_unsafe")
         FolderPermission.objects.create(folder=cls.alpha, everybody=True)
 

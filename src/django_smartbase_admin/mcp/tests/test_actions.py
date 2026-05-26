@@ -56,6 +56,7 @@ class FolderActionsTestAdmin(SBAdmin):
             filter_widget=AutocompleteFilterWidget(model=Folder, multiselect=False),
         ),
     )
+    sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
 
 
 @override_settings(
@@ -195,15 +196,31 @@ class AutocompleteTests(_ToolTestBase):
         cls.sales = Folder.objects.create(name="sales_queue")
         cls.alpha = Folder.objects.create(name="alpha")
 
+    @staticmethod
+    def _filter_widget_id(tools, view_id, field_name):
+        """Pull a list-filter ``widget_id`` out of ``list_admins`` — the
+        only place an agent legitimately learns it."""
+        admins = tools.list_admins()
+        admin_entry = next(a for a in admins if a["view_id"] == view_id)
+        field = next(f for f in admin_entry["fields"] if f["name"] == field_name)
+        return field["filter"]["widget_id"]
+
+    @staticmethod
+    def _detail_widget_id(tools, view_id, object_id, field_name):
+        """Pull a detail-form ``widget_id`` out of ``fetch_detail``."""
+        detail = tools.fetch_detail(view_id, object_id)
+        return detail["fields"][field_name]["widget_id"]
+
     def test_search_returns_matching_options(self):
         """``autocomplete`` must run the widget's ``search`` against the
         live queryset and return ``{value, label}`` rows the agent can
         feed straight back into ``list_rows`` as a filter value."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        request = build_mcp_request(user)
+        tools = SBAdminTools(request=build_mcp_request(user))
+        widget_id = self._filter_widget_id(tools, "filer_folder", "parent")
 
-        result = SBAdminTools(request=request).autocomplete(
-            "filer_folder", "parent", search="queue"
+        result = SBAdminTools(request=build_mcp_request(user)).autocomplete(
+            "filer_folder", widget_id, search="queue"
         )
 
         # ``Folder.__str__`` renders as a path (``/support_queue``), so
@@ -218,34 +235,49 @@ class AutocompleteTests(_ToolTestBase):
             self.assertIn("value", row)
             self.assertIn("label", row)
 
-    def test_error_paths_surface_clear_exceptions(self):
-        """Three ways an autocomplete call can be malformed must all
-        raise actionable exceptions: unknown field, non-autocomplete
-        field, missing view permission."""
+    def test_autocomplete_propagates_view_permission_denial(self):
+        """Missing view permission propagates rather than silently
+        returning an empty list."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
+        widget_id = self._filter_widget_id(
+            SBAdminTools(request=build_mcp_request(user)), "filer_folder", "parent"
+        )
 
-        # Typo'd field name.
-        with self.assertRaises(LookupError):
-            SBAdminTools(request=build_mcp_request(user)).autocomplete(
-                "filer_folder", "no_such_field"
-            )
-
-        # Plain column without a filter widget — ``_resolve_filter_widget``
-        # raises ``LookupError`` (no widget) or ``TypeError`` (wrong widget
-        # class); either is acceptable here.
-        with self.assertRaises((LookupError, TypeError)):
-            SBAdminTools(request=build_mcp_request(user)).autocomplete(
-                "filer_folder", "name"
-            )
-
-        # Missing view permission propagates rather than silently
-        # returning an empty list.
         denied_user = MagicMock(is_authenticated=True, is_superuser=False)
         MCPToolTestConfig.view_permission_for = set()
         with self.assertRaises(PermissionDenied):
             SBAdminTools(request=build_mcp_request(denied_user)).autocomplete(
-                "filer_folder", "parent", search="queue"
+                "filer_folder", widget_id, search="queue"
             )
+
+    def test_form_widget_autocomplete_reuses_dispatch(self):
+        """Form-FK autocomplete reuses the same MCP tool: ``fetch_detail``
+        surfaces the form widget id, and dispatching with it goes through
+        the same ``action_autocomplete`` path as list filters."""
+
+        class FolderFormOnlyAdmin(SBAdmin):
+            model = Folder
+            sbadmin_list_display = ("id", "name")
+            sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderFormOnlyAdmin)
+        self._refresh_configuration_view_map()
+
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+        widget_id = self._detail_widget_id(
+            tools, "filer_folder", self.support.pk, "parent"
+        )
+
+        result = SBAdminTools(request=build_mcp_request(user)).autocomplete(
+            "filer_folder", widget_id, search="queue"
+        )
+
+        labels = [row["label"] for row in result]
+        self.assertTrue(any("support_queue" in label for label in labels), labels)
+        self.assertTrue(any("sales_queue" in label for label in labels), labels)
+        self.assertFalse(any("alpha" in label for label in labels), labels)
 
     def test_autocomplete_respects_action_permission(self):
         class FolderAutocompleteActionDeniedAdmin(FolderActionsTestAdmin):
@@ -259,7 +291,9 @@ class AutocompleteTests(_ToolTestBase):
         self._refresh_configuration_view_map()
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+        widget_id = self._filter_widget_id(tools, "filer_folder", "parent")
         with self.assertRaises(PermissionDenied):
             SBAdminTools(request=build_mcp_request(user)).autocomplete(
-                "filer_folder", "parent", search="queue"
+                "filer_folder", widget_id, search="queue"
             )

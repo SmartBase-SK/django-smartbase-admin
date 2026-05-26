@@ -312,7 +312,29 @@ class SBAdminBaseView(object):
         raise NotImplementedError
 
     def register_autocomplete_views(self, request):
-        pass
+        for step in self._autocomplete_registration_steps(request):
+            step(request)
+
+    def _autocomplete_registration_steps(self, request):
+        return [
+            step
+            for step in (
+                getattr(self, "_register_list_filter_autocomplete", None),
+                getattr(self, "_register_form_autocomplete", None),
+                getattr(self, "_register_inline_autocomplete", None),
+            )
+            if step is not None
+        ]
+
+    def _register_autocomplete_from_filter_fields(self, request, fields) -> None:
+        from django_smartbase_admin.engine.filter_widgets import (
+            AutocompleteFilterWidget,
+        )
+
+        for field in fields:
+            widget = getattr(field, "filter_widget", None)
+            if isinstance(widget, AutocompleteFilterWidget):
+                request.request_data.register_autocomplete_view(widget)
 
     def register_action_autocomplete_views(
         self, request, actions: Iterable[SBAdminCustomAction] | None
@@ -331,14 +353,19 @@ class SBAdminBaseView(object):
 
     @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
-        autocomplete_view = request.request_data.configuration.autocomplete_map.get(
-            modifier
-        )
-        if not autocomplete_view:
+        amap = request.request_data.autocomplete_map
+        autocomplete_view = amap.get(modifier)
+        if autocomplete_view is None:
+            for step in self._autocomplete_registration_steps(request):
+                step(request)
+                autocomplete_view = amap.get(modifier)
+                if autocomplete_view is not None:
+                    break
+        if autocomplete_view is None:
             self.register_autocomplete_views(request)
-        autocomplete_view = request.request_data.configuration.autocomplete_map.get(
-            modifier
-        )
+            autocomplete_view = amap.get(modifier)
+        if autocomplete_view is None:
+            raise Http404
         autocomplete_view.init_view_dynamic(request, request.request_data)
         return autocomplete_view.action_autocomplete(request, modifier)
 
@@ -695,8 +722,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_display(self, request) -> list[str] | list:
         return self.sbadmin_list_display or self.list_display or []
 
-    def register_autocomplete_views(self, request) -> None:
-        super().register_autocomplete_views(request)
+    def _register_list_filter_autocomplete(self, request) -> None:
         self.init_fields_cache(
             self.get_sbadmin_list_display(request),
             request.request_data.configuration,
