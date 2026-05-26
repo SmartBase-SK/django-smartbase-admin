@@ -19,6 +19,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from django.db.models import F
+from django.http import Http404
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
@@ -130,6 +131,13 @@ class TestMCPPermissions(TestCase):
         )
         user = MagicMock(is_authenticated=True, is_superuser=True)
 
+        tools = SBAdminTools(request=build_mcp_request(user))
+        admins = tools.list_admins()
+        folder = next(a for a in admins if a["view_id"] == "filer_folder")
+        parent_widget_id = next(
+            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
+        )
+
         rows = SBAdminTools(request=build_mcp_request(user)).list_rows(
             "filer_folder", fields=["name"], full_text_search="perm"
         )
@@ -138,7 +146,7 @@ class TestMCPPermissions(TestCase):
         self.assertNotIn("hidden_perm", names)
 
         auto = SBAdminTools(request=build_mcp_request(user)).autocomplete(
-            "filer_folder", "parent", search="perm"
+            "filer_folder", parent_widget_id, search="perm"
         )
         labels = " ".join(row["label"] for row in auto)
         self.assertIn("alpha_perm", labels)
@@ -174,9 +182,14 @@ class TestMCPPermissions(TestCase):
                 "filer_folder", fields=["parent"]
             )
 
-        with self.assertRaises(LookupError):
+        parent_widget_id = next(
+            f["filter"]["widget_id"]
+            for f in super_folder["fields"]
+            if f["name"] == "parent"
+        )
+        with self.assertRaises(Http404):
             SBAdminTools(request=build_mcp_request(denied)).autocomplete(
-                "filer_folder", "parent", search="x"
+                "filer_folder", parent_widget_id, search="perm"
             )
 
     def test_inline_fields_respect_dynamic_get_fields(self):

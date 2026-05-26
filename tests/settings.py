@@ -11,6 +11,8 @@ SECRET_KEY = "test-secret-key-not-for-production"
 
 import os
 
+from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
+
 # Default: in-memory SQLite. Override via SBADMIN_TEST_DATABASE_URL to
 # run against Postgres (required for plugin data-path tests that use
 # ArrayAgg).
@@ -77,16 +79,7 @@ DJANGO_MCP_AUTHENTICATION_CLASSES = [
 ]
 DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
-    "instructions": (
-        "Read-only access to the SBAdmin admin surface. "
-        "Start with `list_admins` to discover which admins (and which "
-        "fields on each) the authenticated user can see; the returned "
-        "`view_id` is the handle other tools accept. Use `list_rows` to "
-        "fetch the same JSON payload the browser table renders, with "
-        "filters/pagination/sort. Use `autocomplete` to resolve filter "
-        "values for autocomplete-backed columns (e.g. find a queue id "
-        "before filtering agents by queue)."
-    ),
+    "instructions": SBADMIN_MCP_SERVER_INSTRUCTIONS,
     "stateless": True,
 }
 # Trailing slash so the endpoint matches our discovery metadata
