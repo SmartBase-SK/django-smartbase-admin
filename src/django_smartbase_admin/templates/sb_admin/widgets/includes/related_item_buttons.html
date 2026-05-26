@@ -2,7 +2,7 @@
 <div class="flex items-center gap-4 flex-shrink-0 related-item-buttons">
     {% if widget.attrs.related_edit_url or widget.attrs.related_add_url %}
         <a
-                class="btn btn-icon edit-button {% if not widget.attrs.related_edit_url %}hidden{% endif %}"
+                class="btn btn-only-icon edit-button {% if not widget.attrs.related_edit_url %}hidden{% endif %}"
                 title="{% trans 'Edit' %}"
                 {% if widget.attrs.related_edit_url %}
                     hx-get="{{ widget.attrs.related_edit_url }}?_popup=1&sbadmin_is_modal=1&sb_admin_source_field={{ widget.attrs.id }}{% if reload_on_save %}&sbadmin_reload_on_save=1{% endif %}"
@@ -22,7 +22,7 @@
     {% endif %}
     {% if widget.attrs.related_add_url %}
         <a
-                class="btn btn-icon"
+                class="btn btn-only-icon"
                 title="{% trans 'Add' %}"
                 data-bs-toggle="modal"
                 data-bs-target="#sb-admin-modal"
