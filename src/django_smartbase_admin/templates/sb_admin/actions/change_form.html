@@ -184,9 +184,10 @@
                     {% for tab, tab_content_object in tabular_context.context.items %}
                         {% with sbadmin_tab_slug=tab|slugify %}
                         <li role="presentation">
-                            <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ sbadmin_tab_slug }}" data-bs-toggle="tab"
+                            <button class="relative{% for class in tab_content_object.classes %}{% if class != 'show' %} {{ class }}{% endif %}{% endfor %}" id="tab_{{ sbadmin_tab_slug }}" data-bs-toggle="tab"
                                     data-bs-target="#{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" type="button" role="tab"
-                                    aria-controls="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" aria-selected="true">
+                                    aria-controls="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}"
+                                    aria-selected="{% if 'active' in tab_content_object.classes %}true{% else %}false{% endif %}">
                                 {{ tab }}
                             </button>
                         </li>
@@ -242,6 +243,7 @@
                 </div>
                 {% endwith %}
             {% endfor %}
+            {% include "sb_admin/includes/detail_view_tabs_hash_init.html" %}
 
             {% block admin_change_form_document_ready %}
                 <script type="text/javascript"
