@@ -236,10 +236,14 @@ class SBAdminBaseView(object):
         new_action.action_modifier = (
             "template" if object_id is not None else IGNORE_LIST_SELECTION
         )
-        is_lazy_url = getattr(action, "target_view", None) is not None or (
-            getattr(action, "view", None) and getattr(action, "action_id", None)
+        is_direct_url = (
+            bool(action.url)
+            and getattr(action, "target_view", None) is None
+            and not (
+                getattr(action, "view", None) and getattr(action, "action_id", None)
+            )
         )
-        if is_lazy_url:
+        if not is_direct_url:
             new_action.url = None
         if sub_actions:
             new_action.sub_actions = materialized_sub_actions

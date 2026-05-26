@@ -1988,7 +1988,7 @@ class ArticleAdmin(SBAdmin):
 
 ### Per-Action Permissions (`has_permission_for_action`)
 
-Override `has_permission_for_action` on your admin class to control which actions are visible per request.
+Override `has_permission_for_action` on your admin class to control which actions are visible per request. This is useful when an action exists for the view, but only some users or request states should see it.
 
 ```python
 PUBLISH_ACTION_ID = "publish_articles"
@@ -2014,37 +2014,6 @@ class ArchiveArticlesView(ListActionModalView):
         selection_queryset.update(status="archived")
 
 
-# ❌ BAD - Conditionally building the action list based on request.
-# URL handlers are registered via setattr on the singleton during the first request.
-# If a non-editor visits first, PublishView handler is never registered.
-@admin.register(Article, site=sb_admin_site)
-class ArticleAdmin(SBAdmin):
-    def get_sbadmin_list_selection_actions(self, request):
-        actions = []
-        permissions = set(request.session.get("permissions", []))
-        if "editor" in permissions:
-            actions.append(
-                SBAdminFormViewAction(
-                    target_view=PublishArticlesView,
-                    title=_("Publish Selected"),
-                    view=self,
-                    action_id=PUBLISH_ACTION_ID,
-                    open_in_modal=True,
-                ),
-            )
-        actions.append(
-            SBAdminFormViewAction(
-                target_view=ArchiveArticlesView,
-                title=_("Archive Selected"),
-                view=self,
-                action_id="archive_articles",
-                open_in_modal=True,
-            ),
-        )
-        return actions
-
-
-# ✅ GOOD - Always return all actions, use has_permission_for_action to filter visibility
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     def get_sbadmin_list_selection_actions(self, request):
@@ -2075,8 +2044,7 @@ class ArticleAdmin(SBAdmin):
 ```
 
 **Key points:**
-- Always return **all** possible actions from action getters — use `has_permission_for_action` or row-level enablement to filter visibility
-- Do NOT conditionally build the action list based on request — URL handlers are registered on the singleton during the first request and cached via `init_actions`
+- Use `has_permission_for_action` when an action should be hidden for some users or request states
 - The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
 - `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
 - When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
@@ -2206,46 +2174,6 @@ class PublishArticleView(RowActionModalView):
         return self.view.get_queryset(request)
 ```
 
-### Registration Gotcha
-
-Row actions follow the same registration rule as list and bulk actions: always return every possible action, then hide unavailable actions with permissions or row predicates.
-
-```python
-# ❌ BAD - If the first request cannot publish, PublishArticleView is never registered.
-class ArticleAdmin(SBAdmin):
-    def get_sbadmin_row_actions(self, request):
-        if not request.user.has_perm("blog.publish_article"):
-            return []
-        return [
-            SBAdminRowAction(
-                target_view=PublishArticleView,
-                title=_("Publish"),
-                icon="Check-correct",
-                view=self,
-            )
-        ]
-
-
-# ✅ GOOD - Always declare the action; filter visibility separately.
-class ArticleAdmin(SBAdmin):
-    def get_sbadmin_row_actions(self, request):
-        return [
-            SBAdminRowAction(
-                target_view=PublishArticleView,
-                title=_("Publish"),
-                icon="Check-correct",
-                view=self,
-                enabled_field="status",
-                enabled_value="draft",
-            )
-        ]
-
-    def has_permission_for_action(self, request, action):
-        if getattr(action, "target_view", None) == PublishArticleView:
-            return request.user.has_perm("blog.publish_article")
-        return super().has_permission_for_action(request, action)
-```
-
 ### Row-Aware Attributes
 
 `title`, `icon`, and `css_class` can be static values or callables receiving the row dict. Use class attributes and override the getter methods on a subclass when the logic is reused:
@@ -2288,7 +2216,6 @@ Framework consumers call processed getters, not raw getters:
 - `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; row action materialization replaces it with the row pk server-side.
 - `RowActionModalView` resolves objects with `self.view.get_queryset(request)` by default. Do not override this with a raw model manager unless you also preserve queryset restrictions.
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
-- Always return all possible actions from action getters and use `has_permission_for_action()` or row enablement to hide them. Conditional omission can prevent modal URL handlers from being registered.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
 
 ---
