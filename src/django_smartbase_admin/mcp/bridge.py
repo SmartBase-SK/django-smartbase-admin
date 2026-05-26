@@ -69,10 +69,12 @@ def ensure_sbadmin_request_data(request) -> None:
 def _to_querydict(mapping: dict) -> QueryDict:
     """Build a ``QueryDict`` from a flat ``{str: scalar}`` mapping.
 
-    ``QueryDict`` only stores strings — callers pass either already-encoded
-    JSON or simple scalars, but coerce defensively so a stray ``int`` /
-    ``bool`` doesn't reach the wsgi-shaped ``request.GET`` / ``POST``
-    consumers downstream.
+    Stringifies scalars defensively: this builds the GET/POST surface
+    consumed by the wsgi-shaped list pipeline (filters, search,
+    autocomplete), where downstream parsers assume string values. The
+    write path in :mod:`service` constructs its own ``QueryDict`` of
+    native Python that ``Field.to_python`` accepts directly — that
+    contract is independent of this helper.
     """
     qd = QueryDict(mutable=True)
     for key, value in mapping.items():
