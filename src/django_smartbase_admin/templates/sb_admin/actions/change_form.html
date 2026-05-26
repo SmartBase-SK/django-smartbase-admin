@@ -182,19 +182,22 @@
             {% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %}
                 <ul class="saved-filters" role="tablist">
                     {% for tab, tab_content_object in tabular_context.context.items %}
+                        {% with sbadmin_tab_slug=tab|slugify %}
                         <li role="presentation">
-                            <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ tab|slugify }}" data-bs-toggle="tab"
-                                    data-bs-target="#{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" type="button" role="tab"
-                                    aria-controls="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" aria-selected="true">
+                            <button class="relative{% for class in tab_content_object.classes %} {{ class }}{% endfor %}" id="tab_{{ sbadmin_tab_slug }}" data-bs-toggle="tab"
+                                    data-bs-target="#{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" type="button" role="tab"
+                                    aria-controls="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" aria-selected="true">
                                 {{ tab }}
                             </button>
                         </li>
+                        {% endwith %}
                     {% endfor %}
                 </ul>
             {% endif %}
             {% for tab, tab_content_object in tabular_context.context.items %}
-                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %}{% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %} pt-20{% endif %}" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ tab|slugify }}" role="tabpanel"
-                     aria-labelledby="tab_{{ tab|slugify }}">
+                {% with sbadmin_tab_slug=tab|slugify %}
+                <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %}{% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %} pt-20{% endif %}" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" role="tabpanel"
+                     aria-labelledby="tab_{{ sbadmin_tab_slug }}">
                     <div class="flex max-md:flex-wrap w-full lg:gap-24">
                         <div class="min-w-0 w-full">
                             {% for tab_content in tab_content_object.content %}
@@ -211,7 +214,11 @@
                                     {% block before_inline_tab %}
                                     {% endblock %}
                                     {% with tab_content.value as inline_admin_formset %}
-                                        {% include inline_admin_formset.opts.template %}
+                                        {% if tabular_context.default_tabs %}
+                                            {% include inline_admin_formset.opts.template %}
+                                        {% else %}
+                                            {% include inline_admin_formset.opts.template with sbadmin_inline_tab_slug=sbadmin_tab_slug %}
+                                        {% endif %}
                                     {% endwith %}
                                 {% endif %}
                             {% endfor %}
@@ -233,6 +240,7 @@
                         {% endspaceless %}
                     </div>
                 </div>
+                {% endwith %}
             {% endfor %}
 
             {% block admin_change_form_document_ready %}
