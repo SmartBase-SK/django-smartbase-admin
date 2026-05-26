@@ -285,13 +285,20 @@ class SBAdminBaseView(object):
     @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
         amap = request.request_data.autocomplete_map
-        for step in self._autocomplete_registration_steps(request):
-            step(request)
+        autocomplete_view = amap.get(modifier)
+        if autocomplete_view is None:
+            for step in self._autocomplete_registration_steps(request):
+                step(request)
+                autocomplete_view = amap.get(modifier)
+                if autocomplete_view is not None:
+                    break
+        if autocomplete_view is None:
+            self.register_autocomplete_views(request)
             autocomplete_view = amap.get(modifier)
-            if autocomplete_view is not None:
-                autocomplete_view.init_view_dynamic(request, request.request_data)
-                return autocomplete_view.action_autocomplete(request, modifier)
-        raise Http404
+        if autocomplete_view is None:
+            raise Http404
+        autocomplete_view.init_view_dynamic(request, request.request_data)
+        return autocomplete_view.action_autocomplete(request, modifier)
 
     def auto_create_field_from_model_field(self, model_field):
         from django_smartbase_admin.engine.field import SBAdminField

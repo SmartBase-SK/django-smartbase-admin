@@ -149,7 +149,10 @@ def set_request_payload(request, *, get=None, post=None, method=None) -> None:
         request.GET = _to_querydict(get)
     if post is not None:
         rd.request_post = post
-        set_request_post(request, _to_querydict(post))
+        if isinstance(post, QueryDict):
+            set_request_post(request, post)
+        else:
+            set_request_post(request, _to_querydict(post))
     if method is not None:
         rd.request_method = method
         request.method = method

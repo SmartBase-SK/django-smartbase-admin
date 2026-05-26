@@ -46,7 +46,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     AutocompleteParseMixin,
 )
-from django_smartbase_admin.mcp.bridge import set_request_post
+from django_smartbase_admin.mcp.bridge import set_request_payload
 
 logger = logging.getLogger(__name__)
 
@@ -589,12 +589,9 @@ class SBAdminMCPDetailService:
             qd["_continue"] = "1"
         qd._mutable = False
 
-        # ``_changeform_view`` reads ``request.POST`` / ``request.FILES``
-        # / ``request.method`` while saving. ``set_request_post`` feeds
-        # the DRF parser cache (see its docstring); ``method`` is just
-        # an instance attr on the wrapper.
-        request.method = "POST"
-        set_request_post(request, qd)
+        # Mirror POST onto ``request_data.request_post`` too — dependent
+        # autocomplete widgets read forwarded values from there.
+        set_request_payload(request, post=qd, method="POST")
         _ensure_messages_storage(request)
 
         response = admin._changeform_view(
@@ -704,8 +701,12 @@ class SBAdminMCPDetailService:
                 {
                     "value": pk,
                     "label": (
-                        cls._detail_label_for_item(form_field, objects[pk], request)
-                        if pk in objects
+                        cls._detail_label_for_item(
+                            form_field,
+                            objects[resolved_pk],
+                            request,
+                        )
+                        if (resolved_pk := form_field.prepare_value(pk)) in objects
                         else str(pk)
                     ),
                 }
