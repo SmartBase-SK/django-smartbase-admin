@@ -1,0 +1,285 @@
+"""Tests for ``SBAdminTools.fetch_detail`` and the ``detail_fields`` schema.
+
+Drives the tool against a real ``Folder`` admin so the assertions
+double as a contract check on the wire shape: top-level ``id`` +
+``fields`` + ``inlines``, each field carrying ``value`` / ``readonly``
+/ ``required`` / ``widget``, related selections nested as
+``{"value", "label"}``.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from django.core.exceptions import PermissionDenied
+from django.test import TestCase, override_settings
+from django.urls import path
+from filer.models import Folder, FolderPermission
+
+from django_smartbase_admin.admin.admin_base import (
+    SBAdmin,
+    SBAdminTableInline,
+    SBAdminTableInlinePaginated,
+)
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.tests._common import (
+    MCPToolTestConfig,
+    build_mcp_request,
+)
+
+urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
+
+
+class FolderDetailTestAdmin(SBAdmin):
+    """Admin with a scalar form field, an FK form field, a readonly
+    model field, and a callable readonly method — covers every value
+    shape the detail tool produces (scalar, related selection with
+    label, readonly scalar, readonly callable)."""
+
+    model = Folder
+    fieldsets = ((None, {"fields": ("name", "parent", "uploaded_at", "child_count")}),)
+    readonly_fields = ("uploaded_at", "child_count")
+
+    def child_count(self, obj):
+        return obj.children.count() if obj else 0
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class _FetchDetailTestBase(TestCase):
+    admin_class: type[SBAdmin] = FolderDetailTestAdmin
+
+    def setUp(self):
+        super().setUp()
+        self._original_admin = sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, self.admin_class)
+        MCPToolTestConfig().init_view_map()
+        MCPToolTestConfig.view_permission_for = None
+
+    def tearDown(self):
+        MCPToolTestConfig.view_permission_for = None
+        sb_admin_site._registry.pop(Folder, None)
+        if self._original_admin is not None:
+            sb_admin_site._registry[Folder] = self._original_admin
+        super().tearDown()
+
+    def _fetch(self, object_id, fields=None, *, user=None):
+        user = user or MagicMock(is_authenticated=True, is_superuser=True)
+        return SBAdminTools(request=build_mcp_request(user)).fetch_detail(
+            "filer_folder",
+            str(object_id),
+            fields=fields,
+        )
+
+
+class FetchDetailTests(_FetchDetailTestBase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+        cls.child_a = Folder.objects.create(name="child_a", parent=cls.parent)
+        cls.child_b = Folder.objects.create(name="child_b", parent=cls.parent)
+
+    def test_returns_values_with_per_field_metadata(self):
+        """Covers every value shape: editable scalar, editable FK,
+        readonly scalar, readonly callable."""
+        row = self._fetch(self.child_a.pk)
+
+        self.assertEqual(row["id"], self.child_a.pk)
+        fields = row["fields"]
+        self.assertEqual(list(fields), ["name", "parent", "uploaded_at", "child_count"])
+
+        # Editable scalar — Folder.name has blank=False.
+        self.assertEqual(fields["name"]["value"], "child_a")
+        self.assertFalse(fields["name"]["readonly"])
+        self.assertTrue(fields["name"]["required"])
+        self.assertIsNotNone(fields["name"]["widget"])
+
+        # Editable FK — Folder.parent is nullable.
+        self.assertEqual(
+            fields["parent"]["value"],
+            {"value": self.parent.pk, "label": str(self.parent)},
+        )
+        self.assertFalse(fields["parent"]["readonly"])
+        self.assertFalse(fields["parent"]["required"])
+        self.assertIsNotNone(fields["parent"]["widget"])
+
+        # Readonly fields always report required=False, widget=None.
+        self.assertEqual(fields["uploaded_at"]["value"], self.child_a.uploaded_at)
+        self.assertTrue(fields["uploaded_at"]["readonly"])
+        self.assertFalse(fields["uploaded_at"]["required"])
+        self.assertIsNone(fields["uploaded_at"]["widget"])
+
+        # Readonly callable result passes through verbatim.
+        self.assertEqual(fields["child_count"]["value"], 0)
+        self.assertTrue(fields["child_count"]["readonly"])
+        self.assertFalse(fields["child_count"]["required"])
+        self.assertIsNone(fields["child_count"]["widget"])
+
+        # Root row: null FK must skip label resolution cleanly.
+        parent_row = self._fetch(self.parent.pk)
+        self.assertIsNone(parent_row["fields"]["parent"]["value"])
+        self.assertEqual(parent_row["fields"]["child_count"]["value"], 2)
+
+    def test_field_subset_projection(self):
+        row = self._fetch(self.child_a.pk, fields=["name"])
+        self.assertEqual(row["id"], self.child_a.pk)
+        self.assertEqual(list(row["fields"]), ["name"])
+        self.assertEqual(row["fields"]["name"]["value"], "child_a")
+
+    def test_error_paths_surface_clear_exceptions(self):
+        """Missing object, unknown field, unknown admin, denied admin —
+        each raises a distinct exception."""
+        with self.assertRaises(LookupError):
+            self._fetch(99999)
+
+        with self.assertRaises(LookupError):
+            self._fetch(self.parent.pk, fields=["bogus"])
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(
+                request=build_mcp_request(
+                    MagicMock(is_authenticated=True, is_superuser=True)
+                )
+            ).fetch_detail("does_not_exist", str(self.parent.pk))
+
+        denied_user = MagicMock(is_authenticated=True, is_superuser=False)
+        MCPToolTestConfig.view_permission_for = set()
+        with self.assertRaises((PermissionError, PermissionDenied)):
+            self._fetch(self.parent.pk, user=denied_user)
+
+    def test_restrict_queryset_hides_object(self):
+        """A row filtered out by ``restrict_queryset`` is indistinguishable
+        from a missing one — the tool must report ``LookupError``."""
+
+        def restrict(qs, model):
+            if model is Folder:
+                return qs.exclude(pk=self.child_a.pk)
+            return qs
+
+        MCPToolTestConfig.restrict_qs = staticmethod(restrict)
+        try:
+            with self.assertRaises(LookupError):
+                self._fetch(self.child_a.pk)
+            self._fetch(self.parent.pk)  # sanity: un-filtered still resolves
+        finally:
+            MCPToolTestConfig.restrict_qs = None
+
+
+class FolderPermissionInline(SBAdminTableInline):
+    model = FolderPermission
+    fields = ("type", "everybody", "can_read")
+    extra = 0
+
+
+class FolderPermissionPaginatedInline(SBAdminTableInlinePaginated):
+    model = FolderPermission
+    fields = ("type", "everybody", "can_read")
+    extra = 0
+    per_page = 2
+
+
+class FolderDetailWithInlineAdmin(FolderDetailTestAdmin):
+    inlines = [FolderPermissionInline]
+
+
+class FolderDetailWithPaginatedInlineAdmin(FolderDetailTestAdmin):
+    inlines = [FolderPermissionPaginatedInline]
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FetchDetailInlinesTests(_FetchDetailTestBase):
+    """Inlines are auto-hydrated with full per-field metadata; no
+    per-call inline / field projection."""
+
+    admin_class = FolderDetailWithInlineAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.folder = Folder.objects.create(name="folder")
+        cls.perms = [
+            FolderPermission.objects.create(folder=cls.folder, everybody=bool(i % 2))
+            for i in range(5)
+        ]
+
+    def test_inlines_auto_hydrate_with_per_field_metadata(self):
+        result = self._fetch(self.folder.pk, fields=["name"])
+
+        self.assertEqual(set(result), {"id", "fields", "inlines"})
+        inline = result["inlines"]["FolderPermissionInline"]
+        self.assertEqual(set(inline), {"rows", "truncated"})
+        self.assertFalse(inline["truncated"])
+        self.assertEqual(len(inline["rows"]), 5)
+
+        row = inline["rows"][0]
+        self.assertEqual(set(row), {"id", "fields"})
+        self.assertEqual(set(row["fields"]), {"type", "everybody", "can_read"})
+        self.assertEqual(row["fields"]["everybody"]["readonly"], False)
+        self.assertIsNotNone(row["fields"]["everybody"]["widget"])
+        self.assertIn("required", row["fields"]["everybody"])
+
+    def test_empty_inlines_block_present(self):
+        """Admin without inlines still emits ``inlines: {}`` so the
+        wire shape is uniform across admins."""
+
+        class NoInlineAdmin(FolderDetailTestAdmin):
+            inlines = []
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, NoInlineAdmin)
+        try:
+            result = self._fetch(self.folder.pk, fields=["name"])
+        finally:
+            sb_admin_site._registry.pop(Folder, None)
+            sb_admin_site.register(Folder, self.admin_class)
+
+        self.assertEqual(result["inlines"], {})
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FetchDetailPaginatedInlineTests(_FetchDetailTestBase):
+    """Paginated inlines cap at ``per_page`` and flag ``truncated``."""
+
+    admin_class = FolderDetailWithPaginatedInlineAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.folder = Folder.objects.create(name="folder")
+        cls.perms = [
+            FolderPermission.objects.create(folder=cls.folder, everybody=bool(i % 2))
+            for i in range(5)
+        ]
+
+    def test_paginated_inline_truncates_with_flag(self):
+        result = self._fetch(self.folder.pk, fields=["name"])
+        inline = result["inlines"]["FolderPermissionPaginatedInline"]
+        # FolderPermissionPaginatedInline.per_page = 2 against 5 rows.
+        self.assertEqual(len(inline["rows"]), 2)
+        self.assertTrue(inline["truncated"])
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class DetailFieldsSchemaTests(_FetchDetailTestBase):
+    def test_list_admins_advertises_detail_field_names_only(self):
+        """``list_admins.detail_fields`` lists names only — per-field
+        metadata ships with the values from ``fetch_detail``."""
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+
+        entry = next(e for e in result if e["view_id"] == "filer_folder")
+        self.assertEqual(
+            entry["detail_fields"],
+            ["name", "parent", "uploaded_at", "child_count"],
+            "detail_fields must be a flat name list in fieldset order",
+        )

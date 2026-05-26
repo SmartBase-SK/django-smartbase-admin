@@ -249,13 +249,29 @@ class SBAdminViewService(object):
         field_annotates = {}
         lang_annotates = {}
         visible_fields = []
+        values_set = set(values)
         for field in fields:
-            if field.field in values:
+            if field.field in values_set:
                 if field.view_method:
                     visible_fields.append(field.filter_field)
                 else:
                     visible_fields.append(field.field)
                 field_annotates.update(field.get_field_annotates(values))
+                continue
+            # Parent column is hidden, but its ``supporting_annotates``
+            # keys may still appear in ``values`` because another
+            # column's formatter needs them or the admin lists them in
+            # ``sbadmin_list_display_data``. Emit just those entries
+            # so ``.values(...)`` can resolve them — the parent
+            # column itself is not rendered.
+            if field.supporting_annotates:
+                for key, value in field.supporting_annotates.items():
+                    if key in values_set:
+                        field_annotates[key] = (
+                            value.clone()
+                            if isinstance(value, FilteredRelation)
+                            else value
+                        )
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         for (
             translation_model,

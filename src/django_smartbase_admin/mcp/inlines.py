@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied
 from django_smartbase_admin.engine.fake_inline import (
     FakeInlineFilterOverrideMismatchError,
 )
+from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +64,8 @@ def attach_inlines(admin, request, rows: list[dict], include_inlines) -> None:
         inline = inline_class(admin.model, admin.admin_site)
         inline.init_inline_dynamic(request, None)
         try:
-            grouped, truncated = inline.get_data_for_parents(
-                request, parent_pks, fields=fields
+            grouped, truncated = SBAdminMCPDetailService.get_data_for_parents(
+                inline, request, parent_pks, fields=fields
             )
         except FakeInlineFilterOverrideMismatchError as exc:
             logger.warning("Skipping inline %s: %s", inline_name, exc)

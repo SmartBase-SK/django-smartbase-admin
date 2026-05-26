@@ -15,7 +15,6 @@ from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.contrib.auth.forms import UsernameField, ReadOnlyPasswordHashWidget
-from django.contrib.contenttypes.admin import GenericInlineModelAdmin
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import (
@@ -25,12 +24,10 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import models
-from django.db.models import QuerySet, Q, Model, Window
-from django.db.models.functions import RowNumber
+from django.db.models import QuerySet, Q, Model
 from django.forms import HiddenInput
 from django.forms.models import (
     ModelFormMetaclass,
-    _get_foreign_key,
     modelform_factory,
 )
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
@@ -40,7 +37,7 @@ from django.urls import reverse, NoReverseMatch, resolve
 from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
-from django_admin_inline_paginator.admin import InlinePaginated, TabularInlinePaginated
+from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django_htmx.http import trigger_client_event
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
@@ -924,9 +921,18 @@ class SBAdmin(
             f"{self} is missing definition of fieldsets or sbadmin_fieldsets."
         )
 
-    def register_autocomplete_views(self, request):
-        super().register_autocomplete_views(request)
+    def _register_form_autocomplete(self, request) -> None:
+        try:
+            self.get_sbadmin_fieldsets(
+                request, getattr(request.request_data, "object_id", None)
+            )
+        except ImproperlyConfigured:
+            return
         self.get_form(request)()
+
+    def _register_inline_autocomplete(self, request) -> None:
+        for inline in self.get_inline_instances(request, obj=None):
+            inline._register_inline_autocomplete(request)
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
@@ -1289,8 +1295,7 @@ class SBAdminInline(
             },
         )
 
-    def register_autocomplete_views(self, request) -> None:
-        super().register_autocomplete_views(request)
+    def _register_inline_autocomplete(self, request) -> None:
         form_class = self.get_formset(request, None).form
         self.initialize_form_class(form_class, request)
         form_class()
@@ -1407,169 +1412,9 @@ class SBAdminInline(
         formset.form = form_class
         return formset
 
-    # ------------------------------------------------------------------
-    # Restricted inline-data API (read-only, batch by parent pk).
-    # Counterpart to SBAdminListAction.get_json_data() for related rows;
-    # the only safe place to fetch inline data outside the change form.
-    # ------------------------------------------------------------------
-
-    def _get_inline_data_cap(self) -> int | None:
-        """Per-parent row cap. Only set when the author opted into pagination
-        (``InlinePaginated.per_page``); otherwise unbounded — same trust model
-        as the change-form rendering."""
-        if isinstance(self, InlinePaginated):
-            return self.per_page
-        return None
-
-    def _restrict_to_parents(self, request, parent_pks):
-        """Filter ``self.get_queryset(request)`` to ``parent_pks`` and return
-        ``(qs, parent_key_in_row_dict)``. Branch per join kind so callers
-        never touch ORM column names."""
-        qs = self.get_queryset(request)
-        if isinstance(self, GenericInlineModelAdmin):
-            ct = ContentType.objects.get_for_model(self.parent_model)
-            qs = qs.filter(
-                **{self.ct_field: ct, f"{self.ct_fk_field}__in": list(parent_pks)}
-            )
-            return qs, self.ct_fk_field
-        if isinstance(self, SBAdminFakeInlineMixin):
-            from django_smartbase_admin.engine.fake_inline import (
-                FakeInlineFilterOverrideMismatchError,
-                is_fake_inline_batch_safe,
-            )
-
-            if not is_fake_inline_batch_safe(type(self)):
-                raise FakeInlineFilterOverrideMismatchError(
-                    f"Fake inline {type(self).__name__} overrides only one of "
-                    "filter_fake_inline_identifier_by_parent_instance / "
-                    "filter_fake_inline_identifier_by_parent_pks; override both "
-                    "(or neither) to keep batch read consistent with the "
-                    "change form. See sbadmin.W004."
-                )
-            qs = self.filter_fake_inline_identifier_by_parent_pks(qs, parent_pks)
-            return qs, self.fk_name
-        fk = _get_foreign_key(self.parent_model, self.model, fk_name=self.fk_name)
-        qs = qs.filter(**{f"{fk.attname}__in": list(parent_pks)})
-        return qs, fk.attname
-
-    def _resolve_inline_data_fields(
-        self, request, requested: list[str] | None
-    ) -> list[str]:
-        available = list(self.get_fields(request, None) or [])
-        if requested is None:
-            return available
-        unknown = [f for f in requested if f not in available]
-        if unknown:
-            raise LookupError(
-                f"Inline {type(self).__name__} has no fields {unknown}; "
-                f"available: {available}"
-            )
-        return list(requested)
-
-    def _partition_inline_data_fields(
-        self, selected: list[str]
-    ) -> tuple[list[str], list[str]]:
-        """Split into model concrete fields (cheap ``.values()`` projection)
-        and everything else (callable readonly methods, resolved per-instance)."""
-        concrete: list[str] = []
-        callables: list[str] = []
-        for name in selected:
-            try:
-                self.model._meta.get_field(name)
-            except FieldDoesNotExist:
-                callables.append(name)
-            else:
-                concrete.append(name)
-        return concrete, callables
-
-    def _call_inline_readonly(self, name: str, obj):
-        if obj is None:
-            return None
-        # Mirror Django readonly-field resolution: method on the inline first
-        # (instance method OR classmethod — both bind to a recognisable owner),
-        # then attribute/method on the model.
-        method = getattr(self, name, None)
-        bound_to = getattr(method, "__self__", None)
-        if callable(method) and bound_to in (self, type(self)):
-            return method(obj)
-        value = getattr(obj, name, None)
-        return value() if callable(value) else value
-
-    def _project_inline_instance(
-        self, obj, parent_key, pk_name, concrete, callables
-    ) -> dict:
-        row = {pk_name: obj.pk, parent_key: getattr(obj, parent_key)}
-        for name in concrete:
-            row[name] = getattr(obj, name)
-        for name in callables:
-            row[name] = self._call_inline_readonly(name, obj)
-        return row
-
-    def get_data_for_parents(
-        self,
-        request,
-        parent_pks,
-        fields: list[str] | None = None,
-    ) -> tuple[dict, list]:
-        """Restricted, projected inline rows grouped by parent pk.
-
-        Returns ``({parent_pk: [rows]}, [truncated_parent_pks])``. The
-        ``truncated`` list is non-empty only when the inline declares
-        pagination (``InlinePaginated``) and a parent had more rows than
-        ``per_page``.
-
-        Permissions, queryset restriction, join shape, and field allowlist
-        are all enforced here; callers (MCP, future tooling) cannot bypass
-        any of them by construction.
-        """
-        if not self.has_view_or_change_permission(request, None):
-            raise PermissionDenied(
-                f"User has no view permission on inline {type(self).__name__}."
-            )
-
-        parent_pks = list(parent_pks)
-        if not parent_pks:
-            return {}, []
-
-        selected = self._resolve_inline_data_fields(request, fields)
-        concrete, callables = self._partition_inline_data_fields(selected)
-        pk_name = self.model._meta.pk.name
-
-        qs, parent_key = self._restrict_to_parents(request, parent_pks)
-        cap = self._get_inline_data_cap()
-        if cap is not None:
-            # Window-cap only when the author already accepted pagination
-            # cost; non-paginated inlines keep the cheap unbounded plan.
-            qs = qs.annotate(
-                _rn=Window(
-                    expression=RowNumber(),
-                    partition_by=[parent_key],
-                    order_by=self.get_ordering(request),
-                )
-            ).filter(_rn__lte=cap + 1)
-
-        if callables:
-            rows = [
-                self._project_inline_instance(
-                    obj, parent_key, pk_name, concrete, callables
-                )
-                for obj in qs
-            ]
-        else:
-            rows = list(qs.values(pk_name, parent_key, *concrete))
-
-        grouped: dict = {}
-        for r in rows:
-            grouped.setdefault(r.pop(parent_key), []).append(r)
-
-        truncated: list = []
-        if cap is not None:
-            for pk, items in grouped.items():
-                if len(items) > cap:
-                    truncated.append(pk)
-                    del items[cap:]
-
-        return grouped, truncated
+    # Restricted inline-data batch read (used by MCP) lives in
+    # ``django_smartbase_admin.mcp.service.SBAdminMCPDetailService`` so the
+    # API-only plumbing stays out of normal admin flow.
 
 
 class SBAdminTableInline(SBAdminInline, NestedTabularInline):

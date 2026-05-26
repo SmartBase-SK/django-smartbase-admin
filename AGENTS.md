@@ -39,6 +39,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
 | [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
+| [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
@@ -79,6 +80,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **Regenerate translations?** → [Internationalization](#internationalization)
+- **Wire MCP / Cursor?** → [MCP (AI agents)](#mcp-ai-agents)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
@@ -4655,6 +4657,91 @@ When adding client-side text, expose it through `templates/sb_admin/sb_admin_js_
 ```
 
 This is the preferred pattern for autocomplete placeholders, empty states, and other JS-rendered UI labels.
+
+---
+
+## MCP (AI agents)
+
+Optional `django-mcp-server` integration. Requires normal SBAdmin setup (`SB_ADMIN_CONFIGURATION`, `sb_admin_site.urls`).
+
+```bash
+pip install "django-smartbase-admin[mcp]"
+```
+
+### Host project — `INSTALLED_APPS`
+
+```python
+INSTALLED_APPS = [
+    # ... your apps with SBAdmin model admins ...
+    "django_smartbase_admin",
+    "oauth2_provider",           # MCP OAuth (skip if custom auth)
+    "rest_framework",
+    "mcp_server",
+    "django_smartbase_admin.mcp",
+]
+```
+
+### Host project — `urls.py`
+
+Mount **before** catch-all routes:
+
+```python
+urlpatterns = [
+    path("", include("django_smartbase_admin.mcp.urls")),
+    path("", include("django_smartbase_admin.mcp.oauth.urls")),  # OAuth AS; omit if custom auth
+    path("sb-admin/", sb_admin_site.urls),
+    # ...
+]
+```
+
+Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+
+### Host project — `settings.py`
+
+```python
+from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
+
+DJANGO_MCP_AUTHENTICATION_CLASSES = [
+    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+]
+DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
+    "name": "sbadmin",
+    "instructions": SBADMIN_MCP_SERVER_INSTRUCTIONS,  # optional: + deployment appendix
+    "stateless": True,
+}
+DJANGO_MCP_ENDPOINT = "mcp/"
+
+OAUTH2_PROVIDER = {
+    "SCOPES": {"sbadmin:read": "SBAdmin MCP access"},
+    "PKCE_REQUIRED": True,
+}
+```
+
+Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
+
+### Cursor — `.cursor/mcp.json`
+
+`.cursor/mcp.json` or `~/.cursor/mcp.json` — streamable HTTP `url` only (match `DJANGO_MCP_ENDPOINT`, trailing slash). Prod: **HTTPS** origin; oauthlib enforces TLS (no `OAUTHLIB_INSECURE_TRANSPORT`). Local `http://` only: set that env on Django. Cursor **Connect** for bundled OAuth (PKCE + DCR).
+
+```json
+{
+  "mcpServers": {
+    "sbadmin": {
+      "url": "https://admin.example.com/mcp/"
+    }
+  }
+}
+```
+
+### Verify
+
+```bash
+# List tool names + descriptions (Django must be configured)
+python manage.py mcp_inspect
+
+# Package tests
+python runtests.py django_smartbase_admin.mcp.tests
+```
 
 ---
 
