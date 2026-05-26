@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 from typing import Any, TYPE_CHECKING
 
@@ -48,6 +49,8 @@ QueryBuilderService = import_with_injection(
 
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
+
+logger = logging.getLogger(__name__)
 
 
 class SBAdminAction(object):
@@ -353,7 +356,6 @@ class SBAdminListAction(SBAdminAction):
         and a boolean indicating if the results may contain duplicates.
         """
 
-        # Apply keyword searches.
         def construct_search(field_name):
             prefix = field_name[0] if field_name and field_name[0] in "^=@" else ""
             raw_field_name = field_name[1:] if prefix else field_name
@@ -394,6 +396,12 @@ class SBAdminListAction(SBAdminAction):
                 lookup_spawns_duplicates(self.view.model._meta, search_spec)
                 for search_spec in orm_lookups
             ):
+                logger.warning(
+                    "%s full-text search applied .distinct() because search_fields "
+                    "traverse relations that can duplicate rows; this may hurt "
+                    "performance on large tables.",
+                    self.view.__class__.__name__,
+                )
                 queryset = queryset.distinct()
         return queryset
 
