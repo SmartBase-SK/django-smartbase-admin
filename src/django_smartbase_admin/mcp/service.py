@@ -13,7 +13,6 @@ prefixes, permission gates, and the readonly/required schema.
 
 from __future__ import annotations
 
-import json
 import logging
 
 from django.contrib.admin import helpers as admin_helpers
@@ -26,10 +25,10 @@ from django.db.models.functions import RowNumber
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
 from django.forms.models import _get_foreign_key
 from django.forms.widgets import (
-    CheckboxInput,
     CheckboxSelectMultiple,
     ClearableFileInput,
     FileInput,
+    MultiWidget,
     SelectMultiple,
 )
 from django.http import QueryDict
@@ -52,11 +51,6 @@ from django_smartbase_admin.mcp.bridge import set_request_post
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# POST encoding (Python value → request.POST shape)
-# ---------------------------------------------------------------------------
-
-
 def _unwrap_envelope(value):
     """Accept ``{"value", "label"}`` (or list of) from ``fetch_detail``.
 
@@ -71,55 +65,6 @@ def _unwrap_envelope(value):
             v["value"] if isinstance(v, dict) and "value" in v else v for v in value
         ]
     return value
-
-
-def _python_value_to_post(widget, value):
-    """Inverse of ``widget.value_from_datadict`` for the widgets we accept.
-
-    Returns a string, a list of strings, or ``None`` (key omitted from
-    POST). Covers the cases ``_changeform_view`` actually round-trips:
-    text/select/date/checkbox/multi-select. File inputs are deliberately
-    skipped — omitting the key tells Django "no upload, keep current
-    value" via ``ClearableFileInput``.
-    """
-    value = _unwrap_envelope(value)
-
-    if isinstance(widget, (FileInput, ClearableFileInput)):
-        return None
-
-    if isinstance(widget, CheckboxInput):
-        return "on" if value else None
-
-    if isinstance(widget, AutocompleteParseMixin):
-        # SBAdmin autocomplete widgets read a JSON-encoded list off
-        # POST (matching the JS picker payload). Wrap single values in
-        # a one-element list; empty values stay JSON-empty.
-        if value in (None, ""):
-            return json.dumps([])
-        if isinstance(value, (list, tuple, set)):
-            return json.dumps([v for v in value if v not in (None, "")])
-        return json.dumps([value])
-
-    if isinstance(widget, (SelectMultiple, CheckboxSelectMultiple)):
-        if value in (None, ""):
-            return []
-        return [str(v) for v in value]
-
-    if value is None:
-        return ""
-    if value is True:
-        return "True"
-    if value is False:
-        return ""
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return str(value)
-
-
-def _set_post(post_data: dict, key: str, encoded) -> None:
-    if encoded is None:
-        return
-    post_data[key] = encoded
 
 
 _INLINE_OP_SKIP = frozenset({"id", "_delete"})
@@ -143,8 +88,63 @@ def _reject_non_writable_overrides(
         raise LookupError(f"Cannot set {scope} {invalid}; writable: {sorted(writable)}")
 
 
-def _encode_form_to_post(form, post_data: dict, prefix: str, overrides: dict) -> None:
-    """Restate ``form``'s current initial values into ``post_data``.
+def _write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
+    """Adapt MCP-typed Python ``value`` to the per-widget ``data`` shape.
+
+    Mirrors ``widget.value_from_datadict`` one-to-one: writes ``value``
+    into ``qd`` in whatever shape this widget reads back when
+    ``_changeform_view`` runs, so the field's ``to_python`` receives
+    the right thing. Plain widgets pass through; widgets with a custom
+    POST contract (file, multiselect, ``MultiWidget``, autocomplete)
+    get a shape-specific write.
+
+    No string encoding — ``QueryDict`` stores native Python unchanged
+    (``bytes_to_text`` only touches bytes) and the common
+    ``Field.to_python`` implementations accept native ``bool``, ``int``,
+    ``date``, etc.
+    """
+    value = _unwrap_envelope(value)
+
+    if isinstance(widget, (FileInput, ClearableFileInput)):
+        # Omit the key — ``ClearableFileInput`` treats absence as "no
+        # upload, keep current value", same as a browser submitting an
+        # empty file input.
+        return
+
+    if isinstance(widget, MultiWidget):
+        # SplitDateTime etc. — ``decompress`` is the documented inverse
+        # of ``MultiWidget.value_from_datadict``, splitting one Python
+        # value into one per subwidget.
+        subvalues = (
+            [None] * len(widget.widgets) if value is None else widget.decompress(value)
+        )
+        for subname, subwidget, subvalue in zip(
+            widget.widgets_names, widget.widgets, subvalues
+        ):
+            _write_widget_input(qd, key + subname, subwidget, subvalue)
+        return
+
+    if isinstance(widget, (SelectMultiple, CheckboxSelectMultiple)):
+        qd.setlist(key, list(value) if value not in (None, "") else [])
+        return
+
+    if isinstance(widget, AutocompleteParseMixin):
+        # Always a list — single-select widgets unwrap with
+        # ``next(iter(...), None)`` on the read side, which needs an
+        # iterable.
+        if value in (None, ""):
+            qd[key] = []
+        elif isinstance(value, (list, tuple, set)):
+            qd[key] = list(value)
+        else:
+            qd[key] = [value]
+        return
+
+    qd[key] = value
+
+
+def _encode_form_native(form, qd: QueryDict, prefix: str, overrides: dict) -> None:
+    """Restate ``form``'s current initial values into ``qd`` as native Python.
 
     Layered overrides win per field. Readonly fields aren't in
     ``form.fields`` so they don't roundtrip — Django re-derives them on
@@ -152,15 +152,12 @@ def _encode_form_to_post(form, post_data: dict, prefix: str, overrides: dict) ->
     """
     for name, field in form.fields.items():
         full_name = f"{prefix}-{name}" if prefix else name
-        if name in overrides:
-            value = overrides[name]
-        else:
-            value = form.initial.get(name)
-        _set_post(post_data, full_name, _python_value_to_post(field.widget, value))
+        value = overrides[name] if name in overrides else form.initial.get(name)
+        _write_widget_input(qd, full_name, field.widget, value)
 
 
-def _encode_inline_to_post(iaf, post_data: dict, ops: list) -> None:
-    """Encode an inline formset back into POST, applying caller ops.
+def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
+    """Encode an inline formset into ``qd``, applying caller ops.
 
     Existing rows always restate themselves (sparse POSTs would make
     Django's formset machinery treat untouched fields as blank); update
@@ -183,10 +180,11 @@ def _encode_inline_to_post(iaf, post_data: dict, ops: list) -> None:
 
     initial_forms = list(formset.initial_forms)
     total_forms = len(initial_forms) + len(new_ops)
-    post_data[f"{prefix}-TOTAL_FORMS"] = str(total_forms)
-    post_data[f"{prefix}-INITIAL_FORMS"] = str(len(initial_forms))
-    post_data[f"{prefix}-MIN_NUM_FORMS"] = str(formset.min_num)
-    post_data[f"{prefix}-MAX_NUM_FORMS"] = str(formset.max_num)
+    # Management form keys must be strings — formset parses them with int().
+    qd[f"{prefix}-TOTAL_FORMS"] = str(total_forms)
+    qd[f"{prefix}-INITIAL_FORMS"] = str(len(initial_forms))
+    qd[f"{prefix}-MIN_NUM_FORMS"] = str(formset.min_num)
+    qd[f"{prefix}-MAX_NUM_FORMS"] = str(formset.max_num)
 
     for i, form in enumerate(initial_forms):
         pk = form.instance.pk
@@ -200,9 +198,9 @@ def _encode_inline_to_post(iaf, post_data: dict, ops: list) -> None:
                 value = op[name]
             else:
                 value = form.initial.get(name)
-            _set_post(post_data, full_name, _python_value_to_post(field.widget, value))
+            _write_widget_input(qd, full_name, field.widget, value)
         if deleted:
-            post_data[f"{prefix}-{i}-DELETE"] = "on"
+            qd[f"{prefix}-{i}-DELETE"] = "on"
 
     if ops_by_id:
         raise LookupError(
@@ -219,9 +217,7 @@ def _encode_inline_to_post(iaf, post_data: dict, ops: list) -> None:
             if name == "id":
                 continue
             full_name = f"{prefix}-{i}-{name}"
-            _set_post(
-                post_data, full_name, _python_value_to_post(field.widget, op.get(name))
-            )
+            _write_widget_input(qd, full_name, field.widget, op.get(name))
 
 
 def _pk_from_redirect(url: str):
@@ -235,17 +231,6 @@ def _pk_from_redirect(url: str):
     except Resolver404:
         return None
     return match.kwargs.get("object_id")
-
-
-def _build_querydict(post_data: dict) -> QueryDict:
-    qd = QueryDict(mutable=True)
-    for key, value in post_data.items():
-        if isinstance(value, list):
-            qd.setlist(key, [str(v) for v in value])
-        else:
-            qd[key] = value
-    qd._mutable = False
-    return qd
 
 
 class _NoopMessageStorage:
@@ -591,25 +576,25 @@ class SBAdminMCPDetailService:
             f"detail fields on admin {admin.get_id()!r}",
         )
 
-        post_data: dict = {}
-        _encode_form_to_post(
-            ctx["adminform"].form, post_data, prefix="", overrides=field_values
+        qd = QueryDict(mutable=True)
+        _encode_form_native(
+            ctx["adminform"].form, qd, prefix="", overrides=field_values
         )
         for inline_name, iaf in iafs_by_name.items():
-            _encode_inline_to_post(iaf, post_data, inlines.get(inline_name) or [])
-
+            _encode_inline_native(iaf, qd, inlines.get(inline_name) or [])
         if obj is None:
             # Make ``response_add`` redirect to ``<...>_change/<pk>/``
             # instead of the changelist, so ``_pk_from_redirect`` can
             # recover the new pk.
-            post_data["_continue"] = "1"
+            qd["_continue"] = "1"
+        qd._mutable = False
 
         # ``_changeform_view`` reads ``request.POST`` / ``request.FILES``
         # / ``request.method`` while saving. ``set_request_post`` feeds
         # the DRF parser cache (see its docstring); ``method`` is just
         # an instance attr on the wrapper.
         request.method = "POST"
-        set_request_post(request, _build_querydict(post_data))
+        set_request_post(request, qd)
         _ensure_messages_storage(request)
 
         response = admin._changeform_view(
