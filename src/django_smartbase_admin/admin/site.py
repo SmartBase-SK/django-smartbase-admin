@@ -212,7 +212,7 @@ class SBAdminSite(admin.AdminSite):
                     name="sb_admin_base",
                 ),
                 path(
-                    "<str:view>/<str:action>/<str:modifier>/<int:id>",
+                    "<str:view>/<str:action>/<str:modifier>/<str:object_id>",
                     self.admin_view(SBAdminEntrypointView.as_view()),
                     name="sb_admin_base",
                 ),

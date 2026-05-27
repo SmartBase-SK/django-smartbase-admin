@@ -40,6 +40,11 @@ class SBInactiveFieldPolicy(models.TextChoices):
     PRESERVE = "preserve", _("Preserve")
 
 
+class SBDynamicRegionSource(models.TextChoices):
+    FORM = "form", _("Form")
+    VIEW = "view", _("View")
+
+
 @dataclass(frozen=True)
 class SBDynamicRegionState:
     name: str
@@ -148,9 +153,19 @@ class SBDynamicRegion:
 
 
 class SBAdminDynamicFormMixin:
-    sbadmin_standalone_dynamic_regions = False
+    sbadmin_dynamic_region_source = None
+    sbadmin_dynamic_region_endpoint = None
 
     def __init__(self, *args, **kwargs):
+        self.view = kwargs.pop("view", getattr(self, "view", None))
+        self.sbadmin_dynamic_region_source = kwargs.pop(
+            "sbadmin_dynamic_region_source",
+            self.sbadmin_dynamic_region_source,
+        )
+        self.sbadmin_dynamic_region_endpoint = kwargs.pop(
+            "sbadmin_dynamic_region_endpoint",
+            self.sbadmin_dynamic_region_endpoint,
+        )
         threadsafe_request = kwargs.pop("request", None)
         if threadsafe_request is None:
             threadsafe_request = getattr(self, "request", None)
@@ -211,10 +226,17 @@ class SBAdminDynamicFormMixin:
         regions: list[SBDynamicRegion] = []
         object_id = self._sbadmin_dynamic_object_id()
         view = getattr(self, "view", None)
-        if self.sbadmin_standalone_dynamic_regions:
+        source = getattr(self, "sbadmin_dynamic_region_source", None)
+        if source == SBDynamicRegionSource.FORM and hasattr(
+            self, "get_sbadmin_fieldsets"
+        ):
             # Standalone form views own their dynamic region layout.
             fieldsets = self.get_sbadmin_fieldsets()
-        elif view is not None and hasattr(view, "get_sbadmin_fieldsets"):
+        elif (
+            source in (None, SBDynamicRegionSource.VIEW)
+            and view is not None
+            and hasattr(view, "get_sbadmin_fieldsets")
+        ):
             # Admin forms use the current admin view layout for add/change.
             fieldsets = view.get_sbadmin_fieldsets(request, object_id)
         elif hasattr(self, "get_sbadmin_fieldsets"):
@@ -339,11 +361,16 @@ class SBAdminDynamicFormMixin:
         self, request: HttpRequest | None = None
     ) -> Iterable[tuple[str | None, dict[str, Any]]]:
         view = getattr(self, "view", None)
-        if self.sbadmin_standalone_dynamic_regions and hasattr(
+        source = getattr(self, "sbadmin_dynamic_region_source", None)
+        if source == SBDynamicRegionSource.FORM and hasattr(
             self, "get_sbadmin_fieldsets"
         ):
             return self.get_sbadmin_fieldsets()
-        if view is not None and hasattr(view, "get_sbadmin_fieldsets"):
+        if (
+            source in (None, SBDynamicRegionSource.VIEW)
+            and view is not None
+            and hasattr(view, "get_sbadmin_fieldsets")
+        ):
             object_id = self._sbadmin_dynamic_object_id()
             return view.get_sbadmin_fieldsets(request, object_id)
         if hasattr(self, "get_sbadmin_fieldsets"):
@@ -370,6 +397,29 @@ class SBAdminDynamicFormMixin:
             pieces.append(str(fieldset.name))
         return slugify("-".join(pieces)).replace("_", "-")
 
+    def get_fieldset_actions(
+        self,
+        fieldset: Fieldset,
+        fieldset_data: dict[str, Any],
+        request: HttpRequest | None = None,
+    ) -> Iterable[Any]:
+        actions = fieldset_data.get("actions") or ()
+        if not actions:
+            return ()
+        view = getattr(self, "view", None)
+        if (
+            request is not None
+            and view is not None
+            and hasattr(view, "get_sbadmin_fieldset_actions_processed")
+        ):
+            return view.get_sbadmin_fieldset_actions_processed(
+                request,
+                fieldset,
+                fieldset_data,
+                self._sbadmin_dynamic_object_id(),
+            )
+        return actions
+
     def get_fieldset_context(
         self, fieldset: Fieldset, request: HttpRequest | None = None
     ) -> dict[str, Any]:
@@ -388,6 +438,7 @@ class SBAdminDynamicFormMixin:
             "default_collapsed": default_collapsed,
             "collapse_id": self.get_fieldset_collapse_id(fieldset),
             "collapse_open": collapsible and not default_collapsed,
+            "actions": self.get_fieldset_actions(fieldset, fieldset_data, request),
         }
 
     def get_fieldset_layout(
@@ -545,7 +596,11 @@ class SBAdminDynamicFormMixin:
                 attrs.setdefault(name, value)
 
     def _dynamic_region_endpoint(self, request: HttpRequest | None = None) -> str:
-        if self.sbadmin_standalone_dynamic_regions and request is not None:
+        endpoint = getattr(self, "sbadmin_dynamic_region_endpoint", None)
+        if endpoint:
+            return endpoint
+        source = getattr(self, "sbadmin_dynamic_region_source", None)
+        if source == SBDynamicRegionSource.FORM and request is not None:
             return request.path
         view = getattr(self, "view", None)
         if view is not None and hasattr(view, "get_action_url"):

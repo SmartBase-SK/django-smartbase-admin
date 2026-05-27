@@ -104,15 +104,15 @@ class SBAdminTranslationsService(object):
 
     @classmethod
     def get_model_translation_detail_url(cls, view_id, object_id):
-        url = reverse(
+        return reverse(
             "sb_admin:sb_admin_base",
             kwargs={
                 "view": view_id,
                 "action": Action.DETAIL.value,
                 "modifier": "template",
+                "object_id": object_id,
             },
         )
-        return f"{url}/{object_id}"
 
     @classmethod
     def get_translated_fields_for_model(cls, model, visible_fields=None):

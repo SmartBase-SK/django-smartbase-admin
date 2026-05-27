@@ -6,10 +6,12 @@ from django_htmx.http import trigger_client_event
 from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     TABLE_RELOAD_DATA_EVENT_NAME,
+    Action,
 )
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBAdminDynamicFormMixin,
+    SBDynamicRegionSource,
     dynamic_region_initial_from_data,
 )
 from django_smartbase_admin.utils import (
@@ -78,38 +80,45 @@ class ActionModalView(FormView):
 
     def get_dynamic_region_form(self, request):
         form_class = self.get_form_class()
-        form_kwargs = self.get_form_kwargs()
-        probe_kwargs = {
-            key: value
-            for key, value in form_kwargs.items()
-            if key not in {"data", "files"}
-        }
+        form_kwargs = self.get_unbound_form_kwargs()
+        probe_kwargs = dict(form_kwargs)
         form_kwargs["initial"] = {
             **form_kwargs.get("initial", {}),
             **dynamic_region_initial_from_data(
                 form_class, request.POST, form_kwargs=probe_kwargs
             ),
         }
-        form_kwargs.pop("data", None)
-        form_kwargs.pop("files", None)
         return form_class(**form_kwargs)
 
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-    def get_form_class(self):
-        form_class = super().get_form_class()
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+        if issubclass(form_class, SBAdminDynamicFormMixin):
+            kwargs.update(
+                {
+                    "view": self.view,
+                    "sbadmin_dynamic_region_source": SBDynamicRegionSource.FORM,
+                    "sbadmin_dynamic_region_endpoint": self.request.path,
+                }
+            )
+        from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
 
-        fake_form_class = type(
-            form_class.__name__,
-            (form_class,),
-            {
-                "view": self.view,
-                "sbadmin_standalone_dynamic_regions": True,
-            },
-        )
+        if issubclass(form_class, SBAdminBaseFormInit):
+            kwargs.setdefault("view", self.view)
+            request_data = getattr(self.request, "request_data", None)
+            request_action = getattr(request_data, "action", None)
+            if request_action and request_action != Action.AUTOCOMPLETE.value:
+                kwargs["sbadmin_action_id"] = request_action
+        return kwargs
 
-        return fake_form_class
+    def get_unbound_form_kwargs(self):
+        kwargs = self.get_form_kwargs()
+        kwargs.pop("data", None)
+        kwargs.pop("files", None)
+        return kwargs
 
     def post(self, request, *args, **kwargs):
         if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):
@@ -162,14 +171,21 @@ class RowActionModalView(ActionModalView):
     def get_object_queryset(self, request):
         return self.view.get_queryset(request)
 
+    def get_object_id(self):
+        if hasattr(self.request, "request_data"):
+            object_id = getattr(self.request.request_data, "object_id", None)
+            if object_id is not None:
+                return object_id
+        return self.kwargs.get("modifier")
+
     def get_object(self):
         if not hasattr(self, "_resolved_object"):
-            modifier = self.kwargs.get("modifier")
-            if modifier in (None, IGNORE_LIST_SELECTION):
+            object_id = self.get_object_id()
+            if object_id in (None, IGNORE_LIST_SELECTION):
                 self._resolved_object = None
             else:
                 self._resolved_object = (
-                    self.get_object_queryset(self.request).filter(pk=modifier).first()
+                    self.get_object_queryset(self.request).filter(pk=object_id).first()
                 )
         return self._resolved_object
 
@@ -181,8 +197,8 @@ class RowActionModalView(ActionModalView):
         return kwargs
 
     def dispatch(self, request, *args, **kwargs):
-        modifier = kwargs.get("modifier")
-        if modifier not in (None, IGNORE_LIST_SELECTION) and self.get_object() is None:
+        object_id = self.get_object_id()
+        if object_id not in (None, IGNORE_LIST_SELECTION) and self.get_object() is None:
             return HttpResponse(self.not_found_message, status=404)
         return super().dispatch(request, *args, **kwargs)
 

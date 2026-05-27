@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.test import RequestFactory, TestCase
+from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
@@ -13,7 +14,10 @@ from django_smartbase_admin.engine.actions import (
     SBAdminFormViewAction,
     SBAdminRowAction,
 )
-from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
+from django_smartbase_admin.engine.admin_base_view import (
+    SBAdminBaseListView,
+    SBAdminBaseView,
+)
 from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     MODIFIER_OBJECT_ID,
@@ -41,8 +45,11 @@ class FakeAdminView(SBAdminBaseView):
         self.row_actions = row_actions or []
         self.has_action_permission = has_action_permission
 
-    def get_action_url(self, action, modifier="template"):
-        return f"/actions/{action}/{modifier}/"
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = f"/actions/{action}/{modifier}/"
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
 
     def has_permission_for_action(self, request, action):
         return self.has_action_permission
@@ -132,6 +139,51 @@ class RowActionIntegrationTests(TestCase):
     def setUp(self):
         self.request = RequestFactory().get("/")
 
+    def test_permission_gated_target_view_row_action_is_materialized(self):
+        class ArticleAdmin(FakeAdminView, SBAdminBaseListView):
+            def get_sbadmin_row_actions(self, request):
+                if not request.user.has_perm("blog.publish_article"):
+                    return []
+                return [
+                    SBAdminRowAction(
+                        target_view=PublishArticleView,
+                        title=_("Publish"),
+                        icon="Check-correct",
+                        view=self,
+                    )
+                ]
+
+            def get_sbadmin_row_actions_processed(self, request):
+                return self.process_row_actions(
+                    request, self.get_sbadmin_row_actions(request)
+                )
+
+        allowed_request = RequestFactory().get("/")
+        allowed_request.user = SimpleNamespace(
+            has_perm=lambda perm: perm == "blog.publish_article"
+        )
+        denied_request = RequestFactory().get("/")
+        denied_request.user = SimpleNamespace(has_perm=lambda perm: False)
+
+        view = ArticleAdmin()
+        view.init_actions(denied_request)
+        view.init_actions(allowed_request)
+
+        allowed_first_view = ArticleAdmin()
+        allowed_first_view.init_actions(allowed_request)
+        denied_context = TestListAction(
+            allowed_first_view, denied_request
+        ).get_template_data()
+
+        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertNotIn(
+            "_row_actions",
+            [
+                column["field"]
+                for column in denied_context["tabulator_definition"]["tableColumns"]
+            ],
+        )
+
     def test_row_actions_are_processed_into_table_column_and_row_descriptors(self):
         view = FakeAdminView()
         view.row_actions = [
@@ -183,7 +235,7 @@ class RowActionIntegrationTests(TestCase):
             rows[0]["_row_actions"],
             [
                 {
-                    "url": "/actions/PublishArticleView/7/",
+                    "url": "/actions/PublishArticleView/template/7/",
                     "title": "Publish Draft Article",
                     "icon": "Check-correct",
                     "css_class": "btn btn-small btn-only-icon",
@@ -192,7 +244,7 @@ class RowActionIntegrationTests(TestCase):
                     "open_in_new_tab": False,
                 },
                 {
-                    "url": "/actions/action_archive_article/7/",
+                    "url": "/actions/action_archive_article/template/7/",
                     "title": "Archive",
                     "icon": "Delete",
                     "css_class": "btn-icon draft",
@@ -215,6 +267,92 @@ class RowActionIntegrationTests(TestCase):
             [descriptor["url"] for descriptor in rows[1]["_row_actions"]],
             ["/articles/8/"],
         )
+
+    def test_row_action_accepts_sub_actions_without_direct_interaction_mode(self):
+        view = FakeAdminView()
+        child = SBAdminRowAction(
+            action_id="action_archive_article",
+            title="Archive",
+            view=view,
+        )
+
+        action = SBAdminRowAction(title="More", sub_actions=[child])
+
+        self.assertEqual(action.sub_actions, [child])
+        self.assertIsNone(action.icon)
+        self.assertIsNone(child.icon)
+        self.assertIsNone(action.url)
+        self.assertIsNone(action.action_id)
+        self.assertIsNone(action.target_view)
+
+    def test_row_action_sub_actions_are_materialized_per_row(self):
+        view = FakeAdminView()
+        view.row_actions = [
+            SBAdminRowAction(
+                title=lambda row: f"Actions for {row['title']}",
+                icon="More",
+                sub_actions=[
+                    SBAdminRowAction(
+                        action_id="action_archive_article",
+                        title=lambda row: f"Archive {row['title']}",
+                        icon="Delete",
+                        view=view,
+                        enabled_if=lambda row: row.get("status") != "archived",
+                    ),
+                    SBAdminRowAction(
+                        url=f"/articles/{MODIFIER_OBJECT_ID}/audit/",
+                        title="Audit",
+                        icon="History",
+                        enabled_field="status",
+                        enabled_value="draft",
+                    ),
+                ],
+            )
+        ]
+        rows = [
+            {"id": 7, "title": "Draft Article", "status": "Draft"},
+            {"id": 8, "title": "Archived Article", "status": "Archived"},
+        ]
+        raw_rows_by_pk = {
+            7: {"id": 7, "title": "Draft Article", "status": "draft"},
+            8: {"id": 8, "title": "Archived Article", "status": "archived"},
+        }
+
+        TestListAction(view, self.request).inject_row_actions(
+            rows, raw_rows_by_pk=raw_rows_by_pk
+        )
+
+        self.assertEqual(
+            rows[0]["_row_actions"],
+            [
+                {
+                    "title": "Actions for Draft Article",
+                    "icon": "More",
+                    "css_class": "btn btn-small btn-only-icon",
+                    "sub_actions": [
+                        {
+                            "url": "/actions/action_archive_article/template/7/",
+                            "title": "Archive Draft Article",
+                            "icon": "Delete",
+                            "css_class": "btn btn-small btn-only-icon",
+                            "open_in_modal": False,
+                            "is_method_action": True,
+                            "open_in_new_tab": False,
+                        },
+                        {
+                            "url": "/articles/7/audit/",
+                            "title": "Audit",
+                            "icon": "History",
+                            "css_class": "btn btn-small btn-only-icon",
+                            "open_in_modal": False,
+                            "is_method_action": False,
+                            "open_in_new_tab": False,
+                        },
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(rows[1]["_row_actions"], [])
 
     def test_nested_plugin_materializes_row_actions_for_child_rows(self):
         request = RequestFactory().get("/")
@@ -249,12 +387,12 @@ class RowActionIntegrationTests(TestCase):
 
         self.assertEqual(
             result[0]["_row_actions"][0]["url"],
-            "/actions/action_archive_article/1/",
+            "/actions/action_archive_article/template/1/",
         )
         child = result[0][CHILDREN_FIELD][0]
         self.assertEqual(
             child["_row_actions"][0]["url"],
-            "/actions/action_archive_article/2/",
+            "/actions/action_archive_article/template/2/",
         )
         self.assertTrue(child[LAST_CHILD_FIELD])
 
@@ -275,11 +413,35 @@ class RowActionIntegrationTests(TestCase):
         )
 
         self.assertEqual(action.action_modifier, MODIFIER_OBJECT_ID)
-        self.assertEqual(processed[0].url, "/actions/PublishArticleView/123/")
+        self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
         self.assertEqual(
             processed_without_object[0].url,
             f"/actions/PublishArticleView/{IGNORE_LIST_SELECTION}/",
         )
+
+    def test_detail_action_without_object_modifier_keeps_template_modifier(self):
+        view = FakeAdminView()
+        action = SBAdminCustomAction(
+            title="Contact",
+            view=view,
+            action_id="contact",
+        )
+
+        processed = view.process_detail_actions(self.request, [action], object_id=123)
+
+        self.assertEqual(processed[0].url, "/actions/contact/template/")
+
+    def test_detail_row_modal_action_infers_current_object(self):
+        view = FakeAdminView()
+        action = SBAdminFormViewAction(
+            target_view=PublishArticleView,
+            title="Publish",
+            view=view,
+        )
+
+        processed = view.process_detail_actions(self.request, [action], object_id=123)
+
+        self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
 
     def test_form_view_actions_are_registered_before_permission_filtering(self):
         view = FakeAdminView(has_action_permission=False)
@@ -293,7 +455,40 @@ class RowActionIntegrationTests(TestCase):
 
         self.assertEqual(processed, [])
         self.assertTrue(hasattr(view, "PublishArticleView"))
-        self.assertEqual(action.url, "/actions/PublishArticleView/template/")
+        self.assertIsNone(action.url)
+
+    def test_form_view_action_uses_declared_action_id(self):
+        class CustomActionIdView(RowActionModalView):
+            action_id = "custom_action_id"
+            form_class = forms.Form
+
+        view = FakeAdminView()
+        action = SBAdminFormViewAction(
+            target_view=CustomActionIdView,
+            title="Publish",
+            view=view,
+        )
+
+        processed = view.process_list_actions(self.request, [action])
+
+        self.assertTrue(hasattr(view, "custom_action_id"))
+        self.assertEqual(processed[0].action_id, "custom_action_id")
+        self.assertEqual(processed[0].url, "/actions/custom_action_id/template/")
+        self.assertIsNone(action.action_id)
+        self.assertIsNone(action.url)
+
+    def test_row_action_materializes_explicit_url_without_mutating_definition(self):
+        view = FakeAdminView()
+        action = SBAdminCustomAction(
+            title="Open",
+            url=f"/articles/{MODIFIER_OBJECT_ID}/",
+            action_modifier=MODIFIER_OBJECT_ID,
+        )
+
+        processed = view.process_row_actions(self.request, [action])
+
+        self.assertEqual(action.url, f"/articles/{MODIFIER_OBJECT_ID}/")
+        self.assertEqual(processed[0].url, f"/articles/{MODIFIER_OBJECT_ID}/")
 
     def test_nested_form_view_actions_are_registered(self):
         view = FakeAdminView()
@@ -314,7 +509,8 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_detail_actions(self.request, [parent], object_id=123)
 
         self.assertEqual(
-            processed[0].sub_actions[0].url, "/actions/PublishArticleView/123/"
+            processed[0].sub_actions[0].url,
+            "/actions/PublishArticleView/template/123/",
         )
         self.assertTrue(hasattr(view, "PublishArticleView"))
 
@@ -328,6 +524,21 @@ class RowActionIntegrationTests(TestCase):
                 icon="Close",
                 action_id="action_archive_article",
                 url="/articles/__object_id__/",
+            )
+
+        with self.assertRaises(ImproperlyConfigured):
+            SBAdminRowAction(
+                title="Broken",
+                icon="Close",
+                url="/articles/__object_id__/",
+                sub_actions=[
+                    SBAdminRowAction(
+                        action_id="action_archive_article",
+                        title="Archive",
+                        icon="Delete",
+                        view=FakeAdminView(),
+                    )
+                ],
             )
 
 

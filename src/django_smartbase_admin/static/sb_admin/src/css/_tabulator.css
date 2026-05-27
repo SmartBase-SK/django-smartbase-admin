@@ -419,8 +419,20 @@
     @apply inline-flex items-center justify-end gap-4 relative;
 }
 
+.row-action-dropdown-portal {
+    @apply fixed inset-0 w-0 h-0 overflow-visible pointer-events-none z-1000;
+}
+
+.row-action-dropdown-portal .row-action-dropdown-menu {
+    @apply pointer-events-auto;
+}
+
 .row-action-link {
     @apply inline-flex flex-shrink-0 flex-center;
+}
+
+.row-action-dropdown-link > svg {
+    @apply mr-8 flex-shrink-0;
 }
 
 .row-action-link:focus {

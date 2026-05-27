@@ -280,34 +280,156 @@ class SBAdminTable {
             sbadminRowActionsFormatter: function (cell) {
                 const actions = cell.getRow().getData()._row_actions || []
                 const wrapper = document.createElement('div')
-                wrapper.classList.add('row-actions-cell-inner')
-                actions.forEach((action) => {
-                    const link = document.createElement('a')
-                    link.classList.add('row-action-link')
-                    if (action.css_class) {
-                        link.classList.add(...action.css_class.split(' ').filter(Boolean))
+                wrapper.classList.add('row-actions-cell-inner', 'row-prevent-click')
+
+                const getRowActionDropdownPortal = function () {
+                    let portal = document.querySelector(
+                        `.row-action-dropdown-portal[data-row-action-dropdown-portal="${self.viewId}"]`
+                    )
+                    if (!portal) {
+                        portal = document.createElement('div')
+                        portal.classList.add('row-action-dropdown-portal')
+                        portal.dataset.rowActionDropdownPortal = self.viewId
+                        document.body.append(portal)
                     }
-                    link.title = action.title || ''
-                    link.setAttribute('aria-label', action.title || '')
-                    link.addEventListener('click', (event) => event.stopPropagation())
+                    return portal
+                }
+
+                const safeIdValue = function (value) {
+                    return String(value).replace(/[^a-zA-Z0-9_-]/g, '_')
+                }
+
+                const actionHasCssClass = function (action, cssClass) {
+                    return (action.css_class || '').split(' ').includes(cssClass)
+                }
+
+                const appendActionTitle = function (element, action) {
+                    if (!action.title || actionHasCssClass(action, 'btn-only-icon')) {
+                        return
+                    }
+                    const label = document.createElement('span')
+                    label.textContent = action.title
+                    label.classList.add('ml-4')
+                    element.append(label)
+                }
+
+                const configureActionElement = function (element, action) {
+                    element.title = action.title || ''
+                    element.setAttribute('aria-label', action.title || '')
                     if (action.open_in_modal) {
-                        link.setAttribute('data-bs-toggle', 'modal')
-                        link.setAttribute('data-bs-target', '#sb-admin-modal')
-                        link.setAttribute('hx-get', action.url)
-                        link.setAttribute('hx-target', '#sb-admin-modal')
+                        element.setAttribute('data-bs-toggle', 'modal')
+                        element.setAttribute('data-bs-target', '#sb-admin-modal')
+                        element.setAttribute('hx-get', action.url)
+                        element.setAttribute('hx-target', '#sb-admin-modal')
                     } else if (action.is_method_action) {
-                        link.setAttribute('hx-post', action.url)
-                        link.setAttribute('hx-swap', 'none')
+                        element.setAttribute('hx-post', action.url)
+                        element.setAttribute('hx-swap', 'none')
                     } else {
-                        link.href = action.url
+                        element.href = action.url
                         if (action.open_in_new_tab) {
-                            link.target = '_blank'
-                            link.rel = 'noopener'
+                            element.target = '_blank'
+                            element.rel = 'noopener'
                         }
                     }
+                }
+
+                const buildActionLink = function (action, dropdownItem = false) {
+                    const link = document.createElement('a')
+                    if (dropdownItem) {
+                        link.classList.add('dropdown-menu-link', 'row-action-dropdown-link', 'btn')
+                    } else {
+                        link.classList.add('row-action-link')
+                        if (action.css_class) {
+                            link.classList.add(...action.css_class.split(' ').filter(Boolean))
+                        }
+                    }
+                    configureActionElement(link, action)
                     if (action.icon) {
                         link.append(createIcon(action.icon, ['w-16', 'h-16']))
                     }
+                    if (dropdownItem) {
+                        link.append(action.title || '')
+                    } else {
+                        appendActionTitle(link, action)
+                    }
+                    return link
+                }
+
+                const buildActionDropdown = function (action, index) {
+                    const rowId = cell.getRow().getData()[self.tableIdColumnName]
+                    const buttonId = `${self.viewId}-row-action-dropdown-${safeIdValue(rowId)}-${index}`
+                    const menuId = `${buttonId}-menu`
+
+                    const dropdown = document.createElement('div')
+                    dropdown.classList.add('relative', 'row-action-dropdown')
+
+                    const button = document.createElement('button')
+                    button.id = buttonId
+                    button.type = 'button'
+                    button.classList.add('row-action-link')
+                    if (action.css_class) {
+                        button.classList.add(...action.css_class.split(' ').filter(Boolean))
+                    }
+                    button.title = action.title || ''
+                    button.setAttribute('aria-label', action.title || '')
+                    button.setAttribute('data-bs-toggle', 'dropdown')
+                    button.setAttribute('data-sbadmin-managed-dropdown', 'row-actions')
+                    button.setAttribute('aria-expanded', 'false')
+                    button.setAttribute('aria-controls', menuId)
+                    button.append(createIcon(action.icon || 'More', ['w-16', 'h-16', 'no-rotate']))
+                    appendActionTitle(button, action)
+
+                    const menu = document.createElement('div')
+                    menu.id = menuId
+                    menu.classList.add('dropdown-menu', 'dropdown-menu-end', 'row-action-dropdown-menu', 'max-h-432')
+
+                    const list = document.createElement('ul')
+                    action.sub_actions.forEach((subAction) => {
+                        const item = document.createElement('li')
+                        item.append(buildActionLink(subAction, true))
+                        list.append(item)
+                    })
+                    menu.append(list)
+                    dropdown.append(button)
+                    dropdown.append(menu)
+
+                    if (window.bootstrap5?.Dropdown) {
+                        new window.bootstrap5.Dropdown(button, {
+                            autoClose: true,
+                            offset: [0, 8],
+                            boundary: 'viewport',
+                            popperConfig(defaultBsPopperConfig) {
+                                return {
+                                    ...defaultBsPopperConfig,
+                                    strategy: 'fixed',
+                                    placement: 'bottom-end'
+                                }
+                            }
+                        })
+                        menu.remove()
+
+                        button.addEventListener('show.bs.dropdown', () => {
+                            const portal = getRowActionDropdownPortal()
+                            portal.replaceChildren(menu)
+                            window.htmx?.process(menu)
+                        })
+
+                        button.addEventListener('hidden.bs.dropdown', () => {
+                            if (menu.parentElement?.classList.contains('row-action-dropdown-portal')) {
+                                menu.remove()
+                            }
+                        })
+                    }
+
+                    return dropdown
+                }
+
+                actions.forEach((action, index) => {
+                    if (action.sub_actions && action.sub_actions.length) {
+                        wrapper.append(buildActionDropdown(action, index))
+                        return
+                    }
+                    const link = buildActionLink(action)
                     wrapper.append(link)
                 })
                 return wrapper

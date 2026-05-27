@@ -573,11 +573,44 @@ class SBAdminListAction(SBAdminAction):
         if not action.is_enabled(action_row):
             return None
 
+        sub_actions = [
+            descriptor
+            for sub_action in action.sub_actions or []
+            if (
+                descriptor := self._materialize_row_action(
+                    sub_action, row, obj_id, raw_row=raw_row
+                )
+            )
+            is not None
+        ]
+        if action.sub_actions and not sub_actions:
+            return None
+
+        if getattr(action, "sub_actions", None):
+            sub_actions = [
+                descriptor
+                for sub_action in action.sub_actions
+                if (
+                    descriptor := self._materialize_row_action(
+                        sub_action, row, obj_id, raw_row=raw_row
+                    )
+                )
+                is not None
+            ]
+            if not sub_actions:
+                return None
+            return {
+                "title": str(action.get_title(action_row) or ""),
+                "icon": action.get_icon(action_row),
+                "css_class": action.get_css_class(action_row) or "",
+                "sub_actions": sub_actions,
+            }
+
         url = action.url
         if url and MODIFIER_OBJECT_ID in url:
             url = url.replace(MODIFIER_OBJECT_ID, str(obj_id))
 
-        return {
+        descriptor = {
             "url": url,
             "title": str(action.get_title(action_row) or ""),
             "icon": action.get_icon(action_row),
@@ -586,6 +619,9 @@ class SBAdminListAction(SBAdminAction):
             "is_method_action": bool(action.action_id) and not action.open_in_modal,
             "open_in_new_tab": bool(action.open_in_new_tab),
         }
+        if action.sub_actions:
+            descriptor["sub_actions"] = sub_actions
+        return descriptor
 
     def get_json_data(self):
         data = self.get_data()

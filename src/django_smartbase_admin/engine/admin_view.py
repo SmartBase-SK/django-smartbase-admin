@@ -93,14 +93,10 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
     def get_menu_view_url(self, request):
         return self.get_action_url(self.menu_action)
 
-    def get_action_url(self, action, modifier="template"):
+    def get_action_url(self, action, modifier="template", object_id=None):
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
     def keep_preserved_filters(self, request, url):

@@ -345,9 +345,11 @@ class SBAdminFormFieldWidgetsMixin:
 
 class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
     view = None
+    sbadmin_action_id = None
 
     def __init__(self, *args, **kwargs):
         self.view = kwargs.pop("view", self.view)
+        self.sbadmin_action_id = kwargs.pop("sbadmin_action_id", self.sbadmin_action_id)
         threadsafe_request = kwargs.pop(
             "request", SBAdminThreadLocalService.get_request()
         )
@@ -736,14 +738,10 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
         extra_context.update(self.get_global_context(request))
         return super().changelist_view(request, extra_context)
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
 
@@ -931,7 +929,11 @@ class SBAdmin(
         self.get_form(request)()
 
     def _register_inline_autocomplete(self, request) -> None:
-        for inline in self.get_inline_instances(request, obj=None):
+        obj = None
+        object_id = getattr(request.request_data, "object_id", None)
+        if object_id is not None:
+            obj = self.get_object(request, object_id)
+        for inline in self.get_inline_instances(request, obj=obj):
             inline._register_inline_autocomplete(request)
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
@@ -962,16 +964,12 @@ class SBAdmin(
     def get_menu_label(self) -> str:
         return self.menu_label or self.model._meta.verbose_name_plural
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         if not hasattr(self, action):
             raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
     def get_detail_url(self, object_id=None) -> str:
@@ -1285,18 +1283,16 @@ class SBAdminInline(
             request, self.get_sbadmin_inline_list_actions(request)
         )
 
-    def get_action_url(self, action, modifier="template") -> str:
+    def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
             "sb_admin:sb_admin_base",
-            kwargs={
-                "view": self.get_id(),
-                "action": action,
-                "modifier": modifier,
-            },
+            kwargs=self.get_action_url_kwargs(action, modifier, object_id),
         )
 
     def _register_inline_autocomplete(self, request) -> None:
-        form_class = self.get_formset(request, None).form
+        form_class = self.get_formset(
+            request, getattr(self, "parent_instance", None)
+        ).form
         self.initialize_form_class(form_class, request)
         form_class()
         self.register_action_autocomplete_views(
