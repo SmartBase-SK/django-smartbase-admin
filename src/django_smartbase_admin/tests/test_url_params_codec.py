@@ -18,8 +18,14 @@ class UrlParamsCodecTests(SimpleTestCase):
                 "columnsData": {"columns": {"title": {"visible": True}}},
             }
         }
-        encoded = dumps_for_url(payload)
+        encoded = dumps_for_url(payload, compress=True)
         self.assertFalse(encoded.lstrip().startswith("{"))
+        self.assertEqual(loads_from_url(encoded), payload)
+
+    def test_plain_json_encode(self):
+        payload = {"blog_article": {"filterData": {"status": "draft"}}}
+        encoded = dumps_for_url(payload, compress=False)
+        self.assertTrue(encoded.lstrip().startswith("{"))
         self.assertEqual(loads_from_url(encoded), payload)
 
     def test_plain_json(self):

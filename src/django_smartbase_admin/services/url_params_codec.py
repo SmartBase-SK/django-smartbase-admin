@@ -13,8 +13,10 @@ def _is_plain_json(text: str) -> bool:
     return stripped.startswith("{") or stripped.startswith("[")
 
 
-def dumps_for_url(data) -> str:
+def dumps_for_url(data, *, compress: bool = True) -> str:
     json_str = json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
+    if not compress:
+        return json_str
     return _lz.compressToEncodedURIComponent(json_str)
 
 

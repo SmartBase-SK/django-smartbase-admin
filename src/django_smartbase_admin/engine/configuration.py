@@ -193,6 +193,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     # to self-guard based on admin config (e.g. ``sbadmin_nested``).
     plugins: list = []
     default_list_sticky_header_and_footer = True
+    enable_url_compression = True
 
     def __init__(
         self,
@@ -206,6 +207,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         admin_title=None,
         plugins=None,
         default_list_sticky_header_and_footer=None,
+        enable_url_compression=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -225,6 +227,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             self.default_list_sticky_header_and_footer = (
                 default_list_sticky_header_and_footer
             )
+        self.enable_url_compression = enable_url_compression if enable_url_compression is not None else self.enable_url_compression
 
     def init_registered_views(self):
         registered_views = []

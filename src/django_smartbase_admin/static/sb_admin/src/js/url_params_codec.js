@@ -5,8 +5,12 @@ const isPlainJson = (text) => {
     return stripped.startsWith('{') || stripped.startsWith('[')
 }
 
-export const encodeParamsForUrl = (data) => {
-    return LZString.compressToEncodedURIComponent(JSON.stringify(data))
+export const encodeParamsForUrl = (data, compress = true) => {
+    const jsonStr = JSON.stringify(data)
+    if (!compress) {
+        return jsonStr
+    }
+    return LZString.compressToEncodedURIComponent(jsonStr)
 }
 
 export const decodeParamsFromUrl = (value) => {

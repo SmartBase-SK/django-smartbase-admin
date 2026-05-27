@@ -54,6 +54,7 @@ class SBAdminTable {
         this.tableInitialPage = options.tableInitialPage || 1
         this.tableInitialPageSize = options.tableInitialPageSize
         this.tableHistoryEnabled = options.tableHistoryEnabled
+        this.enableUrlCompression = options.enableUrlCompression !== false
         this.constants = options.constants
         this.tabulatorOptions = options.tabulatorOptions
 
@@ -238,7 +239,7 @@ class SBAdminTable {
     }
 
     paramsObjectToUrlString(params) {
-        return "?" + this.constants.BASE_PARAMS_NAME + "=" + encodeURIComponent(encodeParamsForUrl(params))
+        return "?" + this.constants.BASE_PARAMS_NAME + "=" + encodeURIComponent(encodeParamsForUrl(params, this.enableUrlCompression))
     }
 
     getUrlParamsString() {

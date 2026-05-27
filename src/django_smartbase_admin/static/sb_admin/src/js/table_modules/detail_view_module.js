@@ -6,7 +6,7 @@ import {encodeParamsForUrl} from "../url_params_codec"
 export class DetailViewModule extends SBAdminTableModule {
 
     getDetailUrl(row) {
-        const paramsPayload = this.table.constants.BASE_PARAMS_NAME + '=' + encodeParamsForUrl(this.table.getAllUrlParams())
+        const paramsPayload = this.table.constants.BASE_PARAMS_NAME + '=' + encodeParamsForUrl(this.table.getAllUrlParams(), this.table.enableUrlCompression)
         return this.table.tableDetailUrl.replace(this.table.constants.OBJECT_ID_PLACEHOLDER, row.getData()[this.table.tableIdColumnName]) + '?_changelist_filters=' + encodeURIComponent(paramsPayload)
     }
 

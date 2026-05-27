@@ -668,6 +668,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             "stickyHeaderAndFooter": sticky_header_and_footer,
+            "enableUrlCompression": request.request_data.configuration.enable_url_compression,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -840,7 +841,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                 + urllib.parse.urlencode(
                     {
                         BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(
-                            action.all_params
+                            action.all_params, request
                         )
                     }
                 )
