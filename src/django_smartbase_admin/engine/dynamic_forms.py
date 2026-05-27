@@ -420,6 +420,49 @@ class SBAdminDynamicFormMixin:
             )
         return actions
 
+    @staticmethod
+    def fieldset_has_visible_fields(fieldset: Fieldset) -> bool:
+        return any(getattr(line, "has_visible_field", False) for line in fieldset)
+
+    def fieldset_has_errors(
+        self,
+        fieldset: Fieldset,
+        fieldset_data: dict[str, Any],
+    ) -> bool:
+        field_names = set()
+        for item in self.get_fieldset_fields(fieldset_data):
+            if isinstance(item, (list, tuple)):
+                field_names.update(item)
+            else:
+                field_names.add(item)
+        return bool(field_names.intersection(fieldset.form.errors))
+
+    @staticmethod
+    def dynamic_region_context_is_empty(region_context: SBDynamicRegionContext) -> bool:
+        if not region_context.state.visible:
+            return True
+        if region_context.is_deferred_initial or region_context.region.template:
+            return False
+        return not region_context.state.active_fields
+
+    def fieldset_is_empty(
+        self,
+        fieldset: Fieldset,
+        fieldset_layout: tuple[dict[str, SBDynamicRegionContext | Fieldset], ...],
+    ) -> bool:
+        if not fieldset_layout:
+            return not self.fieldset_has_visible_fields(fieldset)
+        for layout_item in fieldset_layout:
+            layout_fieldset = layout_item.get("fieldset")
+            if layout_fieldset and self.fieldset_has_visible_fields(layout_fieldset):
+                return False
+            region_context = layout_item.get("region")
+            if region_context and not self.dynamic_region_context_is_empty(
+                region_context
+            ):
+                return False
+        return True
+
     def get_fieldset_context(
         self, fieldset: Fieldset, request: HttpRequest | None = None
     ) -> dict[str, Any]:
@@ -429,16 +472,23 @@ class SBAdminDynamicFormMixin:
             return {}
         collapsible = bool(fieldset_data.get("collapsible", False))
         default_collapsed = bool(fieldset_data.get("default_collapsed", False))
+        hide_if_empty = bool(fieldset_data.get("hide_if_empty", False))
+        fieldset_layout = self.get_fieldset_layout(fieldset, fieldset_data, request)
+        fieldset_empty = (
+            hide_if_empty
+            and not self.fieldset_has_errors(fieldset, fieldset_data)
+            and self.fieldset_is_empty(fieldset, fieldset_layout)
+        )
         return {
             "fieldset": fieldset,
-            "fieldset_layout": self.get_fieldset_layout(
-                fieldset, fieldset_data, request
-            ),
+            "fieldset_layout": fieldset_layout,
             "collapsible": collapsible,
             "default_collapsed": default_collapsed,
             "collapse_id": self.get_fieldset_collapse_id(fieldset),
             "collapse_open": collapsible and not default_collapsed,
             "actions": self.get_fieldset_actions(fieldset, fieldset_data, request),
+            "hide_if_empty": hide_if_empty,
+            "empty": fieldset_empty,
         }
 
     def get_fieldset_layout(

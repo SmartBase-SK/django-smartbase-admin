@@ -3899,6 +3899,7 @@ class ArticleAdmin(SBAdmin):
                 "classes": ("wide",),
                 "collapsible": True,
                 "default_collapsed": True,
+                "hide_if_empty": True,
             },
         ),
     )
@@ -3914,11 +3915,13 @@ Supported option keys:
 | `actions` | iterable | Header actions rendered next to the fieldset title. Actions use the same `SBAdminCustomAction` / `SBAdminFormViewAction` objects and `has_permission_for_action` filtering as detail actions. |
 | `collapsible` | bool | Render the fieldset body inside Bootstrap collapse and add a header toggle. Defaults to `False`. |
 | `default_collapsed` | bool | Initial closed state for a collapsible fieldset. Defaults to `False`; ignored unless `collapsible=True`. |
+| `hide_if_empty` | bool | Hide the rendered `<fieldset>` with the existing `hidden` class when it has no visible fields. Defaults to `False`. Useful for fieldsets whose `SBDynamicRegion` may currently render no active fields. |
 
 **Key points:**
 - Use `sbadmin_fieldsets` when you need SBAdmin-only behavior such as dynamic regions or collapsible fieldsets. Plain Django `fieldsets` still works for basic `fields`, `classes`, and `description`.
 - `collapsible=True` uses Bootstrap collapse; do not activate it with `classes=["collapse"]`.
 - `default_collapsed=True` starts the fieldset closed. Existing JS opens collapsed ancestors when focusing validation errors.
+- `hide_if_empty=True` is visual only: it does not disable, clear, or remove fields from form submission. Fieldsets with validation errors stay visible, and dynamic fieldsets are re-checked after HTMX swaps.
 - Fieldset actions are detail-style links. Use `action_modifier=MODIFIER_OBJECT_ID` when the action should receive the current object id.
 - SBAdmin looks up fieldset metadata by the tuple's first value (`name`). Avoid multiple fieldsets with the same name, including multiple `None` fieldsets, when using dynamic regions or collapse metadata.
 - The collapse id is generated from `sbadmin-fieldset`, the form prefix when present, and the fieldset name when present. Prefixed inline rows therefore get separate collapse ids.

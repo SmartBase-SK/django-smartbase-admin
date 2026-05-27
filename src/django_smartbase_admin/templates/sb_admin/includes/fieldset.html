@@ -2,7 +2,7 @@
 {% firstof fieldset_class "card sm:mb-24 relative" as resolved_fieldset_class %}
 {% resolve_fieldset_context fieldset request as fieldset_context %}
 
-<fieldset class="{{ resolved_fieldset_class }} {{ fieldset_context.fieldset.classes }}">
+<fieldset class="{{ resolved_fieldset_class }} {{ fieldset_context.fieldset.classes }}{% if fieldset_context.empty %} hidden{% endif %}"{% if fieldset_context.hide_if_empty %} data-sbadmin-hide-if-empty="true"{% endif %}>
     {% include 'sb_admin/includes/inline_fieldset.html' %}
 
     {% block after_fieldset %}

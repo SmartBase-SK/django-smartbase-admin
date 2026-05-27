@@ -1039,6 +1039,127 @@ class DynamicFormTests(SimpleTestCase):
         for expected_class in expected_classes:
             self.assertIn(expected_class, collapse_class.split())
 
+    def assert_fieldset_hidden(self, html):
+        self.assertIn('data-sbadmin-hide-if-empty="true"', html)
+        fieldset_class = html.split('<fieldset class="', 1)[1].split('"', 1)[0]
+        self.assertIn("hidden", fieldset_class.split())
+
+    def assert_fieldset_visible(self, html):
+        self.assertIn('data-sbadmin-hide-if-empty="true"', html)
+        fieldset_class = html.split('<fieldset class="', 1)[1].split('"', 1)[0]
+        self.assertNotIn("hidden", fieldset_class.split())
+
+    def test_hide_if_empty_fieldset_keeps_non_empty_static_fieldset_visible(self):
+        class NonEmptyFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("title",),
+                            "hide_if_empty": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(NonEmptyFieldsetForm(request=self.request))
+
+        self.assert_fieldset_visible(html)
+
+    def test_hide_if_empty_fieldset_hides_static_fieldset_without_visible_fields(self):
+        class EmptyFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            token = forms.CharField(widget=forms.HiddenInput)
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("token",),
+                            "hide_if_empty": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(EmptyFieldsetForm(request=self.request))
+
+        self.assert_fieldset_hidden(html)
+
+    def test_hide_if_empty_fieldset_keeps_active_dynamic_region_visible(self):
+        class ActiveDynamicRegionForm(SBAdminBaseFormInit, forms.Form):
+            sbadmin_dynamic_region_source = SBDynamicRegionSource.FORM
+
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": (
+                                SBDynamicRegion(
+                                    name="details",
+                                    fields=("title",),
+                                ),
+                            ),
+                            "hide_if_empty": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(ActiveDynamicRegionForm(request=self.request))
+
+        self.assert_fieldset_visible(html)
+
+    def test_hide_if_empty_fieldset_hides_empty_dynamic_region(self):
+        class EmptyDynamicRegionForm(SBAdminBaseFormInit, forms.Form):
+            sbadmin_dynamic_region_source = SBDynamicRegionSource.FORM
+
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": (
+                                SBDynamicRegion(
+                                    name="details",
+                                    fields=("title",),
+                                    get_active_fields=lambda form, request, region: (),
+                                ),
+                            ),
+                            "hide_if_empty": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(EmptyDynamicRegionForm(request=self.request))
+
+        self.assert_fieldset_hidden(html)
+
+    def test_hide_if_empty_fieldset_keeps_fieldset_with_errors_visible(self):
+        class EmptyFieldsetWithErrorsForm(SBAdminBaseFormInit, forms.Form):
+            token = forms.CharField(widget=forms.HiddenInput)
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("token",),
+                            "hide_if_empty": True,
+                        },
+                    ),
+                )
+
+        form = EmptyFieldsetWithErrorsForm(data={}, request=self.request)
+        html = self.render_fieldset(form)
+
+        self.assert_fieldset_visible(html)
+
     def test_form_fieldsets_can_use_meta_fieldsets(self):
         form = MetaFieldsetsForm(request=self.request)
         fieldsets = list(form.fieldsets())
