@@ -178,6 +178,8 @@ def _detail_field_entries(admin, request) -> list[str]:
 
 
 def _row_action_kind(action) -> str:
+    if getattr(action, "sub_actions", None):
+        return "group"
     if getattr(action, "target_view", None) is not None:
         return "modal"
     if getattr(action, "action_id", None):
@@ -196,6 +198,11 @@ def _row_action_entry(action) -> dict:
     target_view = getattr(action, "target_view", None)
     if target_view is not None:
         entry["target_view"] = target_view.__name__
+    sub_actions = getattr(action, "sub_actions", None)
+    if sub_actions:
+        entry["sub_actions"] = [
+            _row_action_entry(sub_action) for sub_action in sub_actions
+        ]
     return entry
 
 

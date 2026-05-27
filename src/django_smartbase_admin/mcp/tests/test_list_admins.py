@@ -18,6 +18,7 @@ from django.db.models import F
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminRowAction
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -192,6 +193,57 @@ class ListAdminsTests(TestCase):
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         self.assertEqual(entry["search_fields"], ["name"])
+
+    def test_nested_row_actions_surface_in_schema(self):
+        class FolderNestedRowActionsAdmin(SBAdmin):
+            model = Folder
+            list_display = ("id", "name")
+
+            def get_sbadmin_row_actions(self, request):
+                return [
+                    SBAdminRowAction(
+                        title="More",
+                        icon="More",
+                        sub_actions=[
+                            SBAdminRowAction(
+                                action_id="action_archive_folder",
+                                title="Archive",
+                                icon="Delete",
+                                view=self,
+                            ),
+                            SBAdminRowAction(
+                                url="/folders/__object_id__/",
+                                title="Open",
+                                icon="Preview-open",
+                            ),
+                        ],
+                    )
+                ]
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderNestedRowActionsAdmin)
+
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+
+        entry = next(e for e in result if e["view_id"] == "filer_folder")
+        self.assertEqual(
+            entry["row_actions"],
+            [
+                {
+                    "title": "More",
+                    "kind": "group",
+                    "sub_actions": [
+                        {
+                            "title": "Archive",
+                            "kind": "method",
+                            "action_id": "action_archive_folder",
+                        },
+                        {"title": "Open", "kind": "url"},
+                    ],
+                }
+            ],
+        )
 
     def test_field_filter_schema(self):
         """Resolved field entries surface filter widget metadata.

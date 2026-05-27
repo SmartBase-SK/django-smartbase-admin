@@ -147,7 +147,8 @@ class SBAdminTools(MCPToolset):
           - ``row_actions``: per-row actions declared on the admin.
             Each entry: ``title``, ``kind`` (``"method"`` —
             non-interactive callable; ``"modal"`` — opens a form;
-            ``"url"`` — plain link), and a handle (``action_id`` for
+            ``"url"`` — plain link; ``"group"`` — dropdown with
+            ``sub_actions``), and a handle (``action_id`` for
             method/modal, ``target_view`` class name for modal).
             Resolved per-row state (URLs, icons, whether the action is
             enabled for that row) is intentionally not returned —

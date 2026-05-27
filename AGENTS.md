@@ -2107,9 +2107,9 @@ class AssignCategoryView(ListActionModalView):
 
 Use `SBAdminRowAction` for small icon buttons rendered inside each list row. Row actions are declared once, processed through `get_sbadmin_row_actions_processed()`, then materialized per row into `_row_actions` during the list data pipeline.
 
-### Three Interaction Modes
+### Interaction Modes and Dropdowns
 
-Pass exactly one of `target_view`, `action_id`, or `url`:
+Pass either `sub_actions` for a per-row dropdown, or exactly one of `target_view`, `action_id`, or `url` for a direct row button:
 
 ```python
 from django import forms
@@ -2171,6 +2171,25 @@ class ArticleAdmin(SBAdmin):
                 title=_("View externally"),
                 icon="Preview-open",
                 open_in_new_tab=True,
+            ),
+            # Dropdown parent: children are materialized with the same row pk.
+            SBAdminRowAction(
+                title=_("More actions"),
+                icon="More",
+                sub_actions=[
+                    SBAdminRowAction(
+                        action_id="action_archive_article",
+                        title=_("Archive"),
+                        icon="Delete",
+                        view=self,
+                    ),
+                    SBAdminRowAction(
+                        url=f"https://example.com/articles/{MODIFIER_OBJECT_ID}/audit/",
+                        title=_("Audit trail"),
+                        icon="History",
+                        open_in_new_tab=True,
+                    ),
+                ],
             ),
         ]
 

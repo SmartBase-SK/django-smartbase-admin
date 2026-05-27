@@ -51,6 +51,7 @@ class SBAdminCustomAction(object):
     template = None
     permission = None
     sub_actions = None
+    icon = None
 
     def __init__(
         self,
@@ -108,7 +109,7 @@ class SBAdminFormViewAction(SBAdminCustomAction):
 class SBAdminRowAction(SBAdminCustomAction):
     """Per-row icon action declared through ``sbadmin_row_actions``.
 
-    Pass exactly one of ``target_view``, ``action_id``, or ``url``:
+    Pass either ``sub_actions`` or exactly one of ``target_view``, ``action_id``, or ``url``:
     ``target_view`` opens a modal, ``action_id`` calls an ``@sbadmin_action``
     method, and ``url`` renders a plain link.
 
@@ -138,10 +139,10 @@ class SBAdminRowAction(SBAdminCustomAction):
         url=None,
         css_class=None,
         open_in_new_tab=None,
-        sub_actions=None,
         enabled_if=None,
         enabled_field=None,
         enabled_value=None,
+        sub_actions=None,
     ) -> None:
         resolved_title = title if title is not None else self.title
         resolved_icon = icon if icon is not None else self.icon
@@ -164,9 +165,13 @@ class SBAdminRowAction(SBAdminCustomAction):
             resolved_action_id is not None,
             resolved_url is not None,
         )
-        if not resolved_sub_actions and sum(modes) != 1:
+        has_sub_actions = bool(resolved_sub_actions)
+        if (has_sub_actions and any(modes)) or (
+            not has_sub_actions and sum(modes) != 1
+        ):
             raise ImproperlyConfigured(
-                "SBAdminRowAction requires exactly one of: target_view, action_id, url"
+                "SBAdminRowAction requires either sub_actions or exactly one of: "
+                "target_view, action_id, url"
             )
         if resolved_sub_actions and any(modes):
             raise ImproperlyConfigured(
@@ -184,8 +189,8 @@ class SBAdminRowAction(SBAdminCustomAction):
             open_in_modal=resolved_target_view is not None,
             open_in_new_tab=resolved_open_in_new_tab,
             icon=resolved_icon,
-            sub_actions=resolved_sub_actions,
             action_modifier=MODIFIER_OBJECT_ID,
+            sub_actions=resolved_sub_actions,
         )
 
         self.enabled_if = enabled_if if enabled_if is not None else self.enabled_if

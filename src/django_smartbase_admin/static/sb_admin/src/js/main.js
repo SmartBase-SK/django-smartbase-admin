@@ -387,7 +387,9 @@ class Main {
 
     initDropdowns(target) {
         target = target || document
-        const dropdowns = [].slice.call(target.querySelectorAll('[data-bs-toggle="dropdown"]'))
+        const dropdowns = [].slice.call(target.querySelectorAll(
+            '[data-bs-toggle="dropdown"]:not([data-sbadmin-managed-dropdown])'
+        ))
         dropdowns.map((dropdownToggleEl) => {
             let offset = dropdownToggleEl.dataset['bsOffset']
             if (offset) {

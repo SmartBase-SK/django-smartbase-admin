@@ -268,6 +268,92 @@ class RowActionIntegrationTests(TestCase):
             ["/articles/8/"],
         )
 
+    def test_row_action_accepts_sub_actions_without_direct_interaction_mode(self):
+        view = FakeAdminView()
+        child = SBAdminRowAction(
+            action_id="action_archive_article",
+            title="Archive",
+            view=view,
+        )
+
+        action = SBAdminRowAction(title="More", sub_actions=[child])
+
+        self.assertEqual(action.sub_actions, [child])
+        self.assertIsNone(action.icon)
+        self.assertIsNone(child.icon)
+        self.assertIsNone(action.url)
+        self.assertIsNone(action.action_id)
+        self.assertIsNone(action.target_view)
+
+    def test_row_action_sub_actions_are_materialized_per_row(self):
+        view = FakeAdminView()
+        view.row_actions = [
+            SBAdminRowAction(
+                title=lambda row: f"Actions for {row['title']}",
+                icon="More",
+                sub_actions=[
+                    SBAdminRowAction(
+                        action_id="action_archive_article",
+                        title=lambda row: f"Archive {row['title']}",
+                        icon="Delete",
+                        view=view,
+                        enabled_if=lambda row: row.get("status") != "archived",
+                    ),
+                    SBAdminRowAction(
+                        url=f"/articles/{MODIFIER_OBJECT_ID}/audit/",
+                        title="Audit",
+                        icon="History",
+                        enabled_field="status",
+                        enabled_value="draft",
+                    ),
+                ],
+            )
+        ]
+        rows = [
+            {"id": 7, "title": "Draft Article", "status": "Draft"},
+            {"id": 8, "title": "Archived Article", "status": "Archived"},
+        ]
+        raw_rows_by_pk = {
+            7: {"id": 7, "title": "Draft Article", "status": "draft"},
+            8: {"id": 8, "title": "Archived Article", "status": "archived"},
+        }
+
+        TestListAction(view, self.request).inject_row_actions(
+            rows, raw_rows_by_pk=raw_rows_by_pk
+        )
+
+        self.assertEqual(
+            rows[0]["_row_actions"],
+            [
+                {
+                    "title": "Actions for Draft Article",
+                    "icon": "More",
+                    "css_class": "btn btn-small btn-only-icon",
+                    "sub_actions": [
+                        {
+                            "url": "/actions/action_archive_article/template/7/",
+                            "title": "Archive Draft Article",
+                            "icon": "Delete",
+                            "css_class": "btn btn-small btn-only-icon",
+                            "open_in_modal": False,
+                            "is_method_action": True,
+                            "open_in_new_tab": False,
+                        },
+                        {
+                            "url": "/articles/7/audit/",
+                            "title": "Audit",
+                            "icon": "History",
+                            "css_class": "btn btn-small btn-only-icon",
+                            "open_in_modal": False,
+                            "is_method_action": False,
+                            "open_in_new_tab": False,
+                        },
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(rows[1]["_row_actions"], [])
+
     def test_nested_plugin_materializes_row_actions_for_child_rows(self):
         request = RequestFactory().get("/")
         request.request_data = SimpleNamespace(additional_data={})
@@ -438,6 +524,21 @@ class RowActionIntegrationTests(TestCase):
                 icon="Close",
                 action_id="action_archive_article",
                 url="/articles/__object_id__/",
+            )
+
+        with self.assertRaises(ImproperlyConfigured):
+            SBAdminRowAction(
+                title="Broken",
+                icon="Close",
+                url="/articles/__object_id__/",
+                sub_actions=[
+                    SBAdminRowAction(
+                        action_id="action_archive_article",
+                        title="Archive",
+                        icon="Delete",
+                        view=FakeAdminView(),
+                    )
+                ],
             )
 
 
