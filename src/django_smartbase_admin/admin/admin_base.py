@@ -2,6 +2,7 @@ import json
 import logging
 import urllib.parse
 from collections.abc import Iterable
+from copy import copy
 from functools import partial
 from typing import Any
 from urllib.parse import urlparse
@@ -936,6 +937,19 @@ class SBAdmin(
         for inline in self.get_inline_instances(request, obj=obj):
             inline._register_inline_autocomplete(request)
 
+    def init_actions(self, request) -> None:
+        super().init_actions(request)
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        if object_id is None:
+            return
+        try:
+            obj = self.get_object(request, object_id)
+        except PermissionDenied:
+            return
+        inline_instances = self.get_inline_instances(request, obj=obj)
+        for inline in inline_instances:
+            inline.init_actions(request)
+
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
 
@@ -1279,9 +1293,85 @@ class SBAdminInline(
         return [*(self.sbadmin_inline_list_actions or [])]
 
     def get_sbadmin_inline_list_actions_processed(self, request) -> list:
-        return self.process_inline_actions(
-            request, self.get_sbadmin_inline_list_actions(request)
+        object_id = (
+            self.parent_instance.pk
+            if self.parent_instance is not None and self.parent_instance.pk is not None
+            else None
         )
+        return self.process_inline_actions(
+            request,
+            self._bind_parent_row_action_modals(
+                self.get_sbadmin_inline_list_actions(request)
+            ),
+            object_id=object_id,
+        )
+
+    def init_actions(self, request) -> None:
+        # inline supports only own sbadmin_inline_list_actions but also sbadmin_fieldsets_actions
+        object_id = (
+            self.parent_instance.pk
+            if self.parent_instance is not None and self.parent_instance.pk is not None
+            else None
+        )
+        all_actions = [*self.get_sbadmin_inline_list_actions_processed(request)]
+        if object_id is not None:
+            all_actions.extend(
+                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+            )
+        self.register_action_autocomplete_views(request, all_actions)
+
+    def _bind_parent_row_action_modals(self, actions: list) -> list:
+        if self.parent_instance is None:
+            return actions
+        parent_admin = self.admin_site._registry.get(self.parent_model)
+        if parent_admin is None:
+            return actions
+        return [
+            self._bind_parent_row_action_modal(action, parent_admin)
+            for action in actions
+        ]
+
+    def _bind_parent_row_action_modal(self, action, parent_admin):
+        # we need to add view on action to be parent_admin
+        # this ->
+        #         SBAdminFormViewAction(
+        #             title=_("Úprava kreditu"),
+        #             target_view=UserManualCreditView,
+        #             open_in_modal=True,
+        #             css_class="btn btn-primary",
+        #         )
+        # needs to become ->
+        #         SBAdminFormViewAction(
+        #             ...
+        #             view=parent_admin
+        #             ...
+        #         )
+        sub_actions = getattr(action, "sub_actions", None)
+        if sub_actions:
+            resolved_sub_actions = [
+                self._bind_parent_row_action_modal(sub_action, parent_admin)
+                for sub_action in sub_actions
+            ]
+            if resolved_sub_actions != sub_actions:
+                action = copy(action)
+                action.sub_actions = resolved_sub_actions
+            return action
+        if getattr(action, "view", None) is not None:
+            return action
+        target_view = getattr(action, "target_view", None)
+        if target_view is None:
+            return action
+        from django_smartbase_admin.engine.modal_view import RowActionModalView
+
+        try:
+            is_row_action_modal = issubclass(target_view, RowActionModalView)
+        except TypeError:
+            is_row_action_modal = False
+        if not is_row_action_modal:
+            return action
+        action = copy(action)
+        action.view = parent_admin
+        return action
 
     def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
@@ -1295,9 +1385,6 @@ class SBAdminInline(
         ).form
         self.initialize_form_class(form_class, request)
         form_class()
-        self.register_action_autocomplete_views(
-            request, self.get_sbadmin_inline_list_actions_processed(request)
-        )
 
     def get_parent_instance_from_request(self):
         # Try to get parent instance from request referrer

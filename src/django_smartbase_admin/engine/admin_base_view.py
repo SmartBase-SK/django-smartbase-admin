@@ -161,9 +161,12 @@ class SBAdminBaseView(object):
         return self.process_actions_permissions(request, resolved_actions)
 
     def process_inline_actions(
-        self, request, actions: list[SBAdminCustomAction]
+        self,
+        request,
+        actions: list[SBAdminCustomAction],
+        object_id: int | str | None = None,
     ) -> list[SBAdminCustomAction]:
-        resolved_actions = self._resolve_action_urls(actions)
+        resolved_actions = self._resolve_action_urls(actions, object_id)
         return self.process_actions_permissions(request, resolved_actions)
 
     def _resolve_action_urls(
@@ -183,13 +186,14 @@ class SBAdminBaseView(object):
                 action.sub_actions = resolved_sub_actions
             return action
         target_view = getattr(action, "target_view", None)
+        source_view = getattr(action, "view", self)
         if target_view is not None:
             resolved_action = copy(action)
-            action_id = self._register_form_view_action(
+            action_id = source_view._register_form_view_action(
                 target_view, getattr(action, "action_id", None)
             )
             resolved_action.action_id = action_id
-            resolved_action.url = self.get_action_url(
+            resolved_action.url = source_view.get_action_url(
                 action_id,
                 modifier=self._get_action_modifier(action, object_id),
                 object_id=self._get_action_url_object_id(action, object_id),
@@ -199,7 +203,7 @@ class SBAdminBaseView(object):
             return action
         if getattr(action, "view", None) and getattr(action, "action_id", None):
             resolved_action = copy(action)
-            resolved_action.url = self.get_action_url(
+            resolved_action.url = source_view.get_action_url(
                 action.action_id,
                 modifier=self._get_action_modifier(action, object_id),
                 object_id=self._get_action_url_object_id(action, object_id),
@@ -389,7 +393,8 @@ class SBAdminBaseView(object):
             if requested_action_id and requested_action_id != action_id:
                 continue
 
-            action_view = target_view(view=self)
+            source_view = getattr(action, "view", None) or self
+            action_view = target_view(view=source_view)
             action_view.setup(
                 request,
                 modifier=request_modifier,
