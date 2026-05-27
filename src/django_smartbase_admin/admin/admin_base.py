@@ -345,9 +345,11 @@ class SBAdminFormFieldWidgetsMixin:
 
 class SBAdminBaseFormInit(SBAdminFormFieldWidgetsMixin, FormFieldsetMixin):
     view = None
+    sbadmin_action_id = None
 
     def __init__(self, *args, **kwargs):
         self.view = kwargs.pop("view", self.view)
+        self.sbadmin_action_id = kwargs.pop("sbadmin_action_id", self.sbadmin_action_id)
         threadsafe_request = kwargs.pop(
             "request", SBAdminThreadLocalService.get_request()
         )
@@ -927,7 +929,11 @@ class SBAdmin(
         self.get_form(request)()
 
     def _register_inline_autocomplete(self, request) -> None:
-        for inline in self.get_inline_instances(request, obj=None):
+        obj = None
+        object_id = getattr(request.request_data, "object_id", None)
+        if object_id is not None:
+            obj = self.get_object(request, object_id)
+        for inline in self.get_inline_instances(request, obj=obj):
             inline._register_inline_autocomplete(request)
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
@@ -1284,7 +1290,9 @@ class SBAdminInline(
         )
 
     def _register_inline_autocomplete(self, request) -> None:
-        form_class = self.get_formset(request, None).form
+        form_class = self.get_formset(
+            request, getattr(self, "parent_instance", None)
+        ).form
         self.initialize_form_class(form_class, request)
         form_class()
         self.register_action_autocomplete_views(

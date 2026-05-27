@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import F
-from django.http import HttpResponse, JsonResponse, HttpRequest
+from django.http import HttpResponse, JsonResponse, HttpRequest, Http404
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse
@@ -41,6 +41,7 @@ from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     MODIFIER_OBJECT_ID,
     SUPPORTED_FILE_TYPE_ICONS,
+    ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
 )
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
@@ -190,8 +191,8 @@ class SBAdminBaseView(object):
             resolved_action.action_id = action_id
             resolved_action.url = self.get_action_url(
                 action_id,
-                modifier=self._get_action_modifier(action),
-                object_id=object_id,
+                modifier=self._get_action_modifier(action, object_id),
+                object_id=self._get_action_url_object_id(action, object_id),
             )
             return resolved_action
         if action.url:
@@ -200,8 +201,8 @@ class SBAdminBaseView(object):
             resolved_action = copy(action)
             resolved_action.url = self.get_action_url(
                 action.action_id,
-                modifier=self._get_action_modifier(action),
-                object_id=object_id,
+                modifier=self._get_action_modifier(action, object_id),
+                object_id=self._get_action_url_object_id(action, object_id),
             )
             return resolved_action
         return action
@@ -214,8 +215,40 @@ class SBAdminBaseView(object):
         return action_id
 
     @staticmethod
-    def _get_action_modifier(action: SBAdminCustomAction) -> str:
+    def _get_action_modifier(
+        action: SBAdminCustomAction, object_id: int | str | None = None
+    ) -> str:
+        if SBAdminBaseView._action_uses_object_id(action, object_id):
+            return "template" if object_id is not None else IGNORE_LIST_SELECTION
         return getattr(action, "action_modifier", None) or "template"
+
+    @staticmethod
+    def _get_action_url_object_id(
+        action: SBAdminCustomAction, object_id: int | str | None
+    ) -> int | str | None:
+        if not SBAdminBaseView._action_uses_object_id(action, object_id):
+            return None
+        return object_id
+
+    @staticmethod
+    def _action_uses_object_id(
+        action: SBAdminCustomAction, object_id: int | str | None = None
+    ) -> bool:
+        if getattr(action, "action_modifier", None) == MODIFIER_OBJECT_ID:
+            return True
+        if isinstance(action, SBAdminRowAction):
+            return True
+        if object_id is None:
+            return False
+        target_view = getattr(action, "target_view", None)
+        if target_view is None:
+            return False
+        from django_smartbase_admin.engine.modal_view import RowActionModalView
+
+        try:
+            return issubclass(target_view, RowActionModalView)
+        except TypeError:
+            return False
 
     @staticmethod
     def _materialize_modifier_object_id(
@@ -233,9 +266,6 @@ class SBAdminBaseView(object):
                 return new_action
             return action
         new_action = copy(action)
-        new_action.action_modifier = (
-            "template" if object_id is not None else IGNORE_LIST_SELECTION
-        )
         is_direct_url = (
             bool(action.url)
             and getattr(action, "target_view", None) is None
@@ -339,17 +369,62 @@ class SBAdminBaseView(object):
     def register_action_autocomplete_views(
         self, request, actions: Iterable[SBAdminCustomAction] | None
     ) -> None:
-
+        request_data = getattr(request, "request_data", None)
+        requested_action_id, request_modifier = self.split_action_autocomplete_modifier(
+            getattr(request_data, "modifier", None)
+        )
+        if not requested_action_id:
+            return
         for action in actions or []:
+            if getattr(action, "sub_actions", None):
+                self.register_action_autocomplete_views(request, action.sub_actions)
+
             target_view = getattr(action, "target_view", None)
             form_class = getattr(target_view, "form_class", None)
             if not form_class:
                 continue
+            action_id = self.get_form_view_action_id(
+                target_view, getattr(action, "action_id", None)
+            )
+            if requested_action_id and requested_action_id != action_id:
+                continue
 
-            if hasattr(target_view, "get_form_class"):
-                target_view(view=self).get_form_class()()
-            else:
-                form_class(view=self)
+            action_view = target_view(view=self)
+            action_view.setup(
+                request,
+                modifier=request_modifier,
+                object_id=getattr(request_data, "object_id", None),
+            )
+            if hasattr(action_view, "get_form_class"):
+                form_class = action_view.get_form_class()
+            form_kwargs = (
+                action_view.get_unbound_form_kwargs()
+                if hasattr(action_view, "get_unbound_form_kwargs")
+                else {"view": self}
+            )
+            from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+
+            if issubclass(form_class, SBAdminBaseFormInit):
+                form_kwargs.setdefault("view", self)
+                form_kwargs["sbadmin_action_id"] = action_id
+            form_class(**form_kwargs)
+
+    @staticmethod
+    def split_action_autocomplete_modifier(modifier):
+        if not modifier or ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR not in modifier:
+            return None, modifier
+        action_id, widget_modifier = modifier.split(
+            ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR, 1
+        )
+        if not action_id or not widget_modifier:
+            return None, modifier
+        return action_id, widget_modifier
+
+    @staticmethod
+    def get_form_view_action_id(target_view, action_id=None):
+        return (
+            action_id or getattr(target_view, "action_id", None) or target_view.__name__
+        )
 
     @sbadmin_action(permission="view")
     def action_autocomplete(self, request, modifier):
@@ -432,19 +507,23 @@ class SBAdminBaseView(object):
 
     def get_sbadmin_fieldsets_actions_processed(
         self, request, object_id: int | str | None = None
-    ) -> None:
+    ) -> list[SBAdminCustomAction]:
         if not hasattr(self, "get_sbadmin_fieldsets"):
-            return
+            return []
         try:
             fieldsets = self.get_sbadmin_fieldsets(request, object_id) or []
         except ImproperlyConfigured as exc:
             if "missing definition of fieldsets or sbadmin_fieldsets" not in str(exc):
                 raise
-            return
+            return []
+        actions = []
         for fieldset, fieldset_data in fieldsets:
-            self.get_sbadmin_fieldset_actions_processed(
-                request, fieldset, fieldset_data, object_id
+            actions.extend(
+                self.get_sbadmin_fieldset_actions_processed(
+                    request, fieldset, fieldset_data, object_id
+                )
             )
+        return actions
 
     def get_color_scheme_context(self, request):
         from django_smartbase_admin.views.user_config_view import ColorSchemeForm
@@ -707,13 +786,20 @@ class SBAdminBaseListView(SBAdminBaseView):
         return HttpResponse(status=200, content=render_notifications(request))
 
     def init_actions(self, request) -> None:
-        self.get_sbadmin_list_selection_actions_processed(request)
-        self.get_sbadmin_list_actions_processed(request)
-        self.get_sbadmin_row_actions_processed(request)
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        all_actions = [
+            *self.get_sbadmin_list_selection_actions_processed(request),
+            *self.get_sbadmin_list_actions_processed(request),
+            *self.get_sbadmin_row_actions_processed(request),
+        ]
         if object_id is not None:
-            self.get_sbadmin_detail_actions_processed(request, object_id)
-            self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+            all_actions.extend(
+                self.get_sbadmin_detail_actions_processed(request, object_id)
+            )
+            all_actions.extend(
+                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+            )
+        self.register_action_autocomplete_views(request, all_actions)
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         super().init_view_dynamic(request, request_data, **kwargs)
@@ -723,11 +809,12 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.sbadmin_list_display or self.list_display or []
 
     def _register_list_filter_autocomplete(self, request) -> None:
-        self.init_fields_cache(
+        field_map = self.init_fields_cache(
             self.get_sbadmin_list_display(request),
             request.request_data.configuration,
             force=True,
         )
+        self._register_autocomplete_from_filter_fields(request, field_map.values())
 
     def get_list_display(self, request) -> list[str]:
         return [

@@ -50,6 +50,7 @@ class SBAdminCustomAction(object):
     open_in_new_tab = False
     template = None
     permission = None
+    sub_actions = None
 
     def __init__(
         self,
@@ -119,6 +120,7 @@ class SBAdminRowAction(SBAdminCustomAction):
     """
 
     target_view = None
+    icon = None
     css_class = "btn btn-small btn-only-icon"
     open_in_new_tab = False
     enabled_if = None
@@ -136,6 +138,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         url=None,
         css_class=None,
         open_in_new_tab=None,
+        sub_actions=None,
         enabled_if=None,
         enabled_field=None,
         enabled_value=None,
@@ -152,15 +155,22 @@ class SBAdminRowAction(SBAdminCustomAction):
         resolved_open_in_new_tab = (
             open_in_new_tab if open_in_new_tab is not None else self.open_in_new_tab
         )
+        resolved_sub_actions = (
+            sub_actions if sub_actions is not None else self.sub_actions
+        )
 
         modes = (
             resolved_target_view is not None,
             resolved_action_id is not None,
             resolved_url is not None,
         )
-        if sum(modes) != 1:
+        if not resolved_sub_actions and sum(modes) != 1:
             raise ImproperlyConfigured(
                 "SBAdminRowAction requires exactly one of: target_view, action_id, url"
+            )
+        if resolved_sub_actions and any(modes):
+            raise ImproperlyConfigured(
+                "SBAdminRowAction with sub_actions cannot also define target_view, action_id, or url"
             )
 
         self.target_view = resolved_target_view
@@ -174,6 +184,7 @@ class SBAdminRowAction(SBAdminCustomAction):
             open_in_modal=resolved_target_view is not None,
             open_in_new_tab=resolved_open_in_new_tab,
             icon=resolved_icon,
+            sub_actions=resolved_sub_actions,
             action_modifier=MODIFIER_OBJECT_ID,
         )
 

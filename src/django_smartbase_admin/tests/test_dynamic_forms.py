@@ -1,12 +1,13 @@
 import json
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django import forms
 from django.contrib.admin.helpers import AdminForm
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.db import models
-from django.http import QueryDict
+from django.http import HttpResponse, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import path
@@ -18,13 +19,22 @@ from django_smartbase_admin.admin.admin_base import (
     SBAdminStackedInline,
 )
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.admin.widgets import SBAdminHiddenWidget
+from django_smartbase_admin.admin.widgets import (
+    SBAdminAutocompleteWidget,
+    SBAdminHiddenWidget,
+)
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminFormViewAction,
+    SBAdminRowAction,
+    sbadmin_action,
 )
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
-from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+from django_smartbase_admin.engine.const import (
+    ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
+    MODIFIER_OBJECT_ID,
+    Action,
+)
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
@@ -38,6 +48,7 @@ from django_smartbase_admin.services.thread_local import (
     SBAdminThreadLocalService,
     sb_admin_request,
 )
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
 
 dynamic_region_admin_site = AdminSite(name="admin")
@@ -542,6 +553,300 @@ class RowObjectDynamicRegionModal(RowActionModalView):
         return User(first_name="Digital", last_name="Hidden")
 
 
+class CompleteActionAutocompleteWidget(SBAdminAutocompleteWidget):
+    def action_autocomplete(self, request, modifier):
+        return JsonResponse(
+            {
+                "data": [
+                    {
+                        "source": self.form.source_name,
+                        "field": self.field_name,
+                        "view": self.view.get_id(),
+                        "object_id": request.request_data.object_id,
+                        "modifier": modifier,
+                    }
+                ]
+            }
+        )
+
+
+class CompleteActionForm(SBAdminBaseFormInit, forms.Form):
+    source_name = None
+    lookup = forms.CharField(
+        required=False,
+        widget=CompleteActionAutocompleteWidget(model=User, multiselect=False),
+    )
+
+    def __init__(self, *args, source_name=None, **kwargs):
+        self.source_name = source_name or self.source_name
+        super().__init__(*args, **kwargs)
+
+
+def complete_action_form_class(source_name):
+    return type(
+        f"Complete{source_name.title().replace('_', '')}ActionForm",
+        (CompleteActionForm,),
+        {"source_name": source_name, "__module__": __name__},
+    )
+
+
+class CompleteActionModal(ActionModalView):
+    source_name = None
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["source_name"] = self.source_name
+        return kwargs
+
+    def render_to_response(self, context, **response_kwargs):
+        form = context["form"]
+        return JsonResponse(
+            {
+                "source": form.source_name,
+                "object_id": self.request.request_data.object_id,
+                "autocomplete_ids": sorted(
+                    self.request.request_data.autocomplete_map.keys()
+                ),
+            }
+        )
+
+
+def complete_action_modal_class(source_name):
+    form_class = complete_action_form_class(source_name)
+    return type(
+        f"Complete{source_name.title().replace('_', '')}ActionModal",
+        (CompleteActionModal,),
+        {
+            "source_name": source_name,
+            "form_class": form_class,
+            "__module__": __name__,
+        },
+    )
+
+
+COMPLETE_ACTION_MODALS = {
+    source_name: complete_action_modal_class(source_name)
+    for source_name in (
+        "list_selection",
+        "list",
+        "row",
+        "detail",
+        "fieldset",
+        "inline",
+    )
+}
+
+
+class CompleteUnrelatedActionForm(CompleteActionForm):
+    source_name = "unrelated"
+
+
+class CompleteUnrelatedActionModal(CompleteActionModal):
+    source_name = "unrelated"
+    form_class = CompleteUnrelatedActionForm
+
+    def get_form_kwargs(self):
+        raise AssertionError("Unrelated action form should not be initialized")
+
+
+class CompleteActionRequestData(SimpleNamespace):
+    def register_autocomplete_view(self, view):
+        self.autocomplete_map[view.get_id()] = view
+
+
+class CompleteActionConfiguration(DynamicRegionTestConfiguration):
+    plugins = []
+    default_list_sticky_header_and_footer = False
+
+
+class CompleteActionSourceView(SBAdminBaseView):
+    method_action_id = "complete_method_action"
+
+    def get_id(self):
+        return self.view_id
+
+    def get_sub_views(self, configuration):
+        return []
+
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = f"/sb-admin/{self.get_id()}/{action}/{modifier}/"
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
+
+    def has_view_or_change_permission(self, request, obj=None):
+        return True
+
+    def has_permission_for_action(self, request, action):
+        return True
+
+    @sbadmin_action(permission="view")
+    def complete_method_action(self, request, modifier):
+        return HttpResponse(f"method:{self.get_id()}:{modifier}")
+
+    def target_action(self, source_name):
+        return SBAdminFormViewAction(
+            target_view=COMPLETE_ACTION_MODALS[source_name],
+            title=f"{source_name} target",
+            view=self,
+            open_in_modal=True,
+        )
+
+    def method_action(self, source_name):
+        return SBAdminCustomAction(
+            title=f"{source_name} method",
+            view=self,
+            action_id=self.method_action_id,
+        )
+
+    def url_action(self, source_name):
+        return SBAdminCustomAction(
+            title=f"{source_name} url",
+            url=f"/external/{source_name}/",
+        )
+
+    def unrelated_target_action(self, source_name):
+        return SBAdminFormViewAction(
+            target_view=CompleteUnrelatedActionModal,
+            title=f"{source_name} unrelated",
+            view=self,
+            open_in_modal=True,
+        )
+
+    def actions_for(self, source_name):
+        return (
+            self.target_action(source_name),
+            self.method_action(source_name),
+            self.url_action(source_name),
+            self.unrelated_target_action(source_name),
+        )
+
+
+class CompleteInlineActionView(CompleteActionSourceView):
+    view_id = "complete_inline_actions"
+
+    def get_sbadmin_inline_list_actions_processed(self, request):
+        return self.process_inline_actions(request, self.actions_for("inline"))
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs):
+        super().init_view_dynamic(request, request_data, **kwargs)
+        self.get_sbadmin_inline_list_actions_processed(request)
+        self._register_action_autocomplete(request)
+
+    def _register_action_autocomplete(self, request):
+        self.register_action_autocomplete_views(
+            request, self.get_sbadmin_inline_list_actions_processed(request)
+        )
+
+
+class CompleteParentActionView(CompleteActionSourceView):
+    view_id = "complete_parent_actions"
+
+    def get_sbadmin_list_display(self, request):
+        return []
+
+    def get_sbadmin_list_selection_actions(self, request):
+        return self.actions_for("list_selection")
+
+    def get_sbadmin_list_selection_actions_processed(self, request):
+        return self.process_list_actions(
+            request, self.get_sbadmin_list_selection_actions(request)
+        )
+
+    def get_sbadmin_list_actions(self, request):
+        return self.actions_for("list")
+
+    def get_sbadmin_list_actions_processed(self, request):
+        return self.process_list_actions(
+            request, self.get_sbadmin_list_actions(request)
+        )
+
+    def get_sbadmin_row_actions(self, request):
+        target_action, method_action, url_action, unrelated_action = self.actions_for(
+            "row"
+        )
+        return [
+            SBAdminRowAction(
+                title="row group",
+                icon="Menu",
+                sub_actions=[
+                    SBAdminRowAction(
+                        target_view=target_action.target_view,
+                        title=target_action.title,
+                        view=self,
+                        icon="Search",
+                    ),
+                    SBAdminRowAction(
+                        action_id=method_action.action_id,
+                        title=method_action.title,
+                        view=self,
+                        icon="Edit",
+                    ),
+                    SBAdminRowAction(
+                        url="/external/row/__object_id__/",
+                        title=url_action.title,
+                        icon="Open",
+                    ),
+                    SBAdminRowAction(
+                        target_view=unrelated_action.target_view,
+                        title=unrelated_action.title,
+                        view=self,
+                        icon="Warning",
+                    ),
+                ],
+            ),
+        ]
+
+    def get_sbadmin_row_actions_processed(self, request):
+        return self.process_row_actions(request, self.get_sbadmin_row_actions(request))
+
+    def get_sbadmin_detail_actions(self, request, object_id=None):
+        return self.actions_for("detail")
+
+    def get_sbadmin_fieldsets(self, request, object_id=None):
+        return (
+            (
+                "Main",
+                {
+                    "fields": (),
+                    "actions": self.actions_for("fieldset"),
+                },
+            ),
+        )
+
+    def get_sbadmin_fieldset_actions(
+        self, request, fieldset, fieldset_data, object_id=None
+    ):
+        return fieldset_data.get("actions")
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs):
+        super().init_view_dynamic(request, request_data, **kwargs)
+        self.get_sbadmin_list_selection_actions_processed(request)
+        self.get_sbadmin_list_actions_processed(request)
+        self.get_sbadmin_row_actions_processed(request)
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        if object_id is not None:
+            self.get_sbadmin_detail_actions_processed(request, object_id)
+            self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+        self._register_action_autocomplete(request)
+
+    def _register_action_autocomplete(self, request):
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        all_actions = [
+            *self.get_sbadmin_list_selection_actions_processed(request),
+            *self.get_sbadmin_list_actions_processed(request),
+            *self.get_sbadmin_row_actions_processed(request),
+        ]
+        if object_id is not None:
+            all_actions.extend(
+                self.get_sbadmin_detail_actions_processed(request, object_id)
+            )
+            all_actions.extend(
+                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+            )
+        self.register_action_autocomplete_views(request, all_actions)
+
+
 class AdminFieldsetsDynamicRegionAdmin(SBAdmin):
     sbadmin_tabs = {"Profile": ("Profile",)}
     sbadmin_fieldsets = (
@@ -977,6 +1282,14 @@ class DynamicFormTests(SimpleTestCase):
 
         FormWithExternalViewRegions.view = None
         view = ActionRegistrationView()
+        self.request.request_data = SimpleNamespace(
+            modifier=(
+                f"{ExternalRegionActionModal.__name__}"
+                f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}unused"
+            ),
+            object_id=None,
+            configuration=DynamicRegionTestConfiguration(),
+        )
 
         view.register_action_autocomplete_views(
             self.request,
@@ -984,6 +1297,109 @@ class DynamicFormTests(SimpleTestCase):
         )
 
         self.assertIsNone(FormWithExternalViewRegions.view)
+
+    def test_actions_and_autocomplete_initialize_all_action_sources(self):
+        parent_view = CompleteParentActionView()
+        inline_view = CompleteInlineActionView()
+        source_views = {
+            "list_selection": parent_view,
+            "list": parent_view,
+            "row": parent_view,
+            "detail": parent_view,
+            "fieldset": parent_view,
+            "inline": inline_view,
+        }
+
+        for source_name, source_view in source_views.items():
+            modal_class = COMPLETE_ACTION_MODALS[source_name]
+            widget_id = (
+                f"{source_view.get_id()}_lookup_CompleteActionAutocompleteWidget_"
+                f"{modal_class.form_class.__name__}"
+            )
+            action_widget_id = (
+                f"{modal_class.__name__}"
+                f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}{widget_id}"
+            )
+
+            action_response = self.dispatch_complete_action_request(
+                source_view,
+                action=modal_class.__name__,
+                modifier="template",
+                object_id="42",
+            )
+            action_payload = json.loads(action_response.content.decode())
+
+            self.assertEqual(action_response.status_code, 200)
+            self.assertEqual(action_payload["source"], source_name)
+            self.assertEqual(action_payload["object_id"], "42")
+            self.assertIn(action_widget_id, action_payload["autocomplete_ids"])
+
+            autocomplete_response = self.dispatch_complete_action_request(
+                source_view,
+                action=Action.AUTOCOMPLETE.value,
+                modifier=action_widget_id,
+                object_id="42",
+                method="post",
+                data={"autocomplete_term": "abc"},
+            )
+            autocomplete_payload = json.loads(autocomplete_response.content.decode())[
+                "data"
+            ][0]
+
+            self.assertEqual(autocomplete_response.status_code, 200)
+            self.assertEqual(autocomplete_payload["source"], source_name)
+            self.assertEqual(autocomplete_payload["field"], "lookup")
+            self.assertEqual(autocomplete_payload["view"], source_view.get_id())
+            self.assertEqual(autocomplete_payload["object_id"], "42")
+            self.assertEqual(autocomplete_payload["modifier"], action_widget_id)
+
+    def dispatch_complete_action_request(
+        self,
+        source_view,
+        *,
+        action,
+        modifier,
+        object_id=None,
+        method="get",
+        data=None,
+    ):
+        request_method = getattr(RequestFactory(), method)
+        request = request_method(
+            source_view.get_action_url(action, modifier, object_id),
+            data=data or {},
+        )
+        request.user = SimpleNamespace(is_anonymous=True)
+        request.session = {}
+        request.request_data = CompleteActionRequestData(
+            view=source_view.get_id(),
+            action=action,
+            modifier=modifier,
+            object_id=object_id,
+            user=request.user,
+            request_meta=request.META,
+            request_get=request.GET,
+            request_post=request.POST,
+            request_method=request.method,
+            configuration=CompleteActionConfiguration(),
+            selected_view=source_view,
+            session=request.session,
+            additional_data={},
+            autocomplete_map={},
+        )
+        SBAdminThreadLocalService.set_request(request)
+
+        with patch(
+            "django_smartbase_admin.services.views."
+            "SBAdminViewRequestData.from_request_and_kwargs",
+            return_value=request.request_data,
+        ):
+            return SBAdminViewService.delegate_to_action(
+                request,
+                view=source_view.get_id(),
+                action=action,
+                modifier=modifier,
+                object_id=object_id,
+            )
 
     def test_action_modal_dynamic_regions_use_current_request_path(self):
         request = RequestFactory().get("/modal/action/")

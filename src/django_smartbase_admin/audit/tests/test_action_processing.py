@@ -333,6 +333,30 @@ class RowActionIntegrationTests(TestCase):
             f"/actions/PublishArticleView/{IGNORE_LIST_SELECTION}/",
         )
 
+    def test_detail_action_without_object_modifier_keeps_template_modifier(self):
+        view = FakeAdminView()
+        action = SBAdminCustomAction(
+            title="Contact",
+            view=view,
+            action_id="contact",
+        )
+
+        processed = view.process_detail_actions(self.request, [action], object_id=123)
+
+        self.assertEqual(processed[0].url, "/actions/contact/template/")
+
+    def test_detail_row_modal_action_infers_current_object(self):
+        view = FakeAdminView()
+        action = SBAdminFormViewAction(
+            target_view=PublishArticleView,
+            title="Publish",
+            view=view,
+        )
+
+        processed = view.process_detail_actions(self.request, [action], object_id=123)
+
+        self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
+
     def test_form_view_actions_are_registered_before_permission_filtering(self):
         view = FakeAdminView(has_action_permission=False)
         action = SBAdminFormViewAction(

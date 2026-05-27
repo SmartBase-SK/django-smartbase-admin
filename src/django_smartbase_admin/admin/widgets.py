@@ -36,6 +36,10 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
 )
+from django_smartbase_admin.engine.const import (
+    ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
+    Action,
+)
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     SBAdminTreeWidgetMixin,
@@ -740,7 +744,20 @@ class SBAdminAutocompleteWidget(
         base_id = super().get_id()
         if self.form:
             base_id += f"_{self.form.__class__.__name__}"
+            action_id = getattr(self.form, "sbadmin_action_id", None)
+            if action_id:
+                separator = ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR
+                base_id = f"{action_id}{separator}{base_id}"
         return base_id
+
+    def get_autocomplete_url(self):
+        request = SBAdminThreadLocalService.get_request()
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        return self.view.get_action_url(
+            Action.AUTOCOMPLETE.value,
+            modifier=self.get_id(),
+            object_id=object_id,
+        )
 
     def init_widget_dynamic(
         self, form, form_field, field_name, view, request, default_create_data=None

@@ -6,6 +6,7 @@ from django_htmx.http import trigger_client_event
 from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     TABLE_RELOAD_DATA_EVENT_NAME,
+    Action,
 )
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
@@ -79,20 +80,14 @@ class ActionModalView(FormView):
 
     def get_dynamic_region_form(self, request):
         form_class = self.get_form_class()
-        form_kwargs = self.get_form_kwargs()
-        probe_kwargs = {
-            key: value
-            for key, value in form_kwargs.items()
-            if key not in {"data", "files"}
-        }
+        form_kwargs = self.get_unbound_form_kwargs()
+        probe_kwargs = dict(form_kwargs)
         form_kwargs["initial"] = {
             **form_kwargs.get("initial", {}),
             **dynamic_region_initial_from_data(
                 form_class, request.POST, form_kwargs=probe_kwargs
             ),
         }
-        form_kwargs.pop("data", None)
-        form_kwargs.pop("files", None)
         return form_class(**form_kwargs)
 
     def get(self, request, *args, **kwargs):
@@ -109,6 +104,20 @@ class ActionModalView(FormView):
                     "sbadmin_dynamic_region_endpoint": self.request.path,
                 }
             )
+        from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+
+        if issubclass(form_class, SBAdminBaseFormInit):
+            kwargs.setdefault("view", self.view)
+            request_data = getattr(self.request, "request_data", None)
+            request_action = getattr(request_data, "action", None)
+            if request_action and request_action != Action.AUTOCOMPLETE.value:
+                kwargs["sbadmin_action_id"] = request_action
+        return kwargs
+
+    def get_unbound_form_kwargs(self):
+        kwargs = self.get_form_kwargs()
+        kwargs.pop("data", None)
+        kwargs.pop("files", None)
         return kwargs
 
     def post(self, request, *args, **kwargs):
