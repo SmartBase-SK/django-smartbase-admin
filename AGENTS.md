@@ -15,6 +15,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
+| [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
@@ -58,6 +59,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Dynamic form sections in action/row modals?** → [Dynamic regions in action modals](#dynamic-regions-in-action-modals)
 - **Dynamic regions in custom form views?** → [Dynamic regions in custom views](#dynamic-regions-in-custom-views)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **Full-text search config?** → [Full-text search (`search_fields`)](#full-text-search-search_fields)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
@@ -1807,6 +1809,38 @@ class ArticleAdmin(SBAdmin):
     sbadmin_list_filter = (...)  # Preferred for SBAdminField names
     search_fields = (...)
 ```
+
+---
+
+## Full-text search (`search_fields`)
+
+When defining `search_fields` on `SBAdmin`, prefer `SBAdminField.name` values over raw ORM relation paths. SBAdmin maps those names through each field's `filter_field` and then builds the ORM lookups.
+
+```python
+# ❌ BAD - raw relation paths can spawn duplicate rows in full-text search
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="author_display", annotate=F("author__name"), filter_field="author"),
+        SBAdminField(name="category_display", annotate=F("category__name"), filter_field="category"),
+    )
+    search_fields = ("author__name", "category__name")
+```
+
+```python
+# ✅ GOOD - use SBAdmin field names so SBAdmin maps through filter_field
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="author_display", annotate=F("author__name"), filter_field="author"),
+        SBAdminField(name="category_display", annotate=F("category__name"), filter_field="category"),
+    )
+    search_fields = ("author_display", "category_display")
+```
+
+**Key points:**
+- `search_fields` accepts prefixes (`^`, `=`, `@`) the same way as Django admin; SBAdmin keeps the prefix and maps only the field name part.
+- If a value in `search_fields` matches `SBAdminField.name`, SBAdmin rewrites it to that field's `filter_field` before building the ORM lookup.
+- If you pass raw ORM relation paths directly (for example `author__name`), full-text search can duplicate rows on relation-heavy queries.
+- Full-text search now logs a warning when configured lookups can spawn duplicates; it does not auto-apply `.distinct()`.
 
 ### Default Visible Filters: sbadmin_list_filter vs list_filter
 
