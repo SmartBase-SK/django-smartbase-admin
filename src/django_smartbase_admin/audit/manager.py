@@ -257,20 +257,24 @@ def _create_audit_log(
         with transaction.atomic():
             from django.contrib.contenttypes.models import ContentType
 
-            # Get user from request (same source as _get_request_id)
+            # Get user + source from request (same source as _get_request_id).
+            # ``source`` mirrors ``request._sbadmin_audit_source`` (or
+            # ``None``), so manual ``create_audit_log`` calls inside an
+            # MCP-triggered action inherit the tag for free.
             user = None
+            source = None
             try:
                 from django_smartbase_admin.services.thread_local import (
                     SBAdminThreadLocalService,
                 )
 
                 request = SBAdminThreadLocalService.get_request()
-                if (
-                    request
-                    and hasattr(request, "user")
-                    and request.user.is_authenticated
-                ):
-                    user = request.user
+                if request is not None:
+                    if hasattr(request, "user") and request.user.is_authenticated:
+                        user = request.user
+                    raw_source = getattr(request, "_sbadmin_audit_source", None)
+                    if isinstance(raw_source, str):
+                        source = raw_source
             except Exception:
                 pass
 
@@ -283,6 +287,7 @@ def _create_audit_log(
                 "object_id": str(object_id) if object_id else "",
                 "object_repr": object_repr[:255] if object_repr else "",
                 "action_type": action_type,
+                "source": source,
                 "snapshot_before": snapshot_before or {},
                 "changes": changes or {},
                 "is_bulk": is_bulk,

@@ -1,7 +1,9 @@
 import json
+import logging
 import math
 from typing import Any, TYPE_CHECKING
 
+from django.contrib.admin.utils import lookup_spawns_duplicates
 from django.db.models import Q, Field
 from django.utils import timezone
 from django.utils.html import escape
@@ -47,6 +49,8 @@ QueryBuilderService = import_with_injection(
 
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
+
+logger = logging.getLogger(__name__)
 
 
 class SBAdminAction(object):
@@ -350,7 +354,6 @@ class SBAdminListAction(SBAdminAction):
         and a boolean indicating if the results may contain duplicates.
         """
 
-        # Apply keyword searches.
         def construct_search(field_name):
             prefix = field_name[0] if field_name and field_name[0] in "^=@" else ""
             raw_field_name = field_name[1:] if prefix else field_name
@@ -387,6 +390,17 @@ class SBAdminListAction(SBAdminAction):
                 )
                 term_queries.append(or_queries)
             queryset = queryset.filter(Q.create(term_queries))
+            if any(
+                lookup_spawns_duplicates(self.view.model._meta, search_spec)
+                for search_spec in orm_lookups
+            ):
+                logger.warning(
+                    "%s full-text search can duplicate rows because current "
+                    "search_fields traverse relations. Prefer SBAdmin field names "
+                    "(SBAdminField.name) in search_fields so SBAdmin can map them "
+                    "through filter_field to direct ORM lookups.",
+                    self.view.__class__.__name__,
+                )
         return queryset
 
     def is_search_query(self):

@@ -4,7 +4,7 @@ import { parseParamsPayload } from "../url_params_codec"
 
 export class ViewsModule extends SBAdminTableModule {
     COMPARE_IGNORE_KEYS = ['filterData.sb_selected_filter_type']
-    COMPARE_IGNORE_EMPTY_KEYS = ['filterData.sb_admin_full_search']
+    COMPARE_IGNORE_EMPTY_KEYS = ['filterData.sb_admin_full_search', 'filterData']
 
     requiresHeader() {
         return true

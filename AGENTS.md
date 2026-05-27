@@ -15,6 +15,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
+| [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
@@ -39,6 +40,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
 | [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
+| [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
@@ -57,6 +59,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Dynamic form sections in action/row modals?** → [Dynamic regions in action modals](#dynamic-regions-in-action-modals)
 - **Dynamic regions in custom form views?** → [Dynamic regions in custom views](#dynamic-regions-in-custom-views)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
+- **Full-text search config?** → [Full-text search (`search_fields`)](#full-text-search-search_fields)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
@@ -79,6 +82,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **Regenerate translations?** → [Internationalization](#internationalization)
+- **Wire MCP / Cursor?** → [MCP (AI agents)](#mcp-ai-agents)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
 - **Required singleton inline not created on add?** → [Validated Singleton Inline Creation on Add](#validated-singleton-inline-creation-on-add)
 - **Making a method URL-callable?** → [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action)
@@ -1362,7 +1366,7 @@ Use the same `SBDynamicRegion` marker in these places:
 | Normal model admin add/change form | `SBAdmin.sbadmin_fieldsets`, or the form's `Meta.sbadmin_fieldsets` | SBAdmin uses the admin `sbadmin_dynamic_region/<object id>` or `sbadmin_dynamic_region/add` action. |
 | Stacked inline row | `SBAdminStackedInline.sbadmin_fieldsets`, or the inline form's `Meta.sbadmin_fieldsets` | SBAdmin injects the inline form prefix into `hx-vals`, so only the changed inline row is refreshed. |
 | Action modal | The modal `form_class.Meta.sbadmin_fieldsets` | `ActionModalView`, `ListActionModalView`, and `RowActionModalView` use the current modal URL. |
-| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `?sbadmin_dynamic_region=<name>` and renders the dynamic-region fragment. |
+| Custom view + standalone form | The form's `Meta.sbadmin_fieldsets`, plus `sbadmin_standalone_dynamic_regions = True` | Your view handles `sbadmin_dynamic_region=<name>` POSTs and renders the dynamic-region fragment. |
 
 ### Basic tutorial: switch fields by article status
 
@@ -1511,6 +1515,7 @@ If the inline needs extra non-model trigger fields, define a custom inline form 
 | `get_active_fields` | callable | Optional `(form, request, region) -> iterable`. Return active field names or grouped iterables. Defaults to all `fields`. |
 | `inactive_field_policy` | `SBInactiveFieldPolicy` | `PRESERVE` by default. Controls cleaning/submission behavior for inactive fields. |
 | `template` | `str` | Optional custom template instead of the default inline fieldset renderer. |
+| `defer_trigger` | `str \| None` | Optional HTMX trigger for self-loading regions, e.g. `"load"`. Initial render emits trigger attrs and skips default inline fields until the fragment response. |
 
 Unknown field names in `get_active_fields` are ignored. A grouped tuple/list such as `("category", "author")` renders those fields together, same as grouped fields in normal Django admin fieldsets.
 
@@ -1561,17 +1566,19 @@ def article_review_fields(form, request, region):
     return ("category",)
 ```
 
-Do not rely on `cleaned_data` in these callbacks. Dynamic-region refreshes are GET requests that build an unbound form with `initial` values extracted from the current request data through each widget's `value_from_datadict()`.
+Do not rely on `cleaned_data` in these callbacks. Dynamic-region refreshes are POST requests that build an unbound form with `initial` values extracted from the current request data through each widget's `value_from_datadict()`.
 
 ### HTMX trigger wiring
 
 Each `trigger_fields` widget receives HTMX attributes automatically:
 
-- `hx-get`: current modal/form path for standalone forms, or the admin `sbadmin_dynamic_region` action URL for admin forms.
+- `hx-post`: current modal/form path for standalone forms, or the admin `sbadmin_dynamic_region` action URL for admin forms.
 - `hx-trigger`: `"change"` by default.
 - `hx-target`: the dynamic region wrapper ID.
 - `hx-include`: `closest form`, so current unsaved form values are sent.
 - `hx-indicator`: the region loader ID.
+- `hx-swap`: `none`; dynamic-region fragments use out-of-band wrapper replacement.
+- `hx-sync`: `closest form:replace` for field-triggered regions and `this:replace` for deferred self-loading regions.
 - `hx-vals`: includes `{"sbadmin_dynamic_region": "<region name>"}`.
 
 To use a custom trigger event, set `dynamic_region_trigger_event` on the widget:
@@ -1586,6 +1593,21 @@ class CategoryAutocompleteWidget(forms.TextInput):
 ```
 
 If several regions share the same trigger field, the admin dynamic-region action returns all related regions for that trigger so cross-fieldset dependent regions stay in sync.
+
+### Deferred self-loading regions
+
+Use `defer_trigger="load"` when a region should request its content after the page is visible, for example a slow read-only detail widget.
+
+```python
+SBDynamicRegion(
+    name="tracking_preview",
+    fields=("tracking_preview",),
+    defer_trigger="load",
+    template="blog/includes/tracking_preview_region.html",
+)
+```
+
+On the initial render, `dynamic_region.is_deferred_initial` is true and `dynamic_region.trigger_attrs` contains the wrapper's HTMX attrs. The default renderer skips inline fields while deferred; a custom template may render a skeleton or placeholder. On the fragment render, `dynamic_region.is_fragment` is true and inline fields should be rendered normally.
 
 ### Dynamic regions in action modals
 
@@ -1645,7 +1667,7 @@ Row action modals can initialize dynamic regions from the row object through the
 
 ### Dynamic regions in custom views
 
-For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small GET branch that renders `sb_admin/includes/dynamic_region.html` for `?sbadmin_dynamic_region=<name>`.
+For a standalone form view outside an SBAdmin modal, set `sbadmin_standalone_dynamic_regions = True` on the form, pass `request` when constructing it, and add a small POST branch that renders `sb_admin/includes/dynamic_region.html` when `sbadmin_dynamic_region=<name>` is present.
 
 ```python
 from django import forms
@@ -1702,17 +1724,17 @@ class ImportProductsView(FormView):
         kwargs["request"] = self.request
         return kwargs
 
-    def get(self, request, *args, **kwargs):
-        region_name = request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM)
+    def post(self, request, *args, **kwargs):
+        region_name = request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM)
         if region_name:
             return self.render_dynamic_region(request, region_name)
-        return super().get(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
 
     def render_dynamic_region(self, request, region_name):
         form_class = self.get_form_class()
         form = form_class(
             request=request,
-            initial=dynamic_region_initial_from_data(form_class, request.GET),
+            initial=dynamic_region_initial_from_data(form_class, request.POST),
         )
         region = form.get_dynamic_region(region_name, request)
         if region is None:
@@ -1720,8 +1742,9 @@ class ImportProductsView(FormView):
         html = render_to_string(
             "sb_admin/includes/dynamic_region.html",
             {
-                "dynamic_region": form.get_dynamic_region_context(region, request),
-                "sbadmin_dynamic_region_fragment": True,
+                "dynamic_region": form.get_dynamic_region_context(
+                    region, request, is_fragment=True
+                ),
             },
             request=request,
         )
@@ -1743,6 +1766,7 @@ Render the form with SBAdmin fieldsets so the dynamic region marker is converted
 
 Pass `template="path/to/template.html"` to take over rendering for the region. The template receives:
 
+- `dynamic_region`
 - `form`
 - `region`
 - `region_state`
@@ -1758,6 +1782,16 @@ SBDynamicRegion(
 ```
 
 The default template renders `region_state.active_fields` with `sb_admin/includes/inline_fieldset.html`. Fragment responses render the wrapper with `hx-swap-oob="outerHTML"` and omit the loader; the full page render wraps the region with a loader.
+
+Custom templates should use `dynamic_region.is_fragment` to detect fragment renders and `dynamic_region.is_deferred_initial` to detect initial deferred placeholders. Do not use a separate `sbadmin_dynamic_region_fragment` template variable.
+
+```django
+{% if dynamic_region.is_deferred_initial %}
+    {% include "blog/includes/tracking_preview_skeleton.html" %}
+{% else %}
+    {% include "sb_admin/includes/inline_fieldset_fields.html" with fieldset=dynamic_fieldset %}
+{% endif %}
+```
 
 ### Placement rules and gotchas
 
@@ -1786,6 +1820,38 @@ class ArticleAdmin(SBAdmin):
     sbadmin_list_filter = (...)  # Preferred for SBAdminField names
     search_fields = (...)
 ```
+
+---
+
+## Full-text search (`search_fields`)
+
+When defining `search_fields` on `SBAdmin`, prefer `SBAdminField.name` values over raw ORM relation paths. SBAdmin maps those names through each field's `filter_field` and then builds the ORM lookups.
+
+```python
+# ❌ BAD - raw relation paths can spawn duplicate rows in full-text search
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="author_display", annotate=F("author__name"), filter_field="author"),
+        SBAdminField(name="category_display", annotate=F("category__name"), filter_field="category"),
+    )
+    search_fields = ("author__name", "category__name")
+```
+
+```python
+# ✅ GOOD - use SBAdmin field names so SBAdmin maps through filter_field
+class ArticleAdmin(SBAdmin):
+    sbadmin_list_display = (
+        SBAdminField(name="author_display", annotate=F("author__name"), filter_field="author"),
+        SBAdminField(name="category_display", annotate=F("category__name"), filter_field="category"),
+    )
+    search_fields = ("author_display", "category_display")
+```
+
+**Key points:**
+- `search_fields` accepts prefixes (`^`, `=`, `@`) the same way as Django admin; SBAdmin keeps the prefix and maps only the field name part.
+- If a value in `search_fields` matches `SBAdminField.name`, SBAdmin rewrites it to that field's `filter_field` before building the ORM lookup.
+- If you pass raw ORM relation paths directly (for example `author__name`), full-text search can duplicate rows on relation-heavy queries.
+- Full-text search now logs a warning when configured lookups can spawn duplicates; it does not auto-apply `.distinct()`.
 
 ### Default Visible Filters: sbadmin_list_filter vs list_filter
 
@@ -4647,6 +4713,91 @@ This is the preferred pattern for autocomplete placeholders, empty states, and o
 
 ---
 
+## MCP (AI agents)
+
+Optional `django-mcp-server` integration. Requires normal SBAdmin setup (`SB_ADMIN_CONFIGURATION`, `sb_admin_site.urls`).
+
+```bash
+pip install "django-smartbase-admin[mcp]"
+```
+
+### Host project — `INSTALLED_APPS`
+
+```python
+INSTALLED_APPS = [
+    # ... your apps with SBAdmin model admins ...
+    "django_smartbase_admin",
+    "oauth2_provider",           # MCP OAuth (skip if custom auth)
+    "rest_framework",
+    "mcp_server",
+    "django_smartbase_admin.mcp",
+]
+```
+
+### Host project — `urls.py`
+
+Mount **before** catch-all routes:
+
+```python
+urlpatterns = [
+    path("", include("django_smartbase_admin.mcp.urls")),
+    path("", include("django_smartbase_admin.mcp.oauth.urls")),  # OAuth AS; omit if custom auth
+    path("sb-admin/", sb_admin_site.urls),
+    # ...
+]
+```
+
+Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+
+### Host project — `settings.py`
+
+```python
+from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
+
+DJANGO_MCP_AUTHENTICATION_CLASSES = [
+    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+]
+DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
+    "name": "sbadmin",
+    "instructions": SBADMIN_MCP_SERVER_INSTRUCTIONS,  # optional: + deployment appendix
+    "stateless": True,
+}
+DJANGO_MCP_ENDPOINT = "mcp/"
+
+OAUTH2_PROVIDER = {
+    "SCOPES": {"sbadmin:read": "SBAdmin MCP access"},
+    "PKCE_REQUIRED": True,
+}
+```
+
+Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
+
+### Cursor — `.cursor/mcp.json`
+
+`.cursor/mcp.json` or `~/.cursor/mcp.json` — streamable HTTP `url` only (match `DJANGO_MCP_ENDPOINT`, trailing slash). Prod: **HTTPS** origin; oauthlib enforces TLS (no `OAUTHLIB_INSECURE_TRANSPORT`). Local `http://` only: set that env on Django. Cursor **Connect** for bundled OAuth (PKCE + DCR).
+
+```json
+{
+  "mcpServers": {
+    "sbadmin": {
+      "url": "https://admin.example.com/mcp/"
+    }
+  }
+}
+```
+
+### Verify
+
+```bash
+# List tool names + descriptions (Django must be configured)
+python manage.py mcp_inspect
+
+# Package tests
+python runtests.py django_smartbase_admin.mcp.tests
+```
+
+---
+
 ## Testing
 
 ### Setup
@@ -4917,7 +5068,7 @@ Default template: `sb_admin/wizard/wizard_step.html`
 | `sbadmin_wizard_step_banner` | Optional HTML banner shown at the top of the step |
 | `sbadmin_wizard_poll_seconds` | If set, the page auto-refreshes at this interval |
 
-**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/js/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
+**Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/dist/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
 
 
 ---

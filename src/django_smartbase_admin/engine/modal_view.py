@@ -61,9 +61,8 @@ class ActionModalView(FormView):
                     "sb_admin/includes/dynamic_region.html",
                     {
                         "dynamic_region": form.get_dynamic_region_context(
-                            target_region, request
+                            target_region, request, is_fragment=True
                         ),
-                        "sbadmin_dynamic_region_fragment": True,
                     },
                     request=request,
                 )
@@ -88,7 +87,7 @@ class ActionModalView(FormView):
         form_kwargs["initial"] = {
             **form_kwargs.get("initial", {}),
             **dynamic_region_initial_from_data(
-                form_class, request.GET, form_kwargs=probe_kwargs
+                form_class, request.POST, form_kwargs=probe_kwargs
             ),
         }
         form_kwargs.pop("data", None)
@@ -96,10 +95,6 @@ class ActionModalView(FormView):
         return form_class(**form_kwargs)
 
     def get(self, request, *args, **kwargs):
-        if region_name := request.GET.get(SBADMIN_DYNAMIC_REGION_PARAM):
-            return self.build_dynamic_region_response(
-                request, self.get_dynamic_region_form(request), region_name
-            )
         return super().get(request, *args, **kwargs)
 
     def get_form_class(self):
@@ -117,6 +112,11 @@ class ActionModalView(FormView):
         return fake_form_class
 
     def post(self, request, *args, **kwargs):
+        if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):
+            return self.build_dynamic_region_response(
+                request, self.get_dynamic_region_form(request), region_name
+            )
+
         form = self.get_form()
         if form.is_valid():
             try:

@@ -46,6 +46,7 @@ def _filter_info(field) -> dict | None:
         ]
     if isinstance(widget, AutocompleteFilterWidget):
         info["multiselect"] = bool(widget.multiselect)
+        info["widget_id"] = widget.get_id()
         target = getattr(widget, "model", None)
         if target is not None:
             opts = target._meta
@@ -142,6 +143,36 @@ def _inline_entries(admin, request) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Detail fields
+# ---------------------------------------------------------------------------
+
+
+def _detail_field_entries(admin, request) -> list[str]:
+    """Detail-page field handles, in display order.
+
+    Schema-side stays intentionally minimal — names only — so
+    discovery doesn't have to construct a form. Per-field metadata
+    (readonly flag, widget class) is reported by ``fetch_detail``
+    itself, sourced from the live render so we have one source of
+    truth instead of two.
+    """
+    from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
+
+    try:
+        names = list(
+            SBAdminMCPDetailService.get_detail_fields(admin, request, None) or []
+        )
+    except Exception:
+        logger.warning(
+            "MCP schema: get_detail_fields failed for %s",
+            admin.__class__.__name__,
+            exc_info=True,
+        )
+        return []
+    return [str(name) for name in names]
+
+
+# ---------------------------------------------------------------------------
 # Row actions
 # ---------------------------------------------------------------------------
 
@@ -235,6 +266,7 @@ def admin_entry(admin, request) -> dict:
         "verbose_name_plural": str(opts.verbose_name_plural),
         "fields": fields,
         "search_fields": list(admin.get_search_fields(request) or []),
+        "detail_fields": _detail_field_entries(admin, request),
         "inlines": _inline_entries(admin, request),
         "row_actions": _row_action_entries(admin, request),
     }

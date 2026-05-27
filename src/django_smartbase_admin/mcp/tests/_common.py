@@ -10,6 +10,7 @@ default would be replaced by a fresh mock from every call.
 from __future__ import annotations
 
 from django.test import RequestFactory
+from rest_framework.request import Request
 
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 
@@ -19,19 +20,19 @@ __all__ = ["MCPToolTestConfig", "build_mcp_request"]
 
 
 def build_mcp_request(user, *, path: str = "/mcp/"):
-    """``RequestFactory`` request pre-bridged into the SBAdmin pipeline.
+    """DRF-wrapped request pre-bridged into the SBAdmin pipeline.
 
-    Mirrors what ``ensure_sbadmin_request_data`` would set up on a real
-    incoming MCP/DRF request, but uses the real ``MCPToolTestConfig`` so
-    ``get_filter_widget`` / ``restrict_queryset`` / ``has_permission``
-    follow their documented contracts. Tests can mutate
-    ``request.request_data.request_get`` / ``request_post`` directly to
-    drive each tool. We also stub ``request.session`` because
-    ``SBAdminViewRequestData.from_request_and_kwargs`` (reached via
-    ``delegate_to_action``) reads ``request.session.get(...)`` directly;
-    ``RequestFactory`` does not attach a session.
+    Wraps a ``RequestFactory`` ``WSGIRequest`` in a DRF ``Request`` so
+    tests exercise the same request shape ``django-mcp-server`` hands
+    to ``SBAdminTools`` in production — ``request.POST`` / ``GET`` /
+    ``method`` go through DRF's read-only properties, ``request.user``
+    / ``request.session`` are attached directly on the wrapper.
+
+    Tests can still mutate ``request.request_data.request_get`` /
+    ``request_post`` directly to drive each tool.
     """
-    request = RequestFactory().get(path)
+    wsgi = RequestFactory().get(path)
+    request = Request(wsgi)
     request.user = user
     request.session = {}
 

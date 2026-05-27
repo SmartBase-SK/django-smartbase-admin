@@ -51,6 +51,18 @@ export const getObjectOrValue = (value) => {
     return value
 }
 
+/**
+ * Skip post-swap processing when hx-swap="none" (no DOM swap occurred).
+ * Prevents double processing for wizard poll and similar HTMX requests.
+ */
+export const shouldProcessAfterSwap = (event) => {
+    const requestEl = event?.detail?.requestConfig?.elt?.closest('[hx-swap]')
+    if (requestEl && requestEl.getAttribute('hx-swap') === 'none') {
+        return false
+    }
+    return true
+}
+
 export const hasSelectedText = () => {
     const selection = window.getSelection ? window.getSelection() : null
     return Boolean(selection && selection.toString().trim())

@@ -53,6 +53,11 @@ class AdminAuditLog(models.Model):
 
     # ─── Action ───
     action_type = models.CharField(max_length=20, choices=ActionType.choices)
+    # Where the request originated (browser admin UI vs MCP tool call).
+    # Set from a marker on the active SBAdmin request, so manual
+    # ``create_audit_log`` calls inside an MCP-triggered action also
+    # get tagged ``mcp`` automatically.
+    source = models.CharField(max_length=32, null=True, blank=True, db_index=True)
 
     # ─── Change data ───
     snapshot_before = models.JSONField(default=dict, blank=True)

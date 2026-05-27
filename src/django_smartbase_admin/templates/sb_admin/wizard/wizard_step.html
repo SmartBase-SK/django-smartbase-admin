@@ -7,7 +7,7 @@
 {{ block.super }}
 {% if form %}{{ form.media }}{% endif %}
 {% if wizard_formsets %}{% for _t, fs in wizard_formsets %}{{ fs.media }}{% endfor %}
-<script src="{% static 'sb_admin/js/sbadmin_formset.js' %}"></script>
+<script src="{% static 'sb_admin/dist/sbadmin_formset.js' %}"></script>
 {% endif %}
 {% endblock %}
 

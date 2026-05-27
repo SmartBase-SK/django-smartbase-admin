@@ -758,6 +758,7 @@ class SBAdminAutocompleteWidget(
             self.model,
             request.request_data.configuration,
         )
+        request.request_data.register_autocomplete_view(self)
 
     def get_field_name(self):
         return self.field_name

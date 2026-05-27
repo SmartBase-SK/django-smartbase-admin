@@ -666,7 +666,6 @@ class AutocompleteFilterWidget(
             raise ImproperlyConfigured(
                 f"For '{field_name}' defined in '{self}', model needs to be specified for AutocompleteFilterWidget."
             )
-        configuration.dynamically_register_autocomplete_view(self)
         self.model = model
 
     @classmethod

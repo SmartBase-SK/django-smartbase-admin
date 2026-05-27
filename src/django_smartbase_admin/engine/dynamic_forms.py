@@ -56,6 +56,9 @@ class SBDynamicRegionContext:
     region: "SBDynamicRegion"
     state: SBDynamicRegionState
     fieldset: Fieldset
+    trigger_attrs: dict[str, str]
+    is_fragment: bool
+    is_deferred_initial: bool
 
 
 class SBDynamicRegion:
@@ -77,6 +80,7 @@ class SBDynamicRegion:
         ) = None,
         inactive_field_policy: SBInactiveFieldPolicy = SBInactiveFieldPolicy.PRESERVE,
         template: str | None = None,
+        defer_trigger: str | None = None,
     ) -> None:
         self.name = name
         self.trigger_fields = tuple(trigger_fields)
@@ -85,6 +89,7 @@ class SBDynamicRegion:
         self.get_active_fields_callback = get_active_fields
         self.inactive_field_policy = inactive_field_policy
         self.template = template
+        self.defer_trigger = defer_trigger
 
     def is_visible(self, form: forms.Form, request: HttpRequest | None = None) -> bool:
         if self.is_visible_callback is None:
@@ -111,7 +116,11 @@ class SBDynamicRegion:
     ) -> SBDynamicRegionState:
         """Build visible field layout and active field names for this form."""
         visible = self.is_visible(form, request)
-        known_field_names = set(self.fields) & set(form.fields)
+        known_field_names = set(self.fields) & set(
+            form.get_dynamic_region_known_field_names(request)
+            if hasattr(form, "get_dynamic_region_known_field_names")
+            else form.fields
+        )
         requested_layout = self.get_active_fields(form, request) if visible else ()
         active_field_names: set[str] = set()
         active_fields: list[str | tuple[str, ...]] = []
@@ -236,18 +245,90 @@ class SBAdminDynamicFormMixin:
             self._sbadmin_dynamic_region_states = cache
         return cache[region.name]
 
-    def as_dynamic_region_fieldset(self, state: SBDynamicRegionState) -> Fieldset:
-        return Fieldset(form=self, name=None, fields=state.active_fields, classes="")
+    def get_dynamic_region_known_field_names(
+        self, request: HttpRequest | None = None
+    ) -> frozenset[str]:
+        return frozenset(self.fields) | frozenset(
+            self.get_dynamic_region_readonly_fields(request)
+        )
+
+    def get_dynamic_region_readonly_fields(
+        self, request: HttpRequest | None = None
+    ) -> tuple[str, ...]:
+        view = getattr(self, "view", None)
+        if view is None:
+            return ()
+        obj = getattr(self, "instance", None)
+        if isinstance(obj, models.Model) and obj.pk is None:
+            obj = None
+        if hasattr(view, "get_readonly_fields"):
+            return tuple(view.get_readonly_fields(request, obj))
+        return tuple(getattr(view, "readonly_fields", ()))
+
+    def as_dynamic_region_fieldset(
+        self,
+        state: SBDynamicRegionState,
+        request: HttpRequest | None = None,
+    ) -> Fieldset:
+        view = getattr(self, "view", None)
+        return Fieldset(
+            form=self,
+            name=None,
+            readonly_fields=self.get_dynamic_region_readonly_fields(request),
+            fields=state.active_fields,
+            classes="",
+            model_admin=view,
+        )
+
+    def get_dynamic_region_trigger_attrs(
+        self,
+        region: SBDynamicRegion,
+        state: SBDynamicRegionState,
+        request: HttpRequest | None = None,
+        *,
+        trigger: str | None = None,
+        hx_sync: str = "closest form:replace",
+    ) -> dict[str, str]:
+        endpoint = self._dynamic_region_endpoint(request)
+        if not trigger or not endpoint:
+            return {}
+        hx_vals = {SBADMIN_DYNAMIC_REGION_PARAM: region.name}
+        if self.prefix is not None:
+            hx_vals[SBADMIN_DYNAMIC_REGION_PREFIX_PARAM] = self.prefix
+        return {
+            "hx-post": endpoint,
+            "hx-trigger": trigger,
+            "hx-target": f"#{state.wrapper_id}",
+            "hx-include": "closest form",
+            "hx-indicator": f"#{state.loading_id}",
+            "hx-swap": "none",
+            "hx-sync": hx_sync,
+            "hx-vals": json.dumps(hx_vals),
+        }
 
     def get_dynamic_region_context(
-        self, region: SBDynamicRegion, request: HttpRequest | None = None
+        self,
+        region: SBDynamicRegion,
+        request: HttpRequest | None = None,
+        *,
+        is_fragment: bool = False,
     ) -> SBDynamicRegionContext:
         state = self.get_dynamic_region_state(region, request)
+        trigger_attrs = self.get_dynamic_region_trigger_attrs(
+            region,
+            state,
+            request,
+            trigger=region.defer_trigger,
+            hx_sync="this:replace",
+        )
         return SBDynamicRegionContext(
             form=self,
             region=region,
             state=state,
-            fieldset=self.as_dynamic_region_fieldset(state),
+            fieldset=self.as_dynamic_region_fieldset(state, request),
+            trigger_attrs=trigger_attrs,
+            is_fragment=is_fragment,
+            is_deferred_initial=bool(trigger_attrs and not is_fragment),
         )
 
     @staticmethod
@@ -340,6 +421,8 @@ class SBAdminDynamicFormMixin:
                         fields=tuple(static_fields),
                         classes=getattr(fieldset, "classes", ""),
                         description=getattr(fieldset, "description", None),
+                        readonly_fields=getattr(fieldset, "readonly_fields", ()),
+                        model_admin=getattr(fieldset, "model_admin", None),
                     )
                 }
             )
@@ -447,23 +530,19 @@ class SBAdminDynamicFormMixin:
                 continue
             widget = self.fields[field_name].widget
             attrs = widget.attrs
-            attrs.setdefault("hx-get", endpoint)
-            attrs.setdefault(
-                "hx-trigger",
-                getattr(widget, "dynamic_region_trigger_event", "change"),
+            trigger = getattr(widget, "dynamic_region_trigger_event", "change")
+            trigger_attrs = self.get_dynamic_region_trigger_attrs(
+                region,
+                state,
+                request,
+                trigger=trigger,
+                hx_sync="closest form:replace",
             )
-            attrs.setdefault("hx-target", f"#{state.wrapper_id}")
-            attrs.setdefault("hx-include", "closest form")
-            attrs.setdefault("hx-indicator", f"#{state.loading_id}")
-            attrs.setdefault("hx-swap", "none")
-            attrs.setdefault("hx-sync", "closest form:replace")
-            hx_vals = {SBADMIN_DYNAMIC_REGION_PARAM: region.name}
-            if self.prefix is not None:
-                hx_vals[SBADMIN_DYNAMIC_REGION_PREFIX_PARAM] = self.prefix
-            attrs.setdefault(
-                "hx-vals",
-                json.dumps(hx_vals),
-            )
+            if not trigger_attrs:
+                continue
+            attrs.pop("hx-get", None)
+            for name, value in trigger_attrs.items():
+                attrs.setdefault(name, value)
 
     def _dynamic_region_endpoint(self, request: HttpRequest | None = None) -> str:
         if self.sbadmin_standalone_dynamic_regions and request is not None:

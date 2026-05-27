@@ -6,7 +6,8 @@
              {% if filter_widget.full_width %}data-autocomplete-full-width="true"{% endif %}
              class="relative flex items-center max-w-full overflow-hidden{% if widget.attrs.related_edit_url or widget.attrs.related_add_url %} gap-4{% endif %}">
             <button
-                    data-bs-toggle="dropdown"
+                    type="button"
+                    {% if widget.attrs.readonly %}disabled{% else %}data-bs-toggle="dropdown"{% endif %}
                     aria-expanded="false"
                     data-bs-offset="[0, 8]"
                     data-bs-config='{"popperConfig":{"strategy":"fixed"}}'
