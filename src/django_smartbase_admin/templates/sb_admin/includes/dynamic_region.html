@@ -5,6 +5,10 @@
 {% endif %}
 
 <div id="{{ region_state.wrapper_id }}"
+     data-sbadmin-dynamic-region-content
+     data-sbadmin-dynamic-region-visible="{{ region_state.visible|yesno:'true,false' }}"
+     {% if region.template %}data-sbadmin-dynamic-region-template="true"{% endif %}
+     {% if dynamic_region.is_deferred_initial %}data-sbadmin-dynamic-region-deferred="true"{% endif %}
      {% if dynamic_region.is_fragment %}class="sbadmin-dynamic-region-content" hx-swap-oob="outerHTML"{% endif %}
      {% if dynamic_region.is_deferred_initial %}
          {% for attr_name, attr_value in dynamic_region.trigger_attrs.items %}{{ attr_name }}="{{ attr_value }}" {% endfor %}

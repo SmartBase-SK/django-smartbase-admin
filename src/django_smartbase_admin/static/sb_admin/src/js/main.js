@@ -68,6 +68,7 @@ class Main {
                 this.textTags.handleDynamicallyAddedTextTags(target)
                 this.initInlines(target)
                 this.initTooltips(target)
+                this.syncEmptyFieldsets(target)
                 this.scheduleScrollToFirstErrorField(target)
             }
 
@@ -113,7 +114,60 @@ class Main {
         this.initAliasName()
         this.handleLocationHashFromTabs()
         this.initCollapseEventListeners()
+        this.syncEmptyFieldsets(document)
         this.scheduleScrollToFirstErrorField(document)
+    }
+
+    isHiddenWithinFieldset(element, fieldset) {
+        let current = element
+        while (current && current !== fieldset) {
+            if (current.hidden || current.classList?.contains('hidden')) {
+                return true
+            }
+            current = current.parentElement
+        }
+        return false
+    }
+
+    fieldsetHasVisibleFieldRows(fieldset) {
+        return Array.from(fieldset.querySelectorAll('.field')).some((fieldRow) => {
+            return !this.isHiddenWithinFieldset(fieldRow, fieldset)
+        })
+    }
+
+    fieldsetHasVisibleDynamicRegionContent(fieldset) {
+        return Array.from(fieldset.querySelectorAll('[data-sbadmin-dynamic-region-content]')).some((region) => {
+            if (this.isHiddenWithinFieldset(region, fieldset)) {
+                return false
+            }
+            return region.dataset.sbadminDynamicRegionVisible === 'true' &&
+                (region.dataset.sbadminDynamicRegionTemplate === 'true' ||
+                    region.dataset.sbadminDynamicRegionDeferred === 'true')
+        })
+    }
+
+    fieldsetHasErrors(fieldset) {
+        return Boolean(fieldset.querySelector('.errorlist, .errors'))
+    }
+
+    syncEmptyFieldsets(target = document) {
+        const selector = 'fieldset[data-sbadmin-hide-if-empty="true"]'
+        const fieldsets = new Set()
+        if (target.matches?.(selector)) {
+            fieldsets.add(target)
+        }
+        const closestFieldset = target.closest?.(selector)
+        if (closestFieldset) {
+            fieldsets.add(closestFieldset)
+        }
+        target.querySelectorAll?.(selector).forEach((fieldset) => fieldsets.add(fieldset))
+
+        fieldsets.forEach((fieldset) => {
+            const isEmpty = !this.fieldsetHasErrors(fieldset) &&
+                !this.fieldsetHasVisibleFieldRows(fieldset) &&
+                !this.fieldsetHasVisibleDynamicRegionContent(fieldset)
+            fieldset.classList.toggle('hidden', isEmpty)
+        })
     }
 
     isDarkMode() {
