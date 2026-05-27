@@ -1,6 +1,8 @@
 from django.test import SimpleTestCase
 
-from django_smartbase_admin.templatetags.sb_paginated_inline import build_tabulator_style_page_items
+from django_smartbase_admin.templatetags.sb_paginated_inline import (
+    build_tabulator_style_page_items,
+)
 
 
 def _page_numbers(items):
@@ -28,5 +30,9 @@ class BuildTabulatorStylePageItemsTests(SimpleTestCase):
 
     def test_at_most_five_numbered_buttons_in_middle(self):
         items = build_tabulator_style_page_items(current_page=10, max_page=50)
-        page_items = [item for item in items if item["kind"] == "page" and item["number"] not in (1, 50)]
+        page_items = [
+            item
+            for item in items
+            if item["kind"] == "page" and item["number"] not in (1, 50)
+        ]
         self.assertEqual(len(page_items), 5)
