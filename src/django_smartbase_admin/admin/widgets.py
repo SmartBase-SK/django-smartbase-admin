@@ -851,18 +851,6 @@ class SBAdminAutocompleteWidget(
 
         return context
 
-    def _is_primary_key_value(self, parsed_value):
-        if parsed_value in (None, ""):
-            return False
-        pk_field = self.model._meta.pk
-        if self.get_value_field() != pk_field.name:
-            return False
-        try:
-            pk_field.get_prep_value(parsed_value)
-        except (ValueError, TypeError):
-            return False
-        return True
-
     def add_related_buttons_urls(self, parsed_value, request, context):
         try:
             if hasattr(sb_admin_site, "get_model_admin"):
@@ -875,20 +863,17 @@ class SBAdminAutocompleteWidget(
             if parsed_value and related_model_admin.has_view_or_change_permission(
                 request
             ):
-                # Only emit the edit URL when the PK is reachable through the
-                # related admin's restricted queryset. Without this check the
-                # rendered HTML would leak the existence of row-restricted
-                # records (tenant scoping, soft-delete, etc.) any time a
-                # parent form had a pre-set FK pointing outside the user's
-                # allowed set.
-                if (
-                    self._is_primary_key_value(parsed_value)
-                    and related_model_admin.get_queryset(request)
-                    .filter(pk=parsed_value)
-                    .exists()
-                ):
+                try:
+                    related_obj = (
+                        related_model_admin.get_queryset(request)
+                        .filter(**{self.get_value_field(): parsed_value})
+                        .first()
+                    )
+                except (ValueError, TypeError):
+                    related_obj = None
+                if related_obj is not None:
                     context["widget"]["attrs"]["related_edit_url"] = (
-                        related_model_admin.get_detail_url(parsed_value)
+                        related_model_admin.get_detail_url(related_obj.pk)
                     )
             if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
