@@ -184,9 +184,6 @@ class Main {
     }
 
     handleLocationHashFromTabs() {
-        if (window.location.hash) {
-            document.querySelector(`#tab_${CSS.escape(window.location.hash.slice(1))}`)?.click()
-        }
         const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]:not([data-bs-disable-history])')
         tabEls.forEach(tab => {
             tab.addEventListener('shown.bs.tab', function (event) {

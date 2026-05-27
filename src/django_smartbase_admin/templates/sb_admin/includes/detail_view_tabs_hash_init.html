@@ -1,0 +1,34 @@
+{% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %}
+<script>
+(function () {
+    var slug = window.location.hash.replace(/^#/, '');
+    if (!slug) {
+        return;
+    }
+    var btn = document.getElementById('tab_' + slug);
+    if (!btn) {
+        return;
+    }
+    var paneSelector = btn.getAttribute('data-bs-target');
+    if (!paneSelector) {
+        return;
+    }
+    var pane = document.querySelector(paneSelector);
+    if (!pane) {
+        return;
+    }
+    var formRoot = document.getElementById('{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form');
+    var scope = formRoot || document;
+    scope.querySelectorAll('.tab-pane').forEach(function (el) {
+        el.classList.remove('active', 'show');
+    });
+    scope.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function (el) {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    pane.classList.add('active', 'show');
+})();
+</script>
+{% endif %}

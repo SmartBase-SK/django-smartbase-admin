@@ -70,7 +70,7 @@
             .input:not(.choices__input):not([type="search"]){
                 @apply border-0 rounded-none shadow-none;
             }
-            .btn:not(.input-file-edit-btn) {
+            .btn:not(.input-file-edit-btn):not(.keep-btn-style){
                 @apply border-0 rounded-none shadow-none;
             }
             .toggle ~ label {
