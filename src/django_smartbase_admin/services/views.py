@@ -49,9 +49,7 @@ class SBAdminViewService(object):
 
     @classmethod
     def json_dumps_for_url(cls, data, request=None):
-        return dumps_for_url(
-            data, compress=cls.is_url_compression_enabled(request)
-        )
+        return dumps_for_url(data, compress=cls.is_url_compression_enabled(request))
 
     @classmethod
     def json_loads_from_url(cls, value: str | None) -> dict:

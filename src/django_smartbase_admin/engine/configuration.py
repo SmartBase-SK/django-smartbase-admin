@@ -227,7 +227,11 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             self.default_list_sticky_header_and_footer = (
                 default_list_sticky_header_and_footer
             )
-        self.enable_url_compression = enable_url_compression if enable_url_compression is not None else self.enable_url_compression
+        self.enable_url_compression = (
+            enable_url_compression
+            if enable_url_compression is not None
+            else self.enable_url_compression
+        )
 
     def init_registered_views(self):
         registered_views = []
