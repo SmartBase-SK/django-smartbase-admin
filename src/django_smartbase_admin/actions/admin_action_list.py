@@ -397,12 +397,12 @@ class SBAdminListAction(SBAdminAction):
                 for search_spec in orm_lookups
             ):
                 logger.warning(
-                    "%s full-text search applied .distinct() because search_fields "
-                    "traverse relations that can duplicate rows; this may hurt "
-                    "performance on large tables.",
+                    "%s full-text search can duplicate rows because current "
+                    "search_fields traverse relations. Prefer SBAdmin field names "
+                    "(SBAdminField.name) in search_fields so SBAdmin can map them "
+                    "through filter_field to direct ORM lookups.",
                     self.view.__class__.__name__,
                 )
-                queryset = queryset.distinct()
         return queryset
 
     def is_search_query(self):
