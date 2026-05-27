@@ -851,6 +851,18 @@ class SBAdminAutocompleteWidget(
 
         return context
 
+    def _is_primary_key_value(self, parsed_value):
+        if parsed_value in (None, ""):
+            return False
+        pk_field = self.model._meta.pk
+        if self.get_value_field() != pk_field.name:
+            return False
+        try:
+            pk_field.get_prep_value(parsed_value)
+        except (ValueError, TypeError):
+            return False
+        return True
+
     def add_related_buttons_urls(self, parsed_value, request, context):
         try:
             if hasattr(sb_admin_site, "get_model_admin"):
@@ -870,7 +882,8 @@ class SBAdminAutocompleteWidget(
                 # parent form had a pre-set FK pointing outside the user's
                 # allowed set.
                 if (
-                    related_model_admin.get_queryset(request)
+                    self._is_primary_key_value(parsed_value)
+                    and related_model_admin.get_queryset(request)
                     .filter(pk=parsed_value)
                     .exists()
                 ):
