@@ -55,8 +55,7 @@ class FilterValidationTests(TestCase):
         user = MagicMock(is_authenticated=True, is_superuser=True)
         tools = SBAdminTools(request=build_mcp_request(user))
 
-        # 1. Silent-drop guard: misspelled key raises instead of
-        #    returning every row.
+        # 1. Misspelled key raises instead of returning every row.
         with self.assertRaises(ValueError) as ctx:
             tools.list_rows(
                 "filer_folder",
@@ -65,7 +64,17 @@ class FilterValidationTests(TestCase):
             )
         self.assertIn("from_date__gte", str(ctx.exception))
 
-        # 2. Schema publishes the expected value shape so the agent
+        # 2. Known key with wrong-shape value raises instead of
+        #    fail-closing to an ambiguous empty result.
+        with self.assertRaises(ValueError) as ctx:
+            tools.list_rows(
+                "filer_folder",
+                fields=["name"],
+                filter_data={"uploaded_at": "2026-06-01"},  # str, expects list
+            )
+        self.assertIn("DateFilterWidget", str(ctx.exception))
+
+        # 3. Schema publishes the expected value shape so the agent
         #    doesn't have to guess between scalar / list / dict.
         entry = next(e for e in tools.list_admins() if e["view_id"] == "filer_folder")
         filter_info = next(f for f in entry["fields"] if f["name"] == "uploaded_at")[
