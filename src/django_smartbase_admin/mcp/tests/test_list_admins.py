@@ -99,12 +99,13 @@ class ListAdminsTests(TestCase):
         folder_entries = [e for e in result if e["view_id"] == "filer_folder"]
         self.assertEqual(len(folder_entries), 1, result)
         entry = folder_entries[0]
-        self.assertEqual(entry["admin_name"], "FolderListAdminsTestAdmin")
         self.assertEqual(entry["app_label"], "filer")
         self.assertEqual(entry["model"], "Folder")
-        # Folder is concrete, not a proxy.
-        self.assertEqual(entry["base_model"], "Folder")
-        self.assertFalse(entry["is_proxy"])
+        # Implementation-detail keys we deliberately removed from the
+        # public schema: ``admin_name``, ``base_model``, ``is_proxy``.
+        self.assertNotIn("admin_name", entry)
+        self.assertNotIn("base_model", entry)
+        self.assertNotIn("is_proxy", entry)
         # Plain string list_display entries surface as ``{"name": ...}``
         # only — there's no SBAdminField to resolve titles or filters from.
         self.assertEqual([f["name"] for f in entry["fields"]], ["id", "name"])
@@ -134,9 +135,9 @@ class ListAdminsTests(TestCase):
         ]
         self.assertIn("filer_folder", view_ids)
 
-    def test_proxy_model_disambiguation(self):
-        """Proxy admins must report the concrete underlying model so an
-        agent can tell two views over the same table apart."""
+    def test_proxy_model_surfaces_with_own_view_id(self):
+        """Proxy admins surface as their own entry, distinguishable by
+        ``view_id`` and ``model`` from the concrete admin."""
 
         class FolderProxy(Folder):
             class Meta:
@@ -155,10 +156,10 @@ class ListAdminsTests(TestCase):
 
             result = SBAdminTools(request=request).list_admins()
 
-            proxy = next(e for e in result if e["admin_name"] == "FolderProxyAdmin")
-            self.assertTrue(proxy["is_proxy"])
-            self.assertEqual(proxy["model"], "FolderProxy")
-            self.assertEqual(proxy["base_model"], "Folder")
+            view_ids = {e["view_id"]: e for e in result}
+            self.assertIn("filer_folder", view_ids)
+            self.assertIn("filer_folderproxy", view_ids)
+            self.assertEqual(view_ids["filer_folderproxy"]["model"], "FolderProxy")
         finally:
             sb_admin_site._registry.pop(FolderProxy, None)
 

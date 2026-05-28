@@ -212,6 +212,11 @@ class SBAdminBaseView(object):
         return action
 
     def _register_form_view_action(self, target_view, action_id=None) -> str:
+        # Mutates the admin singleton: attaches a synthetic delegate
+        # method named after the modal's ``action_id`` so URL dispatch
+        # (and MCP invocation) can reach it via ``getattr(admin,
+        # action_id)``. Idempotent — the ``hasattr`` guard skips
+        # already-registered ids on subsequent calls.
         action_id = action_id or getattr(target_view, "action_id", None)
         action_id = action_id or target_view.__name__
         if not hasattr(self, action_id):

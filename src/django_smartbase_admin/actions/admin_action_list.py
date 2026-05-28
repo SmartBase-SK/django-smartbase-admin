@@ -650,15 +650,19 @@ class SBAdminListAction(SBAdminAction):
         return final_data
 
     def get_selection_queryset(self):
+        # Use the model's actual PK name — admins with non-``id`` PKs
+        # (UUIDs, custom primary keys) need the real field name here or
+        # the ``__in`` lookup raises ``FieldError``.
+        pk_lookup = f"{self.get_pk_field().name}__in"
         if not self.selection_data:
             # don't run with no selection data as it will result in querying all records
-            return Q(id__in=[])
+            return Q(**{pk_lookup: []})
         additional_filter = None
         if self.selected_rows and self.selected_rows != SELECT_ALL_KEYWORD:
-            additional_filter = Q(id__in=self.selected_rows)
+            additional_filter = Q(**{pk_lookup: self.selected_rows})
 
         if self.selected_rows == SELECT_ALL_KEYWORD:
-            additional_filter = ~Q(id__in=self.deselected_rows)
+            additional_filter = ~Q(**{pk_lookup: self.deselected_rows})
         return additional_filter
 
     def get_xlsx_data(self, request):

@@ -87,6 +87,22 @@ class SBAdminCustomAction(object):
         self.permission = permission
         self.validate_configuration()
 
+    def get_action_id(self):
+        """Dispatch handle for this action.
+
+        Modal actions resolve to ``target_view.__name__`` — the same
+        value ``_register_form_view_action`` assigns at registration
+        time, so callers don't need to know whether registration has
+        run yet. Returns ``None`` for plain-URL actions that have no
+        server-side handle.
+        """
+        if self.action_id:
+            return self.action_id
+        target_view = getattr(self, "target_view", None)
+        if target_view is not None:
+            return target_view.__name__
+        return None
+
     def validate_configuration(self):
         if self.sub_actions:
             return

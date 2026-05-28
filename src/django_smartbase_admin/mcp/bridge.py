@@ -158,6 +158,69 @@ def set_request_payload(request, *, get=None, post=None, method=None) -> None:
         request.method = method
 
 
+_MESSAGE_LEVEL_NAMES = {
+    10: "debug",
+    20: "info",
+    25: "success",
+    30: "warning",
+    40: "error",
+}
+
+
+class MCPMessageStorage:
+    """Capturing ``request._messages`` backend for the MCP request lifecycle.
+
+    Views in the SBAdmin pipeline emit user-facing info via Django's
+    ``messages`` framework — success notices ("Formula created"), warnings
+    ("No selection made"), counts, etc. The browser surfaces them via the
+    messages middleware; MCP has no equivalent rendering, but the
+    information is just as useful to an agent. This storage collects each
+    ``messages.<level>(request, ...)`` call so the response normalizer
+    can include them in the JSON payload.
+    """
+
+    def __init__(self):
+        self.messages: list[dict] = []
+
+    def add(self, level, message, extra_tags=""):
+        entry = {
+            "level": _MESSAGE_LEVEL_NAMES.get(int(level), str(level)),
+            "message": str(message),
+        }
+        if extra_tags:
+            entry["tags"] = extra_tags
+        self.messages.append(entry)
+
+    def update(self, response):
+        # No-op — messages are captured, not handed off to a cookie or
+        # session backend.
+        pass
+
+    def __iter__(self):
+        return iter(self.messages)
+
+
+def ensure_messages_storage(request) -> None:
+    """Attach an ``MCPMessageStorage`` if no messages backend is bound.
+
+    Idempotent — re-uses an existing capturing storage if already set so
+    a single request can accumulate messages across multiple action
+    dispatches.
+    """
+    if not isinstance(getattr(request, "_messages", None), MCPMessageStorage):
+        request._messages = MCPMessageStorage()
+
+
+def captured_messages(request) -> list[dict]:
+    """Return messages captured during this request, or ``[]`` if storage
+    isn't an :class:`MCPMessageStorage` (so callers can call this
+    unconditionally without checking)."""
+    storage = getattr(request, "_messages", None)
+    if isinstance(storage, MCPMessageStorage):
+        return list(storage.messages)
+    return []
+
+
 def strip_html_cells(admin, request, rows: list[dict]) -> None:
     """Plain-text the ``Formatter.HTML`` cells in-place. Numbers / bools pass
     through; same classification the xlsx exporter uses."""

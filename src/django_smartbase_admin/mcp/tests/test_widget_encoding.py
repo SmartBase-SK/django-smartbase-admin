@@ -1,4 +1,4 @@
-"""Unit tests for ``_write_widget_input`` — the per-widget POST encoder.
+"""Unit tests for ``write_widget_input`` — the per-widget POST encoder.
 
 Drives the encoder directly against real widget instances so each
 branch (file, ``MultiWidget``, ``SelectMultiple``, autocomplete, plain)
@@ -35,7 +35,7 @@ from django.utils.datastructures import MultiValueDict
 from django.test import RequestFactory
 
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
-from django_smartbase_admin.mcp.service import _write_widget_input
+from django_smartbase_admin.mcp.form_encoding import write_widget_input
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 
 
@@ -47,7 +47,7 @@ class WritePlainWidgetTests(TestCase):
     def test_string_round_trips_through_value_from_datadict(self):
         qd = _empty_qd()
         widget = TextInput()
-        _write_widget_input(qd, "name", widget, "renamed")
+        write_widget_input(qd, "name", widget, "renamed")
         self.assertEqual(
             widget.value_from_datadict(qd, MultiValueDict(), "name"), "renamed"
         )
@@ -56,13 +56,13 @@ class WritePlainWidgetTests(TestCase):
         """No string coercion — ``QueryDict`` keeps ``True`` as a bool."""
         qd = _empty_qd()
         widget = TextInput()
-        _write_widget_input(qd, "active", widget, True)
+        write_widget_input(qd, "active", widget, True)
         self.assertIs(widget.value_from_datadict(qd, MultiValueDict(), "active"), True)
 
     def test_native_int_round_trips_unchanged(self):
         qd = _empty_qd()
         widget = TextInput()
-        _write_widget_input(qd, "n", widget, 42)
+        write_widget_input(qd, "n", widget, 42)
         recovered = widget.value_from_datadict(qd, MultiValueDict(), "n")
         self.assertEqual(recovered, 42)
         self.assertIsInstance(recovered, int)
@@ -71,7 +71,7 @@ class WritePlainWidgetTests(TestCase):
         """``{"value", "label"}`` from fetch_detail round-trips back to its pk."""
         qd = _empty_qd()
         widget = TextInput()
-        _write_widget_input(qd, "parent", widget, {"value": 7, "label": "Parent"})
+        write_widget_input(qd, "parent", widget, {"value": 7, "label": "Parent"})
         self.assertEqual(widget.value_from_datadict(qd, MultiValueDict(), "parent"), 7)
 
 
@@ -88,13 +88,13 @@ class WriteCheckboxInputTests(TestCase):
     def test_true_round_trips_through_value_from_datadict(self):
         qd = _empty_qd()
         widget = CheckboxInput()
-        _write_widget_input(qd, "active", widget, True)
+        write_widget_input(qd, "active", widget, True)
         self.assertIs(widget.value_from_datadict(qd, MultiValueDict(), "active"), True)
 
     def test_false_round_trips_through_value_from_datadict(self):
         qd = _empty_qd()
         widget = CheckboxInput()
-        _write_widget_input(qd, "active", widget, False)
+        write_widget_input(qd, "active", widget, False)
         # ``False`` reads back as ``False`` whether the key is present
         # (this path) or absent — ``CheckboxInput.value_from_datadict``
         # treats both the same. Pinning the present-key path explicitly.
@@ -103,7 +103,7 @@ class WriteCheckboxInputTests(TestCase):
     def test_none_round_trips_to_false(self):
         qd = _empty_qd()
         widget = CheckboxInput()
-        _write_widget_input(qd, "active", widget, None)
+        write_widget_input(qd, "active", widget, None)
         self.assertIs(widget.value_from_datadict(qd, MultiValueDict(), "active"), False)
 
 
@@ -111,12 +111,12 @@ class WriteFileWidgetTests(TestCase):
     def test_file_input_omits_key(self):
         """Absence of the key means 'no upload, keep current value'."""
         qd = _empty_qd()
-        _write_widget_input(qd, "doc", FileInput(), "anything")
+        write_widget_input(qd, "doc", FileInput(), "anything")
         self.assertNotIn("doc", qd)
 
     def test_clearable_file_input_omits_key(self):
         qd = _empty_qd()
-        _write_widget_input(qd, "doc", ClearableFileInput(), None)
+        write_widget_input(qd, "doc", ClearableFileInput(), None)
         self.assertNotIn("doc", qd)
 
 
@@ -124,7 +124,7 @@ class WriteSelectMultipleTests(TestCase):
     def test_list_round_trips_through_value_from_datadict(self):
         qd = _empty_qd()
         widget = SelectMultiple()
-        _write_widget_input(qd, "tags", widget, [1, 2, 3])
+        write_widget_input(qd, "tags", widget, [1, 2, 3])
         self.assertEqual(
             widget.value_from_datadict(qd, MultiValueDict(), "tags"), [1, 2, 3]
         )
@@ -132,19 +132,19 @@ class WriteSelectMultipleTests(TestCase):
     def test_none_round_trips_to_empty_list(self):
         qd = _empty_qd()
         widget = SelectMultiple()
-        _write_widget_input(qd, "tags", widget, None)
+        write_widget_input(qd, "tags", widget, None)
         self.assertEqual(widget.value_from_datadict(qd, MultiValueDict(), "tags"), [])
 
     def test_empty_string_round_trips_to_empty_list(self):
         qd = _empty_qd()
         widget = SelectMultiple()
-        _write_widget_input(qd, "tags", widget, "")
+        write_widget_input(qd, "tags", widget, "")
         self.assertEqual(widget.value_from_datadict(qd, MultiValueDict(), "tags"), [])
 
     def test_checkbox_select_multiple_round_trips(self):
         qd = _empty_qd()
         widget = CheckboxSelectMultiple()
-        _write_widget_input(qd, "tags", widget, [10, 20])
+        write_widget_input(qd, "tags", widget, [10, 20])
         self.assertEqual(
             widget.value_from_datadict(qd, MultiValueDict(), "tags"), [10, 20]
         )
@@ -155,7 +155,7 @@ class WriteMultiWidgetTests(TestCase):
         qd = _empty_qd()
         widget = SplitDateTimeWidget()
         original = datetime(2024, 5, 26, 14, 30)
-        _write_widget_input(qd, "when", widget, original)
+        write_widget_input(qd, "when", widget, original)
         # ``MultiWidget.value_from_datadict`` returns ``[date, time]``;
         # ``SplitDateTimeField.compress`` would reassemble it on the
         # field side. The encoder's contract stops at the per-subwidget
@@ -168,7 +168,7 @@ class WriteMultiWidgetTests(TestCase):
     def test_split_datetime_none_round_trips_to_none_subvalues(self):
         qd = _empty_qd()
         widget = SplitDateTimeWidget()
-        _write_widget_input(qd, "when", widget, None)
+        write_widget_input(qd, "when", widget, None)
         self.assertEqual(
             widget.value_from_datadict(qd, MultiValueDict(), "when"), [None, None]
         )
@@ -214,29 +214,29 @@ class WriteAutocompleteTests(TestCase):
 
     def test_single_scalar_round_trips(self):
         qd = _empty_qd()
-        _write_widget_input(qd, "fk", self.single, 5)
+        write_widget_input(qd, "fk", self.single, 5)
         self.assertEqual(self.single.value_from_datadict(qd, self._empty(), "fk"), 5)
 
     def test_single_envelope_round_trips_to_pk(self):
         qd = _empty_qd()
-        _write_widget_input(qd, "fk", self.single, {"value": 7, "label": "X"})
+        write_widget_input(qd, "fk", self.single, {"value": 7, "label": "X"})
         self.assertEqual(self.single.value_from_datadict(qd, self._empty(), "fk"), 7)
 
     def test_single_none_round_trips_to_none(self):
         qd = _empty_qd()
-        _write_widget_input(qd, "fk", self.single, None)
+        write_widget_input(qd, "fk", self.single, None)
         self.assertIsNone(self.single.value_from_datadict(qd, self._empty(), "fk"))
 
     def test_multi_list_round_trips(self):
         qd = _empty_qd()
-        _write_widget_input(qd, "fk", self.multi, [1, 2])
+        write_widget_input(qd, "fk", self.multi, [1, 2])
         self.assertEqual(
             self.multi.value_from_datadict(qd, self._empty(), "fk"), [1, 2]
         )
 
     def test_multi_envelope_list_round_trips_to_pks(self):
         qd = _empty_qd()
-        _write_widget_input(
+        write_widget_input(
             qd,
             "fk",
             self.multi,
@@ -250,5 +250,5 @@ class WriteAutocompleteTests(TestCase):
         # parse_value_from_input("") returns "" — empty M2M write is
         # signalled by the queryset stage, not the widget.
         qd = _empty_qd()
-        _write_widget_input(qd, "fk", self.multi, None)
+        write_widget_input(qd, "fk", self.multi, None)
         self.assertIsNone(self.multi.value_from_datadict(qd, self._empty(), "fk"))
