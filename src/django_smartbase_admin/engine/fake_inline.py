@@ -48,6 +48,11 @@ class SBAdminFakeInlineFormset(BaseInlineFormSet):
             form, self.inline_instance.parent_instance, commit
         )
 
+    def _construct_form(self, i, **kwargs):
+        form = super()._construct_form(i, **kwargs)
+        form._sbadmin_formset = self
+        return form
+
 
 class SBAdminFakeInlineMixin:
     fk_name = "inline_fake_relationship"
