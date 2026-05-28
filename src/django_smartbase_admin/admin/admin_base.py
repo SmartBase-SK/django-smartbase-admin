@@ -533,6 +533,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     def get_view_on_site_url(self, obj=None):
         if obj is None or not self.view_on_site:
             return None
+        if callable(self.view_on_site):
+            return self.view_on_site(obj)
+        if not hasattr(obj, "get_absolute_url"):
+            return None
         return reverse(
             "sb_admin:view_on_site_redirect",
             kwargs={"view": self.get_id(), "object_id": obj.pk},

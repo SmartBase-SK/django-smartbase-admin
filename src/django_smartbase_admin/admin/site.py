@@ -202,7 +202,7 @@ class SBAdminSite(admin.AdminSite):
                     name="color_scheme",
                 ),
                 path(
-                    "view-on-site/<str:view>/<int:object_id>/",
+                    "view-on-site/<str:view>/<path:object_id>/",
                     self.admin_view(ViewOnSiteRedirectView.as_view()),
                     name="view_on_site_redirect",
                 ),
