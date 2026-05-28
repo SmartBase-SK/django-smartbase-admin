@@ -102,6 +102,7 @@ USE_TZ = True
 ROOT_URLCONF = "tests.mcp_urls"
 
 MIDDLEWARE = [
+    "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

@@ -4712,6 +4712,18 @@ OAUTH2_PROVIDER = {
     "SCOPES": {"sbadmin:read": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
 }
+
+# Browser-hosted MCP clients (claude.ai's Cowork, cursor.com) cross-origin
+# POST to /mcp/ and preflight the OAuth discovery routes. Without CORS the
+# browser blocks every request and the client's "Install" button stays
+# disabled. Middleware is scoped to MCP + OAuth paths only.
+MIDDLEWARE = [
+    "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
+    # ... your other middleware ...
+]
+# Defaults to ("https://claude.ai", "https://cursor.com"); override to
+# expand or lock down.
+SBADMIN_MCP_ALLOWED_ORIGINS = ["https://claude.ai", "https://cursor.com"]
 ```
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass. Override `authenticate_header(request)` to return `Bearer ..., resource_metadata="<absolute /.well-known/oauth-protected-resource URL>"` so MCP clients can discover OAuth.

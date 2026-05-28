@@ -564,6 +564,7 @@ class SBAdminTools(MCPToolset):
 
         return get_admin_history(
             admin,
+            request=request,
             object_id=object_id,
             page=page,
             page_size=page_size,
@@ -792,6 +793,7 @@ class SBAdminTools(MCPToolset):
         object_ids: list,
         field_values: dict | None = None,
         confirmed: bool = False,
+        modifier: str | None = None,
     ) -> dict:
         """Invoke a selection (bulk) action over an explicit id list.
 
@@ -844,6 +846,7 @@ class SBAdminTools(MCPToolset):
             object_ids=object_ids,
             field_values=field_values,
             confirmed=confirmed,
+            modifier=modifier,
         )
 
     @_clear_thread_local_after_call
@@ -855,6 +858,7 @@ class SBAdminTools(MCPToolset):
         filter_data: dict | None = None,
         full_text_search: str | None = None,
         confirmed: bool = False,
+        modifier: str | None = None,
     ) -> dict:
         """Invoke a list-level action (no row context).
 
@@ -902,6 +906,7 @@ class SBAdminTools(MCPToolset):
             filter_data=filter_data,
             full_text_search=full_text_search,
             confirmed=confirmed,
+            modifier=modifier,
         )
 
     @_clear_thread_local_after_call

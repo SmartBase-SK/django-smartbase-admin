@@ -449,16 +449,24 @@ class IntegrationTests(_Base):
         from django_smartbase_admin.audit.models import AdminAuditLog
 
         folder = Folder.objects.create(name="hist")
+        # Second real folder so the second audit row survives the audit
+        # admin's ``restrict_queryset`` gate (a non-existent object_id
+        # would be filtered out).
+        other_folder = Folder.objects.create(name="other")
+        # Drop the audit framework's automatic create entries so the
+        # assertions count only the explicit rows we're about to set up.
+        AdminAuditLog.objects.all().delete()
         AdminAuditLog.objects.create(
             content_type=ContentType.objects.get_for_model(Folder),
             object_id=str(folder.pk),
             object_repr="hist",
             action_type="create",
         )
-        # An unrelated entry that must NOT appear when scoped to folder.pk.
+        # Entry against a different folder; must not appear when scoped to
+        # the first folder.
         AdminAuditLog.objects.create(
             content_type=ContentType.objects.get_for_model(Folder),
-            object_id="99999",
+            object_id=str(other_folder.pk),
             object_repr="other",
             action_type="delete",
         )

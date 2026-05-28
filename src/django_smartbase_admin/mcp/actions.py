@@ -135,6 +135,13 @@ def action_entries_for(action) -> list[dict]:
         "kind": action_kind(action),
         "action_id": action_id,
     }
+    # Surface ``action_modifier`` so the agent can echo it back on
+    # ``invoke_list_action`` / ``invoke_selection_action`` — required
+    # for actions that branch on it (e.g. ``IGNORE_LIST_SELECTION``
+    # for whole-list exports). Omitted when it's the default.
+    modifier = getattr(action, "action_modifier", None)
+    if modifier:
+        entry["modifier"] = modifier
     target_view = getattr(action, "target_view", None)
     if target_view is not None and getattr(target_view, "requires_confirmation", False):
         entry["requires_confirmation"] = True
@@ -472,12 +479,16 @@ class SBAdminMCPActionInvokeService:
         object_ids: list,
         field_values: dict | None = None,
         confirmed: bool = False,
+        modifier: str | None = None,
     ) -> dict:
         """Invoke a selection (bulk) action over an explicit list of ids.
 
         Mode A only — ``object_ids`` is the canonical, explicit selection.
         Empty list rejected so accidental "act on everything" is impossible.
         Set ``confirmed=True`` after seeing a ``needs_confirmation`` response.
+        ``modifier`` is the action's ``action_modifier`` as surfaced in
+        discovery; defaults to ``"template"`` (matches URL dispatch's
+        fallback when no modifier is declared).
         """
         if not object_ids:
             raise ValueError(
@@ -487,7 +498,7 @@ class SBAdminMCPActionInvokeService:
             admin,
             request,
             action_id=action_id,
-            modifier=None,
+            modifier=modifier or "template",
             field_values=field_values,
             confirmed=confirmed,
             base_params={
@@ -510,12 +521,16 @@ class SBAdminMCPActionInvokeService:
         filter_data: dict | None = None,
         full_text_search: str | None = None,
         confirmed: bool = False,
+        modifier: str | None = None,
     ) -> dict:
         """Invoke a list-level action (no row context).
 
         ``filter_data`` / ``full_text_search`` are passed through to
         filter-aware actions; ignored by actions that don't consult them.
-        Set ``confirmed=True`` after seeing a ``needs_confirmation`` response.
+        ``modifier`` is the action's ``action_modifier`` from discovery
+        (e.g. ``IGNORE_LIST_SELECTION`` for whole-list exports);
+        defaults to ``"template"``. Set ``confirmed=True`` after seeing
+        a ``needs_confirmation`` response.
         """
         base_params = None
         if filter_data or full_text_search:
@@ -527,7 +542,7 @@ class SBAdminMCPActionInvokeService:
             admin,
             request,
             action_id=action_id,
-            modifier=None,
+            modifier=modifier or "template",
             field_values=field_values,
             confirmed=confirmed,
             base_params=base_params,
