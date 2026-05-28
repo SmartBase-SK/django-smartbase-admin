@@ -18,7 +18,11 @@ from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.engine.fake_inline import is_fake_inline_batch_safe
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
+    BooleanFilterWidget,
     ChoiceFilterWidget,
+    DateFilterWidget,
+    MultipleChoiceFilterWidget,
+    NumberRangeFilterWidget,
 )
 from django_smartbase_admin.mcp.actions import (
     action_entries_for,
@@ -34,6 +38,36 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _filter_value_shape(widget) -> tuple[str, object] | None:
+    """``(shape, example)`` for the widget's expected ``filter_data`` value.
+
+    Agents otherwise have to guess between scalar / list / dict per
+    widget kind — silent acceptance of the wrong shape (filter ignored,
+    full table returned) makes that guessing dangerous. Reported here
+    so the agent can pick the right shape on the first call.
+    """
+    if isinstance(widget, DateFilterWidget):
+        return (
+            "[start, end] — list of two ISO-8601 dates ('YYYY-MM-DD'); "
+            "either side may be null for an open-ended range.",
+            ["2026-06-01", "2026-06-30"],
+        )
+    if isinstance(widget, NumberRangeFilterWidget):
+        return ("[min, max] — list of two numbers; either side may be null.", [0, 100])
+    if isinstance(widget, BooleanFilterWidget):
+        return ("bool", True)
+    if isinstance(widget, MultipleChoiceFilterWidget):
+        return ("list of choice values (strings)", [])
+    if isinstance(widget, ChoiceFilterWidget):
+        return ("single choice value (string)", "")
+    if isinstance(widget, AutocompleteFilterWidget):
+        return (
+            "list of {'value': <pk>, 'label': <str>} entries — pks resolved via the autocomplete tool",
+            [],
+        )
+    return ("string", "")
+
+
 def _filter_info(field) -> dict | None:
     """Schema for the field's filter, or ``None`` if not filterable."""
     if getattr(field, "filter_disabled", False):
@@ -46,6 +80,9 @@ def _filter_info(field) -> dict | None:
         "filter_field": getattr(field, "filter_field", None) or field.name,
         "widget": widget.__class__.__name__,
     }
+    shape = _filter_value_shape(widget)
+    if shape is not None:
+        info["value_shape"], info["example"] = shape
     if isinstance(widget, ChoiceFilterWidget) and widget.choices:
         # Boolean / Choice / MultipleChoice / RadioChoice all subclass this.
         info["choices"] = [

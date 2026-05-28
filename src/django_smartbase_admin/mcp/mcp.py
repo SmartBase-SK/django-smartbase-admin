@@ -55,6 +55,41 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.services.views import SBAdminViewService
 
 
+def _known_filter_fields(admin, request) -> set[str]:
+    """Set of valid keys for ``filter_data`` on this admin.
+
+    Each ``SBAdminField`` exposes its filter under ``filter_field`` (or
+    its ``name`` when ``filter_field`` is unset); a missing
+    ``filter_widget`` means the field isn't filterable.
+    """
+    known: set[str] = set()
+    for field in admin.get_sbadmin_list_display(request) or []:
+        if getattr(field, "filter_disabled", False):
+            continue
+        if getattr(field, "filter_widget", None) is None:
+            continue
+        known.add(getattr(field, "filter_field", None) or field.name)
+    return known
+
+
+def _validate_filter_keys(admin, request, filter_data: dict | None) -> None:
+    """Reject filter_data keys the admin can't actually filter on.
+
+    Silent acceptance (the previous behavior) returns *all* rows when a
+    key is misspelled — disastrous for an agent that reports aggregates
+    from the response. Raise so the caller sees a clear ``invalid``.
+    """
+    if not filter_data:
+        return
+    known = _known_filter_fields(admin, request)
+    unknown = [k for k in filter_data if k not in known]
+    if unknown:
+        raise ValueError(
+            f"Unknown filter key(s) {unknown!r}. "
+            f"Known filters on {admin.get_id()!r}: {sorted(known)}"
+        )
+
+
 def _clear_thread_local_after_call(method):
     """Ensure the bridge-bound thread-local request is cleared after every
     tool call. ``ensure_sbadmin_request_data`` binds it for the duration
@@ -191,11 +226,15 @@ class SBAdminTools(MCPToolset):
             ``list_admins[].fields[].name``. The primary key is always
             included for row identity.
           filter_data: ``{filter_field: value}`` mapping. The value
-            shape per filter depends on the widget reported by
-            ``list_admins``: choice filters take a string, multi /
-            autocomplete filters take a list of
-            ``{"value": …, "label": …}`` entries, boolean filters take
-            a bool, date/string filters take a string.
+            shape per filter is reported on the filter entry in
+            ``list_admins[].fields[].filter`` as ``value_shape`` /
+            ``example`` — copy that shape literally. Quick reference:
+            choice → string; multi-choice → list of strings;
+            autocomplete → list of ``{"value", "label"}`` entries;
+            boolean → bool; date → ``["YYYY-MM-DD", "YYYY-MM-DD"]``
+            (either side may be ``null``); number range → ``[min, max]``;
+            string → substring. Unknown keys are rejected — misspellings
+            raise instead of silently returning every row.
           page, page_size: pagination, 1-indexed.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
             entries, applied in order.
@@ -221,6 +260,7 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
+        _validate_filter_keys(admin, request, filter_data)
         columns_data = build_columns_data(admin, request, fields)
 
         table_params: dict = {
@@ -898,6 +938,7 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
+        _validate_filter_keys(admin, request, filter_data)
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,

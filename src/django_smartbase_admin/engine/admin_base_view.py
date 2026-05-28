@@ -635,7 +635,19 @@ class SBAdminBaseView(object):
         if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
             value = field.xlsx_options.python_formatter(obj_id, value)
         elif field.python_formatter:
-            value = field.python_formatter(obj_id, value)
+            # MCP wants one canonical wire format. Bypass the built-in
+            # locale-aware formatters (date / datetime / boolean) so the
+            # JSON encoder emits raw values (ISO 8601 for dates, native
+            # bools). Custom ``python_formatter``s still run — they
+            # carry app logic the agent expects. Flag lives on
+            # ``request`` because ``request_data`` gets rebuilt mid-flow.
+            from django_smartbase_admin.engine.field_formatter import (
+                LOCALE_DEPENDENT_FORMATTERS,
+            )
+
+            is_mcp = getattr(request, "is_mcp", False)
+            if not (is_mcp and field.python_formatter in LOCALE_DEPENDENT_FORMATTERS):
+                value = field.python_formatter(obj_id, value)
         return value
 
 

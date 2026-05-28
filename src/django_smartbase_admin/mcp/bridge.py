@@ -40,6 +40,13 @@ def ensure_sbadmin_request_data(request) -> None:
     # ``create_audit_log`` calls inside MCP-triggered queue/row actions.
     request._sbadmin_audit_source = "mcp"
 
+    # Flag the request as MCP so the formatter pipeline can bypass
+    # locale-dependent built-ins (date / datetime / boolean) and emit
+    # one canonical wire format. Lives on ``request`` (not
+    # ``request_data``) so it survives the request_data rebuild
+    # ``delegate_to_action`` does via ``from_request_and_kwargs``.
+    request.is_mcp = True
+
     # Always bind the contextvar — test fixtures pre-attach
     # ``request_data`` but don't bind the thread-local, and the audit
     # manager keys ``_is_in_admin_context`` off the contextvar.
