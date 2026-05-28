@@ -530,6 +530,19 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
     sbadmin_fake_inlines = None
     all_base_fields_form = None
 
+    def get_view_on_site_url(self, obj=None):
+        if obj is None or not self.view_on_site:
+            return None
+        if callable(self.view_on_site):
+            return self.view_on_site(obj)
+        if not hasattr(obj, "get_absolute_url"):
+            return None
+        return reverse(
+            "sb_admin:view_on_site_redirect",
+            kwargs={"view": self.get_id(), "object_id": obj.pk},
+            current_app=self.admin_site.name,
+        )
+
     def init_view_static(self, configuration, model, admin_site):
         configuration.view_map[self.get_id()] = self
         inlines = getattr(self, "inlines") or []
