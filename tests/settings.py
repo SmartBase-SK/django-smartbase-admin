@@ -13,19 +13,13 @@ import os
 
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
 
-# Local dev defaults to the sandbox Postgres (covers JSON ``__contains``,
-# ArrayAgg, and other Postgres-only features that are part of the
-# production contract). GitHub Actions / lightweight runs can opt into
-# SQLite via:
-#   export SBADMIN_TEST_DATABASE_URL="sqlite://"
-# Any other Postgres deployment via:
+# Defaults to in-memory SQLite — no credentials in the repo, no service
+# required for CI. To exercise Postgres-only paths (JSON ``__contains``,
+# ArrayAgg, etc.) locally, point the env var at your own database:
 #   export SBADMIN_TEST_DATABASE_URL="postgresql://user:pass@host:port/db"
 from urllib.parse import urlparse
 
-_db_url = os.environ.get(
-    "SBADMIN_TEST_DATABASE_URL",
-    "postgresql://dummy-user:dummy-password@localhost:5433/wfm_admin",
-)
+_db_url = os.environ.get("SBADMIN_TEST_DATABASE_URL", "sqlite://")
 _parsed = urlparse(_db_url)
 if _parsed.scheme.startswith("sqlite"):
     DATABASES = {
