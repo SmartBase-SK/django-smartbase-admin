@@ -24,13 +24,6 @@ from django.db.models import Window
 from django.db.models.functions import RowNumber
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
 from django.forms.models import _get_foreign_key
-from django.forms.widgets import (
-    CheckboxSelectMultiple,
-    ClearableFileInput,
-    FileInput,
-    MultiWidget,
-    SelectMultiple,
-)
 from django.http import QueryDict
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
@@ -42,29 +35,19 @@ from django_smartbase_admin.engine.fake_inline import (
     SBAdminFakeInlineMixin,
     is_fake_inline_batch_safe,
 )
-from django_smartbase_admin.engine.filter_widgets import (
-    AutocompleteFilterWidget,
-    AutocompleteParseMixin,
+from django_smartbase_admin.mcp.bridge import (
+    captured_messages,
+    ensure_messages_storage,
+    set_request_payload,
 )
-from django_smartbase_admin.mcp.bridge import set_request_payload
+from django_smartbase_admin.mcp.field_schema import field_info
+from django_smartbase_admin.mcp.form_encoding import (
+    form_errors_dict,
+    get_form_from_response,
+    write_widget_input,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _unwrap_envelope(value):
-    """Accept ``{"value", "label"}`` (or list of) from ``fetch_detail``.
-
-    Lets agents echo a fetched payload back unchanged. Unrecognised
-    shapes pass through untouched so writes from other sources still
-    work.
-    """
-    if isinstance(value, dict) and "value" in value:
-        return value["value"]
-    if isinstance(value, list):
-        return [
-            v["value"] if isinstance(v, dict) and "value" in v else v for v in value
-        ]
-    return value
 
 
 _INLINE_OP_SKIP = frozenset({"id", "_delete"})
@@ -88,61 +71,6 @@ def _reject_non_writable_overrides(
         raise LookupError(f"Cannot set {scope} {invalid}; writable: {sorted(writable)}")
 
 
-def _write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
-    """Adapt MCP-typed Python ``value`` to the per-widget ``data`` shape.
-
-    Mirrors ``widget.value_from_datadict`` one-to-one: writes ``value``
-    into ``qd`` in whatever shape this widget reads back when
-    ``_changeform_view`` runs, so the field's ``to_python`` receives
-    the right thing. Plain widgets pass through; widgets with a custom
-    POST contract (file, multiselect, ``MultiWidget``, autocomplete)
-    get a shape-specific write.
-
-    No string encoding — ``QueryDict`` stores native Python unchanged
-    (``bytes_to_text`` only touches bytes) and the common
-    ``Field.to_python`` implementations accept native ``bool``, ``int``,
-    ``date``, etc.
-    """
-    value = _unwrap_envelope(value)
-
-    if isinstance(widget, (FileInput, ClearableFileInput)):
-        # Omit the key — ``ClearableFileInput`` treats absence as "no
-        # upload, keep current value", same as a browser submitting an
-        # empty file input.
-        return
-
-    if isinstance(widget, MultiWidget):
-        # SplitDateTime etc. — ``decompress`` is the documented inverse
-        # of ``MultiWidget.value_from_datadict``, splitting one Python
-        # value into one per subwidget.
-        subvalues = (
-            [None] * len(widget.widgets) if value is None else widget.decompress(value)
-        )
-        for subname, subwidget, subvalue in zip(
-            widget.widgets_names, widget.widgets, subvalues
-        ):
-            _write_widget_input(qd, key + subname, subwidget, subvalue)
-        return
-
-    if isinstance(widget, (SelectMultiple, CheckboxSelectMultiple)):
-        qd.setlist(key, list(value) if value not in (None, "") else [])
-        return
-
-    if isinstance(widget, AutocompleteParseMixin):
-        # Always a list — single-select widgets unwrap with
-        # ``next(iter(...), None)`` on the read side, which needs an
-        # iterable.
-        if value in (None, ""):
-            qd[key] = []
-        elif isinstance(value, (list, tuple, set)):
-            qd[key] = list(value)
-        else:
-            qd[key] = [value]
-        return
-
-    qd[key] = value
-
-
 def _encode_form_native(form, qd: QueryDict, prefix: str, overrides: dict) -> None:
     """Restate ``form``'s current initial values into ``qd`` as native Python.
 
@@ -153,7 +81,7 @@ def _encode_form_native(form, qd: QueryDict, prefix: str, overrides: dict) -> No
     for name, field in form.fields.items():
         full_name = f"{prefix}-{name}" if prefix else name
         value = overrides[name] if name in overrides else form.initial.get(name)
-        _write_widget_input(qd, full_name, field.widget, value)
+        write_widget_input(qd, full_name, field.widget, value)
 
 
 def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
@@ -198,7 +126,7 @@ def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
                 value = op[name]
             else:
                 value = form.initial.get(name)
-            _write_widget_input(qd, full_name, field.widget, value)
+            write_widget_input(qd, full_name, field.widget, value)
         if deleted:
             qd[f"{prefix}-{i}-DELETE"] = "on"
 
@@ -217,7 +145,7 @@ def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
             if name == "id":
                 continue
             full_name = f"{prefix}-{i}-{name}"
-            _write_widget_input(qd, full_name, field.widget, op.get(name))
+            write_widget_input(qd, full_name, field.widget, op.get(name))
 
 
 def _pk_from_redirect(url: str):
@@ -233,39 +161,24 @@ def _pk_from_redirect(url: str):
     return match.kwargs.get("object_id")
 
 
-class _NoopMessageStorage:
-    """Minimal ``request._messages`` so ``message_user`` doesn't crash.
-
-    ``_changeform_view``'s success path calls ``self.message_user`` via
-    ``response_change`` / ``response_add``. The mock request has no
-    middleware-installed storage, and we don't want flash messages on
-    an MCP call anyway, so we drop them on the floor.
-    """
-
-    def add(self, level, message, extra_tags=""):  # noqa: D401 - matches Django API
-        pass
-
-    def update(self, response):
-        pass
+# Messages storage now lives in ``bridge`` as :class:`MCPMessageStorage`,
+# shared between the detail-write path here and the action invoke path
+# in ``actions.py``. ``ensure_messages_storage`` / ``captured_messages``
+# replace the old noop pair.
 
 
-def _ensure_messages_storage(request) -> None:
-    if not hasattr(request, "_messages"):
-        request._messages = _NoopMessageStorage()
-
-
-def _extract_form_errors(ctx: dict) -> dict:
-    """Pull ``form.errors`` / ``formset.errors`` out of the re-rendered context."""
-    form_errors = {
-        name: list(errors) for name, errors in ctx["adminform"].form.errors.items()
-    }
+def _extract_form_errors(response) -> dict:
+    """Pull ``form.errors`` / ``formset.errors`` out of a failed change-form
+    response. The parent ``adminform`` lives under that key in context;
+    inline formset errors come from ``inline_admin_formsets``."""
+    form = get_form_from_response(response, "adminform")
     inlines_out: dict = {}
-    for iaf in ctx["inline_admin_formsets"]:
+    for iaf in response.context_data["inline_admin_formsets"]:
         formset = iaf.formset
         rows = [
-            {"index": i, "errors": {n: list(es) for n, es in form.errors.items()}}
-            for i, form in enumerate(formset.forms)
-            if form.errors
+            {"index": i, "errors": form_errors_dict(f)}
+            for i, f in enumerate(formset.forms)
+            if f.errors
         ]
         non_form = [str(e) for e in formset.non_form_errors()]
         if rows or non_form:
@@ -273,7 +186,10 @@ def _extract_form_errors(ctx: dict) -> dict:
                 "rows": rows,
                 "non_form": non_form,
             }
-    return {"fields": form_errors, "inlines": inlines_out}
+    return {
+        "fields": form_errors_dict(form) if form else {},
+        "inlines": inlines_out,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -325,7 +241,7 @@ class SBAdminMCPDetailService:
         field they declare. ``truncated`` flags paginated inlines
         where the queryset has more rows than ``per_page``.
         """
-        request.method = "GET"
+        set_request_payload(request, method="GET")
         response, obj = cls._run_change_view(admin, request, object_id)
         return {
             "id": obj.pk,
@@ -369,7 +285,7 @@ class SBAdminMCPDetailService:
             raise PermissionDenied(
                 f"User has no add permission on admin {type(admin).__name__}."
             )
-        request.method = "GET"
+        set_request_payload(request, method="GET")
         return admin._changeform_view(request, None, form_url="", extra_context=None)
 
     @classmethod
@@ -469,7 +385,7 @@ class SBAdminMCPDetailService:
         :meth:`get_detail_data`, plus when an inline op references a
         row id that isn't on the object.
         """
-        request.method = "GET"
+        set_request_payload(request, method="GET")
         response, obj = cls._run_change_view(admin, request, object_id)
         if not admin.has_change_permission(request, obj):
             raise PermissionDenied(
@@ -592,7 +508,7 @@ class SBAdminMCPDetailService:
         # Mirror POST onto ``request_data.request_post`` too — dependent
         # autocomplete widgets read forwarded values from there.
         set_request_payload(request, post=qd, method="POST")
-        _ensure_messages_storage(request)
+        ensure_messages_storage(request)
 
         response = admin._changeform_view(
             request,
@@ -601,6 +517,7 @@ class SBAdminMCPDetailService:
             extra_context=None,
         )
 
+        messages = captured_messages(request)
         if isinstance(response, HttpResponseRedirectBase):
             refetch_pk = obj.pk if obj is not None else _pk_from_redirect(response.url)
             if refetch_pk is None:
@@ -608,16 +525,22 @@ class SBAdminMCPDetailService:
                     f"Admin {admin.get_id()!r} returned a success redirect "
                     f"without a resolvable object pk: {response.url!r}."
                 )
-            request.method = "GET"
-            return {
+            set_request_payload(request, method="GET")
+            result = {
                 "status": "ok",
                 **cls.get_detail_data(admin, request, refetch_pk),
             }
+            if messages:
+                result["messages"] = messages
+            return result
 
-        return {
+        result = {
             "status": "invalid",
-            "errors": _extract_form_errors(response.context_data),
+            "errors": _extract_form_errors(response),
         }
+        if messages:
+            result["messages"] = messages
+        return result
 
     # -- internals -------------------------------------------------------
 
@@ -771,35 +694,20 @@ class SBAdminMCPDetailService:
                         name = field.field["name"]
                         if name not in selected_set:
                             continue
-                        field_data[name] = {
-                            "value": cls._detail_readonly_value(
-                                name, obj, model_admin, request
-                            ),
-                            "readonly": True,
-                            "required": False,
-                            "widget": None,
-                        }
+                        field_data[name] = field_info(
+                            None,
+                            cls._detail_readonly_value(name, obj, model_admin, request),
+                            readonly=True,
+                        )
                     else:
                         bound = field.field
                         name = bound.name
                         if name not in selected_set:
                             continue
-                        widget = bound.field.widget
-                        entry: dict = {
-                            "value": cls._detail_form_value(bound, request),
-                            "readonly": False,
-                            "required": bool(bound.field.required),
-                            "widget": widget.__class__.__name__,
-                        }
-                        # ``widget_id`` is the dispatch key for the
-                        # ``autocomplete`` MCP tool — exposed only for
-                        # autocomplete-backed widgets that ship one.
-                        if isinstance(widget, AutocompleteFilterWidget):
-                            try:
-                                entry["widget_id"] = widget.get_id()
-                            except Exception:
-                                pass
-                        field_data[name] = entry
+                        field_data[name] = field_info(
+                            bound.field,
+                            cls._detail_form_value(bound, request),
+                        )
         return field_data
 
     # ------------------------------------------------------------------

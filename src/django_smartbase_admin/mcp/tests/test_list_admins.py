@@ -11,14 +11,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import path
 from filer.models import Folder, FolderPermission
 
 from django.db.models import F
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminRowAction
+from django_smartbase_admin.engine.actions import SBAdminRowAction, sbadmin_action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -65,6 +66,10 @@ class FolderRichListAdminsTestAdmin(SBAdmin):
     )
 
 
+urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
+
+
+@override_settings(ROOT_URLCONF=__name__)
 class ListAdminsTests(TestCase):
     """Each test registers its own ``FolderListAdminsTestAdmin`` and
     restores any pre-existing admin in tearDown so we don't clobber
@@ -99,12 +104,13 @@ class ListAdminsTests(TestCase):
         folder_entries = [e for e in result if e["view_id"] == "filer_folder"]
         self.assertEqual(len(folder_entries), 1, result)
         entry = folder_entries[0]
-        self.assertEqual(entry["admin_name"], "FolderListAdminsTestAdmin")
         self.assertEqual(entry["app_label"], "filer")
         self.assertEqual(entry["model"], "Folder")
-        # Folder is concrete, not a proxy.
-        self.assertEqual(entry["base_model"], "Folder")
-        self.assertFalse(entry["is_proxy"])
+        # Implementation-detail keys we deliberately removed from the
+        # public schema: ``admin_name``, ``base_model``, ``is_proxy``.
+        self.assertNotIn("admin_name", entry)
+        self.assertNotIn("base_model", entry)
+        self.assertNotIn("is_proxy", entry)
         # Plain string list_display entries surface as ``{"name": ...}``
         # only — there's no SBAdminField to resolve titles or filters from.
         self.assertEqual([f["name"] for f in entry["fields"]], ["id", "name"])
@@ -134,9 +140,9 @@ class ListAdminsTests(TestCase):
         ]
         self.assertIn("filer_folder", view_ids)
 
-    def test_proxy_model_disambiguation(self):
-        """Proxy admins must report the concrete underlying model so an
-        agent can tell two views over the same table apart."""
+    def test_proxy_model_surfaces_with_own_view_id(self):
+        """Proxy admins surface as their own entry, distinguishable by
+        ``view_id`` and ``model`` from the concrete admin."""
 
         class FolderProxy(Folder):
             class Meta:
@@ -155,10 +161,10 @@ class ListAdminsTests(TestCase):
 
             result = SBAdminTools(request=request).list_admins()
 
-            proxy = next(e for e in result if e["admin_name"] == "FolderProxyAdmin")
-            self.assertTrue(proxy["is_proxy"])
-            self.assertEqual(proxy["model"], "FolderProxy")
-            self.assertEqual(proxy["base_model"], "Folder")
+            view_ids = {e["view_id"]: e for e in result}
+            self.assertIn("filer_folder", view_ids)
+            self.assertIn("filer_folderproxy", view_ids)
+            self.assertEqual(view_ids["filer_folderproxy"]["model"], "FolderProxy")
         finally:
             sb_admin_site._registry.pop(FolderProxy, None)
 
@@ -199,6 +205,12 @@ class ListAdminsTests(TestCase):
             model = Folder
             list_display = ("id", "name")
 
+            @sbadmin_action
+            def action_archive_folder(self, request, modifier):
+                from django.http import HttpResponse
+
+                return HttpResponse("")
+
             def get_sbadmin_row_actions(self, request):
                 return [
                     SBAdminRowAction(
@@ -222,26 +234,23 @@ class ListAdminsTests(TestCase):
 
         sb_admin_site._registry.pop(Folder, None)
         sb_admin_site.register(Folder, FolderNestedRowActionsAdmin)
+        MCPToolTestConfig().init_view_map()
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
+        # MCP discovery flattens visual sub-action dropdowns to invocable
+        # leaves and drops url-only entries (agents can't invoke them).
         self.assertEqual(
             entry["row_actions"],
             [
                 {
-                    "title": "More",
-                    "kind": "group",
-                    "sub_actions": [
-                        {
-                            "title": "Archive",
-                            "kind": "method",
-                            "action_id": "action_archive_folder",
-                        },
-                        {"title": "Open", "kind": "url"},
-                    ],
-                }
+                    "title": "Archive",
+                    "kind": "method",
+                    "action_id": "action_archive_folder",
+                    "invoke_with": "invoke_row_action",
+                },
             ],
         )
 

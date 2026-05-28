@@ -121,6 +121,12 @@ class SBAdminFilterWidget(JSONSerializableMixin):
     def parse_value_from_input(self, request, filter_value):
         return filter_value
 
+    def validate_value(self, value) -> None:
+        if not isinstance(value, str):
+            raise ValueError(
+                f"{type(self).__name__} expects a string, got {type(value).__name__}: {value!r}"
+            )
+
     def get_filter_query_for_value(self, request, filter_value):
         parsed_value = self.parse_value_from_input(request, filter_value)
         if self.filter_query_lambda:
@@ -227,6 +233,13 @@ class BooleanFilterWidget(SBAdminFilterWidget):
         if input_value is None:
             return None
         return input_value
+
+    def validate_value(self, value) -> None:
+        if value is None or isinstance(value, bool):
+            return
+        raise ValueError(
+            f"BooleanFilterWidget expects a bool, got {type(value).__name__}: {value!r}"
+        )
 
     @classmethod
     def is_used_for_model_field_type(cls, model_field):
@@ -347,6 +360,12 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
             return q_objects
         return Q(**{f"{self.field.filter_field}__in": filter_value})
 
+    def validate_value(self, value) -> None:
+        if not isinstance(value, list):
+            raise ValueError(
+                f"MultipleChoiceFilterWidget expects a list of choice values, got {type(value).__name__}: {value!r}"
+            )
+
     def get_advanced_filter_operators(self):
         return [
             AllOperators.IN,
@@ -379,6 +398,17 @@ class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
         if filter_value[1] is not None:
             result &= Q(**{f"{self.field.filter_field}__lte": filter_value[1]})
         return result
+
+    def validate_value(self, value) -> None:
+        if not (isinstance(value, list) and len(value) == 2):
+            raise ValueError(
+                f"NumberRangeFilterWidget expects [min, max] (list of 2), got {type(value).__name__}: {value!r}"
+            )
+        for v in value:
+            if v is not None and not isinstance(v, (int, float)):
+                raise ValueError(
+                    f"NumberRangeFilterWidget bounds must be numbers or null, got {v!r}"
+                )
 
     def get_advanced_filter_operators(self):
         return NUMBER_ATTRIBUTES
@@ -573,6 +603,23 @@ class DateFilterWidget(SBAdminFilterWidget):
     def parse_value_from_input(self, request, filter_value):
         return self.get_range_from_value(filter_value)
 
+    def validate_value(self, value) -> None:
+        if not (isinstance(value, list) and len(value) == 2):
+            raise ValueError(
+                f"DateFilterWidget expects [start, end] (list of 2 ISO date strings), got {type(value).__name__}: {value!r}"
+            )
+        for v in value:
+            if v is None:
+                continue
+            if not isinstance(v, str):
+                raise ValueError(
+                    f"DateFilterWidget bounds must be 'YYYY-MM-DD' strings or null, got {v!r}"
+                )
+            if self._parse_date_string(v) is None:
+                raise ValueError(
+                    f"DateFilterWidget bound {v!r} is not a valid ISO-8601 date"
+                )
+
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
         if not filter_value or filter_value[0] is None or filter_value[1] is None:
             return self._EMPTY_RESULT_Q
@@ -704,6 +751,17 @@ class AutocompleteFilterWidget(
 
     def get_base_filter_query_for_parsed_value(self, request, parsed_value):
         return Q(**{f"{self.field.filter_field}__in": parsed_value})
+
+    def validate_value(self, value) -> None:
+        if not isinstance(value, list):
+            raise ValueError(
+                f"AutocompleteFilterWidget expects a list of {{'value', 'label'}} entries, got {type(value).__name__}: {value!r}"
+            )
+        for entry in value:
+            if not (isinstance(entry, dict) and "value" in entry):
+                raise ValueError(
+                    f"AutocompleteFilterWidget entries must be {{'value': <pk>, 'label': <str>}}, got {entry!r}"
+                )
 
     @classmethod
     def should_add_query(cls, model_field, search_term, numeric_term):

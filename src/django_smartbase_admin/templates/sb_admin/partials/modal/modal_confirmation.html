@@ -1,0 +1,24 @@
+{% extends "sb_admin/partials/modal/modal_content.html" %}
+{% load i18n %}
+
+{# Default confirmation step for ActionModalView subclasses with #}
+{# requires_confirmation = True. Renders ``message`` (templated from #}
+{# ``confirmation_message`` with the ``data`` dict) and replays the #}
+{# original POST as hidden inputs plus the ``_confirmed=1`` flag, so #}
+{# the Confirm button re-enters .post() and skips straight to #}
+{# process_form_valid. #}
+
+{% block modal_form_body %}
+    {% if message %}
+        <div class="text-14 text-dark-700 mb-16">{{ message }}</div>
+    {% endif %}
+    {% for key, value in form_data_items %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <input type="hidden" name="{{ confirmation_post_key }}" value="1">
+{% endblock %}
+
+{% block modal_footer %}
+    <button form="sb-admin-modal-form" type="button" class="btn btn-destructive" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
+    <button form="sb-admin-modal-form" type="submit" class="btn btn-primary">{% trans 'Confirm' %}</button>
+{% endblock %}

@@ -37,6 +37,10 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SIZE_NAME,
     TABLE_PARAMS_SORT_NAME,
 )
+from django_smartbase_admin.mcp.actions import (
+    SBAdminMCPActionFormService,
+    SBAdminMCPActionInvokeService,
+)
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.bridge import (
     build_columns_data,
@@ -49,6 +53,36 @@ from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.schema import admin_entry
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
+
+
+def _widgets_by_filter_field(admin, request) -> dict:
+    """Map of ``filter_field -> filter_widget`` for filterable columns."""
+    mapping: dict = {}
+    for field in (admin.get_field_map(request) or {}).values():
+        if getattr(field, "filter_disabled", False):
+            continue
+        widget = getattr(field, "filter_widget", None)
+        if widget is None:
+            continue
+        mapping[getattr(field, "filter_field", None) or field.name] = widget
+    return mapping
+
+
+def _validate_filter_data(admin, request, filter_data: dict | None) -> None:
+    """Reject unknown filter keys and wrong-shape values up front so the
+    agent sees a clear ``invalid`` instead of an ambiguous empty result.
+    """
+    if not filter_data:
+        return
+    widgets = _widgets_by_filter_field(admin, request)
+    unknown = [k for k in filter_data if k not in widgets]
+    if unknown:
+        raise ValueError(
+            f"Unknown filter key(s) {unknown!r}. "
+            f"Known filters on {admin.get_id()!r}: {sorted(widgets)}"
+        )
+    for key, value in filter_data.items():
+        widgets[key].validate_value(value)
 
 
 def _clear_thread_local_after_call(method):
@@ -75,84 +109,73 @@ class SBAdminTools(MCPToolset):
     """Tools over the SBAdmin admin surface.
 
     Every tool runs as the authenticated user — same permissions, row
-    isolation, filters, and column rules the user would see in the UI.
-    Discovery (``list_admins``, ``fetch_add_form``) and reads
-    (``list_rows``, ``fetch_detail``, ``autocomplete``) are read-only;
-    ``update_detail`` and ``create_object`` write through the same
-    change-form pipeline the UI uses.
+    isolation, and filters they'd see in the UI.
 
-    Typical agent flow:
-      1. ``list_admins`` once per session to discover ``view_id``s,
-         field/filter/inline handles, and ``widget_id``s.
+    Typical flow:
+      1. ``list_admins`` once per session for ``view_id``s, field /
+         filter / inline handles, and ``widget_id``s.
       2. ``autocomplete`` to turn human-readable names into row ids
          before filtering or writing.
-      3. ``list_rows`` (optionally with ``include_inlines``) to scan,
-         then ``fetch_detail`` to read one object in full.
-      4. ``update_detail`` to write — echo the ``fetch_detail`` payload
-         back with edits, or send a sparse ``field_values`` /
-         ``inlines`` patch. For new objects call ``fetch_add_form``
-         first to discover the field shape, then ``create_object``.
+      3. ``list_rows`` (optionally ``include_inlines``) to scan, then
+         ``fetch_detail`` to read one object in full.
+      4. ``update_detail`` / ``create_object`` to write. For new
+         objects call ``fetch_add_form`` first for the field shape.
 
-    Writes go through Django's full validation + save cycle, including
-    inline formsets. Validation failures come back as
-    ``{"status": "invalid", "errors": ...}`` with no DB change so the
-    agent can retry; permission denials raise ``PermissionError`` and
-    invisible objects raise ``LookupError`` (matching the UI's "not
-    found" branch).
+    Validation failures come back as ``{"status": "invalid",
+    "errors": ...}`` with no DB change; permission denials raise
+    ``PermissionError``; invisible objects raise ``LookupError``.
     """
 
     @_clear_thread_local_after_call
     def list_admins(self) -> list[dict]:
         """List the admins the current user can view.
 
-        Returns one entry per admin the caller has read access to. Use
-        this to discover what's available before calling other tools —
-        the field, filter, inline, and action handles other tools
-        accept come from here.
+        Use this to discover the handles every other tool accepts —
+        ``view_id``, field/filter names, ``widget_id``s, inline names,
+        and ``action_id``s.
 
         Schema per entry:
-          - ``admin_name``: admin class name (e.g. ``"ArticleAdmin"``).
-          - ``view_id``: handle to pass to other tools as ``view_id``,
-            shaped ``"<app_label>_<model_name>"``.
-          - ``app_label``, ``model``, ``base_model``, ``is_proxy``:
-            identity hints — useful for telling apart proxies that
-            point at the same underlying table.
+          - ``view_id``: pass to other tools as ``view_id``.
+          - ``app_label``, ``model``: match against ``target_model`` on
+            filter widgets.
           - ``verbose_name``, ``verbose_name_plural``: display names.
-          - ``fields``: list of list-view columns visible to this user.
-            Each descriptor is ``{"name", "title", "list_visible"}``
-            plus an optional ``"filter"`` block — present when the
-            column is filterable. The filter block carries the widget
-            kind plus any extras the agent needs to construct a
-            ``filter_data`` value (``"choices"`` for choice-style
-            widgets, ``"multiselect"`` and ``"target_model"`` for
-            autocomplete widgets).
+          - ``fields``: list-view columns. Each is
+            ``{"name", "title", "list_visible"}`` plus an optional
+            ``"filter"`` block — present when the column is filterable.
+            The filter block carries the widget kind plus any extras
+            needed to build a ``filter_data`` value (``"choices"`` for
+            choice widgets, ``"multiselect"`` and ``"target_model"``
+            for autocomplete widgets).
           - ``search_fields``: columns the ``full_text_search`` arg on
             ``list_rows`` matches against. Empty list means free-text
-            search has no effect on this admin — filter via
-            ``filter_data`` or ``autocomplete`` instead.
-          - ``detail_fields``: flat list of field names the detail
-            page renders, in display order. Per-field metadata
-            (readonly / widget) ships with the values from
-            ``fetch_detail``, not here. Use these names with
-            ``fetch_detail(fields=...)`` to project a subset.
-          - ``inlines``: related-model views reachable through this
-            admin. Each entry: ``inline_name`` (handle keying the
-            ``inlines`` block on ``fetch_detail`` and the
-            ``list_rows(include_inlines=...)`` spec), ``model``
-            (``"<app>.<Model>"``), ``verbose_name`` /
-            ``verbose_name_plural``, ``join_kind`` (``"fk"`` /
-            ``"generic"`` / ``"fake"`` — for the agent's own
-            classification, not a wire detail), and ``fields`` (the
-            inline's available column names).
-          - ``row_actions``: per-row actions declared on the admin.
-            Each entry: ``title``, ``kind`` (``"method"`` —
-            non-interactive callable; ``"modal"`` — opens a form;
-            ``"url"`` — plain link; ``"group"`` — dropdown with
-            ``sub_actions``), and a handle (``action_id`` for
-            method/modal, ``target_view`` class name for modal).
-            Resolved per-row state (URLs, icons, whether the action is
-            enabled for that row) is intentionally not returned —
-            invoke the action to act, not to inspect.
+            search is a no-op on this admin.
+          - ``detail_fields``: detail-page field names, in display
+            order. Pass to ``fetch_detail(fields=...)`` to project a
+            subset; per-field metadata ships with the values.
+          - ``inlines``: related rows reachable from the detail page.
+            Each entry: ``inline_name`` (key for
+            ``fetch_detail.inlines`` and
+            ``list_rows(include_inlines=...)``), ``view_id`` (pass to
+            ``invoke_inline_action`` when invoking inline actions),
+            ``model`` (``"<app>.<Model>"``), ``verbose_name`` /
+            ``verbose_name_plural``, ``join_kind`` (``"fk"`` or
+            ``"generic"``), ``fields``, and ``inline_actions``.
+
+          Action lists — every entry is
+          ``{"title", "kind", "action_id", "invoke_with",
+          "requires_confirmation"?}``. ``kind`` is ``"method"`` (calls
+          a server-side method) or ``"modal"`` (opens a form — fetch
+          the schema with ``fetch_action_form`` first). ``invoke_with``
+          names the MCP tool to call. ``requires_confirmation: true``
+          means the first invoke returns ``needs_confirmation``; pass
+          ``confirmed=True`` on the second call to commit. Sub-actions
+          (visual dropdown groups in the UI) are flattened to siblings.
+
+          - ``row_actions``: per-row buttons on the list view.
+          - ``detail_actions``: buttons on the change / detail form.
+          - ``list_actions``: global buttons above the list, no row
+            context (e.g. "Create…" modals, exports).
+          - ``selection_actions``: bulk buttons over selected rows.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -198,11 +221,15 @@ class SBAdminTools(MCPToolset):
             ``list_admins[].fields[].name``. The primary key is always
             included for row identity.
           filter_data: ``{filter_field: value}`` mapping. The value
-            shape per filter depends on the widget reported by
-            ``list_admins``: choice filters take a string, multi /
-            autocomplete filters take a list of
-            ``{"value": …, "label": …}`` entries, boolean filters take
-            a bool, date/string filters take a string.
+            shape per filter is reported on the filter entry in
+            ``list_admins[].fields[].filter`` as ``value_shape`` /
+            ``example`` — copy that shape literally. Quick reference:
+            choice → string; multi-choice → list of strings;
+            autocomplete → list of ``{"value", "label"}`` entries;
+            boolean → bool; date → ``["YYYY-MM-DD", "YYYY-MM-DD"]``
+            (either side may be ``null``); number range → ``[min, max]``;
+            string → substring. Unknown keys are rejected — misspellings
+            raise instead of silently returning every row.
           page, page_size: pagination, 1-indexed.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
             entries, applied in order.
@@ -226,8 +253,9 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
+        _validate_filter_data(admin, request, filter_data)
         columns_data = build_columns_data(admin, request, fields)
 
         table_params: dict = {
@@ -323,7 +351,7 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         try:
             return SBAdminMCPDetailService.get_detail_data(
@@ -357,11 +385,57 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         try:
             return SBAdminMCPDetailService.get_add_form_data(
                 admin, request, fields=fields
+            )
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
+
+    @_clear_thread_local_after_call
+    def fetch_action_form(
+        self,
+        view_id: str,
+        action_id: str,
+        object_id: str | None = None,
+    ) -> dict:
+        """Fetch the form schema for a modal action — prerequisite for invoking it.
+
+        Works for any action with ``kind == "modal"`` in ``list_admins``.
+        ``action_id`` always comes from discovery.
+
+        Pass ``object_id`` when the action is row- or detail-scoped so
+        the form is pre-populated with that row's current values. Omit
+        for list-level / selection modals that have no single-row context.
+
+        Returns ``{"title": "…", "fields": {<name>: <info>, …}}`` where
+        each ``<info>`` is:
+
+          - ``label``        — human-readable field label.
+          - ``value``        — initial / default value, or ``None``.
+          - ``required``     — whether a blank submission is rejected.
+          - ``widget``       — widget class name hint.
+          - ``target_model`` — present on relational fields
+            (``"<app>.<Model>"``); use with ``autocomplete`` to resolve
+            a name to a pk before submitting.
+          - ``widget_id``    — present on autocomplete-backed widgets;
+            pass directly to the ``autocomplete`` tool.
+          - ``choices``      — present on flat-choice fields; list of
+            ``{"value": …, "label": …}``.
+
+        Raises ``LookupError`` if ``action_id`` is not a known modal
+        action on ``view_id``, or if ``object_id`` is required but not
+        visible. Raises ``PermissionError`` if access is denied.
+        """
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+        try:
+            return SBAdminMCPActionFormService.get_action_form_data(
+                admin, request, action_id, object_id=object_id
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
@@ -409,7 +483,7 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         try:
             return SBAdminMCPDetailService.create_object_data(
@@ -465,7 +539,7 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         try:
             return SBAdminMCPDetailService.update_detail_data(
@@ -477,6 +551,399 @@ class SBAdminTools(MCPToolset):
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
+
+    @_clear_thread_local_after_call
+    def get_audit_history(
+        self,
+        view_id: str,
+        object_id: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        """Audit log entries for an admin's model, paginated newest-first.
+
+        Same data the "History" button on the list / detail page would
+        show. Pass ``object_id`` to scope to one object's history; omit
+        for everything on the model. Only available when the admin has
+        ``sbadmin_list_history_enabled`` (the default) and the audit app
+        is installed.
+
+        Args:
+          view_id: handle from ``list_admins``.
+          object_id: optional row id; ``None`` returns all entries for
+            the model.
+          page, page_size: pagination, 1-indexed.
+
+        Returns ``{"data": [<entry>, ...], "page": int, "page_size": int,
+        "last_row": int}`` where each ``<entry>`` is ``{"id", "timestamp",
+        "action_type", "user", "object_id", "object_repr", "is_bulk",
+        "bulk_count", "changes", "source"}``.
+
+        Raises ``LookupError`` if history is disabled on this admin or
+        the audit app isn't installed.
+        """
+        from django.apps import apps as django_apps
+
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        if not getattr(admin, "sbadmin_list_history_enabled", False):
+            raise LookupError(f"Audit history is disabled on view_id={view_id!r}.")
+        if not django_apps.is_installed("django_smartbase_admin.audit"):
+            raise LookupError(
+                "Audit app (`django_smartbase_admin.audit`) is not installed."
+            )
+
+        admin.init_view_dynamic(request, request.request_data)
+        from django_smartbase_admin.audit.mcp import get_admin_history
+
+        return get_admin_history(
+            admin,
+            request=request,
+            object_id=object_id,
+            page=page,
+            page_size=page_size,
+        )
+
+    @_clear_thread_local_after_call
+    def delete_objects(
+        self,
+        view_id: str,
+        object_ids: list,
+        confirmed: bool = False,
+    ) -> dict:
+        """Delete one or more objects on an admin.
+
+        Real deletes — destructive and irrecoverable.
+
+        Two-step contract:
+          1. First call (``confirmed=False``) returns
+             ``{"status": "needs_confirmation", "message": "...",
+             "data": {"count": N, "sample": [...], "cascade": {...}}}``.
+             ``cascade`` lists every related model that will be deleted
+             alongside the target.
+          2. Second call with ``confirmed=True`` performs the delete.
+
+        Prerequisites:
+          1. Call ``list_rows`` with the filter that identifies your
+             candidates and verify the ids.
+          2. Confirm the affected ids + count with the user before
+             passing ``confirmed=True``.
+
+        Args:
+          view_id: handle from ``list_admins``.
+          object_ids: non-empty list of row ids (as strings).
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}`` after delete,
+        ``{"status": "needs_confirmation", ...}`` on the first call, or
+        ``{"status": "invalid", "errors": {"non_field": [...]}}`` if a
+        protected ForeignKey blocks the delete.
+
+        Raises ``ValueError`` if ``object_ids`` is empty,
+        ``PermissionError`` if delete permission is missing.
+        """
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+        return SBAdminMCPActionInvokeService.delete_objects(
+            admin,
+            request,
+            object_ids=object_ids,
+            confirmed=confirmed,
+        )
+
+    @_clear_thread_local_after_call
+    def invoke_row_action(
+        self,
+        view_id: str,
+        action_id: str,
+        object_id: str,
+        field_values: dict | None = None,
+        confirmed: bool = False,
+    ) -> dict:
+        """Invoke a row action against one object.
+
+        Side effects match clicking the action in the UI — writes,
+        deletes, and external API calls are real and irrecoverable.
+
+        Prerequisites:
+          1. Resolve the target via ``fetch_detail`` or ``list_rows``.
+          2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
+             action_id, object_id)`` for the form schema, then use
+             ``autocomplete`` for any ``target_model`` FK fields.
+
+        Args:
+          view_id: admin handle from ``list_admins``.
+          action_id: ``action_id`` from ``list_admins[].row_actions``.
+          object_id: target row id (as a string).
+          field_values: form submission for ``kind == "modal"``; absent
+            for ``kind == "method"``. Accepts raw scalars/pks or the
+            ``{"value", "label"}`` envelope.
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}``,
+        ``{"status": "invalid", "errors": {...}}``, or
+        ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
+        Cross-field / view-raised errors under ``"non_field"``.
+
+        Raises ``PermissionError`` if access is denied, ``LookupError``
+        if the action / object isn't visible, ``ValueError`` if
+        ``field_values`` is supplied for a method action.
+        """
+        return self._invoke_per_object(
+            view_id,
+            action_id,
+            object_id,
+            field_values,
+            confirmed,
+        )
+
+    @_clear_thread_local_after_call
+    def invoke_detail_action(
+        self,
+        view_id: str,
+        action_id: str,
+        object_id: str,
+        field_values: dict | None = None,
+        confirmed: bool = False,
+    ) -> dict:
+        """Invoke a detail-page action against one object.
+
+        Side effects match clicking the action in the UI — writes,
+        deletes, and external API calls are real and irrecoverable.
+
+        Prerequisites:
+          1. Resolve the target via ``fetch_detail`` or ``list_rows``.
+          2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
+             action_id, object_id)`` for the form schema, then use
+             ``autocomplete`` for any ``target_model`` FK fields.
+
+        Args:
+          view_id: admin handle from ``list_admins``.
+          action_id: ``action_id`` from ``list_admins[].detail_actions``.
+          object_id: target row id (as a string).
+          field_values: form submission for ``kind == "modal"``; absent
+            for ``kind == "method"``. Accepts raw scalars/pks or the
+            ``{"value", "label"}`` envelope.
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}``,
+        ``{"status": "invalid", "errors": {...}}``, or
+        ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
+        Cross-field / view-raised errors under ``"non_field"``.
+
+        Raises ``PermissionError`` if access is denied, ``LookupError``
+        if the action / object isn't visible, ``ValueError`` if
+        ``field_values`` is supplied for a method action.
+        """
+        return self._invoke_per_object(
+            view_id,
+            action_id,
+            object_id,
+            field_values,
+            confirmed,
+        )
+
+    @_clear_thread_local_after_call
+    def invoke_inline_action(
+        self,
+        view_id: str,
+        action_id: str,
+        object_id: str,
+        field_values: dict | None = None,
+        confirmed: bool = False,
+    ) -> dict:
+        """Invoke an inline-list action against one inline row.
+
+        Side effects match clicking the action in the UI — writes,
+        deletes, and external API calls are real and irrecoverable.
+
+        Prerequisites:
+          1. Resolve the target via ``list_rows(include_inlines=...)``
+             so you have the inline row's pk and current state.
+          2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
+             action_id, object_id)`` for the form schema, then use
+             ``autocomplete`` for any ``target_model`` FK fields.
+
+        Args:
+          view_id: inline's ``view_id`` from
+            ``list_admins[<parent>].inlines[].view_id`` (not the parent's).
+          action_id: ``action_id`` from
+            ``list_admins[<parent>].inlines[].inline_actions``.
+          object_id: inline row pk (as a string).
+          field_values: form submission for ``kind == "modal"``; absent
+            for ``kind == "method"``. Accepts raw scalars/pks or the
+            ``{"value", "label"}`` envelope.
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}``,
+        ``{"status": "invalid", "errors": {...}}``, or
+        ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
+        Cross-field / view-raised errors under ``"non_field"``.
+
+        Raises ``PermissionError`` if access is denied, ``LookupError``
+        if the action / object isn't visible, ``ValueError`` if
+        ``field_values`` is supplied for a method action.
+        """
+        return self._invoke_per_object(
+            view_id,
+            action_id,
+            object_id,
+            field_values,
+            confirmed,
+        )
+
+    def _invoke_per_object(
+        self,
+        view_id,
+        action_id,
+        object_id,
+        field_values,
+        confirmed,
+    ):
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+        return SBAdminMCPActionInvokeService.invoke_row(
+            admin,
+            request,
+            action_id=action_id,
+            object_id=object_id,
+            field_values=field_values,
+            confirmed=confirmed,
+        )
+
+    @_clear_thread_local_after_call
+    def invoke_selection_action(
+        self,
+        view_id: str,
+        action_id: str,
+        object_ids: list,
+        field_values: dict | None = None,
+        confirmed: bool = False,
+        modifier: str | None = None,
+    ) -> dict:
+        """Invoke a selection (bulk) action over an explicit id list.
+
+        Side effects match clicking the action in the UI on a selected
+        set of rows — writes, deletes, and external API calls are real
+        and irrecoverable.
+
+        Prerequisites you must satisfy before calling:
+          1. Call ``list_rows`` (with the ``filter_data`` /
+             ``full_text_search`` that identifies your candidates) and
+             verify exactly which rows you intend to act on.
+          2. For destructive actions (delete, archive, etc.), confirm
+             the affected ids and count with the user.
+          3. For ``kind == "modal"``: call ``fetch_action_form(view_id,
+             action_id)`` for the form shape.
+
+        ``object_ids`` is the explicit, canonical selection. Empty lists
+        are rejected so accidental "operate on everything" is impossible.
+
+        Args:
+          view_id: handle from ``list_admins``.
+          action_id: ``action_id`` from
+            ``list_admins[].selection_actions``.
+          object_ids: non-empty list of row ids (as strings).
+          field_values: form submission for ``kind == "modal"``; absent
+            for ``kind == "method"``.
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}`` on success
+        (``messages`` typically carries the affected-row count from the
+        view), ``{"status": "invalid", "errors": {...}}`` on modal
+        validation failure, or ``{"status": "needs_confirmation",
+        "message": "...", "data": {...}}`` when the action wants explicit
+        confirmation. Cross-field / view-raised errors appear under the
+        key ``"non_field"``.
+
+        Raises ``ValueError`` if ``object_ids`` is empty,
+        ``PermissionError`` if access is denied.
+        """
+
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+        return SBAdminMCPActionInvokeService.invoke_selection(
+            admin,
+            request,
+            action_id=action_id,
+            object_ids=object_ids,
+            field_values=field_values,
+            confirmed=confirmed,
+            modifier=modifier,
+        )
+
+    @_clear_thread_local_after_call
+    def invoke_list_action(
+        self,
+        view_id: str,
+        action_id: str,
+        field_values: dict | None = None,
+        filter_data: dict | None = None,
+        full_text_search: str | None = None,
+        confirmed: bool = False,
+        modifier: str | None = None,
+    ) -> dict:
+        """Invoke a list-level action (no row context).
+
+        Side effects match clicking the action in the UI — creates,
+        exports, and external API calls are real.
+
+        Prerequisites you must satisfy before calling:
+          1. If ``filter_data`` / ``full_text_search`` is supplied, call
+             ``list_rows`` with the same filter to confirm the scope.
+          2. For ``kind == "modal"`` (e.g. "Create …"): call
+             ``fetch_action_form(view_id, action_id)`` for the form
+             shape, then use ``autocomplete`` for any ``target_model``
+             FK fields.
+
+        Args:
+          view_id: handle from ``list_admins``.
+          action_id: ``action_id`` from
+            ``list_admins[].list_actions``.
+          field_values: form submission for ``kind == "modal"``; absent
+            for ``kind == "method"``.
+          filter_data, full_text_search: optional scope, same shapes as
+            ``list_rows`` — only used by filter-aware actions.
+          confirmed: set to ``True`` on the second call after a
+            ``needs_confirmation`` response.
+
+        Returns ``{"status": "ok", "messages": [...]}`` on success,
+        ``{"status": "invalid", "errors": {...}}`` on modal validation
+        failure, or ``{"status": "needs_confirmation", "message": "...",
+        "data": {...}}`` when the action wants explicit confirmation.
+        Cross-field / view-raised errors appear under the key
+        ``"non_field"``.
+
+        Raises ``PermissionError`` if access is denied.
+        """
+
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+        _validate_filter_data(admin, request, filter_data)
+        return SBAdminMCPActionInvokeService.invoke_list(
+            admin,
+            request,
+            action_id=action_id,
+            field_values=field_values,
+            filter_data=filter_data,
+            full_text_search=full_text_search,
+            confirmed=confirmed,
+            modifier=modifier,
+        )
 
     @_clear_thread_local_after_call
     def autocomplete(
@@ -514,7 +981,7 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id)
+        admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 
         set_request_payload(

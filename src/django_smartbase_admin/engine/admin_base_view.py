@@ -212,6 +212,11 @@ class SBAdminBaseView(object):
         return action
 
     def _register_form_view_action(self, target_view, action_id=None) -> str:
+        # Mutates the admin singleton: attaches a synthetic delegate
+        # method named after the modal's ``action_id`` so URL dispatch
+        # (and MCP invocation) can reach it via ``getattr(admin,
+        # action_id)``. Idempotent — the ``hasattr`` guard skips
+        # already-registered ids on subsequent calls.
         action_id = action_id or getattr(target_view, "action_id", None)
         action_id = action_id or target_view.__name__
         if not hasattr(self, action_id):
@@ -630,7 +635,19 @@ class SBAdminBaseView(object):
         if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
             value = field.xlsx_options.python_formatter(obj_id, value)
         elif field.python_formatter:
-            value = field.python_formatter(obj_id, value)
+            # MCP wants one canonical wire format. Bypass the built-in
+            # locale-aware formatters (date / datetime / boolean) so the
+            # JSON encoder emits raw values (ISO 8601 for dates, native
+            # bools). Custom ``python_formatter``s still run — they
+            # carry app logic the agent expects. Flag lives on
+            # ``request`` because ``request_data`` gets rebuilt mid-flow.
+            from django_smartbase_admin.engine.field_formatter import (
+                LOCALE_DEPENDENT_FORMATTERS,
+            )
+
+            is_mcp = getattr(request, "is_mcp", False)
+            if not (is_mcp and field.python_formatter in LOCALE_DEPENDENT_FORMATTERS):
+                value = field.python_formatter(obj_id, value)
         return value
 
 

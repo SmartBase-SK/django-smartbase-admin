@@ -232,11 +232,13 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
 
         sb_admin_site._registry.pop(Folder, None)
         sb_admin_site.register(Folder, NoInlineAdmin)
+        MCPToolTestConfig().init_view_map()
         try:
             result = self._fetch(self.folder.pk, fields=["name"])
         finally:
             sb_admin_site._registry.pop(Folder, None)
             sb_admin_site.register(Folder, self.admin_class)
+            MCPToolTestConfig().init_view_map()
 
         self.assertEqual(result["inlines"], {})
 
