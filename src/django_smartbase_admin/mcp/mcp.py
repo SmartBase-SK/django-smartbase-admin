@@ -63,7 +63,7 @@ def _known_filter_fields(admin, request) -> set[str]:
     ``filter_widget`` means the field isn't filterable.
     """
     known: set[str] = set()
-    for field in admin.get_sbadmin_list_display(request) or []:
+    for field in (admin.get_field_map(request) or {}).values():
         if getattr(field, "filter_disabled", False):
             continue
         if getattr(field, "filter_widget", None) is None:
