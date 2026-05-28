@@ -186,7 +186,7 @@ class SBAdminBaseView(object):
                 action.sub_actions = resolved_sub_actions
             return action
         target_view = getattr(action, "target_view", None)
-        source_view = getattr(action, "view", self)
+        source_view = getattr(action, "view", None) or self
         if target_view is not None:
             resolved_action = copy(action)
             action_id = source_view._register_form_view_action(
