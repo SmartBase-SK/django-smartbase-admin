@@ -55,39 +55,34 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.services.views import SBAdminViewService
 
 
-def _known_filter_fields(admin, request) -> set[str]:
-    """Set of valid keys for ``filter_data`` on this admin.
-
-    Each ``SBAdminField`` exposes its filter under ``filter_field`` (or
-    its ``name`` when ``filter_field`` is unset); a missing
-    ``filter_widget`` means the field isn't filterable.
-    """
-    known: set[str] = set()
+def _widgets_by_filter_field(admin, request) -> dict:
+    """Map of ``filter_field -> filter_widget`` for filterable columns."""
+    mapping: dict = {}
     for field in (admin.get_field_map(request) or {}).values():
         if getattr(field, "filter_disabled", False):
             continue
-        if getattr(field, "filter_widget", None) is None:
+        widget = getattr(field, "filter_widget", None)
+        if widget is None:
             continue
-        known.add(getattr(field, "filter_field", None) or field.name)
-    return known
+        mapping[getattr(field, "filter_field", None) or field.name] = widget
+    return mapping
 
 
-def _validate_filter_keys(admin, request, filter_data: dict | None) -> None:
-    """Reject filter_data keys the admin can't actually filter on.
-
-    Silent acceptance (the previous behavior) returns *all* rows when a
-    key is misspelled — disastrous for an agent that reports aggregates
-    from the response. Raise so the caller sees a clear ``invalid``.
+def _validate_filter_data(admin, request, filter_data: dict | None) -> None:
+    """Reject unknown filter keys and wrong-shape values up front so the
+    agent sees a clear ``invalid`` instead of an ambiguous empty result.
     """
     if not filter_data:
         return
-    known = _known_filter_fields(admin, request)
-    unknown = [k for k in filter_data if k not in known]
+    widgets = _widgets_by_filter_field(admin, request)
+    unknown = [k for k in filter_data if k not in widgets]
     if unknown:
         raise ValueError(
             f"Unknown filter key(s) {unknown!r}. "
-            f"Known filters on {admin.get_id()!r}: {sorted(known)}"
+            f"Known filters on {admin.get_id()!r}: {sorted(widgets)}"
         )
+    for key, value in filter_data.items():
+        widgets[key].validate_value(value)
 
 
 def _clear_thread_local_after_call(method):
@@ -260,7 +255,7 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        _validate_filter_keys(admin, request, filter_data)
+        _validate_filter_data(admin, request, filter_data)
         columns_data = build_columns_data(admin, request, fields)
 
         table_params: dict = {
@@ -938,7 +933,7 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        _validate_filter_keys(admin, request, filter_data)
+        _validate_filter_data(admin, request, filter_data)
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,
