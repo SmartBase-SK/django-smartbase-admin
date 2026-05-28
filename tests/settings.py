@@ -13,15 +13,28 @@ import os
 
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
 
-# Default: in-memory SQLite. Override via SBADMIN_TEST_DATABASE_URL to
-# run against Postgres (required for plugin data-path tests that use
-# ArrayAgg).
+# Local dev defaults to the sandbox Postgres (covers JSON ``__contains``,
+# ArrayAgg, and other Postgres-only features that are part of the
+# production contract). GitHub Actions / lightweight runs can opt into
+# SQLite via:
+#   export SBADMIN_TEST_DATABASE_URL="sqlite://"
+# Any other Postgres deployment via:
 #   export SBADMIN_TEST_DATABASE_URL="postgresql://user:pass@host:port/db"
-_db_url = os.environ.get("SBADMIN_TEST_DATABASE_URL")
-if _db_url:
-    from urllib.parse import urlparse
+from urllib.parse import urlparse
 
-    _parsed = urlparse(_db_url)
+_db_url = os.environ.get(
+    "SBADMIN_TEST_DATABASE_URL",
+    "postgresql://dummy-user:dummy-password@localhost:5433/wfm_admin",
+)
+_parsed = urlparse(_db_url)
+if _parsed.scheme.startswith("sqlite"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _parsed.path.lstrip("/") or ":memory:",
+        }
+    }
+else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -30,13 +43,6 @@ if _db_url:
             "PASSWORD": _parsed.password or "",
             "HOST": _parsed.hostname or "",
             "PORT": str(_parsed.port or ""),
-        }
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
         }
     }
 

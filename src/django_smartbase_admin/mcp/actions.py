@@ -135,10 +135,9 @@ def action_entries_for(action) -> list[dict]:
         "kind": action_kind(action),
         "action_id": action_id,
     }
-    # Surface ``action_modifier`` so the agent can echo it back on
-    # ``invoke_list_action`` / ``invoke_selection_action`` — required
-    # for actions that branch on it (e.g. ``IGNORE_LIST_SELECTION``
-    # for whole-list exports). Omitted when it's the default.
+    # ``collect_action_entries`` strips this for invoke tools that don't
+    # accept a modifier (row / detail / inline route through
+    # ``invoke_row`` which forces ``"template"``).
     modifier = getattr(action, "action_modifier", None)
     if modifier:
         entry["modifier"] = modifier
@@ -183,12 +182,21 @@ def collect_action_entries(
         return []
 
     invoke_with = _INVOKE_TOOL_BY_GETTER.get(getter_name)
+    # Only list / selection invoke tools accept a ``modifier`` parameter.
+    # Strip it from entries whose invoke tool would ignore it so the
+    # agent doesn't see a value it can't use.
+    surface_modifier = invoke_with in {
+        "invoke_list_action",
+        "invoke_selection_action",
+    }
     entries: list[dict] = []
     for action in actions:
         try:
             for entry in action_entries_for(action):
                 if invoke_with is not None:
                     entry["invoke_with"] = invoke_with
+                if not surface_modifier:
+                    entry.pop("modifier", None)
                 entries.append(entry)
         except Exception:
             logger.warning(
@@ -200,17 +208,32 @@ def collect_action_entries(
     return entries
 
 
-def build_modal_view(target_view_cls, admin, request, modifier):
+def build_modal_view(target_view_cls, admin, request, modifier, object_id=None):
     """Construct and bind a modal view to admin / request / modifier.
 
     Shared by form discovery (``get_action_form_data``), unbound-form
     construction for invoke (``_build_unbound_form``), and the
     rebuild-for-error-extraction step (``_normalize_modal_response``).
-    Caller switches ``request.method`` as needed.
+    Caller switches ``request.method`` as needed. ``object_id`` mirrors
+    the URL kwarg ``RowActionModalView.get_object_id`` looks up first,
+    so the unbound-form build can resolve the row even though the real
+    ``delegate_to_action`` hasn't run yet to populate ``request_data``.
     """
     view = target_view_cls(view=admin)
     view.request = request
-    view.kwargs = {"modifier": modifier} if modifier is not None else {}
+    kwargs: dict = {}
+    if modifier is not None:
+        kwargs["modifier"] = modifier
+    if object_id is not None:
+        kwargs["object_id"] = object_id
+        # ``RowActionModalView.get_object_id`` checks
+        # ``request_data.object_id`` first — populate it so the
+        # fallback to ``kwargs["modifier"]`` doesn't pick up
+        # ``"template"`` and miscast it as a pk.
+        rd = getattr(request, "request_data", None)
+        if rd is not None:
+            rd.object_id = object_id
+    view.kwargs = kwargs
     return view
 
 
@@ -455,17 +478,20 @@ class SBAdminMCPActionInvokeService:
         field_values: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
-        """Invoke a row / detail action against one object.
+        """Invoke a row / detail / inline action against one object.
 
         For modal-kind actions, ``field_values`` is the form submission;
         for method-kind actions it must be ``None`` / empty. Set
         ``confirmed=True`` after seeing a ``needs_confirmation`` response.
+        Object id flows through ``request_data.object_id`` (the same URL
+        kwarg slot the UI uses), not through ``modifier``.
         """
         return cls._invoke(
             admin,
             request,
             action_id=action_id,
-            modifier=str(object_id),
+            modifier="template",
+            object_id=str(object_id),
             field_values=field_values,
             confirmed=confirmed,
         )
@@ -559,6 +585,7 @@ class SBAdminMCPActionInvokeService:
         action_id: str,
         modifier: str | None,
         field_values: dict | None,
+        object_id: str | None = None,
         base_params: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
@@ -572,16 +599,16 @@ class SBAdminMCPActionInvokeService:
                 )
             post_qd = QueryDict(mutable=True)
         else:
-            action, target_view_cls = modal
+            _action, target_view_cls = modal
             # Wire up the synthetic @sbadmin_action wrapper if the UI
             # render path hasn't already done so this process.
             if not hasattr(admin, action_id):
-                admin._register_form_view_actions([action])
+                admin._register_form_view_action(target_view_cls, action_id)
             # Widget-aware POST encoding: build the form unbound to get
             # the widget map, then route field_values through each
             # widget (handles MultiWidget, autocomplete list-shape, etc.).
             unbound_form = cls._build_unbound_form(
-                target_view_cls, admin, request, modifier
+                target_view_cls, admin, request, modifier, object_id=object_id
             )
             post_qd = encode_field_values(unbound_form, field_values or {})
             if confirmed:
@@ -609,6 +636,7 @@ class SBAdminMCPActionInvokeService:
                 view=admin.get_id(),
                 action=action_id,
                 modifier=modifier,
+                object_id=object_id,
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
@@ -650,7 +678,9 @@ class SBAdminMCPActionInvokeService:
             return None
 
     @classmethod
-    def _build_unbound_form(cls, target_view_cls, admin, request, modifier):
+    def _build_unbound_form(
+        cls, target_view_cls, admin, request, modifier, object_id=None
+    ):
         """Construct the modal view's form without binding POST data.
 
         Mirrors :meth:`SBAdminMCPActionFormService.get_action_form_data`'s
@@ -660,7 +690,9 @@ class SBAdminMCPActionInvokeService:
         Used by invoke to introspect the widget map before encoding the
         agent's submission.
         """
-        view = build_modal_view(target_view_cls, admin, request, modifier)
+        view = build_modal_view(
+            target_view_cls, admin, request, modifier, object_id=object_id
+        )
 
         saved_method = request.method
         set_request_payload(request, method="GET")
