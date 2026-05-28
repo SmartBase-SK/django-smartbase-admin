@@ -913,6 +913,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             "stickyHeaderAndFooter": sticky_header_and_footer,
+            "enableUrlCompression": request.request_data.configuration.enable_url_compression,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -1083,7 +1084,11 @@ class SBAdminBaseListView(SBAdminBaseView):
                 self.get_action_url("action_bulk_delete")
                 + "?"
                 + urllib.parse.urlencode(
-                    {BASE_PARAMS_NAME: json.dumps(action.all_params)}
+                    {
+                        BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(
+                            action.all_params, request
+                        )
+                    }
                 )
             )
         if not action.selection_data:
@@ -1242,7 +1247,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             views.append(
                 {
                     "name": defined_view["name"],
-                    "url_params": SBAdminViewService.json_dumps_for_url(url_params),
+                    "url_params": SBAdminViewService.json_dumps_and_replace(url_params),
                     "default": True,
                 }
             )

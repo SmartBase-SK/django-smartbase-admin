@@ -1,5 +1,6 @@
 import { SBAdminTableModule } from "./base_module"
 import { get, unset } from "lodash"
+import { parseParamsPayload } from "../url_params_codec"
 
 export class ViewsModule extends SBAdminTableModule {
     COMPARE_IGNORE_KEYS = ['filterData.sb_selected_filter_type']
@@ -58,7 +59,7 @@ export class ViewsModule extends SBAdminTableModule {
             if(!item.dataset.params) {
                 return
             }
-            const itemParamsNormalized = this.normalizeForCompare(JSON.parse(item.dataset.params))
+            const itemParamsNormalized = this.normalizeForCompare(parseParamsPayload(item.dataset.params))
             // Fast string comparison with sorted keys
             const sameAsUrlParams = (itemParamsNormalized === urlParamsNormalized)
             const sameAsSelectedParams = (selectedParamsNormalized === itemParamsNormalized)
@@ -68,7 +69,7 @@ export class ViewsModule extends SBAdminTableModule {
             if (!this.selectedViewParams && sameAsUrlParams) {
                 item.classList.add("active")
                 selectedView = item
-                this.selectedViewParams = JSON.parse(item.dataset.params)
+                this.selectedViewParams = parseParamsPayload(item.dataset.params)
             }
             if (sameAsSelectedParams) {
                 selectedView = item
@@ -114,7 +115,7 @@ export class ViewsModule extends SBAdminTableModule {
             }
             history.pushState({}, "", new_path)
         } else {
-            const savedParams = JSON.parse(params) || {}
+            const savedParams = parseParamsPayload(params) || {}
             const allParams = this.table.getAllUrlParams()
             allParams[this.table.viewId] = savedParams
             history.pushState({}, "", window.location.pathname + this.table.paramsObjectToUrlString(allParams))

@@ -20,6 +20,12 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+from django_smartbase_admin.services.url_params_codec import (
+    dumps_for_url,
+    loads_from_url,
+    parse_changelist_filters,
+)
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 if TYPE_CHECKING:
@@ -28,16 +34,40 @@ if TYPE_CHECKING:
 
 class SBAdminViewService(object):
     @classmethod
-    def json_dumps_for_url(cls, data):
-        return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
+    def is_url_compression_enabled(cls, request=None) -> bool:
+        if request is None:
+            try:
+                request = SBAdminThreadLocalService.get_request()
+            except LookupError:
+                return True
+        configuration = getattr(
+            getattr(request, "request_data", None), "configuration", None
+        )
+        if configuration is None:
+            return True
+        return getattr(configuration, "enable_url_compression", True)
+
+    @classmethod
+    def json_dumps_for_url(cls, data, request=None):
+        return dumps_for_url(data, compress=cls.is_url_compression_enabled(request))
+
+    @classmethod
+    def json_loads_from_url(cls, value: str | None) -> dict:
+        return loads_from_url(value)
+
+    @classmethod
+    def parse_changelist_filters(cls, raw_filters: str) -> dict:
+        return parse_changelist_filters(raw_filters)
 
     @classmethod
     def json_dumps_and_replace(cls, data):
-        return cls.json_dumps_for_url(data)
+        return json.dumps(data, separators=(",", ":"), cls=SBAdminJSONEncoder)
 
     @classmethod
-    def build_list_url(cls, view_id, url_params):
-        params = {BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: url_params})}
+    def build_list_url(cls, view_id, url_params, request=None):
+        params = {
+            BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: url_params}, request)
+        }
         return urllib.parse.urlencode(params)
 
     @classmethod
@@ -80,7 +110,9 @@ class SBAdminViewService(object):
             return filter_data_processed
 
     @classmethod
-    def build_list_params_url(cls, view_id, filter_data=None, filter_version=None):
+    def build_list_params_url(
+        cls, view_id, filter_data=None, filter_version=None, request=None
+    ):
         if filter_version == FilterVersions.FILTERS_VERSION_2:
             filter_dict = {
                 ADVANCED_FILTER_DATA_NAME: {
@@ -95,7 +127,11 @@ class SBAdminViewService(object):
             filter_dict[ADVANCED_FILTER_DATA_NAME]["rules"].extend(
                 cls.process_filter_data_url(view_id, filter_data, filter_version)
             )
-            params = {BASE_PARAMS_NAME: cls.json_dumps_for_url({view_id: filter_dict})}
+            params = {
+                BASE_PARAMS_NAME: cls.json_dumps_for_url(
+                    {view_id: filter_dict}, request
+                )
+            }
             return urllib.parse.urlencode(params)
         filter_data = filter_data or {}
         view_params = {
@@ -103,7 +139,7 @@ class SBAdminViewService(object):
                 view_id, filter_data, filter_version
             )
         }
-        return cls.build_list_url(view_id, view_params)
+        return cls.build_list_url(view_id, view_params, request)
 
     @classmethod
     def get_pk_field_for_model(cls, model):

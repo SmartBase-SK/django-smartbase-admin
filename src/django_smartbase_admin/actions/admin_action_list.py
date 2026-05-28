@@ -75,19 +75,17 @@ class SBAdminListAction(SBAdminAction):
     ) -> None:
         super().__init__(view, request)
         if all_params is None:
-            self.all_params = json.loads(
-                request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
-            )
-            source_data = request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
-            if (
+            get_params = request.request_data.request_get.get(BASE_PARAMS_NAME, "{}")
+            self.all_params = SBAdminViewService.json_loads_from_url(get_params)
+            is_tabulator_post = (
                 request.request_data.request_method == "POST"
                 and request.headers.get("X-TabulatorRequest", None) == "true"
-            ):
-                source_data = request.body
-            try:
-                self.all_params = json.loads(source_data)
-            except json.JSONDecodeError:
-                pass
+            )
+            if is_tabulator_post:
+                try:
+                    self.all_params = json.loads(request.body)
+                except json.JSONDecodeError:
+                    pass
         else:
             self.all_params = all_params
         if not self.all_params:

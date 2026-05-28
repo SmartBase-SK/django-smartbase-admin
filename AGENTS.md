@@ -845,6 +845,25 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `has_action_permission()` | Decide which Django permission a URL-callable action needs (default: `"change"`, unless `@sbadmin_action(permission=...)` is set) | [Permission defaults](#permission-defaults) |
 | `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
+| `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
+
+### URL Params Compression Toggle
+
+`SBAdminRoleConfiguration.enable_url_compression` controls whether SBAdmin compresses URL `params` payloads with LZ-String.
+
+```python
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[...],
+    registered_views=[...],
+    enable_url_compression=False,  # default is True
+)
+```
+
+**Key points:**
+- `True` (default): shorter URL payloads using LZ-String.
+- `False`: plain JSON payloads in URLs (useful for debugging or compatibility checks).
+- Decoding remains backward compatible in both modes (plain JSON and compressed payloads are both accepted).
 
 **Typical subclass combining all three:**
 
