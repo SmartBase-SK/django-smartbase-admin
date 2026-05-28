@@ -138,6 +138,7 @@ class FolderFileInline(SBAdminTableInline):
             SBAdminFormViewAction(
                 target_view=InlineRowRenameModalView,
                 title="Rename file",
+                view=self,
             ),
         ]
 

@@ -14,12 +14,17 @@ import logging
 
 from django.contrib.contenttypes.admin import GenericInlineModelAdmin
 
+from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.engine.fake_inline import is_fake_inline_batch_safe
-from django_smartbase_admin.mcp.actions import collect_action_entries
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     ChoiceFilterWidget,
 )
+from django_smartbase_admin.mcp.actions import (
+    action_entries_for,
+    collect_action_entries,
+)
+from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +111,6 @@ def _inline_field_names(inline, request) -> list[str]:
     ``SBAdminInline``; it is stripped here just as the detail service
     strips it from inline row payloads.
     """
-    from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
-
     return [
         str(name)
         for name in inline.get_fields(request, None) or []
@@ -175,6 +178,43 @@ def _inline_entries(admin, request) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _fieldset_action_entries(admin, request) -> list[dict]:
+    """Per-fieldset actions, tagged with ``fieldset`` + ``invoke_with =
+    "invoke_detail_action"`` so they merge cleanly into ``detail_actions``.
+    """
+    try:
+        fieldsets = admin.get_sbadmin_fieldsets(request, None) or []
+    except Exception:
+        return []
+
+    entries: list[dict] = []
+    for fieldset, fieldset_data in fieldsets:
+        try:
+            actions = admin.get_sbadmin_fieldset_actions_processed(
+                request, fieldset, fieldset_data, None
+            )
+        except Exception:
+            logger.warning(
+                "MCP schema: fieldset action collection failed on %s",
+                admin.__class__.__name__,
+                exc_info=True,
+            )
+            continue
+        for action in actions or []:
+            try:
+                for entry in action_entries_for(action):
+                    entry["invoke_with"] = "invoke_detail_action"
+                    entry["fieldset"] = str(fieldset) if fieldset is not None else None
+                    entries.append(entry)
+            except Exception:
+                logger.warning(
+                    "MCP schema: skipping fieldset action on %s",
+                    admin.__class__.__name__,
+                    exc_info=True,
+                )
+    return entries
+
+
 def _detail_field_entries(admin, request) -> list[str]:
     """Detail-page field handles, in display order.
 
@@ -184,8 +224,6 @@ def _detail_field_entries(admin, request) -> list[str]:
     itself, sourced from the live render so we have one source of
     truth instead of two.
     """
-    from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
-
     try:
         names = list(
             SBAdminMCPDetailService.get_detail_fields(admin, request, None) or []
@@ -258,9 +296,12 @@ def admin_entry(admin, request) -> dict:
         "row_actions": collect_action_entries(
             admin, "get_sbadmin_row_actions_processed", request
         ),
-        "detail_actions": collect_action_entries(
-            admin, "get_sbadmin_detail_actions_processed", request
-        ),
+        "detail_actions": [
+            *collect_action_entries(
+                admin, "get_sbadmin_detail_actions_processed", request
+            ),
+            *_fieldset_action_entries(admin, request),
+        ],
         "list_actions": collect_action_entries(
             admin, "get_sbadmin_list_actions_processed", request
         ),

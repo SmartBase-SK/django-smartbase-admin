@@ -11,14 +11,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import path
 from filer.models import Folder, FolderPermission
 
 from django.db.models import F
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminRowAction
+from django_smartbase_admin.engine.actions import SBAdminRowAction, sbadmin_action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -65,6 +66,10 @@ class FolderRichListAdminsTestAdmin(SBAdmin):
     )
 
 
+urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
+
+
+@override_settings(ROOT_URLCONF=__name__)
 class ListAdminsTests(TestCase):
     """Each test registers its own ``FolderListAdminsTestAdmin`` and
     restores any pre-existing admin in tearDown so we don't clobber
@@ -200,6 +205,12 @@ class ListAdminsTests(TestCase):
             model = Folder
             list_display = ("id", "name")
 
+            @sbadmin_action
+            def action_archive_folder(self, request, modifier):
+                from django.http import HttpResponse
+
+                return HttpResponse("")
+
             def get_sbadmin_row_actions(self, request):
                 return [
                     SBAdminRowAction(
@@ -223,26 +234,23 @@ class ListAdminsTests(TestCase):
 
         sb_admin_site._registry.pop(Folder, None)
         sb_admin_site.register(Folder, FolderNestedRowActionsAdmin)
+        MCPToolTestConfig().init_view_map()
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
+        # MCP discovery flattens visual sub-action dropdowns to invocable
+        # leaves and drops url-only entries (agents can't invoke them).
         self.assertEqual(
             entry["row_actions"],
             [
                 {
-                    "title": "More",
-                    "kind": "group",
-                    "sub_actions": [
-                        {
-                            "title": "Archive",
-                            "kind": "method",
-                            "action_id": "action_archive_folder",
-                        },
-                        {"title": "Open", "kind": "url"},
-                    ],
-                }
+                    "title": "Archive",
+                    "kind": "method",
+                    "action_id": "action_archive_folder",
+                    "invoke_with": "invoke_row_action",
+                },
             ],
         )
 

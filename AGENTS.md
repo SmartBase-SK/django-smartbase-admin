@@ -4695,7 +4695,11 @@ Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
 
 DJANGO_MCP_AUTHENTICATION_CLASSES = [
-    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+    # Spec-compliant 401 + WWW-Authenticate (RFC 9728 / MCP authorization).
+    # Plain DOT ``OAuth2Authentication`` omits ``resource_metadata`` and MCP
+    # clients (Cursor / Claude / Cowork) can't discover OAuth — Install
+    # button stays greyed out.
+    "django_smartbase_admin.mcp.oauth.auth.SBAdminMCPOAuth2Authentication",
 ]
 DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
@@ -4710,7 +4714,7 @@ OAUTH2_PROVIDER = {
 }
 ```
 
-Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
+Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass. Override `authenticate_header(request)` to return `Bearer ..., resource_metadata="<absolute /.well-known/oauth-protected-resource URL>"` so MCP clients can discover OAuth.
 
 ### Cursor — `.cursor/mcp.json`
 

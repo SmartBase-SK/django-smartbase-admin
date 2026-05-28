@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import re
+from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
@@ -62,8 +63,6 @@ def _filename_from_disposition(header: str) -> str | None:
         return None
     match = re.search(r"filename\*=(?:UTF-8'')?([^;]+)", header, re.IGNORECASE)
     if match:
-        from urllib.parse import unquote
-
         return unquote(match.group(1).strip().strip('"'))
     match = re.search(r'filename="?([^";]+)"?', header, re.IGNORECASE)
     if match:
@@ -315,6 +314,10 @@ class SBAdminMCPActionFormService:
         yield view.get_sbadmin_detail_actions_processed(request)
         yield view.get_sbadmin_list_selection_actions_processed(request)
         yield view.get_sbadmin_list_actions_processed(request)
+        # Fieldset-scoped actions dispatch through the same detail path,
+        # so include them in the modal-action lookup. ``object_id=None``
+        # for discovery / form-fetch; invoke supplies it via ``modifier``.
+        yield view.get_sbadmin_fieldsets_actions_processed(request)
 
     @classmethod
     def _search_action_tree(cls, action, action_id: str):
