@@ -65,7 +65,15 @@ class SBAdminFakeInlineMixin:
         super().__init__(parent_model, admin_site)
         if self.original_model:
             return
-        model_name = f"{self.model._meta.object_name}{self.model_name}{self.parent_model._meta.object_name}"
+        # Include the inline class name in the dynamic proxy name so
+        # two fake inlines on the same (parent, child) pair don't bind
+        # to the same proxy and silently overwrite each other's config.
+        model_name = (
+            f"{self.model._meta.object_name}"
+            f"{self.model_name}"
+            f"{self.__class__.__name__}"
+            f"{self.parent_model._meta.object_name}"
+        )
         try:
             fake_model_class = apps.get_model(self.model._meta.app_label, model_name)
         except LookupError:

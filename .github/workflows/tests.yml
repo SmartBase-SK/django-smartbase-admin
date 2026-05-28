@@ -24,4 +24,6 @@ jobs:
         run: pip install -e '.[mcp]' psycopg2-binary
 
       - name: Run tests
+        env:
+          SBADMIN_TEST_DATABASE_URL: "sqlite://"
         run: python runtests.py

@@ -114,15 +114,19 @@ class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
             except (ValueError, TypeError):
                 obj_pk = object_id
 
-            # OR filter: direct changes, parent context, or affected (JSON contains)
-            q |= (
-                Q(content_type_id=content_type_id, object_id=str(object_id))
-                | Q(
-                    parent_content_type_id=content_type_id,
-                    parent_object_id=str(object_id),
-                )
-                | Q(affected_objects__contains=[{"ct": ct_label, "id": obj_pk}])
+            # OR filter: direct changes, parent context, or affected.
+            # JSON ``__contains`` on ``affected_objects`` is Postgres-only
+            # — skip on other backends; direct + parent clauses cover the
+            # common cases.
+            from django.db import connection
+
+            clause = Q(content_type_id=content_type_id, object_id=str(object_id)) | Q(
+                parent_content_type_id=content_type_id,
+                parent_object_id=str(object_id),
             )
+            if connection.vendor == "postgresql":
+                clause |= Q(affected_objects__contains=[{"ct": ct_label, "id": obj_pk}])
+            q |= clause
 
         return q if q else Q()
 

@@ -13,15 +13,22 @@ import os
 
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
 
-# Default: in-memory SQLite. Override via SBADMIN_TEST_DATABASE_URL to
-# run against Postgres (required for plugin data-path tests that use
-# ArrayAgg).
+# Defaults to in-memory SQLite — no credentials in the repo, no service
+# required for CI. To exercise Postgres-only paths (JSON ``__contains``,
+# ArrayAgg, etc.) locally, point the env var at your own database:
 #   export SBADMIN_TEST_DATABASE_URL="postgresql://user:pass@host:port/db"
-_db_url = os.environ.get("SBADMIN_TEST_DATABASE_URL")
-if _db_url:
-    from urllib.parse import urlparse
+from urllib.parse import urlparse
 
-    _parsed = urlparse(_db_url)
+_db_url = os.environ.get("SBADMIN_TEST_DATABASE_URL", "sqlite://")
+_parsed = urlparse(_db_url)
+if _parsed.scheme.startswith("sqlite"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _parsed.path.lstrip("/") or ":memory:",
+        }
+    }
+else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -30,13 +37,6 @@ if _db_url:
             "PASSWORD": _parsed.password or "",
             "HOST": _parsed.hostname or "",
             "PORT": str(_parsed.port or ""),
-        }
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
         }
     }
 
@@ -75,7 +75,7 @@ OAUTH2_PROVIDER = {
 # django-mcp-server: enforce OAuth on the MCP endpoint via DRF auth class
 # that reads DOT's AccessToken table.
 DJANGO_MCP_AUTHENTICATION_CLASSES = [
-    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+    "django_smartbase_admin.mcp.oauth.auth.SBAdminMCPOAuth2Authentication",
 ]
 DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
@@ -102,6 +102,7 @@ USE_TZ = True
 ROOT_URLCONF = "tests.mcp_urls"
 
 MIDDLEWARE = [
+    "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

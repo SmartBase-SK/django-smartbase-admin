@@ -120,9 +120,13 @@ class SafeFakeInlineTests(_FakeInlineTestBase):
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline_names = {entry["inline_name"]: entry for entry in folder["inlines"]}
         self.assertIn("FolderPermissionFakeInline", inline_names)
-        self.assertEqual(
-            inline_names["FolderPermissionFakeInline"]["join_kind"], "fake"
-        )
+        # Fake inlines report ``"fk"`` over the wire — the distinction is
+        # an internal implementation detail and the agent contract for
+        # batch reads is identical to a real FK.
+        entry = inline_names["FolderPermissionFakeInline"]
+        self.assertEqual(entry["join_kind"], "fk")
+        # ``model`` reports the *original* model, not the dynamic proxy.
+        self.assertEqual(entry["model"], "filer.FolderPermission")
 
         result = SBAdminTools(request=build_mcp_request(user)).list_rows(
             "filer_folder",

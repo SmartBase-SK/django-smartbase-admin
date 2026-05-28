@@ -212,6 +212,11 @@ class SBAdminBaseView(object):
         return action
 
     def _register_form_view_action(self, target_view, action_id=None) -> str:
+        # Mutates the admin singleton: attaches a synthetic delegate
+        # method named after the modal's ``action_id`` so URL dispatch
+        # (and MCP invocation) can reach it via ``getattr(admin,
+        # action_id)``. Idempotent — the ``hasattr`` guard skips
+        # already-registered ids on subsequent calls.
         action_id = action_id or getattr(target_view, "action_id", None)
         action_id = action_id or target_view.__name__
         if not hasattr(self, action_id):
@@ -630,7 +635,19 @@ class SBAdminBaseView(object):
         if is_xlsx_export and getattr(field.xlsx_options, "python_formatter", None):
             value = field.xlsx_options.python_formatter(obj_id, value)
         elif field.python_formatter:
-            value = field.python_formatter(obj_id, value)
+            # MCP wants one canonical wire format. Bypass the built-in
+            # locale-aware formatters (date / datetime / boolean) so the
+            # JSON encoder emits raw values (ISO 8601 for dates, native
+            # bools). Custom ``python_formatter``s still run — they
+            # carry app logic the agent expects. Flag lives on
+            # ``request`` because ``request_data`` gets rebuilt mid-flow.
+            from django_smartbase_admin.engine.field_formatter import (
+                LOCALE_DEPENDENT_FORMATTERS,
+            )
+
+            is_mcp = getattr(request, "is_mcp", False)
+            if not (is_mcp and field.python_formatter in LOCALE_DEPENDENT_FORMATTERS):
+                value = field.python_formatter(obj_id, value)
         return value
 
 
@@ -896,6 +913,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             "stickyHeaderAndFooter": sticky_header_and_footer,
+            "enableUrlCompression": request.request_data.configuration.enable_url_compression,
             # used to initialize all columns with these values
             "defaultColumnData": {},
             "locale": request.LANGUAGE_CODE,
@@ -1066,7 +1084,11 @@ class SBAdminBaseListView(SBAdminBaseView):
                 self.get_action_url("action_bulk_delete")
                 + "?"
                 + urllib.parse.urlencode(
-                    {BASE_PARAMS_NAME: json.dumps(action.all_params)}
+                    {
+                        BASE_PARAMS_NAME: SBAdminViewService.json_dumps_for_url(
+                            action.all_params, request
+                        )
+                    }
                 )
             )
         if not action.selection_data:
@@ -1225,7 +1247,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             views.append(
                 {
                     "name": defined_view["name"],
-                    "url_params": SBAdminViewService.json_dumps_for_url(url_params),
+                    "url_params": SBAdminViewService.json_dumps_and_replace(url_params),
                     "default": True,
                 }
             )

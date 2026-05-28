@@ -61,6 +61,17 @@ def boolean_formatter(object_id, value):
     )
 
 
+# Built-in formatters that produce locale-dependent strings. The MCP
+# layer bypasses these when ``request_data.is_mcp`` is set so agents
+# always see one canonical wire format (ISO 8601 for dates, native
+# bools), instead of whatever ``LANGUAGE_CODE`` happens to be on the
+# server. Custom formatters declared on host admins keep running —
+# they carry app logic the agent shouldn't lose.
+LOCALE_DEPENDENT_FORMATTERS = frozenset(
+    {date_formatter, datetime_formatter, boolean_formatter}
+)
+
+
 def format_array(value_list, separator="", badge_type: BadgeType = BadgeType.NOTICE):
     if not value_list:
         return ""
