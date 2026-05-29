@@ -118,15 +118,16 @@ class SBAdminBaseView(object):
             request, obj
         )
 
-    def delegate_to_action_view(self, processed_action):
-        return self.delegate_to_target_view(processed_action.target_view)
-
-    def delegate_to_target_view(self, target_view):
+    def delegate_to_target_view(self, target_view, action=None):
         def inner_view(request, modifier):
             return target_view.as_view(view=self)(request, modifier=modifier)
 
         inner_view._is_sbadmin_action = True
         inner_view._sbadmin_keep_route_modifier_argument = True
+        if action is not None:
+            inner_view._sbadmin_action_attrs = {
+                "permission": getattr(action, "permission", None)
+            }
         return inner_view
 
     def process_list_actions(
@@ -190,7 +191,7 @@ class SBAdminBaseView(object):
         if target_view is not None:
             resolved_action = copy(action)
             action_id = source_view._register_form_view_action(
-                target_view, getattr(action, "action_id", None)
+                target_view, getattr(action, "action_id", None), action
             )
             resolved_action.action_id = action_id
             resolved_action.url = source_view.get_action_url(
@@ -211,7 +212,9 @@ class SBAdminBaseView(object):
             return resolved_action
         return action
 
-    def _register_form_view_action(self, target_view, action_id=None) -> str:
+    def _register_form_view_action(
+        self, target_view, action_id=None, action=None
+    ) -> str:
         # Mutates the admin singleton: attaches a synthetic delegate
         # method named after the modal's ``action_id`` so URL dispatch
         # (and MCP invocation) can reach it via ``getattr(admin,
@@ -220,7 +223,7 @@ class SBAdminBaseView(object):
         action_id = action_id or getattr(target_view, "action_id", None)
         action_id = action_id or target_view.__name__
         if not hasattr(self, action_id):
-            setattr(self, action_id, self.delegate_to_target_view(target_view))
+            setattr(self, action_id, self.delegate_to_target_view(target_view, action))
         return action_id
 
     @staticmethod

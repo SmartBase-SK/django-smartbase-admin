@@ -86,6 +86,51 @@ def _validate_filter_data(admin, request, filter_data: dict | None) -> None:
         widgets[key].validate_value(value)
 
 
+def _decode_preset_url_params(url_params) -> dict:
+    """Turn a preset's raw ``url_params`` blob (JSON string or dict) into
+    the kwargs ``list_rows`` accepts: ``filter_data``,
+    ``full_text_search``, ``sort``, ``page_size``.
+
+    Empty / missing pieces are simply absent from the returned dict so
+    the agent can splat the result onto ``list_rows`` without filtering
+    out ``None``s.
+
+    Empty filter values are dropped. Presets pad ``filterData`` with an
+    empty ``""`` for every unfiltered column (so the UI renders all the
+    filter inputs); those placeholders aren't real filters and would in
+    fact fail ``list_rows``' per-widget validation (e.g. a multichoice
+    widget rejects ``""`` — it wants a list). Stripping them leaves only
+    the columns the preset actually constrains. Non-empty values are
+    left in their stored widget form (e.g. autocomplete /multichoice
+    ``[{"value", "label"}]``); ``list_rows`` accepts that shape directly.
+
+    ``page`` is intentionally dropped — a saved preset's last-viewed
+    page is session state, not part of the preset; an agent replaying it
+    should start from page 1 (the ``list_rows`` default).
+    """
+    if isinstance(url_params, str):
+        url_params = json.loads(url_params) if url_params else {}
+    url_params = url_params or {}
+    raw_filter = dict(url_params.get(FILTER_DATA_NAME, {}) or {})
+    table_params = url_params.get(TABLE_PARAMS_NAME, {}) or {}
+
+    decoded: dict = {}
+    # ``sb_admin_full_search`` lives inside filterData (it's how the list
+    # action reads it) — surface it as a dedicated arg here.
+    full_text = raw_filter.pop(TABLE_PARAMS_FULL_TEXT_SEARCH, None)
+    # Drop padding placeholders: "", None, [] and {} all mean "no filter".
+    filter_data = {k: v for k, v in raw_filter.items() if v not in ("", None, [], {})}
+    if filter_data:
+        decoded["filter_data"] = filter_data
+    if full_text:
+        decoded["full_text_search"] = full_text
+    if TABLE_PARAMS_SORT_NAME in table_params:
+        decoded["sort"] = table_params[TABLE_PARAMS_SORT_NAME]
+    if TABLE_PARAMS_SIZE_NAME in table_params:
+        decoded["page_size"] = int(table_params[TABLE_PARAMS_SIZE_NAME])
+    return decoded
+
+
 def _clear_thread_local_after_call(method):
     """Ensure the bridge-bound thread-local request is cleared after every
     tool call. ``ensure_sbadmin_request_data`` binds it for the duration
@@ -217,6 +262,92 @@ class SBAdminTools(MCPToolset):
             "widget_shapes": WIDGET_SHAPES,
             "action_invokers": ACTION_INVOKERS,
         }
+
+    @_clear_thread_local_after_call
+    def fetch_filter_preset(
+        self,
+        view_id: str,
+        name: str | None = None,
+        source: str = "static",
+        id: int | None = None,
+    ) -> dict:
+        """Resolve a filter preset (static or saved) into ready-to-use
+        ``list_rows`` kwargs.
+
+        ``list_admins`` advertises presets per admin as
+        ``{"name", "source", "id"?}`` under ``filter_presets``; pass
+        those values straight here. Returns the decoded preset:
+        ``filter_data``, ``full_text_search``, ``sort``, ``page_size``
+        (only keys the preset actually sets). The agent can splat the
+        result onto ``list_rows`` to replay the preset, or merge it with
+        overrides. ``page`` is intentionally not returned — a saved page
+        number is session state, not part of the preset, so replay
+        always starts on page 1.
+
+        Args:
+          view_id: admin handle from ``list_admins[].view_id``.
+          source: ``"static"`` (admin-defined preset, including the
+            implicit ``"All"`` reset) or ``"saved"`` (per-user). Defaults
+            to ``"static"`` because saved presets always have an ``id``
+            and agents typically discover those first.
+          name: preset name as it appears in
+            ``list_admins[].filter_presets[].name``. Required for static
+            presets; for saved presets, used as a fallback when ``id`` is
+            omitted (the name is user-editable so prefer ``id``).
+          id: saved preset primary key from
+            ``list_admins[].filter_presets[].id``. Ignored for static
+            presets.
+
+        Raises ``LookupError`` when no preset matches, ``PermissionError``
+        if the user can't see the admin, ``ValueError`` for bad input.
+        """
+        from django_smartbase_admin.services.configuration import (
+            SBAdminUserConfigurationService,
+        )
+
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+
+        if source == "static":
+            if not name:
+                raise ValueError("'name' is required when source='static'")
+            # Decode the *raw* config (clean url_params), not
+            # ``get_base_config`` whose output is processed into the
+            # URL-ready, JSON-stringified form ``list_rows`` can't take.
+            # This mirrors ``get_base_config``'s own assembly: the
+            # implicit "All" reset first, then ``sbadmin_list_view_config``.
+            raw_presets = [
+                admin.get_all_config(request),
+                *(admin.get_sbadmin_list_view_config(request) or []),
+            ]
+            for preset in raw_presets:
+                if str(preset.get("name", "")) == name:
+                    return _decode_preset_url_params(preset.get("url_params"))
+            raise LookupError(
+                f"No static filter preset named {name!r} on {view_id!r}. "
+                f"Known: {[str(p.get('name', '')) for p in raw_presets]}"
+            )
+        if source == "saved":
+            saved = (
+                SBAdminUserConfigurationService.get_saved_views(
+                    request, view_id=view_id
+                )
+                or []
+            )
+            for preset in saved:
+                # ``id`` is the stable handle; ``name`` is a fallback for
+                # callers that don't have the id cached.
+                if id is not None and preset.get("id") == id:
+                    return _decode_preset_url_params(preset.get("url_params"))
+                if id is None and name and str(preset.get("name", "")) == name:
+                    return _decode_preset_url_params(preset.get("url_params"))
+            raise LookupError(
+                f"No saved filter preset matching id={id!r} name={name!r} "
+                f"on {view_id!r}"
+            )
+        raise ValueError(f"source must be 'static' or 'saved', got {source!r}")
 
     @_clear_thread_local_after_call
     def list_rows(

@@ -295,6 +295,57 @@ def _detail_field_entries(admin, request) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _filter_preset_entries(admin, request) -> list[dict]:
+    """Static + saved filter presets available to the user, in display order.
+
+    Static presets are admin-defined named bundles of url_params
+    (``sbadmin_list_view_config`` + the implicit ``"All"`` reset). Saved
+    presets are per-user rows in ``SBAdminListViewConfiguration``. Both
+    are surfaced as ``{name, source, id?}``; the filter/sort params
+    themselves are fetched on demand via ``fetch_filter_preset`` so this
+    discovery payload stays small even when admins ship many presets.
+
+    Errors in either source are swallowed (logged) so a broken preset
+    config can't take down ``list_admins`` — the agent still sees the
+    rest of the admin.
+    """
+    from django_smartbase_admin.services.configuration import (  # local import: avoids settings touch at module load
+        SBAdminUserConfigurationService,
+    )
+
+    entries: list[dict] = []
+    try:
+        # ``get_base_config`` returns ``{name, url_params, ...}`` for the
+        # built-in "All" reset plus every entry in ``sbadmin_list_view_config``.
+        for preset in admin.get_base_config(request) or []:
+            entries.append({"name": str(preset.get("name", "")), "source": "static"})
+    except Exception:
+        logger.warning(
+            "MCP schema: static preset collection failed on %s",
+            admin.__class__.__name__,
+            exc_info=True,
+        )
+    try:
+        saved = SBAdminUserConfigurationService.get_saved_views(
+            request, view_id=admin.get_id()
+        )
+    except Exception:
+        logger.warning(
+            "MCP schema: saved preset collection failed on %s",
+            admin.__class__.__name__,
+            exc_info=True,
+        )
+        saved = []
+    for preset in saved or []:
+        entry = {"name": str(preset.get("name", "")), "source": "saved"}
+        # ``id`` is the only stable handle for saved presets (the name is
+        # user-editable) — surface it so ``fetch_filter_preset`` resolves by pk.
+        if preset.get("id") is not None:
+            entry["id"] = preset["id"]
+        entries.append(entry)
+    return entries
+
+
 def admin_entry(admin, request) -> dict:
     """Schema entry for one registered SBAdmin admin."""
     model = admin.model
@@ -326,6 +377,7 @@ def admin_entry(admin, request) -> dict:
         "search_fields": list(admin.get_search_fields(request) or []),
         "detail_fields": _detail_field_entries(admin, request),
         "inlines": _inline_entries(admin, request),
+        "filter_presets": _filter_preset_entries(admin, request),
     }
     # --- actions (all four admin-level types) ---
     # row_actions:       per-row icon buttons on the list view.

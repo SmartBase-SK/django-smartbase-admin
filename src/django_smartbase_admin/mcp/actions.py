@@ -614,7 +614,7 @@ class SBAdminMCPActionInvokeService:
             # Wire up the synthetic @sbadmin_action wrapper if the UI
             # render path hasn't already done so this process.
             if not hasattr(admin, action_id):
-                admin._register_form_view_action(target_view_cls, action_id)
+                admin._register_form_view_action(target_view_cls, action_id, _action)
             # Widget-aware POST encoding: build the form unbound to get
             # the widget map, then route field_values through each
             # widget (handles MultiWidget, autocomplete list-shape, etc.).
