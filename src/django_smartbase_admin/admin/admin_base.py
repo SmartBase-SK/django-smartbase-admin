@@ -662,7 +662,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if prefix:
             form_kwargs["prefix"] = prefix
         form_kwargs["initial"] = self._dynamic_region_initial_from_data(
-            form_class, data, form_kwargs
+            form_class, data, form_kwargs, request.FILES
         )
         return form_kwargs
 
@@ -715,7 +715,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         return response
 
     @staticmethod
-    def _dynamic_region_initial_from_data(form_class, data, form_kwargs):
+    def _dynamic_region_initial_from_data(form_class, data, form_kwargs, files=None):
         if form_kwargs is None:
             form_kwargs = {}
         elif not isinstance(form_kwargs, dict):
@@ -723,7 +723,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             form_kwargs = {}
             if obj is not None:
                 form_kwargs["instance"] = obj
-        return dynamic_region_initial_from_data(form_class, data, form_kwargs)
+        return dynamic_region_initial_from_data(form_class, data, form_kwargs, files)
 
     def initialize_all_base_fields_form(self, request) -> None:
         params = {

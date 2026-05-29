@@ -2031,6 +2031,25 @@ class DynamicFormTests(SimpleTestCase):
             },
         )
 
+    def test_dynamic_region_initial_includes_uploaded_files(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        class UploadForm(forms.Form):
+            attachment = forms.FileField()
+
+        uploaded = SimpleUploadedFile("preview.jpg", b"preview-bytes", content_type="image/jpeg")
+        data = QueryDict("attachment=")
+        files = {"attachment": uploaded}
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            UploadForm,
+            data,
+            {},
+            files,
+        )
+
+        self.assertIs(initial["attachment"], uploaded)
+
     def test_admin_form_can_include_inactive_region_fields(self):
         form = DynamicRegionForm(request=self.request)
         fieldsets = [

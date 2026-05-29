@@ -100,7 +100,7 @@ class ActionModalView(FormView):
         form_kwargs["initial"] = {
             **form_kwargs.get("initial", {}),
             **dynamic_region_initial_from_data(
-                form_class, request.POST, form_kwargs=probe_kwargs
+                form_class, request.POST, form_kwargs=probe_kwargs, files=request.FILES
             ),
         }
         return form_class(**form_kwargs)

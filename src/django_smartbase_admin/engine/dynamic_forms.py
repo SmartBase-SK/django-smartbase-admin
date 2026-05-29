@@ -21,10 +21,11 @@ def dynamic_region_initial_from_data(
     form_class: type[forms.Form],
     data: Any,
     form_kwargs: dict[str, Any] | None = None,
+    files: Any = None,
 ) -> dict[str, Any]:
     probe_form = form_class(**(form_kwargs or {}))
     initial = {}
-    files = {}
+    files = files or {}
     for field_name, field in probe_form.fields.items():
         prefixed_name = probe_form.add_prefix(field_name)
         if field.widget.value_omitted_from_data(data, files, prefixed_name):
@@ -322,6 +323,7 @@ class SBAdminDynamicFormMixin:
             "hx-trigger": trigger,
             "hx-target": f"#{state.wrapper_id}",
             "hx-include": "closest form",
+            "hx-encoding": "multipart/form-data",
             "hx-indicator": f"#{state.loading_id}",
             "hx-swap": "none",
             "hx-sync": hx_sync,
