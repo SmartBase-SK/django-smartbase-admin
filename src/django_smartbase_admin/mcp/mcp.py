@@ -469,8 +469,15 @@ class SBAdminTools(MCPToolset):
         result = json.loads(response.content.decode())
         result.pop(SB_ADMIN_AJAX_NOTIFICATIONS_KEY, None)
         rows = result.get("data") or []
+        # Normalize row identity to a stable ``"id"`` key. The list action
+        # keys the pk under the model's pk field name (``"id"`` usually,
+        # but e.g. ``"emergency_uuid"`` for a custom pk); ``fetch_detail``
+        # always uses ``"id"``, so mirror that here for one cross-tool key.
+        pk_attname = admin.model._meta.pk.attname
         for row in rows:
             row.pop("_row_actions", None)
+            if pk_attname != "id" and "id" not in row and pk_attname in row:
+                row["id"] = row[pk_attname]
         strip_html_cells(admin, request, rows)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)

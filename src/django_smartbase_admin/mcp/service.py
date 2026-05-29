@@ -780,7 +780,13 @@ class SBAdminMCPDetailService:
 
         grouped: dict = {}
         for r in rows:
-            grouped.setdefault(r.pop(parent_key), []).append(r)
+            parent = r.pop(parent_key)
+            # Stable ``"id"`` key for row identity, matching ``fetch_detail``
+            # and top-level ``list_rows`` even when the inline model has a
+            # custom pk field name.
+            if pk_name != "id" and "id" not in r and pk_name in r:
+                r["id"] = r[pk_name]
+            grouped.setdefault(parent, []).append(r)
 
         truncated: list = []
         if cap is not None:
