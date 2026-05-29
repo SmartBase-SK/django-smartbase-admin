@@ -148,14 +148,27 @@ def action_entries_for(action) -> list[dict]:
 
 
 # Maps the admin getter that produced an action list to the MCP tool an
-# agent must call to invoke it. Surfaced per-entry as ``invoke_with`` so
-# agents reading discovery don't have to learn the mapping from prose.
+# agent must call to invoke it. The mapping is published once at the top
+# level of ``list_admins`` as ``action_invokers`` (keyed by action-list
+# name, e.g. ``row_actions`` → ``invoke_row_action``) so individual
+# action entries don't need to repeat ``invoke_with`` ~30 times per
+# response.
 _INVOKE_TOOL_BY_GETTER = {
     "get_sbadmin_row_actions_processed": "invoke_row_action",
     "get_sbadmin_detail_actions_processed": "invoke_detail_action",
     "get_sbadmin_inline_list_actions_processed": "invoke_inline_action",
     "get_sbadmin_list_actions_processed": "invoke_list_action",
     "get_sbadmin_list_selection_actions_processed": "invoke_selection_action",
+}
+
+# Top-level legend: action-list field name → MCP tool to invoke entries
+# in that list. ``fieldset_actions`` are merged into ``detail_actions``.
+ACTION_INVOKERS: dict[str, str] = {
+    "row_actions": "invoke_row_action",
+    "detail_actions": "invoke_detail_action",
+    "list_actions": "invoke_list_action",
+    "selection_actions": "invoke_selection_action",
+    "inline_actions": "invoke_inline_action",
 }
 
 
@@ -193,8 +206,6 @@ def collect_action_entries(
     for action in actions:
         try:
             for entry in action_entries_for(action):
-                if invoke_with is not None:
-                    entry["invoke_with"] = invoke_with
                 if not surface_modifier:
                     entry.pop("modifier", None)
                 entries.append(entry)

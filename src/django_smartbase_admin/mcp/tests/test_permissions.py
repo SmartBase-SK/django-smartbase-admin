@@ -115,7 +115,9 @@ class TestMCPPermissions(TestCase):
         the agent learns the surface exists, the denied inline disappears."""
         MCPToolTestConfig.view_permission_for = {Folder}
         denied = MagicMock(is_authenticated=True, is_superuser=False)
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline_names = {entry["inline_name"] for entry in folder["inlines"]}
         self.assertNotIn("PermissionFolderPermissionInline", inline_names)
@@ -132,7 +134,7 @@ class TestMCPPermissions(TestCase):
         user = MagicMock(is_authenticated=True, is_superuser=True)
 
         tools = SBAdminTools(request=build_mcp_request(user))
-        admins = tools.list_admins()
+        admins = tools.list_admins()["admin_views"]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         parent_widget_id = next(
             f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
@@ -167,11 +169,15 @@ class TestMCPPermissions(TestCase):
         allowed = MagicMock(is_authenticated=True, is_superuser=True)
         denied = MagicMock(is_authenticated=True, is_superuser=False)
 
-        super_admins = SBAdminTools(request=build_mcp_request(allowed)).list_admins()
+        super_admins = SBAdminTools(request=build_mcp_request(allowed)).list_admins()[
+            "admin_views"
+        ]
         super_folder = next(a for a in super_admins if a["view_id"] == "filer_folder")
         self.assertIn("parent", {f["name"] for f in super_folder["fields"]})
 
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         names = {f["name"] for f in folder["fields"]}
         self.assertNotIn("parent", names)
@@ -201,7 +207,9 @@ class TestMCPPermissions(TestCase):
         """
         denied = MagicMock(is_authenticated=True, is_superuser=False)
 
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline = next(
             entry

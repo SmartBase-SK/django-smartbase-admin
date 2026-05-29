@@ -277,7 +277,9 @@ class DetailFieldsSchemaTests(_FetchDetailTestBase):
         """``list_admins.detail_fields`` lists names only — per-field
         metadata ships with the values from ``fetch_detail``."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         self.assertEqual(

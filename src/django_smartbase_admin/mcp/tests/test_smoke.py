@@ -159,8 +159,11 @@ class MCPOAuthSmokeTests(TestCase):
         result = payload["result"]
         self.assertFalse(result.get("isError"), payload)
         # No SBAdmin admins are registered for tests, so the structured
-        # tool result is an empty list.
-        self.assertEqual(result["structuredContent"]["result"], [])
+        # tool result has an empty ``admins`` list (and the static
+        # ``widget_shapes`` legend).
+        structured = result["structuredContent"]
+        self.assertEqual(structured["admin_views"], [])
+        self.assertIn("widget_shapes", structured)
 
     # --- helpers ---------------------------------------------------------
 

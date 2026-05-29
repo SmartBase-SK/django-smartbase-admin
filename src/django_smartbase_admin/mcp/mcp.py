@@ -50,7 +50,8 @@ from django_smartbase_admin.mcp.bridge import (
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
-from django_smartbase_admin.mcp.schema import admin_entry
+from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
+from django_smartbase_admin.mcp.schema import WIDGET_SHAPES, admin_entry
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -127,14 +128,23 @@ class SBAdminTools(MCPToolset):
     """
 
     @_clear_thread_local_after_call
-    def list_admins(self) -> list[dict]:
+    def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
 
         Use this to discover the handles every other tool accepts —
         ``view_id``, field/filter names, ``widget_id``s, inline names,
         and ``action_id``s.
 
-        Schema per entry:
+        Returns ``{"admin_views": [...], "widget_shapes": {...}}``.
+        ``widget_shapes`` is a legend keyed by widget category (the
+        ``widget`` value on every filter entry); each value is
+        ``{"value_shape": str, "example": <example value>}`` describing
+        the expected ``filter_data`` value shape. Subclassed widgets
+        (e.g. ``FromValuesAutocompleteWidget``) are reported as their
+        base category — only the base controls the ``filter_data``
+        contract.
+
+        Schema per admin entry:
           - ``view_id``: pass to other tools as ``view_id``.
           - ``app_label``, ``model``: match against ``target_model`` on
             filter widgets.
@@ -162,11 +172,13 @@ class SBAdminTools(MCPToolset):
             ``"generic"``), ``fields``, and ``inline_actions``.
 
           Action lists — every entry is
-          ``{"title", "kind", "action_id", "invoke_with",
+          ``{"title", "kind", "action_id",
           "requires_confirmation"?}``. ``kind`` is ``"method"`` (calls
           a server-side method) or ``"modal"`` (opens a form — fetch
-          the schema with ``fetch_action_form`` first). ``invoke_with``
-          names the MCP tool to call. ``requires_confirmation: true``
+          the schema with ``fetch_action_form`` first). The MCP tool to
+          call is looked up in the top-level ``action_invokers`` legend
+          by action-list name (``row_actions`` →
+          ``invoke_row_action``, etc.). ``requires_confirmation: true``
           means the first invoke returns ``needs_confirmation``; pass
           ``confirmed=True`` on the second call to commit. Sub-actions
           (visual dropdown groups in the UI) are flattened to siblings.
@@ -180,7 +192,7 @@ class SBAdminTools(MCPToolset):
         request = self.request
         ensure_sbadmin_request_data(request)
 
-        result: list[dict] = []
+        admins: list[dict] = []
         for admin in sb_admin_site._registry.values():
             if not isinstance(admin, SBAdminBaseListView):
                 continue
@@ -189,10 +201,22 @@ class SBAdminTools(MCPToolset):
                     continue
             except Exception:
                 continue  # one broken admin shouldn't break discovery
-            result.append(admin_entry(admin, request))
+            admins.append(admin_entry(admin, request))
 
-        result.sort(key=lambda entry: entry["view_id"])
-        return result
+        admins.sort(key=lambda entry: entry["view_id"])
+        # ``widget_shapes`` is the legend keyed by the ``widget`` field
+        # reported on every filter entry. Emitting it once at the top
+        # level keeps each per-field filter block to ``filter_field`` +
+        # ``widget`` (+ choices/autocomplete extras) instead of repeating
+        # ``value_shape`` / ``example`` for every column.
+        # ``action_invokers`` is a sibling legend to ``widget_shapes`` —
+        # keyed by action-list name, value is the MCP tool to call.
+        # Saves repeating ``invoke_with`` on every individual action.
+        return {
+            "admin_views": admins,
+            "widget_shapes": WIDGET_SHAPES,
+            "action_invokers": ACTION_INVOKERS,
+        }
 
     @_clear_thread_local_after_call
     def list_rows(
@@ -218,12 +242,14 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           fields: non-empty list of column names to return, drawn from
-            ``list_admins[].fields[].name``. The primary key is always
+            ``list_admins["admin_views"][].fields[].name``. The primary key is always
             included for row identity.
           filter_data: ``{filter_field: value}`` mapping. The value
             shape per filter is reported on the filter entry in
-            ``list_admins[].fields[].filter`` as ``value_shape`` /
-            ``example`` — copy that shape literally. Quick reference:
+            ``list_admins["admin_views"][].fields[].filter.widget``; look up
+            ``value_shape`` / ``example`` for that widget category in
+            ``list_admins["widget_shapes"]`` and copy the shape
+            literally. Quick reference:
             choice → string; multi-choice → list of strings;
             autocomplete → list of ``{"value", "label"}`` entries;
             boolean → bool; date → ``["YYYY-MM-DD", "YYYY-MM-DD"]``
@@ -239,7 +265,7 @@ class SBAdminTools(MCPToolset):
             beside each parent row. Each item:
             ``{"inline_name": "...", "fields": [...]}`` where
             ``inline_name`` and ``fields`` are taken from
-            ``list_admins[].inlines``.
+            ``list_admins["admin_views"][].inlines``.
 
             Hydrated rows arrive at
             ``row["_inlines"][<inline_name>]``. When a parent has more
@@ -289,7 +315,7 @@ class SBAdminTools(MCPToolset):
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
         # the JSON and drop UI-only payload (notifications, per-row action
-        # buttons advertised once via ``list_admins[].row_actions``, HTML
+        # buttons advertised once via ``list_admins["admin_views"][].row_actions``, HTML
         # markup in cell values).
         response = SBAdminViewService.delegate_to_action(
             request,
@@ -323,7 +349,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           object_id: target row id (as a string).
-          fields: optional subset of ``list_admins[].detail_fields``.
+          fields: optional subset of ``list_admins["admin_views"][].detail_fields``.
             ``None`` returns every detail field; unknown names raise
             ``LookupError``. Inline rows always come back with every
             field the inline declares.
@@ -679,7 +705,7 @@ class SBAdminTools(MCPToolset):
 
         Args:
           view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins[].row_actions``.
+          action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
           object_id: target row id (as a string).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
@@ -726,7 +752,7 @@ class SBAdminTools(MCPToolset):
 
         Args:
           view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins[].detail_actions``.
+          action_id: ``action_id`` from ``list_admins["admin_views"][].detail_actions``.
           object_id: target row id (as a string).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
@@ -853,7 +879,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           action_id: ``action_id`` from
-            ``list_admins[].selection_actions``.
+            ``list_admins["admin_views"][].selection_actions``.
           object_ids: non-empty list of row ids (as strings).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
@@ -913,7 +939,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           action_id: ``action_id`` from
-            ``list_admins[].list_actions``.
+            ``list_admins["admin_views"][].list_actions``.
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
           filter_data, full_text_search: optional scope, same shapes as
@@ -966,7 +992,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           widget_id: opaque widget identifier from
-            ``list_admins[].fields[].filter.widget_id`` (list filters)
+            ``list_admins["admin_views"][].fields[].filter.widget_id`` (list filters)
             or ``fetch_detail`` / ``fetch_add_form`` →
             ``fields.<name>.widget_id`` (parent form; inline FK fields on
             add usually lack ``widget_id`` — use another admin's filter
