@@ -54,6 +54,19 @@ logger = logging.getLogger(__name__)
 _INLINE_OP_SKIP = frozenset({"id", "_delete"})
 
 
+def _is_blank_inline_value(value) -> bool:
+    """Whether an inline field value carries nothing usable.
+
+    Covers raw blanks (``None`` / ``""`` / ``[]`` / ``{}``) and the
+    ``{"value", "label"}`` envelope with an empty ``value``.
+    """
+    if value in (None, "", [], {}):
+        return True
+    if isinstance(value, dict) and "value" in value:
+        return value["value"] in (None, "")
+    return False
+
+
 def _reject_non_writable_overrides(
     overrides: dict,
     writable: set[str],
@@ -106,6 +119,22 @@ def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
 
     ops_by_id = {op["id"]: op for op in ops if "id" in op}
     new_ops = [op for op in ops if "id" not in op]
+
+    # A new row with no usable field value would be treated as a blank
+    # extra form and silently skipped by Django's formset (no save, no
+    # error). The caller explicitly asked to create it, so reject it
+    # instead of dropping it — otherwise the write "succeeds" with the
+    # row missing.
+    for op in new_ops:
+        meaningful = {k: v for k, v in op.items() if k not in _INLINE_OP_SKIP}
+        if not meaningful or all(
+            _is_blank_inline_value(v) for v in meaningful.values()
+        ):
+            raise ValueError(
+                f"Inline {type(iaf.opts).__name__!r} new row {op!r} has no "
+                "field values; it would be silently skipped. Provide the "
+                "row's required fields, or omit it."
+            )
 
     initial_forms = list(formset.initial_forms)
     total_forms = len(initial_forms) + len(new_ops)

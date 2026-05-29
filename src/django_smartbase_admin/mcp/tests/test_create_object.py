@@ -198,3 +198,15 @@ class CreateObjectInlineTests(_CreateObjectTestBase):
             with self.subTest(inlines=inlines):
                 with self.assertRaises(LookupError):
                     self._create(field_values={"name": "x"}, inlines=inlines)
+
+    def test_empty_new_inline_row_is_rejected_not_dropped(self):
+        """A new inline row with no usable value would be a blank extra form
+        that Django's formset silently skips — the tool rejects it so the
+        create can't 'succeed' with the requested row missing."""
+        for op in ({}, {"type": "", "everybody": "", "can_read": ""}):
+            with self.subTest(op=op):
+                with self.assertRaises(ValueError):
+                    self._create(
+                        field_values={"name": "x"},
+                        inlines={"FolderPermissionInline": [op]},
+                    )
