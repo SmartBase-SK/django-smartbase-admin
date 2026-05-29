@@ -120,6 +120,7 @@ class TabulatorNestedPluginTests(TestCase):
         view.init_fields_cache(
             view.get_sbadmin_list_display(request),
             request.request_data.configuration,
+            request=request,
         )
         return view, request
 
