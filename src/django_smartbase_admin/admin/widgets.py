@@ -783,15 +783,12 @@ class SBAdminAutocompleteWidget(
         return self.field_name
 
     def get_selected_option_cache_key(self, request):
+        formset = getattr(getattr(self, "bound_form", None), "_sbadmin_formset", None)
         return (
-            self.view.get_id(),
-            self.__class__.__module__,
-            self.__class__.__qualname__,
-            self.model._meta.label_lower,
-            self.field_name,
+            self.get_id(),
+            getattr(formset, "prefix", None),
+            # Defensive: value_field changes how submitted values map back to rows.
             self.get_value_field(),
-            self.is_multiselect(),
-            id(self.value_lambda),
         )
 
     def get_selected_option_cache(self, request):
