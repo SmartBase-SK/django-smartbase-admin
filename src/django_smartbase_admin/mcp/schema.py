@@ -170,12 +170,37 @@ def _inline_field_names(inline, request) -> list[str]:
     ]
 
 
+def _inline_relation_targets(model_cls, field_names) -> dict:
+    """``{field: "app.Model"}`` for the inline's relational columns.
+
+    Inline rows carry FK / M2M columns as bare pks (``{"work": 443}``).
+    Emitted once per inline (not per row), this map tells the agent the
+    target model behind each such id — enough to interpret it and to pick
+    the right model to ``autocomplete`` against when resolving a *name* to
+    an id. Reverse resolution (id -> label) for a single object is done by
+    ``fetch_detail``, which labels inline FKs the same way it does parent
+    FKs; ``autocomplete`` is forward-only and can't do it.
+    """
+    targets: dict[str, str] = {}
+    for name in field_names:
+        try:
+            field = model_cls._meta.get_field(name)
+        except Exception:
+            continue
+        related = getattr(field, "related_model", None)
+        if related is not None:
+            opts = related._meta
+            targets[name] = f"{opts.app_label}.{opts.object_name}"
+    return targets
+
+
 def _inline_entry(inline, request) -> dict:
     # For fake inlines, ``inline.model`` is a dynamic proxy whose
     # auto-generated name is an internal detail. Report the original
     # model so agents see the real ``app.Model`` label.
     model_cls = getattr(inline, "original_model", None) or inline.model
     opts = model_cls._meta
+    field_names = _inline_field_names(inline, request)
     entry = {
         "inline_name": inline.__class__.__name__,
         # Inlines are registered in ``view_map`` under their own
@@ -188,8 +213,13 @@ def _inline_entry(inline, request) -> dict:
         "verbose_name_plural": str(
             getattr(inline, "verbose_name_plural", None) or opts.verbose_name_plural
         ),
-        "fields": _inline_field_names(inline, request),
+        "fields": field_names,
     }
+    # Per-inline FK/M2M -> target model map (once, not per row) so bare
+    # inline ids in ``list_rows(include_inlines)`` are interpretable.
+    relations = _inline_relation_targets(model_cls, field_names)
+    if relations:
+        entry["relations"] = relations
     inline_actions = collect_action_entries(
         inline, "get_sbadmin_inline_list_actions_processed", request
     )

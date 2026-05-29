@@ -223,8 +223,14 @@ class SBAdminTools(MCPToolset):
             ``list_rows(include_inlines=...)``), ``view_id`` (pass to
             ``invoke_inline_action`` when invoking inline actions),
             ``model`` (``"<app>.<Model>"``), ``verbose_name`` /
-            ``verbose_name_plural``, ``join_kind`` (``"fk"`` or
-            ``"generic"``), ``fields``, and ``inline_actions``.
+            ``verbose_name_plural``, ``fields``, ``inline_actions``, and
+            ``relations`` — a ``{field: "<app>.<Model>"}`` map for the
+            inline's FK / M2M columns. ``include_inlines`` returns those
+            columns as bare pks (e.g. ``{"work": 443}``); ``relations``
+            names the target model so the agent can interpret the id and
+            pick the model to ``autocomplete`` against. (``fetch_detail``
+            instead resolves inline FKs to ``{"value", "label"}``
+            directly, the same as parent FKs.)
 
           Action lists — every entry is
           ``{"title", "kind", "action_id",
