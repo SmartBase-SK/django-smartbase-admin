@@ -90,3 +90,27 @@ class FilterValidationTests(TestCase):
         shape = result["widget_shapes"]["DateFilterWidget"]
         self.assertIn("start", shape["value_shape"])
         self.assertEqual(shape["example"], ["2026-06-01", "2026-06-30"])
+
+    def test_date_open_ended_ranges_apply_the_present_bound(self):
+        """A null bound is an open-ended range, not 'match nothing' — only
+        both-null short-circuits to the empty result."""
+        from datetime import datetime, timedelta
+        from types import SimpleNamespace
+
+        widget = DateFilterWidget()
+        widget.field = SimpleNamespace(filter_field="uploaded_at")
+        d1, d2 = datetime(2026, 3, 1), datetime(2026, 3, 10)
+
+        def q(value):
+            return widget.get_base_filter_query_for_parsed_value(None, value).children
+
+        self.assertEqual(q([None, None]), [("pk__in", [])])
+        self.assertEqual(q([d1, None]), [("uploaded_at__gte", d1)])
+        self.assertEqual(q([None, d2]), [("uploaded_at__lte", d2 + timedelta(days=1))])
+        self.assertEqual(
+            q([d1, d2]),
+            [
+                ("uploaded_at__gte", d1),
+                ("uploaded_at__lte", d2 + timedelta(days=1)),
+            ],
+        )

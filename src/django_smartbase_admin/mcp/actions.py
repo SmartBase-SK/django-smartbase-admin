@@ -20,7 +20,7 @@ from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
-from django.http import QueryDict
+from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
 from mcp.types import BlobResourceContents, EmbeddedResource
 
@@ -651,6 +651,14 @@ class SBAdminMCPActionInvokeService:
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
+        except Http404:
+            # Unknown action_id falls through dispatch to a bare
+            # (empty-message) Http404; give a clear, named error instead.
+            raise LookupError(
+                f"No invocable action {action_id!r} on view "
+                f"{admin.get_id()!r}. action_id must come from "
+                f"list_admins()'s row/detail/list/selection_actions."
+            )
 
         if modal is None:
             result = cls._normalize_method_response(response)

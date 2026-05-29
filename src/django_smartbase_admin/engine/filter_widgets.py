@@ -640,17 +640,23 @@ class DateFilterWidget(SBAdminFilterWidget):
                 )
 
     def get_base_filter_query_for_parsed_value(self, request, filter_value):
-        if not filter_value or filter_value[0] is None or filter_value[1] is None:
+        if not filter_value:
             return self._EMPTY_RESULT_Q
-        date_from = filter_value[0]
-        # add one day to include all 'to' date hours, this is needed instead of casting datetime to date in DB
-        date_to = filter_value[1] + timedelta(days=1)
-        return Q(
-            **{
-                f"{self.field.filter_field}__gte": date_from,
-                f"{self.field.filter_field}__lte": date_to,
-            }
-        )
+        date_from, date_to = filter_value[0], filter_value[1]
+        # Only both-null means "no usable filter" → match nothing. A single
+        # bound is a valid open-ended range (``>= from`` or ``<= to``).
+        if date_from is None and date_to is None:
+            return self._EMPTY_RESULT_Q
+        query = Q()
+        if date_from is not None:
+            query &= Q(**{f"{self.field.filter_field}__gte": date_from})
+        if date_to is not None:
+            # add one day to include all 'to' date hours, this is needed
+            # instead of casting datetime to date in DB
+            query &= Q(
+                **{f"{self.field.filter_field}__lte": date_to + timedelta(days=1)}
+            )
+        return query
 
     def get_advanced_filter_query_for_parsed_value(
         self, request, parsed_value, original_query, rule
