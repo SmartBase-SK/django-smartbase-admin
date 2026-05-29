@@ -89,15 +89,19 @@ def _to_querydict(mapping: dict) -> QueryDict:
     return qd
 
 
-def build_columns_data(admin, request, fields: list[str]) -> dict:
+def build_columns_data(admin, request, fields: list[str], field_map=None) -> dict:
     """Translate an MCP ``fields`` selection into the list action's
     ``columnsData`` payload: validates against the admin's field map and
     marks the requested subset visible.
+
+    ``field_map`` lets the caller reuse an already-built map instead of
+    rebuilding it (``get_field_map`` clones every field on each call).
     """
     if not isinstance(fields, list) or not fields:
         raise TypeError("list_rows requires a non-empty 'fields' list.")
 
-    field_map = admin.get_field_map(request)
+    if field_map is None:
+        field_map = admin.get_field_map(request)
     unknown = [name for name in fields if name not in field_map]
     if unknown:
         raise LookupError(

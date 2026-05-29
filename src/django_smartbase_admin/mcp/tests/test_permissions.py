@@ -20,7 +20,6 @@ from unittest.mock import MagicMock
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
-from django.http import Http404
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
@@ -215,7 +214,9 @@ class TestMCPPermissions(TestCase):
             for f in super_folder["fields"]
             if f["name"] == "parent"
         )
-        with self.assertRaises(Http404):
+        # A widget the user can't see is "not found" for them — same
+        # ``LookupError`` as the ``fields=[hidden]`` branch, no existence leak.
+        with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(denied)).autocomplete(
                 "filer_folder", parent_widget_id, search="perm"
             )

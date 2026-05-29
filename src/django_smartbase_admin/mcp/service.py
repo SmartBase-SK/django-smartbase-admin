@@ -662,9 +662,7 @@ class SBAdminMCPDetailService:
         """
         f, _, value = lookup_field(name, obj, model_admin)
         if f is None:
-            # Callable display methods (``*_display``, ``python_formatter``)
-            # land here and routinely return ``mark_safe`` HTML built for
-            # the browser; sanitize it for the agent surface.
+            # Callable display methods often return mark_safe HTML.
             return sanitize_html(value)
         if f.many_to_many:
             related = getattr(obj, name).all()
@@ -781,9 +779,7 @@ class SBAdminMCPDetailService:
         grouped: dict = {}
         for r in rows:
             parent = r.pop(parent_key)
-            # Stable ``"id"`` key for row identity, matching ``fetch_detail``
-            # and top-level ``list_rows`` even when the inline model has a
-            # custom pk field name.
+            # Mirror a custom pk name to a stable ``"id"`` key.
             if pk_name != "id" and "id" not in r and pk_name in r:
                 r["id"] = r[pk_name]
             grouped.setdefault(parent, []).append(r)
