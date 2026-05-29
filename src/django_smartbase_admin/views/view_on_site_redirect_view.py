@@ -1,4 +1,4 @@
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.views import View
@@ -28,7 +28,14 @@ class ViewOnSiteRedirectView(View):
         if not admin_instance.has_view_permission(request):
             raise PermissionDenied
 
-        obj = get_object_or_404(admin_instance.get_queryset(request), pk=object_id)
+        # ``<path:object_id>`` accepts arbitrary strings; for models with a
+        # validating PK (int, UUID, …) a malformed id raises ValueError/
+        # ValidationError. get_object_or_404 only maps DoesNotExist to 404, so
+        # convert those to 404 too instead of leaking a 500.
+        try:
+            obj = get_object_or_404(admin_instance.get_queryset(request), pk=object_id)
+        except (ValueError, ValidationError, TypeError):
+            raise Http404
 
         get_absolute_url = getattr(obj, "get_absolute_url", None)
         url = get_absolute_url() if callable(get_absolute_url) else None

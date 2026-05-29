@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django.core.exceptions import PermissionDenied
 from django.db.models import F
 from django.http import Http404
 from django.test import TestCase, override_settings
@@ -108,6 +109,27 @@ class TestMCPPermissions(TestCase):
         if self._original_admin is not None:
             sb_admin_site._registry[Folder] = self._original_admin
         super().tearDown()
+
+    def test_non_staff_user_is_denied_despite_model_permission(self):
+        """MCP tools never pass through ``admin_view()``, so the staff gate
+        must be enforced in-band. A user with model view permission but
+        ``is_staff=False`` is rejected; flipping ``is_staff`` on lets the
+        same call through — proving staff status, not model perms, is the
+        gate."""
+        MCPToolTestConfig.view_permission_for = {Folder}
+        non_staff = MagicMock(
+            is_authenticated=True, is_active=True, is_staff=False, is_superuser=False
+        )
+        with self.assertRaises(PermissionDenied):
+            SBAdminTools(request=build_mcp_request(non_staff)).list_admins()
+
+        staff = MagicMock(
+            is_authenticated=True, is_active=True, is_staff=True, is_superuser=False
+        )
+        admins = SBAdminTools(request=build_mcp_request(staff)).list_admins()[
+            "admin_views"
+        ]
+        self.assertTrue(any(a["view_id"] == "filer_folder" for a in admins))
 
     def test_schema_omits_inline_user_cannot_view(self):
         """``list_admins.inlines`` skips inlines failing

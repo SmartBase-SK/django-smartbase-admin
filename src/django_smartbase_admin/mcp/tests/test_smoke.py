@@ -36,7 +36,7 @@ class MCPOAuthSmokeTests(TestCase):
     """End-to-end OAuth 2.1 + MCP transport smoke."""
 
     REDIRECT_URI = "http://127.0.0.1:5555/cb"
-    SCOPE = "sbadmin:read"
+    SCOPE = "sbadmin:write"
 
     @classmethod
     def setUpClass(cls):
@@ -48,7 +48,7 @@ class MCPOAuthSmokeTests(TestCase):
     def setUp(self):
         super().setUp()
         User = get_user_model()
-        self.user = User.objects.create(username="alice", is_active=True)
+        self.user = User.objects.create(username="alice", is_active=True, is_staff=True)
         self.user.set_password("pw")
         self.user.save()
         self.client = Client()

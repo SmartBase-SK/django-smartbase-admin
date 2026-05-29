@@ -1,6 +1,7 @@
 import Choices from "choices.js"
 import {choicesJSOptions} from "./choices"
 import {createIcon, getResultLabel, syncDropdownMenuWidth} from "./utils"
+import {sanitizeHtml} from "./sanitize"
 
 // Shares the autocomplete UI shell (dropdown button + Choices.js wrapped
 // <select>) but uses a static list of <option> tags rendered server-side —
@@ -53,7 +54,7 @@ export default class StaticAutocomplete {
             if (!labelEl) return
             const value = choicesJS.getValue()
             const items = Array.isArray(value) ? value : (value ? [value] : [])
-            labelEl.innerHTML = items.length === 0 ? emptyLabel : getResultLabel(items)
+            labelEl.innerHTML = items.length === 0 ? emptyLabel : sanitizeHtml(getResultLabel(items))
         }
         choiceInput.addEventListener('addItem', updateLabel)
         choiceInput.addEventListener('removeItem', updateLabel)

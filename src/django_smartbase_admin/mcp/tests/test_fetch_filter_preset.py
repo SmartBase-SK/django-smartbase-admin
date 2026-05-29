@@ -113,7 +113,9 @@ class FetchFilterPresetTests(TestCase):
     def test_presets_surface_and_fetch_decodes_both_sources(self):
         # Real user so the saved-preset DB lookup has a valid FK target.
         User = get_user_model()
-        user = User.objects.create(username="vw", is_active=True, is_superuser=True)
+        user = User.objects.create(
+            username="vw", is_active=True, is_staff=True, is_superuser=True
+        )
 
         # Saved preset: stored as a JSON-string ``url_params`` (mirrors
         # what the frontend POSTs to ``create_or_update_saved_view``),

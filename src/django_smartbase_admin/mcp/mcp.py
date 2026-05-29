@@ -131,18 +131,28 @@ def _decode_preset_url_params(url_params) -> dict:
     return decoded
 
 
-def _clear_thread_local_after_call(method):
-    """Ensure the bridge-bound thread-local request is cleared after every
-    tool call. ``ensure_sbadmin_request_data`` binds it for the duration
-    of the call so SBAdmin internals (and the audit hook) see the active
-    request, but MCP transport never fires ``request_finished`` — without
-    this wrapper the binding leaks across calls and tests, causing audit
-    rows to be written under stale users.
+def _guarded_tool_call(method):
+    """Tool entry/exit wrapper.
+
+    Before the tool runs, enforce the admin staff gate. MCP tools never
+    pass through ``SBAdminSite.admin_view()``, so without this a user with
+    Django model permissions but no admin access (``is_active``/``is_staff``)
+    could read and mutate through the tools — the same boundary the HTTP
+    admin's front door applies.
+
+    After the tool runs, clear the bridge-bound thread-local request.
+    ``ensure_sbadmin_request_data`` binds it for the duration of the call so
+    SBAdmin internals (and the audit hook) see the active request, but MCP
+    transport never fires ``request_finished`` — without this the binding
+    leaks across calls and tests, causing audit rows to be written under
+    stale users.
     """
     from functools import wraps
 
     @wraps(method)
     def wrapper(self, *args, **kwargs):
+        if not sb_admin_site.has_permission(self.request):
+            raise PermissionDenied
         try:
             return method(self, *args, **kwargs)
         finally:
@@ -172,7 +182,7 @@ class SBAdminTools(MCPToolset):
     ``PermissionError``; invisible objects raise ``LookupError``.
     """
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
 
@@ -263,7 +273,7 @@ class SBAdminTools(MCPToolset):
             "action_invokers": ACTION_INVOKERS,
         }
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_filter_preset(
         self,
         view_id: str,
@@ -349,7 +359,7 @@ class SBAdminTools(MCPToolset):
             )
         raise ValueError(f"source must be 'static' or 'saved', got {source!r}")
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def list_rows(
         self,
         view_id: str,
@@ -464,7 +474,7 @@ class SBAdminTools(MCPToolset):
             attach_inlines(admin, request, rows, include_inlines)
         return result
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_detail(
         self,
         view_id: str,
@@ -519,7 +529,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_add_form(
         self,
         view_id: str,
@@ -553,7 +563,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_action_form(
         self,
         view_id: str,
@@ -599,7 +609,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def create_object(
         self,
         view_id: str,
@@ -654,7 +664,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def update_detail(
         self,
         view_id: str,
@@ -711,7 +721,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def get_audit_history(
         self,
         view_id: str,
@@ -764,7 +774,7 @@ class SBAdminTools(MCPToolset):
             page_size=page_size,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def delete_objects(
         self,
         view_id: str,
@@ -814,7 +824,7 @@ class SBAdminTools(MCPToolset):
             confirmed=confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_row_action(
         self,
         view_id: str,
@@ -861,7 +871,7 @@ class SBAdminTools(MCPToolset):
             confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_detail_action(
         self,
         view_id: str,
@@ -908,7 +918,7 @@ class SBAdminTools(MCPToolset):
             confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_inline_action(
         self,
         view_id: str,
@@ -979,7 +989,7 @@ class SBAdminTools(MCPToolset):
             confirmed=confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_selection_action(
         self,
         view_id: str,
@@ -1043,7 +1053,7 @@ class SBAdminTools(MCPToolset):
             modifier=modifier,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_list_action(
         self,
         view_id: str,
@@ -1104,7 +1114,7 @@ class SBAdminTools(MCPToolset):
             modifier=modifier,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def autocomplete(
         self,
         view_id: str,
