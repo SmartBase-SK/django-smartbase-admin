@@ -88,9 +88,6 @@ class Main {
             })
 
             window.htmx.on("htmx:afterSettle", (detail) => {
-                if(!shouldProcessAfterSwap(detail)) {
-                    return
-                }
                 this.switchCKEditorTheme(detail.target)
             })
         }
