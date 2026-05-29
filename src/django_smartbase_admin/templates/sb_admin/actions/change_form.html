@@ -199,8 +199,8 @@
                 {% with sbadmin_tab_slug=tab|slugify %}
                 <div class="detail-view-tab tab-pane fade{% for class in tab_content_object.classes %} {{ class }}{% endfor %}{% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %} pt-20{% endif %}" id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_tabcontent_{{ sbadmin_tab_slug }}" role="tabpanel"
                      aria-labelledby="tab_{{ sbadmin_tab_slug }}">
-                    <div class="flex max-md:flex-wrap w-full lg:gap-24">
-                        <div class="min-w-0 w-full">
+                    <div class="flex max-md:flex-wrap w-full lg:gap-24 detail-view-layout">
+                        <div class="min-w-0 w-full detail-view-layout-left">
                             {% for tab_content in tab_content_object.content %}
                                 {% if tab_content.type == 'fieldset' %}
                                     {% block tab_content_fieldset %}
@@ -225,7 +225,7 @@
                             {% endfor %}
                         </div>
                         {% spaceless %}
-                            <div class="lg:flex-shrink-0 w-full lg:w-370 empty:hidden">
+                            <div class="lg:flex-shrink-0 w-full lg:w-370 empty:hidden detail-view-layout-right">
                                 {% for tab_content in tab_content_object.content %}
                                     {% if tab_content.type == 'fieldset' %}
                                         {% block tab_content_fieldset_right %}
