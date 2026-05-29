@@ -256,6 +256,10 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
         language_choice_change_response = self.handle_language_choice_change(request)
         if language_choice_change_response:
             return language_choice_change_response
+        self.init_fields_cache(
+            configuration=request.request_data.configuration,
+            request=request,
+        )
         action = SBAdminListAction(self, request)
         data = action.get_template_data()
         context = self.get_context_data(request)
