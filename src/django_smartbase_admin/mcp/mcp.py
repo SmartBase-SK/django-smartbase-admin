@@ -385,18 +385,14 @@ class SBAdminTools(MCPToolset):
           fields: non-empty list of column names to return, drawn from
             ``list_admins["admin_views"][].fields[].name``. The primary key is always
             included for row identity.
-          filter_data: ``{filter_field: value}`` mapping. The value
-            shape per filter is reported on the filter entry in
-            ``list_admins["admin_views"][].fields[].filter.widget``; look up
-            ``value_shape`` / ``example`` for that widget category in
-            ``list_admins["widget_shapes"]`` and copy the shape
-            literally. Quick reference:
-            choice → string; multi-choice → list of strings;
-            autocomplete → list of ``{"value", "label"}`` entries;
-            boolean → bool; date → ``["YYYY-MM-DD", "YYYY-MM-DD"]``
-            (either side may be ``null``); number range → ``[min, max]``;
-            string → substring. Unknown keys are rejected — misspellings
-            raise instead of silently returning every row.
+          filter_data: ``{filter_field: value}`` mapping. Per filter,
+            read the widget category from
+            ``list_admins["admin_views"][].fields[].filter.widget`` and
+            copy its ``value_shape`` / ``example`` from
+            ``list_admins["widget_shapes"]`` literally — that legend is
+            the single source of truth for the per-widget value shape.
+            Unknown keys are rejected — misspellings raise instead of
+            silently returning every row.
           page, page_size: pagination, 1-indexed.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
             entries, applied in order.

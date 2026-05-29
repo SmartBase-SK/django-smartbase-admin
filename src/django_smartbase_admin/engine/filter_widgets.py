@@ -400,14 +400,33 @@ class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
         return result
 
     def validate_value(self, value) -> None:
-        if not (isinstance(value, list) and len(value) == 2):
+        # Same shape the frontend widget emits and ``parse_value_from_input``
+        # consumes: ``{"from": {"value": <num>}, "to": {"value": <num>}}`` —
+        # either side omittable for an open-ended range.
+        if not isinstance(value, dict):
             raise ValueError(
-                f"NumberRangeFilterWidget expects [min, max] (list of 2), got {type(value).__name__}: {value!r}"
+                "NumberRangeFilterWidget expects "
+                "{'from': {'value': <number>}, 'to': {'value': <number>}}, "
+                f"got {type(value).__name__}: {value!r}"
             )
-        for v in value:
-            if v is not None and not isinstance(v, (int, float)):
+        for key in ("from", "to"):
+            bound = value.get(key)
+            if bound is None:
+                continue
+            if not isinstance(bound, dict):
                 raise ValueError(
-                    f"NumberRangeFilterWidget bounds must be numbers or null, got {v!r}"
+                    f"NumberRangeFilterWidget {key!r} must be {{'value': <number>}} "
+                    f"or omitted, got {bound!r}"
+                )
+            inner = bound.get("value")
+            if inner in (None, ""):
+                continue
+            try:
+                float(inner)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"NumberRangeFilterWidget {key!r} value must be a number, "
+                    f"got {inner!r}"
                 )
 
     def get_advanced_filter_operators(self):

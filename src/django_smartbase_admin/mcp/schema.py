@@ -63,8 +63,13 @@ WIDGET_SHAPES: dict[str, dict] = {
         "example": ["2026-06-01", "2026-06-30"],
     },
     "NumberRangeFilterWidget": {
-        "value_shape": "[min, max] — list of two numbers; either side may be null.",
-        "example": [0, 100],
+        "value_shape": (
+            "{'from': {'value': <number>}, 'to': {'value': <number>}} — "
+            "either side may be omitted for an open-ended range "
+            "(e.g. {'from': {'value': 10}} means >= 10, "
+            "{'to': {'value': 10}} means <= 10)."
+        ),
+        "example": {"from": {"value": 0}, "to": {"value": 100}},
     },
     "BooleanFilterWidget": {"value_shape": "bool", "example": True},
     "MultipleChoiceFilterWidget": {

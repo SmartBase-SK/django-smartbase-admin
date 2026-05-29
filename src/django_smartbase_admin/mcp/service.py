@@ -41,6 +41,7 @@ from django_smartbase_admin.mcp.bridge import (
     set_request_payload,
 )
 from django_smartbase_admin.mcp.field_schema import field_info
+from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.mcp.form_encoding import (
     form_errors_dict,
     get_form_from_response,
@@ -661,7 +662,10 @@ class SBAdminMCPDetailService:
         """
         f, _, value = lookup_field(name, obj, model_admin)
         if f is None:
-            return value
+            # Callable display methods (``*_display``, ``python_formatter``)
+            # land here and routinely return ``mark_safe`` HTML built for
+            # the browser; sanitize it for the agent surface.
+            return sanitize_html(value)
         if f.many_to_many:
             related = getattr(obj, name).all()
             return [
@@ -678,7 +682,7 @@ class SBAdminMCPDetailService:
                 "value": value.pk,
                 "label": cls._detail_label_for_item(None, value, request),
             }
-        return value
+        return sanitize_html(value)
 
     @classmethod
     def _extract_detail_row(cls, admin_form, obj, model_admin, selected_set, request):
@@ -868,9 +872,9 @@ class SBAdminMCPDetailService:
         method = getattr(inline, name, None)
         bound_to = getattr(method, "__self__", None)
         if callable(method) and bound_to in (inline, type(inline)):
-            return method(obj)
+            return sanitize_html(method(obj))
         value = getattr(obj, name, None)
-        return value() if callable(value) else value
+        return sanitize_html(value() if callable(value) else value)
 
     @classmethod
     def _project_inline_instance(
