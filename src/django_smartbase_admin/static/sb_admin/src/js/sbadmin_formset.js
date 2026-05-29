@@ -37,7 +37,7 @@ export default class SBAdminFormset {
             this.processAfterSwap(event.target)
         })
         window.htmx.on('htmx:oobAfterSwap', (event) => {
-            const target = event.detail?.elt || event.detail?.target || event.target
+            const target = event.detail?.target || event.target
             if (!target) {
                 return
             }

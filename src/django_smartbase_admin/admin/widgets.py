@@ -222,6 +222,7 @@ class SBAdminToggleWidget(SBAdminBaseWidget, forms.CheckboxInput):
 
 
 class SBAdminCKEditorWidget(SBAdminBaseWidget, CKEditorWidget):
+    dynamic_region_trigger_event = "SBAdminCKEditorChange"
 
     def __init__(
         self,

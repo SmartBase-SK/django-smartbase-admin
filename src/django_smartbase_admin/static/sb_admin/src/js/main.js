@@ -30,7 +30,7 @@ import Autocomplete from "./autocomplete"
 import StaticAutocomplete from "./static_autocomplete"
 import ChoicesJS from "./choices"
 import TextTags from "./text_tags"
-import {setCookie, setDropdownLabel, shouldProcessAfterSwap} from "./utils"
+import { setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
 
@@ -79,8 +79,14 @@ class Main {
                 processAfterSwap(detail.target)
             })
 
-            window.htmx.on("htmx:oobAfterSwap", (detail) => {
-                const target = detail.detail?.elt || detail.detail?.target || detail.target
+            window.htmx.on("htmx:oobAfterSwap", (event) => {
+                // fix duplicit oobAfterSwap events triggered for multiple oob swaps
+                // https://github.com/bigskysoftware/htmx/issues/1803
+                if (event.detail.__seen) {
+                    return
+                }
+                event.detail.__seen = true
+                const target = event.detail?.target || event.target
                 if (!target) {
                     return
                 }
@@ -170,7 +176,7 @@ class Main {
     isDarkMode() {
         const colorScheme = document.documentElement.dataset.theme
         let isDark = colorScheme === 'dark'
-        if(!colorScheme || colorScheme === 'auto') {
+        if (!colorScheme || colorScheme === 'auto') {
             isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
         }
         return isDark
@@ -178,9 +184,9 @@ class Main {
 
     handleColorSchemeChange() {
         const picker = document.querySelector('.js-color-scheme-picker')
-        if(picker) {
-            picker.addEventListener('change', (e)=>{
-                if(e.target.value) {
+        if (picker) {
+            picker.addEventListener('change', (e) => {
+                if (e.target.value) {
                     document.documentElement.setAttribute('data-theme', e.target.value)
                     this.switchBodyColorSchemeClass(true)
                     this.switchCKEditorTheme()
@@ -194,16 +200,16 @@ class Main {
     }
 
     switchBodyColorSchemeClass(fireEvents = false) {
-        if(this.isDarkMode()) {
+        if (this.isDarkMode()) {
             document.body.classList.add('dark')
-            if(fireEvents) {
-                document.body.dispatchEvent(new CustomEvent('color-scheme-change', {detail: 'dark'}))
+            if (fireEvents) {
+                document.body.dispatchEvent(new CustomEvent('color-scheme-change', { detail: 'dark' }))
             }
             return
         }
         document.body.classList.remove('dark')
-        if(fireEvents) {
-            document.body.dispatchEvent(new CustomEvent('color-scheme-change', {detail: 'light'}))
+        if (fireEvents) {
+            document.body.dispatchEvent(new CustomEvent('color-scheme-change', { detail: 'light' }))
         }
     }
 
@@ -228,7 +234,7 @@ class Main {
         tooltipTriggerList.map((tooltipTriggerEl) => {
             const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
             if (tooltipEl) {
-                return new Tooltip(tooltipTriggerEl, {container: tooltipEl})
+                return new Tooltip(tooltipTriggerEl, { container: tooltipEl })
             }
             return null
         })
@@ -325,8 +331,8 @@ class Main {
         const modalScrollMargin = `${MODAL_SCROLL_MARGIN_PX}px`
         const pageScrollMarginTop = `${actionBarHeight + PAGE_SCROLL_MARGIN_PX}px`
         const scrollMargins = modalBody
-            ? {scrollMarginTop: modalScrollMargin, scrollMarginBottom: modalScrollMargin}
-            : {scrollMarginTop: pageScrollMarginTop}
+            ? { scrollMarginTop: modalScrollMargin, scrollMarginBottom: modalScrollMargin }
+            : { scrollMarginTop: pageScrollMarginTop }
         const previousScrollMargins = {
             scrollMarginTop: anchor.style.scrollMarginTop,
             scrollMarginBottom: anchor.style.scrollMarginBottom
@@ -336,7 +342,7 @@ class Main {
             Object.entries(scrollMargins).forEach(([propertyName, propertyValue]) => {
                 anchor.style[propertyName] = propertyValue
             })
-            anchor.scrollIntoView({behavior: 'instant', block: 'start', inline: 'nearest'})
+            anchor.scrollIntoView({ behavior: 'instant', block: 'start', inline: 'nearest' })
         } finally {
             anchor.style.scrollMarginTop = previousScrollMargins.scrollMarginTop
             anchor.style.scrollMarginBottom = previousScrollMargins.scrollMarginBottom
@@ -373,7 +379,7 @@ class Main {
                         }
                         resolve()
                     }
-                    collapseElement.addEventListener('shown.bs.collapse', complete, {once: true})
+                    collapseElement.addEventListener('shown.bs.collapse', complete, { once: true })
                     timeoutId = window.setTimeout(complete, 450)
                     collapseInstance.show()
                 })
@@ -395,7 +401,7 @@ class Main {
         this.expandCollapsedAncestors(scrollTarget).then(() => {
             this.scrollElementIntoViewport(scrollTarget)
             if (firstField) {
-                firstField.focus({preventScroll: true})
+                firstField.focus({ preventScroll: true })
             }
         })
     }
@@ -453,15 +459,15 @@ class Main {
                     if (dropdownToggleEl.dataset['bsPopperPlacement']) {
                         elementConf['placement'] = dropdownToggleEl.dataset['bsPopperPlacement']
                     }
-                    return {...defaultBsPopperConfig, ...elementConf, strategy: 'fixed'}
+                    return { ...defaultBsPopperConfig, ...elementConf, strategy: 'fixed' }
                 }
             })
             const dropdownWrapper = dropdownToggleEl.closest('.js-dropdown-wrapper')
-            if(dropdownWrapper) {
+            if (dropdownWrapper) {
                 const dropdownLabelEl = dropdownWrapper.querySelector('.js-dropdown-label')
-                dropdown._menu.addEventListener('change', (event)=>{
+                dropdown._menu.addEventListener('change', (event) => {
                     setDropdownLabel(dropdown._menu, dropdownLabelEl)
-                    if(event.target.closest("input[type='radio']")) {
+                    if (event.target.closest("input[type='radio']")) {
                         dropdown.hide()
                     }
                 })
@@ -471,7 +477,7 @@ class Main {
     }
 
     initAliasName() {
-        if(!window.sb_admin_const) {
+        if (!window.sb_admin_const) {
             return
         }
         const aliasGroup = document.getElementById(window.sb_admin_const.GLOBAL_FILTER_ALIAS_WIDGET_ID)
@@ -558,19 +564,19 @@ class Main {
                 if (e.target.files[0]) {
                     fileInput.classList.add('filled')
                     fileInput.querySelectorAll('.js-input-file-image').forEach(el => {
-                        const nameSplit= e.target.files[0].name.split('.')
+                        const nameSplit = e.target.files[0].name.split('.')
                         const extension = nameSplit[nameSplit.length - 1]
-                        if(['jpg', 'jpeg', 'png', 'svg', 'webp'].includes(extension)) {
+                        if (['jpg', 'jpeg', 'png', 'svg', 'webp'].includes(extension)) {
                             el.src = URL.createObjectURL(e.target.files[0])
                             el.classList.add('border')
                             return
                         }
                         el.classList.remove('border')
-                        if(window.sb_admin_const.SUPPORTED_FILE_TYPE_ICONS.includes(extension)) {
-                            el.src =  `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-${extension}.svg`
+                        if (window.sb_admin_const.SUPPORTED_FILE_TYPE_ICONS.includes(extension)) {
+                            el.src = `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-${extension}.svg`
                             return
                         }
-                        el.src =  `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-other.svg`
+                        el.src = `${window.sb_admin_const.STATIC_BASE_PATH}/images/file_types/file-other.svg`
                     })
                     fileInput.querySelector('.js-input-file-filename').innerHTML = e.target.files[0].name
                 } else {
@@ -593,14 +599,14 @@ class Main {
         })
     }
 
-    initCKEditor(target, config, force=false) {
+    initCKEditor(target, config, force = false) {
         if (!window.CKEDITOR) {
             return
         }
         target = target || document
         target.querySelectorAll('textarea[data-type="ckeditortype"]').forEach((textarea) => {
-            if( force || textarea.getAttribute("data-processed") == "0") {
-                if(textarea.id.indexOf("__prefix__") == -1) {
+            if (force || textarea.getAttribute("data-processed") == "0") {
+                if (textarea.id.indexOf("__prefix__") == -1) {
                     this.reinitCKEditor(textarea, config)
                 }
             }
@@ -612,30 +618,49 @@ class Main {
         if (!id) {
             return
         }
-        if(window.CKEDITOR.instances[id]) {
+        if (window.CKEDITOR.instances[id]) {
             window.CKEDITOR.instances[id].destroy(true)
         }
         config = config || {}
-        const new_config = {...JSON.parse(textarea.getAttribute("data-config")), ...config}
-        window.CKEDITOR.replace(id, new_config)
+        const new_config = { ...JSON.parse(textarea.getAttribute("data-config")), ...config }
+        const editor = window.CKEDITOR.replace(id, new_config)
+        this.bindCKEditorDynamicRegionTriggers(editor, textarea)
+    }
+
+    bindCKEditorDynamicRegionTriggers(editor, textarea) {
+        if (!textarea.hasAttribute('hx-post')) {
+            return
+        }
+        const hxTrigger = textarea.getAttribute('hx-trigger') || 'change'
+        const triggerEvents = hxTrigger.split(',').map((part) => part.trim().split(/\s+/)[0]).filter(Boolean)
+        const notifyChange = debounce(() => {
+            editor.updateElement()
+            triggerEvents.forEach((triggerName) => {
+                textarea.dispatchEvent(new Event(triggerName, { bubbles: true }))
+            })
+        }, 300)
+        editor.on('change', notifyChange)
+        editor.on('blur', () => {
+            notifyChange.flush()
+        })
     }
 
     switchCKEditorTheme(target) {
-        if(!window.CKEDITOR) {
+        if (!window.CKEDITOR) {
             return
         }
-        if(this.isDarkMode()) {
-            this.initCKEditor(target, {'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000'}, true)
+        if (this.isDarkMode()) {
+            this.initCKEditor(target, { 'contentsCss': '/static/sb_admin/css/ckeditor/ckeditor_content_dark.css', uiColor: '#000000' }, true)
             return
         }
-        this.initCKEditor(target, {'contentsCss':window.CKEDITOR.config.contentsCss}, true)
+        this.initCKEditor(target, { 'contentsCss': window.CKEDITOR.config.contentsCss }, true)
     }
 
     clearFilter(inputId) {
         const fieldElem = document.querySelector(`#${inputId}`)
         fieldElem.value = ''
         fieldElem.dispatchEvent(new Event('change'))
-        fieldElem.dispatchEvent(new CustomEvent('clear', {detail: {refresh: true}}))
+        fieldElem.dispatchEvent(new CustomEvent('clear', { detail: { refresh: true } }))
     }
 
 
@@ -654,7 +679,7 @@ class Main {
     isCurrentlyCollapsed(parentWrapper) {
         const collapseElements = parentWrapper.querySelectorAll('.js-stacked-inline-collapse')
         return Array.from(collapseElements).every(el => {
-            if(el.closest('.djn-empty-form')) {
+            if (el.closest('.djn-empty-form')) {
                 return true
             }
             return !el.classList.contains('show')
@@ -691,7 +716,7 @@ class Main {
                 debouncedUpdateCollapseAllButton(parentWrapper)
             }
         })
-        
+
         document.addEventListener('hidden.bs.collapse', (e) => {
             const parentWrapper = e.target.closest('.djn-fieldset')
             if (parentWrapper && e.target.classList.contains('js-stacked-inline-collapse')) {
@@ -714,7 +739,7 @@ class Main {
 
     collapseStackedInlineButtons(event) {
         const collapseStackedInline = event.target.closest('.js-collapse-stacked-inline')
-        if(collapseStackedInline) {
+        if (collapseStackedInline) {
             const collapseEl = event.target.closest('.djn-inline-form').querySelector('.js-stacked-inline-collapse')
             const instance = Collapse.getOrCreateInstance(collapseEl)
             instance.toggle()
@@ -730,7 +755,7 @@ class Main {
             const isCurrentlyCollapsed = this.isCurrentlyCollapsed(parentWrapper)
 
             collapseTriggers.forEach(el => {
-                if(el.closest('.djn-empty-form')) {
+                if (el.closest('.djn-empty-form')) {
                     return
                 }
                 if (isCurrentlyCollapsed) {
@@ -741,7 +766,7 @@ class Main {
             })
 
             collapseElements.forEach(el => {
-                if(el.closest('.djn-empty-form')) {
+                if (el.closest('.djn-empty-form')) {
                     return
                 }
                 const instance = Collapse.getOrCreateInstance(el)
