@@ -203,7 +203,7 @@
                                                                     {% call_method field "contents" request %}
                                                                 </div>
                                                             {% else %}
-                                                                {{ field.field }}
+                                                                {% sb_admin_render_inline_table_field field.field %}
                                                                 {% if field.field.errors %}
                                                                     {{ field.field.errors.as_ul }}
                                                                 {% endif %}
