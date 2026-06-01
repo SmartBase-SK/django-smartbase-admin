@@ -15,19 +15,19 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
     readonly_template = "sb_admin/includes/readonly_field.html"
     readonly_boolean_template = "sb_admin/includes/readonly_boolean_field.html"
 
-    def _boolean_field_content(self, value):
+    def _boolean_field_content(self, value, hide_label=False):
         return mark_safe(
             render_to_string(
                 template_name=self.readonly_boolean_template,
                 context={
-                    "field_label": self.field.get("label"),
+                    "field_label": None if hide_label else self.field.get("label"),
                     "field_name": self.field.get("name"),
                     "value": value,
                 },
             ),
         )
 
-    def contents(self, request=None):
+    def contents(self, request=None, hide_label=False):
         admin_site = getattr(self.model_admin, "admin_site", None)
         if getattr(admin_site, "name", None) != sb_admin_site.name:
             return super().contents()
@@ -47,10 +47,11 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
                 # This isn't elegant but suffices for contrib.auth's
                 # ReadOnlyPasswordHashWidget.
                 if getattr(widget, "read_only", False):
-                    return widget.render(field, value)
+                    attrs = {"sbadmin_hide_label": True} if hide_label else None
+                    return widget.render(field, value, attrs=attrs)
             if f is None:
                 if getattr(attr, "boolean", False):
-                    return self._boolean_field_content(value)
+                    return self._boolean_field_content(value, hide_label=hide_label)
                 else:
                     if hasattr(value, "__html__"):
                         result_repr = value
@@ -81,14 +82,14 @@ class SBAdminReadonlyField(django.contrib.admin.helpers.AdminReadonlyField):
                         result_repr = self.get_admin_url(f.remote_field, value)
                 else:
                     if isinstance(f, models.BooleanField):
-                        return self._boolean_field_content(value)
+                        return self._boolean_field_content(value, hide_label=hide_label)
                     result_repr = display_for_field(value, f, self.empty_value_display)
                 result_repr = linebreaksbr(result_repr)
         return render_to_string(
             template_name=self.readonly_template,
             context={
                 "readonly_content": conditional_escape(result_repr),
-                "field_label": self.field.get("label"),
+                "field_label": None if hide_label else self.field.get("label"),
                 "field_label_suffix": self.form.label_suffix,
             },
         )
