@@ -292,7 +292,9 @@ class ListAdminsTests(TestCase):
         status = fields_by_name["status"]
         self.assertEqual(status["title"], "Status")
         self.assertEqual(status["filter"]["widget"], "MultipleChoiceFilterWidget")
-        self.assertEqual(status["filter"]["filter_field"], "status")
+        # The filter is keyed by the column ``name`` in list_rows; the
+        # internal ``filter_field`` is not surfaced.
+        self.assertNotIn("filter_field", status["filter"])
         self.assertEqual(
             status["filter"]["choices"],
             [

@@ -11,7 +11,10 @@ from filer.models import Folder
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.field import SBAdminField
-from django_smartbase_admin.engine.filter_widgets import DateFilterWidget
+from django_smartbase_admin.engine.filter_widgets import (
+    AutocompleteFilterWidget,
+    DateFilterWidget,
+)
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
@@ -90,6 +93,78 @@ class FilterValidationTests(TestCase):
         shape = result["widget_shapes"]["DateFilterWidget"]
         self.assertIn("start", shape["value_shape"])
         self.assertEqual(shape["example"], ["2026-06-01", "2026-06-30"])
+
+    def test_filter_key_normalization_round_trips_name_and_filter_field(self):
+        """The agent uses one identifier — the column ``name`` — everywhere.
+        ``_normalize_filter_keys`` accepts a column ``name`` (or a raw
+        ``filter_field``) on input and re-keys to ``filter_field`` for the
+        pipeline; ``_filter_keys_to_names`` is its inverse, used to hand a
+        decoded preset back in column-``name`` terms so the agent never meets
+        a ``filter_field`` it can't find in the schema."""
+        from types import SimpleNamespace
+
+        from django_smartbase_admin.mcp.mcp import (
+            _filter_keys_to_names,
+            _normalize_filter_keys,
+        )
+
+        # Column name differs from its filter_field; another column has no
+        # explicit filter_field (falls back to its own name).
+        field_map = {
+            "closed": SimpleNamespace(filter_field="status__is_closed"),
+            "name": SimpleNamespace(filter_field=None),
+        }
+        v = ["x"]
+
+        # Input normalization: name | filter_field | unknown.
+        self.assertEqual(
+            _normalize_filter_keys({"closed": v}, field_map),
+            {"status__is_closed": v},  # name -> filter_field
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"status__is_closed": v}, field_map),
+            {"status__is_closed": v},  # exact filter_field left untouched
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"name": v}, field_map),
+            {"name": v},  # filter_field falls back to the column name
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"nope": v}, field_map),
+            {"nope": v},  # unknown passes through to be reported downstream
+        )
+        self.assertIsNone(_normalize_filter_keys(None, field_map))
+
+        # Inverse (preset output): filter_field -> column name, and a
+        # filter_field with no matching column is left as-is.
+        self.assertEqual(
+            _filter_keys_to_names({"status__is_closed": v}, field_map),
+            {"closed": v},
+        )
+        self.assertEqual(
+            _filter_keys_to_names({"unmapped": v}, field_map), {"unmapped": v}
+        )
+        # Round trip: a preset key surfaced as a name normalizes back to the
+        # same filter_field on replay.
+        surfaced = _filter_keys_to_names({"status__is_closed": v}, field_map)
+        self.assertEqual(
+            _normalize_filter_keys(surfaced, field_map), {"status__is_closed": v}
+        )
+
+    def test_autocomplete_filter_rejects_value_that_is_not_a_valid_pk(self):
+        """A right-shaped entry whose ``value`` can't be the target pk (e.g.
+        an email where an integer id is expected) fails at validation with a
+        pointer to the autocomplete tool — not as a raw ORM error mid-query.
+        Valid ids (int or numeric string) pass."""
+        widget = AutocompleteFilterWidget(model=Folder)  # Folder pk is integer
+        with self.assertRaises(ValueError) as ctx:
+            widget.validate_value([{"value": "petra@example.com", "label": "P"}])
+        message = str(ctx.exception)
+        self.assertIn("petra@example.com", message)
+        self.assertIn("autocomplete", message)
+
+        widget.validate_value([{"value": 42, "label": "P"}])
+        widget.validate_value([{"value": "42", "label": "P"}])
 
     def test_date_open_ended_ranges_apply_the_present_bound(self):
         """A null bound is an open-ended range, not 'match nothing' — only

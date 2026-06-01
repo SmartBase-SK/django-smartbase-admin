@@ -252,3 +252,30 @@ class TestMCPPermissions(TestCase):
                     }
                 ],
             )
+
+    def test_autocomplete_denied_target_admin_gets_actionable_message(self):
+        """An autocomplete widget delegates to its target-model admin, which
+        enforces its own ``view`` permission. A denied target raises a *bare*
+        PermissionDenied (empty message) deep in the pipeline; the tool keeps
+        the PermissionDenied type (callers gate on it) but attaches a reason
+        naming the widget, so the agent sees more than just a class name."""
+        from unittest.mock import patch
+
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
+        folder = next(a for a in admins if a["view_id"] == "filer_folder")
+        parent_widget_id = next(
+            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
+        )
+
+        with patch(
+            "django_smartbase_admin.mcp.mcp.SBAdminViewService.delegate_to_action",
+            side_effect=PermissionDenied,
+        ):
+            with self.assertRaises(PermissionDenied) as ctx:
+                SBAdminTools(request=build_mcp_request(user)).autocomplete(
+                    "filer_folder", parent_widget_id, search="perm"
+                )
+        self.assertIn(parent_widget_id, str(ctx.exception))

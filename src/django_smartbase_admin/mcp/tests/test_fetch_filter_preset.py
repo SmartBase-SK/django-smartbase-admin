@@ -183,6 +183,10 @@ class FetchFilterPresetTests(TestCase):
         decoded_status = tools.fetch_filter_preset(
             view_id="filer_folder", name="By status", source="static"
         )
+        # The key is surfaced as the column ``name`` (here name == filter_field
+        # == "status"), the single identifier the agent uses everywhere else;
+        # on replay list_rows normalizes it back to the filter_field. Key
+        # round-tripping when they differ is covered in test_filter_validation.
         self.assertEqual(
             decoded_status["filter_data"],
             {"status": [{"value": "alpha", "label": "Alpha"}]},
