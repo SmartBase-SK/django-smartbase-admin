@@ -38,7 +38,6 @@ from django.urls import reverse, NoReverseMatch, resolve
 from django.utils.safestring import mark_safe, SafeString
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
-from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django_htmx.http import trigger_client_event
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
@@ -56,6 +55,11 @@ from django_smartbase_admin.audit.views import (
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+from django_smartbase_admin.engine.inline_pagination import (
+    TabularInlinePaginated,
+    get_inline_admin_formset_by_prefix,
+    get_inline_partial_prefix,
+)
 from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
@@ -1107,6 +1111,10 @@ class SBAdmin(
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
+        partial_response = self._render_inline_partial_for_htmx(request, context)
+        if partial_response is not None:
+            return partial_response
+
         if context.get("sbadmin_is_modal"):
             media = context["media"]
             js_assets = [str(asset) for asset in getattr(media, "_js", [])]
@@ -1120,6 +1128,26 @@ class SBAdmin(
             context["media_json"] = media_json
         return super().render_change_form(
             request, context, add=add, change=change, form_url=form_url, obj=obj
+        )
+
+    def _render_inline_partial_for_htmx(self, request, context):
+        inline_prefix = get_inline_partial_prefix(request)
+        if not inline_prefix:
+            return None
+        inline_admin_formset = get_inline_admin_formset_by_prefix(
+            context, inline_prefix
+        )
+        if inline_admin_formset is None:
+            return None
+
+        request.current_app = self.admin_site.name
+        return TemplateResponse(
+            request,
+            inline_admin_formset.opts.template,
+            {
+                **context,
+                "inline_admin_formset": inline_admin_formset,
+            },
         )
 
     def history_view(self, request, object_id, extra_context=None):

@@ -1,16 +1,69 @@
 {% extends 'sb_admin/inlines/table_inline.html' %}
-{% load i18n paginated_inline sb_paginated_inline %}
+{% load i18n sb_paginated_inline %}
+
+{% block additional_wrapper_attributes %} style="position: relative;"{{ block.super }}{% endblock %}
 
 {% block card_content %}
     {{ block.super }}
 
     {% with inline_admin_formset.formset.page as page_obj %}
+        <script>
+            (function() {
+                const paginationClass = "pagination-plus-{{ inline_admin_formset.formset.prefix }}";
+                window.SBAdminInlinePaginator = window.SBAdminInlinePaginator || {};
+                if (window.SBAdminInlinePaginator[paginationClass]) return;
+                window.SBAdminInlinePaginator[paginationClass] = true;
+
+                function hasParameter(parameters, key) {
+                    if (typeof parameters.has === "function") {
+                        return parameters.has(key);
+                    }
+                    return Object.prototype.hasOwnProperty.call(parameters, key);
+                }
+
+                function setParameter(parameters, key, value) {
+                    if (typeof parameters.set === "function") {
+                        parameters.set(key, value);
+                        return;
+                    }
+                    parameters[key] = value;
+                }
+
+                document.body.addEventListener("htmx:configRequest", function(evt) {
+                    if (!evt.target.classList.contains(paginationClass)) return;
+                    const url = new URL(window.location.href);
+                    url.searchParams.forEach(function(value, key) {
+                        if (!hasParameter(evt.detail.parameters, key)) {
+                            setParameter(evt.detail.parameters, key, value);
+                        }
+                    });
+                    url.search = "";
+                    evt.detail.path = url.href;
+                });
+            }());
+        </script>
+        <input type="hidden" name="_paginator-plus-{{ inline_admin_formset.formset.prefix }}" value="{{ page_obj.number }}">
+        {% with inline_admin_formset.formset.prefix|add:"-pagination-loading" as pagination_loading_id %}
+            {% include "sb_admin/includes/loading_absolute.html" with loading_id=pagination_loading_id additional_class="inline-pagination-loading" %}
         <div class="flex items-center w-full p-16">
             <div class="max-xs:text-12"><strong>{{ page_obj.paginator.count }}</strong> {% trans 'results' %}</div>
             <div class="ml-auto">
-                <div class="tabulator-paginator">
+                <div
+                    class="tabulator-paginator"
+                    hx-indicator="#{{ pagination_loading_id }}"
+                    hx-target="#{{ inline_admin_formset.formset.prefix }}-group"
+                    hx-select="#{{ inline_admin_formset.formset.prefix }}-group"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-SBAdmin-Inline-Prefix": "{{ inline_admin_formset.formset.prefix }}"}'
+                    hx-push-url="true">
 
-                    <{% if page_obj.has_previous %}a href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.previous_page_number %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"{% else %}button type="button" disabled{% endif %} class="tabulator-page">
+                    {% if page_obj.has_previous %}
+                        {% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.previous_page_number as previous_page_query %}
+                    {% endif %}
+                    <{% if page_obj.has_previous %}a href="?{{ previous_page_query }}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"
+                                                        hx-get=""
+                                                        hx-params="{{ inline_admin_formset.formset.pagination_key }}"
+                                                        {% hx_vals inline_admin_formset.formset.pagination_key page_obj.previous_page_number %}{% else %}button type="button" disabled{% endif %} class="pagination-plus-{{ inline_admin_formset.formset.prefix }} tabulator-page">
                         <svg class="w-20 h-20"><use xlink:href="#Left"></use></svg>
                     </{% if page_obj.has_previous %}a{% else %}button{% endif %}>
 
@@ -20,19 +73,30 @@
                             {% if item.active %}
                                 <span class="tabulator-page active">{{ item.number }}</span>
                             {% else %}
-                                <a class="tabulator-page"
-                                   href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key item.number %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}">{{ item.number }}</a>
+                                {% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key item.number as page_query %}
+                                <a class="pagination-plus-{{ inline_admin_formset.formset.prefix }} tabulator-page"
+                                   href="?{{ page_query }}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"
+                                   hx-get=""
+                                   hx-params="{{ inline_admin_formset.formset.pagination_key }}"
+                                   {% hx_vals inline_admin_formset.formset.pagination_key item.number %}>{{ item.number }}</a>
                             {% endif %}
                         {% elif item.kind == "ellipsis" %}
                             <button type="button" class="tabulator-page" disabled><svg class="w-20 h-20 mt-8"><use xlink:href="#More"></use></svg></button>
                         {% endif %}
                     {% endfor %}
 
-                    <{% if page_obj.has_next %}a href="?{% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.next_page_number %}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"{% else %}button type="button" disabled{% endif %} class="tabulator-page">
+                    {% if page_obj.has_next %}
+                        {% modify_pagination_path request.get_full_path inline_admin_formset.formset.pagination_key page_obj.next_page_number as next_page_query %}
+                    {% endif %}
+                    <{% if page_obj.has_next %}a href="?{{ next_page_query }}{% if sbadmin_inline_tab_slug %}#{{ sbadmin_inline_tab_slug }}{% endif %}"
+                                                    hx-get=""
+                                                    hx-params="{{ inline_admin_formset.formset.pagination_key }}"
+                                                    {% hx_vals inline_admin_formset.formset.pagination_key page_obj.next_page_number %}{% else %}button type="button" disabled{% endif %} class="pagination-plus-{{ inline_admin_formset.formset.prefix }} tabulator-page">
                         <svg class="w-20 h-20"><use xlink:href="#Right"></use></svg>
                     </{% if page_obj.has_next %}a{% else %}button{% endif %}>
                 </div>
             </div>
         </div>
+        {% endwith %}
     {% endwith %}
 {% endblock %}

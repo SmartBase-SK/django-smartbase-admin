@@ -1,9 +1,6 @@
 asgiref==3.7.2 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:89b2ef2247e3b562a16eef663bc0e2e703ec6468e2fa8a5cd61cd449786d4f6e \
     --hash=sha256:9e0ce3aa93a819ba5b45120216b23878cf6e8525eb3848653452b4192b92afed
-django-admin-inline-paginator==0.4.0 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:63b2e13dca6b0933f4b7a4d3262c7cb31db8cda19ad005bcbc1c29bba0e95a1a \
-    --hash=sha256:e1558b468d347e965c4d25be7f546da6682ea03d95098ae37b90c926edd491b1
 django-ckeditor==6.7.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:55b5f9ce3af47e3c8a8ed37d42be8439da2a664d6e571c2247c1db5c96459dd7 \
     --hash=sha256:7144f9ead662306266c728912487313b3b87ba2abf9dbb82c447f662ce25d1f7

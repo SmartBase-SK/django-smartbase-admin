@@ -1,4 +1,7 @@
+import urllib.parse
+
 from django import template
+from django.utils.html import format_html
 
 from django_smartbase_admin.engine.const import PAGINATION_ACTIVE_RANGE
 
@@ -58,3 +61,21 @@ def tabulator_style_inline_pages(page_obj):
         current_page=page_obj.number,
         max_page=page_obj.paginator.num_pages,
     )
+
+
+@register.simple_tag
+def modify_pagination_path(full_path: str, key: str, value: str) -> str:
+    get_params = full_path
+    if "?" in get_params:
+        get_params = get_params[get_params.find("?") + 1 :]
+    if "#" in get_params:
+        get_params = get_params[: get_params.find("#")]
+
+    params = urllib.parse.parse_qs(get_params)
+    params[key] = [str(value)]
+    return urllib.parse.urlencode(params, doseq=True)
+
+
+@register.simple_tag
+def hx_vals(key: str, value: str) -> str:
+    return format_html('hx-vals=\'{{"{}": "{}"}}\'', key, value)
