@@ -864,16 +864,17 @@ class SBAdminAutocompleteWidget(
                 request
             ):
                 try:
-                    related_obj = (
+                    related_row = (
                         related_model_admin.get_queryset(request)
                         .filter(**{self.get_value_field(): parsed_value})
+                        .values("pk")
                         .first()
                     )
                 except (ValueError, TypeError):
-                    related_obj = None
-                if related_obj is not None:
+                    related_row = None
+                if related_row is not None:
                     context["widget"]["attrs"]["related_edit_url"] = (
-                        related_model_admin.get_detail_url(related_obj.pk)
+                        related_model_admin.get_detail_url(related_row["pk"])
                     )
             if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
