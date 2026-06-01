@@ -319,10 +319,14 @@ class SBAdminBaseView(object):
 
     def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.init_fields_cache(
-            self.get_sbadmin_list_display(request), request.request_data.configuration
+            self.get_sbadmin_list_display(request),
+            request.request_data.configuration,
+            request=request,
         )
 
-    def init_fields_cache(self, fields_source, configuration, force=False):
+    def init_fields_cache(
+        self, fields_source, configuration, force=False, request=None
+    ):
         from django_smartbase_admin.engine.field import SBAdminField
 
         field_cache = {}
@@ -835,7 +839,10 @@ class SBAdminBaseListView(SBAdminBaseView):
             self.get_sbadmin_list_display(request),
             request.request_data.configuration,
             force=True,
+            request=request,
         )
+        if not field_map:
+            return
         self._register_autocomplete_from_filter_fields(request, field_map.values())
 
     def get_list_display(self, request) -> list[str]:

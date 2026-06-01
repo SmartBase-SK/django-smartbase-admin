@@ -667,7 +667,9 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
-            self.get_sbadmin_list_display(request), request.request_data.configuration
+            self.get_sbadmin_list_display(request),
+            request.request_data.configuration,
+            request=request,
         )
 
     def get_widget_context_data(self, request):
