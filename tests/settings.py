@@ -64,8 +64,8 @@ INSTALLED_APPS = [
 LOGIN_URL = "/login/"
 
 OAUTH2_PROVIDER = {
-    "SCOPES": {"sbadmin:read": "Read access to SBAdmin data via MCP"},
-    "DEFAULT_SCOPES": ["sbadmin:read"],
+    "SCOPES": {"sbadmin:write": "Read-write access to SBAdmin data via MCP"},
+    "DEFAULT_SCOPES": ["sbadmin:write"],
     "PKCE_REQUIRED": True,
     "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
     "REFRESH_TOKEN_EXPIRE_SECONDS": 0,

@@ -20,7 +20,7 @@ from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
-from django.http import QueryDict
+from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
 from mcp.types import BlobResourceContents, EmbeddedResource
 
@@ -135,6 +135,9 @@ def action_entries_for(action) -> list[dict]:
         "kind": action_kind(action),
         "action_id": action_id,
     }
+    description = getattr(action, "mcp_description", None)
+    if description:
+        entry["description"] = str(description)
     # ``collect_action_entries`` strips this for invoke tools that don't
     # accept a modifier (row / detail / inline route through
     # ``invoke_row`` which forces ``"template"``).
@@ -148,14 +151,27 @@ def action_entries_for(action) -> list[dict]:
 
 
 # Maps the admin getter that produced an action list to the MCP tool an
-# agent must call to invoke it. Surfaced per-entry as ``invoke_with`` so
-# agents reading discovery don't have to learn the mapping from prose.
+# agent must call to invoke it. The mapping is published once at the top
+# level of ``list_admins`` as ``action_invokers`` (keyed by action-list
+# name, e.g. ``row_actions`` → ``invoke_row_action``) so individual
+# action entries don't need to repeat ``invoke_with`` ~30 times per
+# response.
 _INVOKE_TOOL_BY_GETTER = {
     "get_sbadmin_row_actions_processed": "invoke_row_action",
     "get_sbadmin_detail_actions_processed": "invoke_detail_action",
     "get_sbadmin_inline_list_actions_processed": "invoke_inline_action",
     "get_sbadmin_list_actions_processed": "invoke_list_action",
     "get_sbadmin_list_selection_actions_processed": "invoke_selection_action",
+}
+
+# Top-level legend: action-list field name → MCP tool to invoke entries
+# in that list. ``fieldset_actions`` are merged into ``detail_actions``.
+ACTION_INVOKERS: dict[str, str] = {
+    "row_actions": "invoke_row_action",
+    "detail_actions": "invoke_detail_action",
+    "list_actions": "invoke_list_action",
+    "selection_actions": "invoke_selection_action",
+    "inline_actions": "invoke_inline_action",
 }
 
 
@@ -193,8 +209,6 @@ def collect_action_entries(
     for action in actions:
         try:
             for entry in action_entries_for(action):
-                if invoke_with is not None:
-                    entry["invoke_with"] = invoke_with
                 if not surface_modifier:
                     entry.pop("modifier", None)
                 entries.append(entry)
@@ -603,7 +617,7 @@ class SBAdminMCPActionInvokeService:
             # Wire up the synthetic @sbadmin_action wrapper if the UI
             # render path hasn't already done so this process.
             if not hasattr(admin, action_id):
-                admin._register_form_view_action(target_view_cls, action_id)
+                admin._register_form_view_action(target_view_cls, action_id, _action)
             # Widget-aware POST encoding: build the form unbound to get
             # the widget map, then route field_values through each
             # widget (handles MultiWidget, autocomplete list-shape, etc.).
@@ -640,6 +654,14 @@ class SBAdminMCPActionInvokeService:
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
+        except Http404:
+            # Unknown action_id falls through dispatch to a bare
+            # (empty-message) Http404; give a clear, named error instead.
+            raise LookupError(
+                f"No invocable action {action_id!r} on view "
+                f"{admin.get_id()!r}. action_id must come from "
+                f"list_admins()'s row/detail/list/selection_actions."
+            )
 
         if modal is None:
             result = cls._normalize_method_response(response)

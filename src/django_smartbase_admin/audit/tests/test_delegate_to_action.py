@@ -95,7 +95,7 @@ class TestDelegateToAction(TestCase):
         )
 
         base_view = SBAdminBaseView.__new__(SBAdminBaseView)
-        inner = base_view.delegate_to_action_view(mock_action)
+        inner = base_view.delegate_to_target_view(mock_action.target_view)
         self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
         self.assertTrue(getattr(inner, "_sbadmin_keep_route_modifier_argument", False))
 

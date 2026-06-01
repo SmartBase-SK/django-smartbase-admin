@@ -18,18 +18,21 @@ from __future__ import annotations
 import json
 
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from mcp_server import MCPToolset
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.const import (
     Action,
+    ADVANCED_FILTER_DATA_NAME,
     AUTOCOMPLETE_FORWARD_NAME,
     AUTOCOMPLETE_PAGE_NUM,
     AUTOCOMPLETE_SEARCH_NAME,
     BASE_PARAMS_NAME,
     COLUMNS_DATA_NAME,
     FILTER_DATA_NAME,
+    TABLE_PARAMS_SELECTED_FILTER_TYPE,
     SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_NAME,
@@ -50,15 +53,23 @@ from django_smartbase_admin.mcp.bridge import (
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
-from django_smartbase_admin.mcp.schema import admin_entry
+from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
+from django_smartbase_admin.mcp.schema import WIDGET_SHAPES, admin_entry
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
 
-def _widgets_by_filter_field(admin, request) -> dict:
-    """Map of ``filter_field -> filter_widget`` for filterable columns."""
+def _widgets_by_filter_field(admin, request, field_map=None) -> dict:
+    """Map of ``filter_field -> filter_widget`` for filterable columns.
+
+    ``field_map`` lets the caller pass an already-built map so
+    ``get_field_map`` (which rebuilds + clones every field) isn't run
+    again; falls back to fetching one when omitted.
+    """
+    if field_map is None:
+        field_map = admin.get_field_map(request)
     mapping: dict = {}
-    for field in (admin.get_field_map(request) or {}).values():
+    for field in (field_map or {}).values():
         if getattr(field, "filter_disabled", False):
             continue
         widget = getattr(field, "filter_widget", None)
@@ -68,13 +79,15 @@ def _widgets_by_filter_field(admin, request) -> dict:
     return mapping
 
 
-def _validate_filter_data(admin, request, filter_data: dict | None) -> None:
+def _validate_filter_data(
+    admin, request, filter_data: dict | None, field_map=None
+) -> None:
     """Reject unknown filter keys and wrong-shape values up front so the
     agent sees a clear ``invalid`` instead of an ambiguous empty result.
     """
     if not filter_data:
         return
-    widgets = _widgets_by_filter_field(admin, request)
+    widgets = _widgets_by_filter_field(admin, request, field_map)
     unknown = [k for k in filter_data if k not in widgets]
     if unknown:
         raise ValueError(
@@ -85,18 +98,113 @@ def _validate_filter_data(admin, request, filter_data: dict | None) -> None:
         widgets[key].validate_value(value)
 
 
-def _clear_thread_local_after_call(method):
-    """Ensure the bridge-bound thread-local request is cleared after every
-    tool call. ``ensure_sbadmin_request_data`` binds it for the duration
-    of the call so SBAdmin internals (and the audit hook) see the active
-    request, but MCP transport never fires ``request_finished`` — without
-    this wrapper the binding leaks across calls and tests, causing audit
-    rows to be written under stale users.
+def _validate_sort(admin, request, sort, field_map=None) -> None:
+    """Reject unknown sort fields up front with the same clean, listed
+    error ``filter_data`` / ``fields`` give. Without this an unknown
+    column falls through to the ORM and surfaces a raw Django
+    ``FieldError`` that leaks internal model field names.
+    """
+    if not sort:
+        return
+    if field_map is None:
+        field_map = admin.get_field_map(request)
+    field_map = field_map or {}
+    for entry in sort:
+        if not isinstance(entry, dict) or "field" not in entry:
+            raise ValueError(
+                "Each sort entry must be {'field': <name>, 'dir': "
+                f"'asc'|'desc'}}, got {entry!r}"
+            )
+        name = entry["field"]
+        if name not in field_map:
+            raise LookupError(
+                f"Admin {admin.get_id()!r} cannot sort by {name!r}; "
+                f"sortable fields: {sorted(field_map)}."
+            )
+        direction = entry.get("dir", "asc")
+        if direction not in ("asc", "desc"):
+            raise ValueError(f"sort dir must be 'asc' or 'desc', got {direction!r}")
+
+
+def _decode_preset_url_params(url_params) -> dict:
+    """Turn a preset's raw ``url_params`` blob (JSON string or dict) into
+    the kwargs ``list_rows`` accepts: ``filter_data``,
+    ``full_text_search``, ``sort``, ``page_size``.
+
+    Empty / missing pieces are simply absent from the returned dict so
+    the agent can splat the result onto ``list_rows`` without filtering
+    out ``None``s.
+
+    Empty filter values are dropped. Presets pad ``filterData`` with an
+    empty ``""`` for every unfiltered column (so the UI renders all the
+    filter inputs); those placeholders aren't real filters and would in
+    fact fail ``list_rows``' per-widget validation (e.g. a multichoice
+    widget rejects ``""`` — it wants a list). Stripping them leaves only
+    the columns the preset actually constrains. Non-empty values are
+    left in their stored widget form (e.g. autocomplete /multichoice
+    ``[{"value", "label"}]``); ``list_rows`` accepts that shape directly.
+
+    ``page`` is intentionally dropped — a saved preset's last-viewed
+    page is session state, not part of the preset; an agent replaying it
+    should start from page 1 (the ``list_rows`` default).
+    """
+    if isinstance(url_params, str):
+        url_params = json.loads(url_params) if url_params else {}
+    url_params = url_params or {}
+    raw_filter = dict(url_params.get(FILTER_DATA_NAME, {}) or {})
+    table_params = url_params.get(TABLE_PARAMS_NAME, {}) or {}
+
+    # Advanced-filter presets keep their predicates in advancedFilterData,
+    # which list_rows doesn't apply — decoding only the simple filterData
+    # would match too many rows. Refuse rather than hand back a filter that
+    # silently under-constrains.
+    if url_params.get(ADVANCED_FILTER_DATA_NAME) or raw_filter.get(
+        TABLE_PARAMS_SELECTED_FILTER_TYPE
+    ):
+        raise ValueError(
+            "This preset uses advanced filters, which list_rows does not "
+            "support; rebuild the filter with list_rows filter_data instead."
+        )
+
+    decoded: dict = {}
+    # ``sb_admin_full_search`` lives inside filterData (it's how the list
+    # action reads it) — surface it as a dedicated arg here.
+    full_text = raw_filter.pop(TABLE_PARAMS_FULL_TEXT_SEARCH, None)
+    # Drop padding placeholders: "", None, [] and {} all mean "no filter".
+    filter_data = {k: v for k, v in raw_filter.items() if v not in ("", None, [], {})}
+    if filter_data:
+        decoded["filter_data"] = filter_data
+    if full_text:
+        decoded["full_text_search"] = full_text
+    if TABLE_PARAMS_SORT_NAME in table_params:
+        decoded["sort"] = table_params[TABLE_PARAMS_SORT_NAME]
+    if TABLE_PARAMS_SIZE_NAME in table_params:
+        decoded["page_size"] = int(table_params[TABLE_PARAMS_SIZE_NAME])
+    return decoded
+
+
+def _guarded_tool_call(method):
+    """Tool entry/exit wrapper.
+
+    Before the tool runs, enforce the admin staff gate. MCP tools never
+    pass through ``SBAdminSite.admin_view()``, so without this a user with
+    Django model permissions but no admin access (``is_active``/``is_staff``)
+    could read and mutate through the tools — the same boundary the HTTP
+    admin's front door applies.
+
+    After the tool runs, clear the bridge-bound thread-local request.
+    ``ensure_sbadmin_request_data`` binds it for the duration of the call so
+    SBAdmin internals (and the audit hook) see the active request, but MCP
+    transport never fires ``request_finished`` — without this the binding
+    leaks across calls and tests, causing audit rows to be written under
+    stale users.
     """
     from functools import wraps
 
     @wraps(method)
     def wrapper(self, *args, **kwargs):
+        if not sb_admin_site.has_permission(self.request):
+            raise PermissionDenied
         try:
             return method(self, *args, **kwargs)
         finally:
@@ -126,15 +234,24 @@ class SBAdminTools(MCPToolset):
     ``PermissionError``; invisible objects raise ``LookupError``.
     """
 
-    @_clear_thread_local_after_call
-    def list_admins(self) -> list[dict]:
+    @_guarded_tool_call
+    def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
 
         Use this to discover the handles every other tool accepts —
         ``view_id``, field/filter names, ``widget_id``s, inline names,
         and ``action_id``s.
 
-        Schema per entry:
+        Returns ``{"admin_views": [...], "widget_shapes": {...}}``.
+        ``widget_shapes`` is a legend keyed by widget category (the
+        ``widget`` value on every filter entry); each value is
+        ``{"value_shape": str, "example": <example value>}`` describing
+        the expected ``filter_data`` value shape. Subclassed widgets
+        (e.g. ``FromValuesAutocompleteWidget``) are reported as their
+        base category — only the base controls the ``filter_data``
+        contract.
+
+        Schema per admin entry:
           - ``view_id``: pass to other tools as ``view_id``.
           - ``app_label``, ``model``: match against ``target_model`` on
             filter widgets.
@@ -158,15 +275,23 @@ class SBAdminTools(MCPToolset):
             ``list_rows(include_inlines=...)``), ``view_id`` (pass to
             ``invoke_inline_action`` when invoking inline actions),
             ``model`` (``"<app>.<Model>"``), ``verbose_name`` /
-            ``verbose_name_plural``, ``join_kind`` (``"fk"`` or
-            ``"generic"``), ``fields``, and ``inline_actions``.
+            ``verbose_name_plural``, ``fields``, ``inline_actions``, and
+            ``relations`` — a ``{field: "<app>.<Model>"}`` map for the
+            inline's FK / M2M columns. ``include_inlines`` returns those
+            columns as bare pks (e.g. ``{"work": 443}``); ``relations``
+            names the target model so the agent can interpret the id and
+            pick the model to ``autocomplete`` against. (``fetch_detail``
+            instead resolves inline FKs to ``{"value", "label"}``
+            directly, the same as parent FKs.)
 
           Action lists — every entry is
-          ``{"title", "kind", "action_id", "invoke_with",
+          ``{"title", "kind", "action_id",
           "requires_confirmation"?}``. ``kind`` is ``"method"`` (calls
           a server-side method) or ``"modal"`` (opens a form — fetch
-          the schema with ``fetch_action_form`` first). ``invoke_with``
-          names the MCP tool to call. ``requires_confirmation: true``
+          the schema with ``fetch_action_form`` first). The MCP tool to
+          call is looked up in the top-level ``action_invokers`` legend
+          by action-list name (``row_actions`` →
+          ``invoke_row_action``, etc.). ``requires_confirmation: true``
           means the first invoke returns ``needs_confirmation``; pass
           ``confirmed=True`` on the second call to commit. Sub-actions
           (visual dropdown groups in the UI) are flattened to siblings.
@@ -180,7 +305,7 @@ class SBAdminTools(MCPToolset):
         request = self.request
         ensure_sbadmin_request_data(request)
 
-        result: list[dict] = []
+        admins: list[dict] = []
         for admin in sb_admin_site._registry.values():
             if not isinstance(admin, SBAdminBaseListView):
                 continue
@@ -189,12 +314,110 @@ class SBAdminTools(MCPToolset):
                     continue
             except Exception:
                 continue  # one broken admin shouldn't break discovery
-            result.append(admin_entry(admin, request))
+            admins.append(admin_entry(admin, request))
 
-        result.sort(key=lambda entry: entry["view_id"])
-        return result
+        admins.sort(key=lambda entry: entry["view_id"])
+        # ``widget_shapes`` is the legend keyed by the ``widget`` field
+        # reported on every filter entry. Emitting it once at the top
+        # level keeps each per-field filter block to ``filter_field`` +
+        # ``widget`` (+ choices/autocomplete extras) instead of repeating
+        # ``value_shape`` / ``example`` for every column.
+        # ``action_invokers`` is a sibling legend to ``widget_shapes`` —
+        # keyed by action-list name, value is the MCP tool to call.
+        # Saves repeating ``invoke_with`` on every individual action.
+        return {
+            "admin_views": admins,
+            "widget_shapes": WIDGET_SHAPES,
+            "action_invokers": ACTION_INVOKERS,
+        }
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
+    def fetch_filter_preset(
+        self,
+        view_id: str,
+        name: str | None = None,
+        source: str = "static",
+        id: int | None = None,
+    ) -> dict:
+        """Resolve a filter preset (static or saved) into ready-to-use
+        ``list_rows`` kwargs.
+
+        ``list_admins`` advertises presets per admin as
+        ``{"name", "source", "id"?}`` under ``filter_presets``; pass
+        those values straight here. Returns the decoded preset:
+        ``filter_data``, ``full_text_search``, ``sort``, ``page_size``
+        (only keys the preset actually sets). The agent can splat the
+        result onto ``list_rows`` to replay the preset, or merge it with
+        overrides. ``page`` is intentionally not returned — a saved page
+        number is session state, not part of the preset, so replay
+        always starts on page 1.
+
+        Args:
+          view_id: admin handle from ``list_admins[].view_id``.
+          source: ``"static"`` (admin-defined preset, including the
+            implicit ``"All"`` reset) or ``"saved"`` (per-user). Defaults
+            to ``"static"`` because saved presets always have an ``id``
+            and agents typically discover those first.
+          name: preset name as it appears in
+            ``list_admins[].filter_presets[].name``. Required for static
+            presets; for saved presets, used as a fallback when ``id`` is
+            omitted (the name is user-editable so prefer ``id``).
+          id: saved preset primary key from
+            ``list_admins[].filter_presets[].id``. Ignored for static
+            presets.
+
+        Raises ``LookupError`` when no preset matches, ``PermissionError``
+        if the user can't see the admin, ``ValueError`` for bad input.
+        """
+        from django_smartbase_admin.services.configuration import (
+            SBAdminUserConfigurationService,
+        )
+
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        admin.init_view_dynamic(request, request.request_data)
+
+        if source == "static":
+            if not name:
+                raise ValueError("'name' is required when source='static'")
+            # Decode the *raw* config (clean url_params), not
+            # ``get_base_config`` whose output is processed into the
+            # URL-ready, JSON-stringified form ``list_rows`` can't take.
+            # This mirrors ``get_base_config``'s own assembly: the
+            # implicit "All" reset first, then ``sbadmin_list_view_config``.
+            raw_presets = [
+                admin.get_all_config(request),
+                *(admin.get_sbadmin_list_view_config(request) or []),
+            ]
+            for preset in raw_presets:
+                if str(preset.get("name", "")) == name:
+                    return _decode_preset_url_params(preset.get("url_params"))
+            raise LookupError(
+                f"No static filter preset named {name!r} on {view_id!r}. "
+                f"Known: {[str(p.get('name', '')) for p in raw_presets]}"
+            )
+        if source == "saved":
+            saved = (
+                SBAdminUserConfigurationService.get_saved_views(
+                    request, view_id=view_id
+                )
+                or []
+            )
+            for preset in saved:
+                # ``id`` is the stable handle; ``name`` is a fallback for
+                # callers that don't have the id cached.
+                if id is not None and preset.get("id") == id:
+                    return _decode_preset_url_params(preset.get("url_params"))
+                if id is None and name and str(preset.get("name", "")) == name:
+                    return _decode_preset_url_params(preset.get("url_params"))
+            raise LookupError(
+                f"No saved filter preset matching id={id!r} name={name!r} "
+                f"on {view_id!r}"
+            )
+        raise ValueError(f"source must be 'static' or 'saved', got {source!r}")
+
+    @_guarded_tool_call
     def list_rows(
         self,
         view_id: str,
@@ -218,35 +441,41 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           fields: non-empty list of column names to return, drawn from
-            ``list_admins[].fields[].name``. The primary key is always
-            included for row identity.
-          filter_data: ``{filter_field: value}`` mapping. The value
-            shape per filter is reported on the filter entry in
-            ``list_admins[].fields[].filter`` as ``value_shape`` /
-            ``example`` — copy that shape literally. Quick reference:
-            choice → string; multi-choice → list of strings;
-            autocomplete → list of ``{"value", "label"}`` entries;
-            boolean → bool; date → ``["YYYY-MM-DD", "YYYY-MM-DD"]``
-            (either side may be ``null``); number range → ``[min, max]``;
-            string → substring. Unknown keys are rejected — misspellings
-            raise instead of silently returning every row.
+            ``list_admins["admin_views"][].fields[].name``. Every row also
+            carries a normalized ``"id"`` key for row identity, regardless
+            of the model's pk field name (so ``row["id"]`` is always safe).
+          filter_data: ``{filter_field: value}`` mapping. Per filter,
+            read the widget category from
+            ``list_admins["admin_views"][].fields[].filter.widget`` and
+            copy its ``value_shape`` / ``example`` from
+            ``list_admins["widget_shapes"]`` literally — that legend is
+            the single source of truth for the per-widget value shape.
+            Unknown keys are rejected — misspellings raise instead of
+            silently returning every row.
           page, page_size: pagination, 1-indexed.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
-            entries, applied in order.
+            entries, applied in order. ``field`` is a column name from
+            ``list_admins["admin_views"][].fields[].name``; unknown
+            fields are rejected with the list of sortable names.
           full_text_search: cross-column free text term — no-op on
             admins whose ``search_fields`` is empty.
           include_inlines: optional list of inline specs to hydrate
             beside each parent row. Each item:
             ``{"inline_name": "...", "fields": [...]}`` where
             ``inline_name`` and ``fields`` are taken from
-            ``list_admins[].inlines``.
+            ``list_admins["admin_views"][].inlines``.
 
             Hydrated rows arrive at
-            ``row["_inlines"][<inline_name>]``. When a parent has more
-            related rows than the inline's pagination cap, the
-            response includes that inline name in
-            ``row["_truncated_inlines"]`` and only the first page is
-            attached.
+            ``row["_inlines"][<inline_name>]``, each with a normalized
+            ``"id"`` key. Inline FK / M2M columns come back as bare pks
+            (e.g. ``{"work": 443}``); map each to its target model via
+            the inline's ``relations`` entry in ``list_admins`` and
+            resolve names with ``autocomplete`` (or read one parent in
+            full via ``fetch_detail``, which labels inline FKs as
+            ``{"value", "label"}``). When a parent has more related rows
+            than the inline's pagination cap, the response includes that
+            inline name in ``row["_truncated_inlines"]`` and only the
+            first page is attached.
 
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
         plus any pagination metadata the list view emits.
@@ -255,8 +484,12 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        _validate_filter_data(admin, request, filter_data)
-        columns_data = build_columns_data(admin, request, fields)
+        # Built once and shared — ``get_field_map`` rebuilds + clones on
+        # every call.
+        field_map = admin.get_field_map(request)
+        _validate_filter_data(admin, request, filter_data, field_map)
+        _validate_sort(admin, request, sort, field_map)
+        columns_data = build_columns_data(admin, request, fields, field_map)
 
         table_params: dict = {
             TABLE_PARAMS_PAGE_NAME: int(page),
@@ -289,7 +522,7 @@ class SBAdminTools(MCPToolset):
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
         # the JSON and drop UI-only payload (notifications, per-row action
-        # buttons advertised once via ``list_admins[].row_actions``, HTML
+        # buttons advertised once via ``list_admins["admin_views"][].row_actions``, HTML
         # markup in cell values).
         response = SBAdminViewService.delegate_to_action(
             request,
@@ -300,30 +533,42 @@ class SBAdminTools(MCPToolset):
         result = json.loads(response.content.decode())
         result.pop(SB_ADMIN_AJAX_NOTIFICATIONS_KEY, None)
         rows = result.get("data") or []
+        # Mirror the pk to a stable ``"id"`` key (the list action keys it
+        # under the model's pk name, e.g. ``"emergency_uuid"``).
+        pk_attname = admin.model._meta.pk.attname
         for row in rows:
             row.pop("_row_actions", None)
+            if pk_attname != "id" and "id" not in row and pk_attname in row:
+                row["id"] = row[pk_attname]
         strip_html_cells(admin, request, rows)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
         return result
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_detail(
         self,
         view_id: str,
         object_id: str,
         fields: list[str] | None = None,
     ) -> dict:
-        """Fetch detail-page data for one object — values only, no markup.
+        """Fetch detail-page data for one object.
 
         Permissions and row isolation match the UI detail page (an
         object the user wouldn't see there is reported missing). All
         inlines the user can view are always hydrated.
 
+        Display fields that render HTML in the UI are sanitized for the
+        agent: structural markup (tables, lists, links, ``div`` / ``span``)
+        is kept, but styling, classes, and ``<script>`` / ``<style>`` are
+        stripped. Inline FK / M2M values are resolved to
+        ``{"value", "label"}`` here (unlike ``list_rows(include_inlines)``,
+        which returns bare pks).
+
         Args:
           view_id: handle from ``list_admins``.
           object_id: target row id (as a string).
-          fields: optional subset of ``list_admins[].detail_fields``.
+          fields: optional subset of ``list_admins["admin_views"][].detail_fields``.
             ``None`` returns every detail field; unknown names raise
             ``LookupError``. Inline rows always come back with every
             field the inline declares.
@@ -362,7 +607,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_add_form(
         self,
         view_id: str,
@@ -396,7 +641,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def fetch_action_form(
         self,
         view_id: str,
@@ -442,7 +687,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def create_object(
         self,
         view_id: str,
@@ -497,7 +742,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def update_detail(
         self,
         view_id: str,
@@ -554,7 +799,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def get_audit_history(
         self,
         view_id: str,
@@ -607,7 +852,7 @@ class SBAdminTools(MCPToolset):
             page_size=page_size,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def delete_objects(
         self,
         view_id: str,
@@ -657,7 +902,7 @@ class SBAdminTools(MCPToolset):
             confirmed=confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_row_action(
         self,
         view_id: str,
@@ -679,7 +924,7 @@ class SBAdminTools(MCPToolset):
 
         Args:
           view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins[].row_actions``.
+          action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
           object_id: target row id (as a string).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
@@ -704,7 +949,7 @@ class SBAdminTools(MCPToolset):
             confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_detail_action(
         self,
         view_id: str,
@@ -726,7 +971,7 @@ class SBAdminTools(MCPToolset):
 
         Args:
           view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins[].detail_actions``.
+          action_id: ``action_id`` from ``list_admins["admin_views"][].detail_actions``.
           object_id: target row id (as a string).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
@@ -751,7 +996,7 @@ class SBAdminTools(MCPToolset):
             confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_inline_action(
         self,
         view_id: str,
@@ -822,7 +1067,7 @@ class SBAdminTools(MCPToolset):
             confirmed=confirmed,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_selection_action(
         self,
         view_id: str,
@@ -853,7 +1098,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           action_id: ``action_id`` from
-            ``list_admins[].selection_actions``.
+            ``list_admins["admin_views"][].selection_actions``.
           object_ids: non-empty list of row ids (as strings).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
@@ -886,7 +1131,7 @@ class SBAdminTools(MCPToolset):
             modifier=modifier,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def invoke_list_action(
         self,
         view_id: str,
@@ -913,7 +1158,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           action_id: ``action_id`` from
-            ``list_admins[].list_actions``.
+            ``list_admins["admin_views"][].list_actions``.
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
           filter_data, full_text_search: optional scope, same shapes as
@@ -947,7 +1192,7 @@ class SBAdminTools(MCPToolset):
             modifier=modifier,
         )
 
-    @_clear_thread_local_after_call
+    @_guarded_tool_call
     def autocomplete(
         self,
         view_id: str,
@@ -966,7 +1211,7 @@ class SBAdminTools(MCPToolset):
         Args:
           view_id: handle from ``list_admins``.
           widget_id: opaque widget identifier from
-            ``list_admins[].fields[].filter.widget_id`` (list filters)
+            ``list_admins["admin_views"][].fields[].filter.widget_id`` (list filters)
             or ``fetch_detail`` / ``fetch_add_form`` →
             ``fields.<name>.widget_id`` (parent form; inline FK fields on
             add usually lack ``widget_id`` — use another admin's filter
@@ -996,10 +1241,19 @@ class SBAdminTools(MCPToolset):
             method="POST",
         )
 
-        response = SBAdminViewService.delegate_to_action(
-            request,
-            view=admin.get_id(),
-            action=Action.AUTOCOMPLETE.value,
-            modifier=widget_id,
-        )
+        try:
+            response = SBAdminViewService.delegate_to_action(
+                request,
+                view=admin.get_id(),
+                action=Action.AUTOCOMPLETE.value,
+                modifier=widget_id,
+            )
+        except Http404:
+            # ``action_autocomplete`` raises a bare (empty-message) Http404
+            # for an unknown/hidden widget_id; give a clear error instead.
+            raise LookupError(
+                f"No autocomplete widget {widget_id!r} on {view_id!r}. Copy "
+                "widget_id verbatim from list_admins fields[].filter.widget_id "
+                "or fetch_detail / fetch_add_form fields.<name>.widget_id."
+            )
         return json.loads(response.content.decode())["data"]

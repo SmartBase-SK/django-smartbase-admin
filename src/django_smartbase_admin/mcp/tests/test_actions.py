@@ -200,7 +200,7 @@ class AutocompleteTests(_ToolTestBase):
     def _filter_widget_id(tools, view_id, field_name):
         """Pull a list-filter ``widget_id`` out of ``list_admins`` — the
         only place an agent legitimately learns it."""
-        admins = tools.list_admins()
+        admins = tools.list_admins()["admin_views"]
         admin_entry = next(a for a in admins if a["view_id"] == view_id)
         field = next(f for f in admin_entry["fields"] if f["name"] == field_name)
         return field["filter"]["widget_id"]

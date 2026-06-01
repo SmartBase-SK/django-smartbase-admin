@@ -277,7 +277,9 @@ class DetailFieldsSchemaTests(_FetchDetailTestBase):
         """``list_admins.detail_fields`` lists names only — per-field
         metadata ships with the values from ``fetch_detail``."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         self.assertEqual(
@@ -285,3 +287,61 @@ class DetailFieldsSchemaTests(_FetchDetailTestBase):
             ["name", "parent", "uploaded_at", "child_count"],
             "detail_fields must be a flat name list in fieldset order",
         )
+
+
+class FolderHtmlDisplayAdmin(SBAdmin):
+    """Admin whose readonly callable returns ``mark_safe`` HTML — the
+    ``*_display`` pattern that, unsanitized, leaks inline CSS / JS into
+    ``fetch_detail``. Covers the sanitize contract end to end."""
+
+    model = Folder
+    fieldsets = ((None, {"fields": ("name", "rich")}),)
+    readonly_fields = ("rich",)
+
+    def rich(self, obj):
+        from django.utils.safestring import mark_safe
+
+        return mark_safe(
+            '<div class="wrap" style="color:red" onclick="x()">'
+            "<style>.wrap{color:red}</style>"
+            "<script>steal()</script>"
+            '<span style="font-weight:bold">flag_a</span>'
+            '<a href="/ticketing/queue/53/change/" class="lnk">Queue 53</a>'
+            "<table><tr><td>Max</td><td>3</td></tr></table>"
+            "</div>"
+        )
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FetchDetailHtmlSanitizeTests(_FetchDetailTestBase):
+    admin_class = FolderHtmlDisplayAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.folder = Folder.objects.create(name="f")
+
+    def test_display_html_is_sanitized_keeping_structure(self):
+        """One pass over the sanitize contract: structure + ``href`` kept,
+        presentational/executable noise gone."""
+        value = self._fetch(self.folder.pk)["fields"]["rich"]["value"]
+
+        # Structure preserved — div/span/table/link tags survive.
+        self.assertIn("<table>", value)
+        self.assertIn("<td>Max</td>", value)
+        self.assertIn("<span>flag_a</span>", value)
+        self.assertIn("<div>", value)
+        # Information-bearing attribute kept.
+        self.assertIn('href="/ticketing/queue/53/change/"', value)
+
+        # Presentational / executable noise stripped.
+        self.assertNotIn("style=", value)
+        self.assertNotIn("class=", value)
+        self.assertNotIn("onclick", value)
+        # script / style content removed entirely, not just unwrapped.
+        self.assertNotIn("steal()", value)
+        self.assertNotIn(".wrap{color:red}", value)
+        self.assertNotIn("<script", value)
+        self.assertNotIn("<style", value)

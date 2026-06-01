@@ -116,15 +116,13 @@ class SafeFakeInlineTests(_FakeInlineTestBase):
         """
         user = MagicMock(is_authenticated=True, is_superuser=True)
 
-        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline_names = {entry["inline_name"]: entry for entry in folder["inlines"]}
         self.assertIn("FolderPermissionFakeInline", inline_names)
-        # Fake inlines report ``"fk"`` over the wire — the distinction is
-        # an internal implementation detail and the agent contract for
-        # batch reads is identical to a real FK.
         entry = inline_names["FolderPermissionFakeInline"]
-        self.assertEqual(entry["join_kind"], "fk")
         # ``model`` reports the *original* model, not the dynamic proxy.
         self.assertEqual(entry["model"], "filer.FolderPermission")
 
@@ -163,7 +161,9 @@ class UnsafeFakeInlineTests(_FakeInlineTestBase):
         """
         user = MagicMock(is_authenticated=True, is_superuser=True)
 
-        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         self.assertNotIn(
             "UnsafeFolderPermissionFakeInline",

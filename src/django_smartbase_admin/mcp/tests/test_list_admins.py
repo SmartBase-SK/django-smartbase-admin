@@ -96,7 +96,7 @@ class ListAdminsTests(TestCase):
         user = MagicMock(is_authenticated=True, is_superuser=True)
         request = build_mcp_request(user)
 
-        result = SBAdminTools(request=request).list_admins()
+        result = SBAdminTools(request=request).list_admins()["admin_views"]
 
         view_ids = [e["view_id"] for e in result]
         self.assertEqual(view_ids, sorted(view_ids))
@@ -129,14 +129,18 @@ class ListAdminsTests(TestCase):
         MCPToolTestConfig.view_permission_for = set()
         view_ids = [
             e["view_id"]
-            for e in SBAdminTools(request=build_mcp_request(user)).list_admins()
+            for e in SBAdminTools(request=build_mcp_request(user)).list_admins()[
+                "admin_views"
+            ]
         ]
         self.assertNotIn("filer_folder", view_ids)
 
         MCPToolTestConfig.view_permission_for = {Folder}
         view_ids = [
             e["view_id"]
-            for e in SBAdminTools(request=build_mcp_request(user)).list_admins()
+            for e in SBAdminTools(request=build_mcp_request(user)).list_admins()[
+                "admin_views"
+            ]
         ]
         self.assertIn("filer_folder", view_ids)
 
@@ -159,7 +163,7 @@ class ListAdminsTests(TestCase):
             user = MagicMock(is_authenticated=True, is_superuser=True)
             request = build_mcp_request(user)
 
-            result = SBAdminTools(request=request).list_admins()
+            result = SBAdminTools(request=request).list_admins()["admin_views"]
 
             view_ids = {e["view_id"]: e for e in result}
             self.assertIn("filer_folder", view_ids)
@@ -176,7 +180,7 @@ class ListAdminsTests(TestCase):
         request = build_mcp_request(user)
         original_config = request.request_data.configuration
 
-        SBAdminTools(request=request).list_admins()
+        SBAdminTools(request=request).list_admins()["admin_views"]
 
         self.assertIs(request.request_data.configuration, original_config)
 
@@ -195,7 +199,9 @@ class ListAdminsTests(TestCase):
         sb_admin_site.register(Folder, FolderSearchableAdmin)
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         self.assertEqual(entry["search_fields"], ["name"])
@@ -237,11 +243,16 @@ class ListAdminsTests(TestCase):
         MCPToolTestConfig().init_view_map()
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         # MCP discovery flattens visual sub-action dropdowns to invocable
         # leaves and drops url-only entries (agents can't invoke them).
+        # ``invoke_with`` no longer lives per-entry; the MCP tool to call
+        # for each action list is published once at the top level via
+        # ``action_invokers`` (``row_actions`` → ``invoke_row_action``).
         self.assertEqual(
             entry["row_actions"],
             [
@@ -249,7 +260,6 @@ class ListAdminsTests(TestCase):
                     "title": "Archive",
                     "kind": "method",
                     "action_id": "action_archive_folder",
-                    "invoke_with": "invoke_row_action",
                 },
             ],
         )
@@ -274,7 +284,7 @@ class ListAdminsTests(TestCase):
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
         request = build_mcp_request(user)
-        result = SBAdminTools(request=request).list_admins()
+        result = SBAdminTools(request=request).list_admins()["admin_views"]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         fields_by_name = {f["name"]: f for f in entry["fields"]}
@@ -319,7 +329,9 @@ class ListAdminsTests(TestCase):
         sb_admin_site.register(Folder, FolderDynamicInlineAdmin)
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        result = SBAdminTools(request=build_mcp_request(user)).list_admins()
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
 
         entry = next(e for e in result if e["view_id"] == "filer_folder")
         self.assertIn(

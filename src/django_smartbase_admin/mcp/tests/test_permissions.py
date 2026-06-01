@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django.core.exceptions import PermissionDenied
 from django.db.models import F
-from django.http import Http404
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
@@ -109,13 +109,36 @@ class TestMCPPermissions(TestCase):
             sb_admin_site._registry[Folder] = self._original_admin
         super().tearDown()
 
+    def test_non_staff_user_is_denied_despite_model_permission(self):
+        """MCP tools never pass through ``admin_view()``, so the staff gate
+        must be enforced in-band. A user with model view permission but
+        ``is_staff=False`` is rejected; flipping ``is_staff`` on lets the
+        same call through — proving staff status, not model perms, is the
+        gate."""
+        MCPToolTestConfig.view_permission_for = {Folder}
+        non_staff = MagicMock(
+            is_authenticated=True, is_active=True, is_staff=False, is_superuser=False
+        )
+        with self.assertRaises(PermissionDenied):
+            SBAdminTools(request=build_mcp_request(non_staff)).list_admins()
+
+        staff = MagicMock(
+            is_authenticated=True, is_active=True, is_staff=True, is_superuser=False
+        )
+        admins = SBAdminTools(request=build_mcp_request(staff)).list_admins()[
+            "admin_views"
+        ]
+        self.assertTrue(any(a["view_id"] == "filer_folder" for a in admins))
+
     def test_schema_omits_inline_user_cannot_view(self):
         """``list_admins.inlines`` skips inlines failing
         ``has_view_or_change_permission`` — parent admin stays visible so
         the agent learns the surface exists, the denied inline disappears."""
         MCPToolTestConfig.view_permission_for = {Folder}
         denied = MagicMock(is_authenticated=True, is_superuser=False)
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline_names = {entry["inline_name"] for entry in folder["inlines"]}
         self.assertNotIn("PermissionFolderPermissionInline", inline_names)
@@ -132,7 +155,7 @@ class TestMCPPermissions(TestCase):
         user = MagicMock(is_authenticated=True, is_superuser=True)
 
         tools = SBAdminTools(request=build_mcp_request(user))
-        admins = tools.list_admins()
+        admins = tools.list_admins()["admin_views"]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         parent_widget_id = next(
             f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
@@ -167,11 +190,15 @@ class TestMCPPermissions(TestCase):
         allowed = MagicMock(is_authenticated=True, is_superuser=True)
         denied = MagicMock(is_authenticated=True, is_superuser=False)
 
-        super_admins = SBAdminTools(request=build_mcp_request(allowed)).list_admins()
+        super_admins = SBAdminTools(request=build_mcp_request(allowed)).list_admins()[
+            "admin_views"
+        ]
         super_folder = next(a for a in super_admins if a["view_id"] == "filer_folder")
         self.assertIn("parent", {f["name"] for f in super_folder["fields"]})
 
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         names = {f["name"] for f in folder["fields"]}
         self.assertNotIn("parent", names)
@@ -187,7 +214,9 @@ class TestMCPPermissions(TestCase):
             for f in super_folder["fields"]
             if f["name"] == "parent"
         )
-        with self.assertRaises(Http404):
+        # A widget the user can't see is "not found" for them — same
+        # ``LookupError`` as the ``fields=[hidden]`` branch, no existence leak.
+        with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(denied)).autocomplete(
                 "filer_folder", parent_widget_id, search="perm"
             )
@@ -201,7 +230,9 @@ class TestMCPPermissions(TestCase):
         """
         denied = MagicMock(is_authenticated=True, is_superuser=False)
 
-        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()
+        admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
+            "admin_views"
+        ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         inline = next(
             entry

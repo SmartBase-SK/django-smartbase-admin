@@ -28,7 +28,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from oauth2_provider.models import get_application_model
 
-SUPPORTED_SCOPE = "sbadmin:read"
+# Single scope granting full read-write access to the SBAdmin MCP tools.
+# Tool-level authorization is the staff gate plus Django model permissions;
+# the scope is not split read/write, so it must not imply read-only.
+SUPPORTED_SCOPE = "sbadmin:write"
 
 
 def _issuer(request: HttpRequest) -> str:

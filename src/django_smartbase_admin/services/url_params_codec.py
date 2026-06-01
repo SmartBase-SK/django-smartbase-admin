@@ -7,6 +7,13 @@ from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 
 _lz = LZString()
 
+# Hard caps so a short compressed URL param can't expand into a multi-megabyte
+# payload (decompression + JSON-parse DoS). Deliberately very generous — orders
+# of magnitude above any legitimate filter/params blob — so they only ever trip
+# on abuse.
+MAX_ENCODED_LEN = 256 * 1024  # raw URL param length
+MAX_DECOMPRESSED_LEN = 4 * 1024 * 1024  # LZ-string decompressed output length
+
 
 def _is_plain_json(text: str) -> bool:
     stripped = text.lstrip()
@@ -36,12 +43,16 @@ def parse_changelist_filters(raw_filters: str) -> dict:
 def loads_from_url(value: str | None) -> dict:
     if not value:
         return {}
+    if len(value) > MAX_ENCODED_LEN:
+        return {}
     try:
         if _is_plain_json(value):
             data = json.loads(value)
         else:
             raw = _lz.decompressFromEncodedURIComponent(value)
             if not raw:
+                return {}
+            if len(raw) > MAX_DECOMPRESSED_LEN:
                 return {}
             data = json.loads(raw)
         return data if isinstance(data, dict) else {}

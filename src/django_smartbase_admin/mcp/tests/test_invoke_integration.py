@@ -262,7 +262,7 @@ class IntegrationTests(_Base):
     def test_discovery_classifies_actions_and_filters_unsupported(self):
         """``list_admins`` separates actions by source with correct kinds and
         ``requires_confirmation`` flags; URL-only and bulk_delete are hidden."""
-        admins = self._tools().list_admins()
+        admins = self._tools().list_admins()["admin_views"]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
 
         row = {a["title"]: a for a in folder["row_actions"]}
@@ -402,7 +402,9 @@ class IntegrationTests(_Base):
 
         # Discovery: pick up the inline's view_id from the parent's entry.
         folder_entry = next(
-            a for a in self._tools().list_admins() if a["view_id"] == "filer_folder"
+            a
+            for a in self._tools().list_admins()["admin_views"]
+            if a["view_id"] == "filer_folder"
         )
         inline = next(
             i for i in folder_entry["inlines"] if i["inline_name"] == "FolderFileInline"

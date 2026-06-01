@@ -51,9 +51,11 @@ setuptools = "^67.0.0"
 django-oauth-toolkit = {version = "^3.2", optional = true}
 djangorestframework = {version = "^3.17", optional = true}
 django-mcp-server = {version = "^0.5.7", optional = true}
+# Allowlist HTML sanitizer for ``fetch_detail`` display values.
+nh3 = {version = ">=0.2.15", optional = true}
 
 [tool.poetry.extras]
-mcp = ["django-oauth-toolkit", "djangorestframework", "django-mcp-server"]
+mcp = ["django-oauth-toolkit", "djangorestframework", "django-mcp-server", "nh3"]
 
 [build-system]
 requires = ["poetry-core"]

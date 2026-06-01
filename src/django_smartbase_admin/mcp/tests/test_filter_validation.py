@@ -75,10 +75,42 @@ class FilterValidationTests(TestCase):
         self.assertIn("DateFilterWidget", str(ctx.exception))
 
         # 3. Schema publishes the expected value shape so the agent
-        #    doesn't have to guess between scalar / list / dict.
-        entry = next(e for e in tools.list_admins() if e["view_id"] == "filer_folder")
+        #    doesn't have to guess between scalar / list / dict. The
+        #    per-field filter block only names the widget category;
+        #    ``value_shape`` / ``example`` live once in the top-level
+        #    ``widget_shapes`` legend so we don't repeat them per column.
+        result = tools.list_admins()
+        entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
         filter_info = next(f for f in entry["fields"] if f["name"] == "uploaded_at")[
             "filter"
         ]
-        self.assertIn("start", filter_info["value_shape"])
-        self.assertEqual(filter_info["example"], ["2026-06-01", "2026-06-30"])
+        self.assertEqual(filter_info["widget"], "DateFilterWidget")
+        self.assertNotIn("value_shape", filter_info)
+        self.assertNotIn("example", filter_info)
+        shape = result["widget_shapes"]["DateFilterWidget"]
+        self.assertIn("start", shape["value_shape"])
+        self.assertEqual(shape["example"], ["2026-06-01", "2026-06-30"])
+
+    def test_date_open_ended_ranges_apply_the_present_bound(self):
+        """A null bound is an open-ended range, not 'match nothing' — only
+        both-null short-circuits to the empty result."""
+        from datetime import datetime, timedelta
+        from types import SimpleNamespace
+
+        widget = DateFilterWidget()
+        widget.field = SimpleNamespace(filter_field="uploaded_at")
+        d1, d2 = datetime(2026, 3, 1), datetime(2026, 3, 10)
+
+        def q(value):
+            return widget.get_base_filter_query_for_parsed_value(None, value).children
+
+        self.assertEqual(q([None, None]), [("pk__in", [])])
+        self.assertEqual(q([d1, None]), [("uploaded_at__gte", d1)])
+        self.assertEqual(q([None, d2]), [("uploaded_at__lte", d2 + timedelta(days=1))])
+        self.assertEqual(
+            q([d1, d2]),
+            [
+                ("uploaded_at__gte", d1),
+                ("uploaded_at__lte", d2 + timedelta(days=1)),
+            ],
+        )

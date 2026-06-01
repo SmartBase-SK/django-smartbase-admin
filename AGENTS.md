@@ -4728,7 +4728,7 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
 DJANGO_MCP_ENDPOINT = "mcp/"
 
 OAUTH2_PROVIDER = {
-    "SCOPES": {"sbadmin:read": "SBAdmin MCP access"},
+    "SCOPES": {"sbadmin:write": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
 }
 
