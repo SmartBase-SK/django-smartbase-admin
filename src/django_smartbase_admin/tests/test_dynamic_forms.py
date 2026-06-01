@@ -2037,7 +2037,9 @@ class DynamicFormTests(SimpleTestCase):
         class UploadForm(forms.Form):
             attachment = forms.FileField()
 
-        uploaded = SimpleUploadedFile("preview.jpg", b"preview-bytes", content_type="image/jpeg")
+        uploaded = SimpleUploadedFile(
+            "preview.jpg", b"preview-bytes", content_type="image/jpeg"
+        )
         data = QueryDict("attachment=")
         files = {"attachment": uploaded}
 
