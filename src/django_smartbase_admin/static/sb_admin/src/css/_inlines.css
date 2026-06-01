@@ -35,9 +35,6 @@
             @apply relative;
             @apply min-h-56;
             @apply border-b border-dark-200;
-            label:first-child:not(.input-file-edit-btn) {
-                @apply hidden;
-            }
             &:not(:first-child) {
                 @apply border-l;
             }

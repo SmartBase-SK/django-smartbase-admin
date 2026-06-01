@@ -116,6 +116,11 @@ def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
 
 
 @register.simple_tag
+def sb_admin_render_inline_table_field(form_field):
+    return form_field.as_widget(attrs={"sbadmin_hide_label": True})
+
+
+@register.simple_tag
 def resolve_fieldset_context(fieldset, request=None):
     form = getattr(fieldset, "form", None)
     if form is not None and hasattr(form, "get_fieldset_context"):

@@ -881,6 +881,11 @@ class SBAdminInlineFormSetMixin:
                 form.has_changed = lambda: True
         return super().full_clean()
 
+    def _construct_form(self, i, **kwargs):
+        form = super()._construct_form(i, **kwargs)
+        form._sbadmin_formset = self
+        return form
+
 
 class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFormSet):
     pass

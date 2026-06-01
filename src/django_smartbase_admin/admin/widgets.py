@@ -726,6 +726,7 @@ class SBAdminAutocompleteWidget(
     reload_on_save = None
     full_width = False
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
+    SELECTED_OPTION_CACHE_KEY = "_sbadmin_autocomplete_selected_options"
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
@@ -764,6 +765,7 @@ class SBAdminAutocompleteWidget(
         self, form, form_field, field_name, view, request, default_create_data=None
     ):
         super().init_widget_dynamic(form, form_field, field_name, view, request)
+        self.bound_form = form
         if self.initialised:
             return
         self.initialised = True
@@ -780,6 +782,66 @@ class SBAdminAutocompleteWidget(
 
     def get_field_name(self):
         return self.field_name
+
+    def get_selected_option_cache_key(self, request):
+        formset = getattr(getattr(self, "bound_form", None), "_sbadmin_formset", None)
+        return (
+            self.get_id(),
+            getattr(formset, "prefix", None),
+            # Defensive: value_field changes how submitted values map back to rows.
+            self.get_value_field(),
+        )
+
+    def get_selected_option_cache(self, request):
+        cache = getattr(request, self.SELECTED_OPTION_CACHE_KEY, None)
+        if cache is None:
+            cache = {}
+            setattr(request, self.SELECTED_OPTION_CACHE_KEY, cache)
+        return cache
+
+    def get_selected_option_items_from_cache(self, request, parsed_value):
+        formset = getattr(getattr(self, "bound_form", None), "_sbadmin_formset", None)
+        if formset is None:
+            return None
+
+        cache = self.get_selected_option_cache(request)
+        cache_key = self.get_selected_option_cache_key(request)
+        if cache_key not in cache:
+            values = []
+            value_set = set()
+            for form in formset.forms:
+                field = form.fields.get(self.field_name)
+                if field is None or not isinstance(
+                    field.widget, SBAdminAutocompleteWidget
+                ):
+                    continue
+                raw_value = form[self.field_name].value()
+                for value in field.widget.parse_value_list_from_input(
+                    request, raw_value
+                ):
+                    value_key = str(value)
+                    if value_key in value_set:
+                        continue
+                    value_set.add(value_key)
+                    values.append(value)
+
+            items_by_value = {}
+            if values:
+                for item in self.get_queryset(request).filter(
+                    **{f"{self.get_value_field()}__in": values}
+                ):
+                    items_by_value[str(self.get_value(request, item))] = item
+            cache[cache_key] = items_by_value
+
+        items_by_value = cache[cache_key]
+        parsed_values = (
+            parsed_value if isinstance(parsed_value, list) else [parsed_value]
+        )
+        return [
+            items_by_value[str(value)]
+            for value in parsed_values
+            if str(value) in items_by_value
+        ]
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
@@ -824,9 +886,14 @@ class SBAdminAutocompleteWidget(
                     parsed_value = [parsed_value]
 
                 try:
-                    for item in self.get_queryset(threadsafe_request).filter(
-                        **{f"{self.get_value_field()}{query_suffix}": parsed_value}
-                    ):
+                    items = self.get_selected_option_items_from_cache(
+                        threadsafe_request, parsed_value
+                    )
+                    if items is None:
+                        items = self.get_queryset(threadsafe_request).filter(
+                            **{f"{self.get_value_field()}{query_suffix}": parsed_value}
+                        )
+                    for item in items:
                         selected_options.append(
                             {
                                 "value": self.get_value(threadsafe_request, item),

@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta
 
+from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, fields, FilteredRelation, Count
@@ -46,6 +47,16 @@ class AutocompleteParseMixin:
         else:
             value = input_value
         return value
+
+    def parse_value_list_from_input(self, request, input_value):
+        parsed_value = self.parse_value_from_input(request, input_value)
+        if parsed_value in forms.Field.empty_values:
+            return []
+        if not isinstance(parsed_value, list):
+            parsed_value = [parsed_value]
+        return [
+            value for value in parsed_value if value not in forms.Field.empty_values
+        ]
 
     def parse_is_create_from_input(self, request, input_value):
         try:
