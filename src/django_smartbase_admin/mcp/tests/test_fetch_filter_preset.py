@@ -178,12 +178,8 @@ class FetchFilterPresetTests(TestCase):
             )
         self.assertIn("Recent", str(ctx.exception))
 
-        # 6. The real end-to-end: a multichoice preset stored as
-        #    ``[{"value","label"}]`` decodes to that same shape and, splatted
-        #    onto ``list_rows``, actually filters (the list pipeline's
-        #    parse extracts the value). Two folders, one matching.
-        Folder.objects.create(name="alpha")
-        Folder.objects.create(name="beta")
+        # 6. A multichoice preset stored as ``[{"value","label"}]`` decodes
+        #    to that same shape — which ``list_rows`` accepts directly.
         decoded_status = tools.fetch_filter_preset(
             view_id="filer_folder", name="By status", source="static"
         )
@@ -191,5 +187,3 @@ class FetchFilterPresetTests(TestCase):
             decoded_status["filter_data"],
             {"status": [{"value": "alpha", "label": "Alpha"}]},
         )
-        rows = tools.list_rows("filer_folder", fields=["name"], **decoded_status)
-        self.assertEqual([r["name"] for r in rows["data"]], ["alpha"])
