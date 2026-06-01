@@ -25,12 +25,14 @@ from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.const import (
     Action,
+    ADVANCED_FILTER_DATA_NAME,
     AUTOCOMPLETE_FORWARD_NAME,
     AUTOCOMPLETE_PAGE_NUM,
     AUTOCOMPLETE_SEARCH_NAME,
     BASE_PARAMS_NAME,
     COLUMNS_DATA_NAME,
     FILTER_DATA_NAME,
+    TABLE_PARAMS_SELECTED_FILTER_TYPE,
     SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_NAME,
@@ -151,6 +153,18 @@ def _decode_preset_url_params(url_params) -> dict:
     url_params = url_params or {}
     raw_filter = dict(url_params.get(FILTER_DATA_NAME, {}) or {})
     table_params = url_params.get(TABLE_PARAMS_NAME, {}) or {}
+
+    # Advanced-filter presets keep their predicates in advancedFilterData,
+    # which list_rows doesn't apply — decoding only the simple filterData
+    # would match too many rows. Refuse rather than hand back a filter that
+    # silently under-constrains.
+    if url_params.get(ADVANCED_FILTER_DATA_NAME) or raw_filter.get(
+        TABLE_PARAMS_SELECTED_FILTER_TYPE
+    ):
+        raise ValueError(
+            "This preset uses advanced filters, which list_rows does not "
+            "support; rebuild the filter with list_rows filter_data instead."
+        )
 
     decoded: dict = {}
     # ``sb_admin_full_search`` lives inside filterData (it's how the list

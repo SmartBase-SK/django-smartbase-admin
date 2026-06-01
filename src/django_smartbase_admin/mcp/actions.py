@@ -135,6 +135,9 @@ def action_entries_for(action) -> list[dict]:
         "kind": action_kind(action),
         "action_id": action_id,
     }
+    description = getattr(action, "mcp_description", None)
+    if description:
+        entry["description"] = str(description)
     # ``collect_action_entries`` strips this for invoke tools that don't
     # accept a modifier (row / detail / inline route through
     # ``invoke_row`` which forces ``"template"``).

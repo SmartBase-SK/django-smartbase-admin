@@ -414,6 +414,8 @@ def admin_entry(admin, request) -> dict:
         "inlines": _inline_entries(admin, request),
         "filter_presets": _filter_preset_entries(admin, request),
     }
+    if admin.mcp_description:
+        entry["description"] = str(admin.mcp_description)
     # --- actions (all four admin-level types) ---
     # row_actions:       per-row icon buttons on the list view.
     # detail_actions:    buttons on the change/detail form.

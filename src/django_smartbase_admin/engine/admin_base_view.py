@@ -669,6 +669,7 @@ class SBAdminBaseQuerysetMixin(object):
 
 class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_view_config = None
+    mcp_description = None
     sbadmin_list_display = None
     sbadmin_list_display_data = None
     sbadmin_list_selection_actions = None

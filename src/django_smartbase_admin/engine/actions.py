@@ -52,6 +52,7 @@ class SBAdminCustomAction(object):
     permission = None
     sub_actions = None
     icon = None
+    mcp_description = None
 
     def __init__(
         self,
@@ -69,9 +70,13 @@ class SBAdminCustomAction(object):
         open_in_new_tab=None,
         template=None,
         permission=None,
+        mcp_description=None,
     ) -> None:
         super().__init__()
         self.title = title
+        self.mcp_description = (
+            mcp_description if mcp_description is not None else self.mcp_description
+        )
         self.url = url
         self.view = view
         self.action_id = action_id
@@ -159,6 +164,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         enabled_field=None,
         enabled_value=None,
         sub_actions=None,
+        mcp_description=None,
     ) -> None:
         resolved_title = title if title is not None else self.title
         resolved_icon = icon if icon is not None else self.icon
@@ -207,6 +213,7 @@ class SBAdminRowAction(SBAdminCustomAction):
             icon=resolved_icon,
             action_modifier=MODIFIER_OBJECT_ID,
             sub_actions=resolved_sub_actions,
+            mcp_description=mcp_description,
         )
 
         self.enabled_if = enabled_if if enabled_if is not None else self.enabled_if
