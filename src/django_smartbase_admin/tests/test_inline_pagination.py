@@ -1,7 +1,29 @@
-from django.test import SimpleTestCase
+from django.apps import apps
+from django.conf import settings
+from django.test import RequestFactory, SimpleTestCase
 
+if not settings.configured:
+    settings.configure(
+        DEFAULT_AUTO_FIELD="django.db.models.AutoField",
+        INSTALLED_APPS=["django.contrib.contenttypes"],
+        SECRET_KEY="test",
+    )
+
+if not apps.ready:
+    import django
+
+    django.setup()
+
+from django_smartbase_admin.engine.inline_pagination import (
+    InlinePaginated,
+    PaginationFormSetBase,
+    get_inline_admin_formset_by_prefix,
+    get_inline_partial_prefix,
+)
 from django_smartbase_admin.templatetags.sb_paginated_inline import (
     build_tabulator_style_page_items,
+    hx_vals,
+    modify_pagination_path,
 )
 
 
@@ -36,3 +58,87 @@ class BuildTabulatorStylePageItemsTests(SimpleTestCase):
             if item["kind"] == "page" and item["number"] not in (1, 50)
         ]
         self.assertEqual(len(page_items), 5)
+
+
+class InlinePaginationTests(SimpleTestCase):
+    def test_modify_pagination_path_replaces_page_param(self):
+        url = "/admin/app/model/1/change/?q=test&page=2#inline"
+        self.assertEqual(modify_pagination_path(url, "page", 3), "q=test&page=3")
+
+    def test_hx_vals_renders_inline_page_value(self):
+        attrs = str(hx_vals("inline-page", 3))
+        self.assertEqual(attrs, 'hx-vals=\'{"inline-page": "3"}\'')
+
+    def test_page_num_uses_positive_get_param(self):
+        formset = object.__new__(PaginationFormSetBase)
+        formset.request = RequestFactory().get("/admin/?inline_page=4")
+        formset.pagination_key = "inline_page"
+        formset.prefix = "permissions"
+
+        self.assertEqual(formset.get_page_num(), 4)
+
+    def test_show_all_keeps_full_queryset(self):
+        formset = object.__new__(PaginationFormSetBase)
+        formset.queryset = [1, 2, 3]
+        formset.request = RequestFactory().get("/admin/?all=1")
+        formset.pagination_key = "page"
+        formset.per_page = 1
+        formset.prefix = "permissions"
+
+        formset.mount_paginator()
+        formset.mount_queryset()
+
+        self.assertEqual(formset._queryset, [1, 2, 3])
+
+    def test_inline_paginated_uses_explicit_formset_prefix(self):
+        class BaseFormSet:
+            @classmethod
+            def get_default_prefix(cls):
+                return "default-prefix"
+
+        class ParentInline:
+            def get_formset(self, request, obj=None, **kwargs):
+                return BaseFormSet
+
+        class TestInline(InlinePaginated, ParentInline):
+            formset_prefix = "stable-prefix"
+
+        formset_class = TestInline().get_formset(RequestFactory().get("/admin/"))
+
+        self.assertEqual(formset_class.get_default_prefix(), "stable-prefix")
+
+    def test_inline_partial_prefix_requires_htmx_request(self):
+        request = RequestFactory().get(
+            "/admin/",
+            HTTP_X_SBADMIN_INLINE_PREFIX="prices",
+        )
+
+        self.assertIsNone(get_inline_partial_prefix(request))
+
+    def test_inline_partial_prefix_uses_django_htmx_request_details(self):
+        class HtmxRequestDetails:
+            def __bool__(self):
+                return True
+
+        request = RequestFactory().get(
+            "/admin/",
+            HTTP_X_SBADMIN_INLINE_PREFIX="prices",
+        )
+        request.htmx = HtmxRequestDetails()
+
+        self.assertEqual(get_inline_partial_prefix(request), "prices")
+
+    def test_get_inline_admin_formset_by_prefix(self):
+        class FormSet:
+            prefix = "prices"
+
+        class InlineAdminFormSet:
+            formset = FormSet()
+
+        context = {"inline_admin_formsets": [InlineAdminFormSet()]}
+
+        self.assertIs(
+            get_inline_admin_formset_by_prefix(context, "prices"),
+            context["inline_admin_formsets"][0],
+        )
+        self.assertIsNone(get_inline_admin_formset_by_prefix(context, "other"))

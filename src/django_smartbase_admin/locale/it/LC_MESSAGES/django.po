@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 15:03+0200\n"
+"POT-Creation-Date: 2026-06-02 10:26+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -139,6 +139,9 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
+msgid "Publish"
+msgstr ""
+
 msgid "Search..."
 msgstr ""
 
@@ -209,6 +212,15 @@ msgid "Last Quarter"
 msgstr ""
 
 msgid "Last Year"
+msgstr ""
+
+msgid "Preserve"
+msgstr ""
+
+msgid "Form"
+msgstr ""
+
+msgid "View"
 msgstr ""
 
 msgid "Yes"
@@ -582,9 +594,6 @@ msgstr ""
 msgid "Change"
 msgstr ""
 
-msgid "View"
-msgstr ""
-
 msgid "Delete"
 msgstr ""
 
@@ -806,6 +815,12 @@ msgstr ""
 msgid "${value} selected"
 msgstr ""
 
+msgid "Unsaved changes"
+msgstr ""
+
+msgid "This list has unsaved changes. Changing page will discard them."
+msgstr ""
+
 msgid "Basic Settings"
 msgstr ""
 
@@ -911,6 +926,15 @@ msgid "Deleted {name} “{object}”."
 msgstr ""
 
 msgid "No fields changed."
+msgstr ""
+
+msgid "Combined details"
+msgstr ""
+
+msgid "Primary"
+msgstr ""
+
+msgid "Secondary"
 msgstr ""
 
 msgid "Finish"

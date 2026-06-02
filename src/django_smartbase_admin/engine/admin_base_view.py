@@ -43,6 +43,7 @@ from django_smartbase_admin.engine.const import (
     SUPPORTED_FILE_TYPE_ICONS,
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
 )
+from django_smartbase_admin.engine.inline_pagination import SBADMIN_INLINE_PREFIX_HEADER
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
 )
@@ -601,6 +602,7 @@ class SBAdminBaseView(object):
             "change_label": self.get_change_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,
             "OVERRIDE_CONTENT_OF_NOTIFICATION": OVERRIDE_CONTENT_OF_NOTIFICATION,
+            "SBADMIN_INLINE_PREFIX_HEADER": SBADMIN_INLINE_PREFIX_HEADER,
             "username_data": self.get_username_data(request),
             "detail_actions": self.get_sbadmin_detail_actions_processed(
                 request, object_id

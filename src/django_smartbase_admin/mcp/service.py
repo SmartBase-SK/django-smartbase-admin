@@ -27,7 +27,6 @@ from django.forms.models import _get_foreign_key
 from django.http import QueryDict
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
-from django_admin_inline_paginator.admin import InlinePaginated
 
 from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.engine.fake_inline import (
@@ -35,6 +34,7 @@ from django_smartbase_admin.engine.fake_inline import (
     SBAdminFakeInlineMixin,
     is_fake_inline_batch_safe,
 )
+from django_smartbase_admin.engine.inline_pagination import InlinePaginated
 from django_smartbase_admin.mcp.bridge import (
     captured_messages,
     ensure_messages_storage,

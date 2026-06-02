@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 15:03+0200\n"
+"POT-Creation-Date: 2026-06-02 10:25+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -141,6 +141,9 @@ msgstr "Související změny"
 msgid "Summary"
 msgstr "Souhrn"
 
+msgid "Publish"
+msgstr "Publikovat"
+
 msgid "Search..."
 msgstr "Hledat..."
 
@@ -214,6 +217,15 @@ msgstr "Poslední čtvrtletí"
 
 msgid "Last Year"
 msgstr "Poslední rok"
+
+msgid "Preserve"
+msgstr "Zachovat"
+
+msgid "Form"
+msgstr "Formulář"
+
+msgid "View"
+msgstr "Zobrazit"
 
 msgid "Yes"
 msgstr "Ano"
@@ -604,9 +616,6 @@ msgstr "Přidat další %(verbose_name)s"
 msgid "Change"
 msgstr "Změnit"
 
-msgid "View"
-msgstr "Zobrazit"
-
 msgid "Delete"
 msgstr "Smazat"
 
@@ -839,6 +848,12 @@ msgstr "<strong>0</strong> položek"
 msgid "${value} selected"
 msgstr "${value} vybráno"
 
+msgid "Unsaved changes"
+msgstr "Neuložené změny"
+
+msgid "This list has unsaved changes. Changing page will discard them."
+msgstr "V tomto seznamu máte neuložené změny. Při změně stránky se zahodí."
+
 msgid "Basic Settings"
 msgstr "Základní nastavení"
 
@@ -950,6 +965,17 @@ msgstr "Smazáno {name} “{object}“."
 
 msgid "No fields changed."
 msgstr "Žádná pole nebyla změněna."
+
+#, fuzzy
+#| msgid "Product details"
+msgid "Combined details"
+msgstr "Podrobnosti o produktu"
+
+msgid "Primary"
+msgstr "Primární"
+
+msgid "Secondary"
+msgstr "Sekundární"
 
 msgid "Finish"
 msgstr "Dokončit"
