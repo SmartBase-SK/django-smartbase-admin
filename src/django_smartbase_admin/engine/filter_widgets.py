@@ -787,26 +787,6 @@ class AutocompleteFilterWidget(
                 raise ValueError(
                     f"AutocompleteFilterWidget entries must be {{'value': <pk>, 'label': <str>}}, got {entry!r}"
                 )
-        # Each ``value`` is fed straight into ``<filter_field>__in``, so it
-        # must be a pk the target model accepts. Reject a wrong-typed value
-        # (e.g. an email where an integer id is expected) here, pointing at
-        # the autocomplete tool, instead of letting it explode as a raw ORM
-        # ``ValueError`` mid-query. Skipped when the target model isn't
-        # resolved yet (no pk to check against).
-        pk_field = getattr(getattr(self.model, "_meta", None), "pk", None)
-        if pk_field is None:
-            return
-        for entry in value:
-            raw = entry["value"]
-            try:
-                pk_field.get_prep_value(raw)
-            except (ValueError, TypeError):
-                raise ValueError(
-                    f"Autocomplete filter value {raw!r} is not a valid "
-                    f"{self.model._meta.label} id. Resolve the name to an id "
-                    "with the autocomplete tool first, then pass that id as "
-                    "'value'."
-                )
 
     @classmethod
     def should_add_query(cls, model_field, search_term, numeric_term):

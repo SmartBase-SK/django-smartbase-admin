@@ -14,6 +14,7 @@ from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     DateFilterWidget,
+    FromValuesAutocompleteWidget,
 )
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
@@ -28,11 +29,19 @@ class _Admin(SBAdmin):
     model = Folder
     sbadmin_list_display = (
         "id",
-        "name",
+        # FromValues returns the column's own value (a name string), not the
+        # pk — the live case that regressed when validation assumed a pk.
+        SBAdminField(name="name", filter_widget=FromValuesAutocompleteWidget()),
         SBAdminField(
             name="uploaded_at",
             filter_field="uploaded_at",
             filter_widget=DateFilterWidget(),
+        ),
+        # FK autocomplete on an integer-pk relation: value must be a pk.
+        SBAdminField(
+            name="parent",
+            filter_field="parent",
+            filter_widget=AutocompleteFilterWidget(model=Folder),
         ),
     )
 
@@ -151,20 +160,44 @@ class FilterValidationTests(TestCase):
             _normalize_filter_keys(surfaced, field_map), {"status__is_closed": v}
         )
 
-    def test_autocomplete_filter_rejects_value_that_is_not_a_valid_pk(self):
-        """A right-shaped entry whose ``value`` can't be the target pk (e.g.
-        an email where an integer id is expected) fails at validation with a
-        pointer to the autocomplete tool — not as a raw ORM error mid-query.
-        Valid ids (int or numeric string) pass."""
-        widget = AutocompleteFilterWidget(model=Folder)  # Folder pk is integer
-        with self.assertRaises(ValueError) as ctx:
-            widget.validate_value([{"value": "petra@example.com", "label": "P"}])
-        message = str(ctx.exception)
-        self.assertIn("petra@example.com", message)
-        self.assertIn("autocomplete", message)
+    def test_autocomplete_filter_values_are_not_pre_validated_against_pk(self):
+        """Autocomplete values aren't pre-validated against the pk: the value
+        isn't always a pk (``FromValues`` returns the column's own string), so
+        a non-pk value is accepted and filters normally — the live case that
+        wrongly raised "not a valid id". A genuinely uncoercible value (an
+        email where an integer id is expected) isn't caught up front; it
+        surfaces as the ORM's own error from the list pipeline."""
+        marketing = Folder.objects.create(name="marketing")
+        Folder.objects.create(name="sales", parent=marketing)
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
 
-        widget.validate_value([{"value": 42, "label": "P"}])
-        widget.validate_value([{"value": "42", "label": "P"}])
+        # FromValues string value (not a pk) is accepted and narrows.
+        result = tools.list_rows(
+            "filer_folder",
+            fields=["name"],
+            filter_data={"name": [{"value": "marketing", "label": "marketing"}]},
+        )
+        self.assertEqual({r["name"] for r in result["data"]}, {"marketing"})
+
+        # Valid FK pk filters normally (returns marketing's children).
+        children = tools.list_rows(
+            "filer_folder",
+            fields=["name"],
+            filter_data={"parent": [{"value": marketing.pk, "label": "marketing"}]},
+        )
+        self.assertEqual({r["name"] for r in children["data"]}, {"sales"})
+
+        # A non-numeric string where an integer pk is expected isn't
+        # pre-validated; the ORM's own coercion error surfaces from the list
+        # pipeline.
+        with self.assertRaises(ValueError) as ctx:
+            tools.list_rows(
+                "filer_folder",
+                fields=["name"],
+                filter_data={"parent": [{"value": "not-a-pk", "label": "x"}]},
+            )
+        self.assertIn("not-a-pk", str(ctx.exception))
 
     def test_date_open_ended_ranges_apply_the_present_bound(self):
         """A null bound is an open-ended range, not 'match nothing' — only

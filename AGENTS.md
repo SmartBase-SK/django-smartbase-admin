@@ -4747,6 +4747,15 @@ SBADMIN_MCP_ALLOWED_ORIGINS = ["https://claude.ai", "https://cursor.com"]
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass. Override `authenticate_header(request)` to return `Bearer ..., resource_metadata="<absolute /.well-known/oauth-protected-resource URL>"` so MCP clients can discover OAuth.
 
+### Two browser-only extras
+
+The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. Two bundled classes, however, only matter for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
+
+- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them.
+- **`SBAdminMCPOAuth2Authentication`** (`mcp/oauth/auth.py`) — adds `resource_metadata="…"` to the `WWW-Authenticate` header for header-driven discovery. Native clients fall back to probing `/.well-known/*` directly, so the stock DOT `OAuth2Authentication` also works for them. Keep the subclass for broad compatibility.
+
+(Verified: a Claude Code CLI connection completed OAuth with the plain auth class and no CORS middleware.)
+
 ### Cursor — `.cursor/mcp.json`
 
 `.cursor/mcp.json` or `~/.cursor/mcp.json` — streamable HTTP `url` only (match `DJANGO_MCP_ENDPOINT`, trailing slash). Prod: **HTTPS** origin; oauthlib enforces TLS (no `OAUTHLIB_INSECURE_TRANSPORT`). Local `http://` only: set that env on Django. Cursor **Connect** for bundled OAuth (PKCE + DCR).
