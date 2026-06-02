@@ -1590,6 +1590,44 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="email"', html)
         self.assertNotIn('name="last_name"', html)
 
+    def test_model_admin_get_fieldsets_preserves_fields_container_type(self):
+        model_admin = dynamic_region_admin_site._registry[DynamicRegionDemoModel]
+
+        fieldsets = model_admin.get_fieldsets(self.request)
+        fields = fieldsets[0][1]["fields"]
+
+        self.assertIsInstance(fields, tuple)
+        self.assertEqual(fields, ("username", "first_name", "last_name"))
+
+        class ListFieldsetsAdmin(SBAdmin):
+            sbadmin_fieldsets = (
+                (
+                    "Profile",
+                    {
+                        "fields": [
+                            "username",
+                            SBDynamicRegion(
+                                name="profile",
+                                fields=("first_name", "last_name"),
+                            ),
+                        ],
+                    },
+                ),
+            )
+
+        list_model_admin = ListFieldsetsAdmin(DynamicRegionDemoModel, AdminSite())
+        list_fieldsets = list_model_admin.get_fieldsets(self.request)
+        list_fields = list_fieldsets[0][1]["fields"]
+
+        self.assertIsInstance(list_fields, list)
+        self.assertEqual(list_fields, ["username", "first_name", "last_name"])
+
+        list_fields.remove("first_name")
+
+        configured_fields = ListFieldsetsAdmin.sbadmin_fieldsets[0][1]["fields"]
+        self.assertIsInstance(configured_fields, list)
+        self.assertEqual(configured_fields[1].fields, ("first_name", "last_name"))
+
     @override_settings(ROOT_URLCONF=__name__)
     def test_model_admin_fieldsets_dynamic_regions_render_add_view(self):
         model_admin = dynamic_region_admin_site._registry[DynamicRegionDemoModel]

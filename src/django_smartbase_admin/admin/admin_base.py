@@ -633,9 +633,10 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             return super().get_fieldsets(request, obj)
         fieldsets = []
         for fieldset in sbadmin_fieldsets:
-            fieldset_dict = {
-                "fields": SBAdminDynamicFormMixin.get_fieldset_fields(fieldset[1])
-            }
+            fields = SBAdminDynamicFormMixin.get_fieldset_fields(fieldset[1])
+            if isinstance(fieldset[1].get("fields"), list):
+                fields = list(fields)
+            fieldset_dict = {"fields": fields}
             classes = fieldset[1].get("classes")
             description = fieldset[1].get("description")
             if classes:
