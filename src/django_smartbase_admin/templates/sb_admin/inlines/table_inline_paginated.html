@@ -7,108 +7,17 @@
     {{ block.super }}
 
     {% with inline_admin_formset.formset.page as page_obj %}
-        {% translate "V tomto zozname máte neuložené zmeny. Pri zmene stránky sa zahodia. Pokračovať?" as unsaved_changes_message %}
         <script>
             (function() {
-                const paginationClass = "pagination-plus-{{ inline_admin_formset.formset.prefix }}";
-                const unsavedChangesMessage = "{{ unsaved_changes_message|escapejs }}";
-                const inlineGroupId = "{{ inline_admin_formset.formset.prefix }}-group";
-                const listenerKey = paginationClass + ":listeners";
-                window.SBAdminInlinePaginator = window.SBAdminInlinePaginator || {};
-
-                function getInlineGroup() {
-                    return document.getElementById(inlineGroupId);
+                const config = {
+                    prefix: "{{ inline_admin_formset.formset.prefix|escapejs }}"
+                };
+                if (window.SBAdminInlinePaginator && window.SBAdminInlinePaginator.init) {
+                    window.SBAdminInlinePaginator.init(config);
+                    return;
                 }
-
-                function getFieldValue(field) {
-                    if (field.type === "checkbox" || field.type === "radio") {
-                        return field.checked ? "1" : "0";
-                    }
-                    if (field.tagName === "SELECT") {
-                        return JSON.stringify(Array.from(field.options).filter(function(option) {
-                            return option.selected;
-                        }).map(function(option) {
-                            return option.value;
-                        }));
-                    }
-                    return field.value;
-                }
-
-                function getFields(group) {
-                    return Array.from(group.querySelectorAll("input, select, textarea"));
-                }
-
-                function storeInitialFieldValue(field) {
-                    field.dataset.sbadminInlineInitialValue = getFieldValue(field);
-                }
-
-                function initializeDirtySnapshot() {
-                    const group = getInlineGroup();
-                    if (!group) return;
-                    group.dataset.sbadminInlineDirty = "";
-                    getFields(group).forEach(storeInitialFieldValue);
-                }
-
-                function fieldChanged(field) {
-                    if (field.disabled || !field.name) return false;
-                    if (!Object.prototype.hasOwnProperty.call(field.dataset, "sbadminInlineInitialValue")) {
-                        storeInitialFieldValue(field);
-                        return false;
-                    }
-                    return getFieldValue(field) !== field.dataset.sbadminInlineInitialValue;
-                }
-
-                function hasUnsavedChanges() {
-                    const group = getInlineGroup();
-                    if (!group) return false;
-                    if (group.dataset.sbadminInlineDirty === "true") return true;
-                    return getFields(group).some(fieldChanged);
-                }
-
-                initializeDirtySnapshot();
-
-                if (window.SBAdminInlinePaginator[listenerKey]) return;
-                window.SBAdminInlinePaginator[listenerKey] = true;
-
-                function hasParameter(parameters, key) {
-                    if (typeof parameters.has === "function") {
-                        return parameters.has(key);
-                    }
-                    return Object.prototype.hasOwnProperty.call(parameters, key);
-                }
-
-                function setParameter(parameters, key, value) {
-                    if (typeof parameters.set === "function") {
-                        parameters.set(key, value);
-                        return;
-                    }
-                    parameters[key] = value;
-                }
-
-                function markUnsavedChanges(evt) {
-                    const group = getInlineGroup();
-                    if (!group || !group.contains(evt.target)) return;
-                    group.dataset.sbadminInlineDirty = "true";
-                }
-
-                document.body.addEventListener("input", markUnsavedChanges, true);
-                document.body.addEventListener("change", markUnsavedChanges, true);
-                document.body.addEventListener("SBAutocompleteChange", markUnsavedChanges, true);
-                document.body.addEventListener("htmx:configRequest", function(evt) {
-                    if (!evt.target.classList.contains(paginationClass)) return;
-                    if (hasUnsavedChanges() && !window.confirm(unsavedChangesMessage)) {
-                        evt.preventDefault();
-                        return;
-                    }
-                    const url = new URL(window.location.href);
-                    url.searchParams.forEach(function(value, key) {
-                        if (!hasParameter(evt.detail.parameters, key)) {
-                            setParameter(evt.detail.parameters, key, value);
-                        }
-                    });
-                    url.search = "";
-                    evt.detail.path = url.href;
-                });
+                window.SBAdminInlinePaginatorQueue = window.SBAdminInlinePaginatorQueue || [];
+                window.SBAdminInlinePaginatorQueue.push(config);
             }());
         </script>
         <input type="hidden" name="_paginator-plus-{{ inline_admin_formset.formset.prefix }}" value="{{ page_obj.number }}">

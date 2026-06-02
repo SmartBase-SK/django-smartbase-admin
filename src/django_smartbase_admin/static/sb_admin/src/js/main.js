@@ -33,6 +33,7 @@ import TextTags from "./text_tags"
 import { setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
+import "./inline_paginator"
 
 const CKEDITOR_READY_MAX_FRAMES = 120
 const PAGE_SCROLL_MARGIN_PX = 24
@@ -215,7 +216,11 @@ class Main {
 
     initInlines(target) {
         target = target || document
-        const inlineGroups = target.querySelectorAll('.inline-group')
+        const inlineGroups = []
+        if (target.matches && target.matches('.inline-group')) {
+            inlineGroups.push(target)
+        }
+        inlineGroups.push(...target.querySelectorAll('.inline-group'))
         inlineGroups.forEach(group => {
             window.django.jQuery(group).djangoFormset()
         })

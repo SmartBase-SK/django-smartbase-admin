@@ -138,6 +138,26 @@
     display: none !important;
 }
 
+@keyframes sbadmin-inline-dirty-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.45;
+    }
+}
+
+.sbadmin-inline-dirty-cell {
+    background-color: var(--color-negative);
+    animation: sbadmin-inline-dirty-pulse 0.6s ease-in-out 5;
+}
+
+.sbadmin-inline-dirty-continue {
+    box-shadow: 0 0 0 3px var(--color-negative-100), 0 0 0 1px var(--color-negative);
+    animation: sbadmin-inline-dirty-pulse 0.6s ease-in-out 5;
+}
+
 .djn-item {
     position: relative;
 }
