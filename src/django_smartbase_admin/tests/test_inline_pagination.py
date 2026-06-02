@@ -115,12 +115,16 @@ class InlinePaginationTests(SimpleTestCase):
 
         self.assertIsNone(get_inline_partial_prefix(request))
 
-    def test_inline_partial_prefix_uses_header_for_htmx_request(self):
+    def test_inline_partial_prefix_uses_django_htmx_request_details(self):
+        class HtmxRequestDetails:
+            def __bool__(self):
+                return True
+
         request = RequestFactory().get(
             "/admin/",
-            HTTP_HX_REQUEST="true",
             HTTP_X_SBADMIN_INLINE_PREFIX="prices",
         )
+        request.htmx = HtmxRequestDetails()
 
         self.assertEqual(get_inline_partial_prefix(request), "prices")
 

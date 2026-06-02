@@ -32,7 +32,7 @@
                     hx-target="#{{ inline_admin_formset.formset.prefix }}-group"
                     hx-select="#{{ inline_admin_formset.formset.prefix }}-group"
                     hx-swap="outerHTML"
-                    hx-headers='{"X-SBAdmin-Inline-Prefix": "{{ inline_admin_formset.formset.prefix }}"}'
+                    hx-headers='{"{{ SBADMIN_INLINE_PREFIX_HEADER }}": "{{ inline_admin_formset.formset.prefix }}"}'
                     hx-push-url="true">
 
                     {% if page_obj.has_previous %}
