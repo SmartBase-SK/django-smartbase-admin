@@ -54,7 +54,7 @@ from django_smartbase_admin.mcp.bridge import (
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
-from django_smartbase_admin.mcp.schema import WIDGET_SHAPES, admin_entry
+from django_smartbase_admin.mcp.schema import admin_entry, get_widget_shapes
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -378,7 +378,7 @@ class SBAdminTools(MCPToolset):
         # Saves repeating ``invoke_with`` on every individual action.
         return {
             "admin_views": admins,
-            "widget_shapes": WIDGET_SHAPES,
+            "widget_shapes": get_widget_shapes(),
             "action_invokers": ACTION_INVOKERS,
         }
 
@@ -521,7 +521,11 @@ class SBAdminTools(MCPToolset):
             entry ``value`` (a free-text name/email is not a valid id).
             Unknown keys are rejected — misspellings raise instead of
             silently returning every row.
-          page, page_size: pagination, 1-indexed.
+          page: 1-indexed page number (default 1).
+          page_size: rows per page (default 20). No enforced maximum —
+            set it high to pull the whole filtered set in one call (use
+            ``last_row`` from a first probe to size it). Mind context cost
+            on large sets.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
             entries, applied in order. ``field`` is a column name from
             ``list_admins["admin_views"][].fields[].name``; unknown
@@ -889,7 +893,10 @@ class SBAdminTools(MCPToolset):
           view_id: handle from ``list_admins``.
           object_id: optional row id; ``None`` returns all entries for
             the model.
-          page, page_size: pagination, 1-indexed.
+          page: 1-indexed page number (default 1).
+          page_size: rows per page (default 20). No enforced maximum —
+            set it high to pull the full history in one call (use
+            ``last_row`` to size it).
 
         Returns ``{"data": [<entry>, ...], "page": int, "page_size": int,
         "last_row": int}`` where each ``<entry>`` is ``{"id", "timestamp",
