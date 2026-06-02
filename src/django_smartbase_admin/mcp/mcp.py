@@ -1250,7 +1250,12 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        _validate_filter_data(admin, request, filter_data)
+        # Callers pass column-name keys (per the schema/presets), so re-key to
+        # the ``filter_field`` the list pipeline uses — same as ``list_rows``,
+        # otherwise a filter-aware action gets the wrong/unknown filter keys.
+        field_map = admin.get_field_map(request)
+        filter_data = _normalize_filter_keys(filter_data, field_map)
+        _validate_filter_data(admin, request, filter_data, field_map)
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,
