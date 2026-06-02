@@ -122,6 +122,7 @@ class InlinePaginationTests(SimpleTestCase):
 
         request = RequestFactory().get(
             "/admin/",
+            HTTP_HX_REQUEST="true",
             HTTP_X_SBADMIN_INLINE_PREFIX="prices",
         )
         request.htmx = HtmxRequestDetails()
