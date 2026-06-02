@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 15:03+0200\n"
+"POT-Creation-Date: 2026-06-02 10:25+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -141,6 +141,9 @@ msgstr "Verwandte Änderungen"
 msgid "Summary"
 msgstr "Zusammenfassung"
 
+msgid "Publish"
+msgstr ""
+
 msgid "Search..."
 msgstr "Suchen..."
 
@@ -212,6 +215,15 @@ msgstr "Letztes Quartal"
 
 msgid "Last Year"
 msgstr "Letztes Jahr"
+
+msgid "Preserve"
+msgstr ""
+
+msgid "Form"
+msgstr ""
+
+msgid "View"
+msgstr "Ansehen"
 
 msgid "Yes"
 msgstr "Ja"
@@ -600,9 +612,6 @@ msgstr "Weitere(n) %(verbose_name)s hinzufügen"
 msgid "Change"
 msgstr "Ändern"
 
-msgid "View"
-msgstr "Ansehen"
-
 msgid "Delete"
 msgstr "Löschen"
 
@@ -837,6 +846,14 @@ msgstr "<strong>0</strong> Einträge"
 msgid "${value} selected"
 msgstr "${value} ausgewählt"
 
+#, fuzzy
+#| msgid "Related Changes"
+msgid "Unsaved changes"
+msgstr "Verwandte Änderungen"
+
+msgid "This list has unsaved changes. Changing page will discard them."
+msgstr ""
+
 msgid "Basic Settings"
 msgstr "Grundeinstellungen"
 
@@ -945,6 +962,17 @@ msgstr "{name} “{object}” gelöscht."
 
 msgid "No fields changed."
 msgstr "Keine Felder geändert."
+
+#, fuzzy
+#| msgid "Product details"
+msgid "Combined details"
+msgstr "Produktdetails"
+
+msgid "Primary"
+msgstr ""
+
+msgid "Secondary"
+msgstr ""
 
 msgid "Finish"
 msgstr "Fertigstellen"

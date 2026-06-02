@@ -2,12 +2,12 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 15:03+0200\n"
+"POT-Creation-Date: 2026-06-02 10:25+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -19,73 +19,73 @@ msgstr ""
 "X-Generator: Poedit 3.4.1\n"
 
 msgid "Equal"
-msgstr ""
+msgstr "Rovná sa"
 
 msgid "Not equal"
-msgstr ""
+msgstr "Nerovná sa"
 
 msgid "Less"
-msgstr ""
+msgstr "Menšie"
 
 msgid "Less or equal"
-msgstr ""
+msgstr "Menšie alebo rovné"
 
 msgid "Greater"
-msgstr ""
+msgstr "Väčšie"
 
 msgid "Greater or equal"
-msgstr ""
+msgstr "Väčšie alebo rovné"
 
 msgid "Between"
-msgstr ""
+msgstr "Medzi"
 
 msgid "Not between"
-msgstr ""
+msgstr "Nie medzi"
 
 msgid "In"
-msgstr ""
+msgstr "V"
 
 msgid "Not in"
-msgstr ""
+msgstr "Nie je v"
 
 msgid "Begins with"
-msgstr ""
+msgstr "Začína na"
 
 msgid "Not begins with"
-msgstr ""
+msgstr "Nezačína na"
 
 msgid "Contains"
-msgstr ""
+msgstr "Obsahuje"
 
 msgid "Not contains"
-msgstr ""
+msgstr "Neobsahuje"
 
 msgid "End with"
-msgstr ""
+msgstr "Končí na"
 
 msgid "Not ends with"
-msgstr ""
+msgstr "Nekončí na"
 
 msgid "Is empty"
-msgstr ""
+msgstr "Je prázdne"
 
 msgid "Is null"
-msgstr ""
+msgstr "Je null"
 
 msgid "Is not null"
-msgstr ""
+msgstr "Nie je null"
 
 msgid "Before"
-msgstr ""
+msgstr "Pred"
 
 msgid "After"
-msgstr ""
+msgstr "Po"
 
 msgid "In the last"
-msgstr ""
+msgstr "Za posledných"
 
 msgid "In the next"
-msgstr ""
+msgstr "Za nasledujúcich"
 
 msgid "Hold down “Control”, or “Command” on a Mac, to select more than one."
 msgstr "Pre vybratie viacerých súborov podržte “Control”, alebo “Command” na Mac-u."
@@ -98,7 +98,7 @@ msgid "Log in"
 msgstr "Prihlásiť sa"
 
 msgid "The new value was created but became unselected due to another validation error. Please select it again."
-msgstr ""
+msgstr "Nová hodnota bola vytvorená, ale kvôli ďalšej validačnej chybe neostala vybraná. Vyberte ju znova."
 
 msgid "Clear"
 msgstr "Vymazať"
@@ -110,22 +110,22 @@ msgid "Change file"
 msgstr "Zmeniť súbor"
 
 msgid "Cannot set parent to itself"
-msgstr ""
+msgstr "Nadradenú položku nemožno nastaviť na seba samu"
 
 msgid "Cannot set parent to it's own child"
-msgstr ""
+msgstr "Nadradenú položku nemožno nastaviť na jej vlastnú podradenú položku"
 
 msgid "Details"
-msgstr ""
+msgstr "Detaily"
 
 msgid "Bulk"
-msgstr ""
+msgstr "Hromadné"
 
 msgid "Parent Context"
-msgstr ""
+msgstr "Kontext nadradenej položky"
 
 msgid "(empty)"
-msgstr ""
+msgstr "(prázdne)"
 
 #, fuzzy
 #| msgid "Change"
@@ -138,10 +138,13 @@ msgid "Affected Objects"
 msgstr "Objekty"
 
 msgid "Related Changes"
-msgstr ""
+msgstr "Súvisiace zmeny"
 
 msgid "Summary"
 msgstr "Zhrnutie"
+
+msgid "Publish"
+msgstr "Publikovať"
 
 msgid "Search..."
 msgstr "Vyhľadať..."
@@ -151,7 +154,7 @@ msgstr "Ukončiť preusporiadanie"
 
 #, python-brace-format
 msgid "Reorder {self.model._meta.verbose_name}"
-msgstr ""
+msgstr "Zmeniť poradie: {self.model._meta.verbose_name}"
 
 msgid "History"
 msgstr "História"
@@ -173,11 +176,11 @@ msgstr "Všetky"
 
 #, python-brace-format
 msgid "The {name} “{obj}” was changed successfully. You may edit it again below."
-msgstr ""
+msgstr "{name} „{obj}“ bolo úspešne zmenené. Nižšie ho môžete znova upraviť."
 
 #, python-brace-format
 msgid "The {name} “{obj}” was changed successfully."
-msgstr ""
+msgstr "{name} „{obj}“ bolo úspešne zmenené."
 
 msgid "Year"
 msgstr "Rok"
@@ -214,6 +217,15 @@ msgstr "Posledný štvrťrok"
 
 msgid "Last Year"
 msgstr "Posledný rok"
+
+msgid "Preserve"
+msgstr "Zachovať"
+
+msgid "Form"
+msgstr "Formulár"
+
+msgid "View"
+msgstr "Zobraziť"
 
 msgid "Yes"
 msgstr "Áno"
@@ -284,7 +296,7 @@ msgstr "Pred."
 
 #, python-format
 msgid "<strong>%(current_index)s</strong> / %(all_objects_count)s"
-msgstr ""
+msgstr "<strong>%(current_index)s</strong> / %(all_objects_count)s"
 
 msgid "Next"
 msgstr "Ďal."
@@ -388,10 +400,10 @@ msgid "Save Order"
 msgstr "Uložiť zoradenie"
 
 msgid "more"
-msgstr ""
+msgstr "ďalšie"
 
 msgid "No other affected objects."
-msgstr ""
+msgstr "Žiadne ďalšie ovplyvnené objekty."
 
 #, fuzzy
 #| msgid "Operations"
@@ -399,19 +411,19 @@ msgid "Bulk operation"
 msgstr "Operácie"
 
 msgid "items affected"
-msgstr ""
+msgstr "ovplyvnené položky"
 
 msgid "Field"
-msgstr ""
+msgstr "Pole"
 
 msgid "Value"
-msgstr ""
+msgstr "Hodnota"
 
 msgid "No changes recorded."
-msgstr ""
+msgstr "Neboli zaznamenané žiadne zmeny."
 
 msgid "Model"
-msgstr ""
+msgstr "Model"
 
 #, fuzzy
 #| msgid "Objects"
@@ -419,7 +431,7 @@ msgid "Object"
 msgstr "Objekty"
 
 msgid "No related changes in this request."
-msgstr ""
+msgstr "V tejto požiadavke nie sú žiadne súvisiace zmeny."
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -568,13 +580,13 @@ msgid "Editorial reviews"
 msgstr "Redakčné recenzie"
 
 msgid "Reader reviews"
-msgstr ""
+msgstr "Recenzie čitateľov"
 
 msgid "Author"
 msgstr "Autor"
 
 msgid "Product details"
-msgstr ""
+msgstr "Detaily produktu"
 
 msgid "Awards"
 msgstr "Ocenenia"
@@ -594,9 +606,6 @@ msgstr "Pridať ďalší %(verbose_name)s"
 
 msgid "Change"
 msgstr "Zmeniť"
-
-msgid "View"
-msgstr "Zobraziť"
 
 msgid "Delete"
 msgstr "Zmazať"
@@ -649,13 +658,13 @@ msgid "Successfully moved"
 msgstr "Úspešne presunuté"
 
 msgid "Changes within the tree might require a refresh."
-msgstr ""
+msgstr "Zmeny v strome môžu vyžadovať obnovenie."
 
 msgid "Error:"
 msgstr "Chyba:"
 
 msgid "This page cannot be copied because an application is attached to it. See the Page's Advanced settings to manage apphooks."
-msgstr ""
+msgstr "Túto stránku nemožno skopírovať, pretože je k nej pripojená aplikácia. Apphooky spravíte v rozšírených nastaveniach stránky."
 
 msgid "Are you sure you want to § this page?"
 msgstr "Naozaj chcete § túto stránku?"
@@ -667,7 +676,7 @@ msgid "New node"
 msgstr "Nový uzol"
 
 msgid "nodes"
-msgstr ""
+msgstr "uzly"
 
 msgid "Menu"
 msgstr "Menu"
@@ -690,7 +699,7 @@ msgid "Duplicates"
 msgstr "Duplikáty"
 
 msgid "URL copied to clipboard"
-msgstr ""
+msgstr "URL bola skopírovaná do schránky"
 
 msgid "Go back to admin homepage"
 msgstr "Naspäť na adminovú domovskú stránku"
@@ -748,7 +757,7 @@ msgid "Move"
 msgstr "Presunúť"
 
 msgid "Dropdown"
-msgstr ""
+msgstr "Rozbaľovacie menu"
 
 msgid "Adds a new Folder"
 msgstr "Pridaá nový priečinok"
@@ -774,22 +783,22 @@ msgid "File is missing"
 msgstr "Súbor chýba"
 
 msgid "Type"
-msgstr ""
+msgstr "Typ"
 
 msgid "Size"
-msgstr ""
+msgstr "Veľkosť"
 
 msgid "File-size"
-msgstr ""
+msgstr "Veľkosť súboru"
 
 msgid "Modified"
-msgstr ""
+msgstr "Upravené"
 
 msgid "Created"
-msgstr ""
+msgstr "Vytvorené"
 
 msgid "Owner"
-msgstr ""
+msgstr "Vlastník"
 
 msgid "Logout"
 msgstr "Odhlásiť sa"
@@ -832,6 +841,12 @@ msgstr "<strong>0</strong> položiek"
 msgid "${value} selected"
 msgstr "${value} vybrané"
 
+msgid "Unsaved changes"
+msgstr "Neuložené zmeny"
+
+msgid "This list has unsaved changes. Changing page will discard them."
+msgstr "V tomto zozname máte neuložené zmeny. Pri zmene stránky sa zahodia."
+
 msgid "Basic Settings"
 msgstr "Základné nastavenia"
 
@@ -872,28 +887,28 @@ msgstr "Vymazať výber farby"
 
 #, python-brace-format
 msgid "Saturation: {s}. Brightness: {v}."
-msgstr ""
+msgstr "Sýtosť: {s}. Jas: {v}."
 
 msgid "Hue slider"
-msgstr ""
+msgstr "Posuvník odtieňa"
 
 msgid "Opacity slider"
-msgstr ""
+msgstr "Posuvník priehľadnosti"
 
 msgid "Color value field"
-msgstr ""
+msgstr "Pole hodnoty farby"
 
 msgid "Color format"
-msgstr ""
+msgstr "Formát farby"
 
 msgid "Color swatch"
-msgstr ""
+msgstr "Vzorka farby"
 
 msgid "Saturation and brightness selector. Use up, down, left and right arrow keys to select."
-msgstr ""
+msgstr "Výber sýtosti a jasu. Na výber použite šípky nahor, nadol, doľava a doprava."
 
 msgid "drop your file here or"
-msgstr ""
+msgstr "presuňte súbor sem alebo"
 
 msgid "No file selected"
 msgstr "Nebol vybraný žiadny súbor"
@@ -911,7 +926,7 @@ msgid "Add another row"
 msgstr "Pridať ďalší riadok"
 
 msgid "Row"
-msgstr ""
+msgstr "Riadok"
 
 msgid "New row"
 msgstr "Nový riadok"
@@ -940,6 +955,15 @@ msgstr "Odstránené {name} “{object}”."
 
 msgid "No fields changed."
 msgstr "Žiadne zmeny."
+
+msgid "Combined details"
+msgstr "Kombinované detaily"
+
+msgid "Primary"
+msgstr "Primárne"
+
+msgid "Secondary"
+msgstr "Sekundárne"
 
 msgid "Finish"
 msgstr "Dokončiť"
