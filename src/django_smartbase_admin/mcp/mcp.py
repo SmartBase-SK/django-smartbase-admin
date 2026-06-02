@@ -203,6 +203,14 @@ def _decode_preset_url_params(url_params) -> dict:
         url_params = json.loads(url_params) if url_params else {}
     url_params = url_params or {}
     raw_filter = dict(url_params.get(FILTER_DATA_NAME, {}) or {})
+    # Some presets store a multi-value filter as a JSON string; parse it back
+    # to a list. Plain scalar strings (substring filters) are left untouched.
+    for _key, _value in list(raw_filter.items()):
+        if isinstance(_value, str) and _value[:1] in "[{":
+            try:
+                raw_filter[_key] = json.loads(_value)
+            except ValueError:
+                pass
     table_params = url_params.get(TABLE_PARAMS_NAME, {}) or {}
 
     # Advanced-filter presets keep their predicates in advancedFilterData,
@@ -491,6 +499,7 @@ class SBAdminTools(MCPToolset):
         sort: list | None = None,
         full_text_search: str | None = None,
         include_inlines: list | None = None,
+        aggregate: list | None = None,
     ) -> dict:
         """List rows for one admin — same data the UI list shows.
 
@@ -550,8 +559,17 @@ class SBAdminTools(MCPToolset):
             inline name in ``row["_truncated_inlines"]`` and only the
             first page is attached.
 
+          aggregate: optional list of ``{"fn", "field"}`` specs, each a
+            total over the WHOLE filtered set (independent of paging).
+            ``fn`` is one of ``sum / avg / min / max / count``; ``field``
+            must be a declared column from ``list_admins`` —
+            ``sum/avg/min/max`` need a numeric one, ``count`` may omit
+            ``field`` for a row count. Results land under ``aggregates``,
+            keyed ``f"{fn}_{field}"`` (or ``"count"``).
+
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
-        plus any pagination metadata the list view emits.
+        plus any pagination metadata the list view emits, and ``aggregates``
+        when the ``aggregate`` argument is supplied.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -593,6 +611,12 @@ class SBAdminTools(MCPToolset):
             method="GET",
         )
 
+        # Totals over the whole filtered set, validated before the page fetch.
+        aggregates = None
+        if aggregate is not None:
+            action = admin.sbadmin_list_action_class(admin, request)
+            aggregates = action.get_aggregates(aggregate, field_map=field_map)
+
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
         # the JSON and drop UI-only payload (notifications, per-row action
@@ -617,6 +641,8 @@ class SBAdminTools(MCPToolset):
         strip_html_cells(admin, request, rows)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
+        if aggregates is not None:
+            result["aggregates"] = aggregates
         return result
 
     @_guarded_tool_call

@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase, override_settings
 from django.urls import path
+from django.utils.safestring import mark_safe
 from filer.models import Folder, FolderPermission
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
@@ -106,3 +107,64 @@ class FetchAddFormTests(TestCase):
         MCPToolTestConfig.view_permission_for = set()
         with self.assertRaises((PermissionError, PermissionDenied)):
             self._fetch(user=denied)
+
+
+class FolderReadonlyAddFormTestAdmin(SBAdmin):
+    """Admin exposing a readonly display *method* on its form.
+
+    The method reads the instance, so on the add page (no instance) the
+    readonly-value extraction is asked for a value with ``obj=None``.
+    """
+
+    model = Folder
+    readonly_fields = ("computed_summary",)
+    fieldsets = ((None, {"fields": ("name", "computed_summary")}),)
+
+    def computed_summary(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return mark_safe(f"<span>{obj.name}</span>")
+
+    computed_summary.short_description = "Summary"
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FetchAddFormReadonlyFieldTests(TestCase):
+    """Regression: a readonly method field on the add page must not crash.
+
+    Django's ``lookup_field`` dereferences ``obj._meta`` on its first line;
+    on the add page ``obj`` is ``None``. The readonly-value extraction has
+    to short-circuit and report an empty value rather than 500.
+    """
+
+    def setUp(self):
+        super().setUp()
+        SBAdminThreadLocalService.clear_request()
+        self._original_admin = sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderReadonlyAddFormTestAdmin)
+        MCPToolTestConfig().init_view_map()
+        MCPToolTestConfig.view_permission_for = None
+
+    def tearDown(self):
+        MCPToolTestConfig.view_permission_for = None
+        sb_admin_site._registry.pop(Folder, None)
+        if self._original_admin is not None:
+            sb_admin_site._registry[Folder] = self._original_admin
+        super().tearDown()
+
+    def test_readonly_method_field_is_empty_not_crash(self):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        # Must not raise (previously: AttributeError 'NoneType'.. ._meta).
+        result = SBAdminTools(request=build_mcp_request(user)).fetch_add_form(
+            "filer_folder"
+        )
+
+        summary = result["fields"]["computed_summary"]
+        self.assertTrue(summary["readonly"])
+        # Add page has no instance, so the computed readonly value is empty.
+        self.assertIsNone(summary["value"])
+        # The writable field is still present and editable.
+        self.assertFalse(result["fields"]["name"]["readonly"])

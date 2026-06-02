@@ -85,6 +85,17 @@ class FolderPresetTestAdmin(SBAdmin):
                 }
             },
         },
+        {
+            # Some saved presets persist a multi-value filter double-encoded
+            # as a JSON *string* rather than a list. fetch must parse it back
+            # to the list shape list_rows accepts.
+            "name": "By status (stringified)",
+            "url_params": {
+                "filterData": {
+                    "status": '[{"value": "alpha", "label": "Alpha"}]',
+                }
+            },
+        },
     ]
 
 
@@ -189,5 +200,16 @@ class FetchFilterPresetTests(TestCase):
         # round-tripping when they differ is covered in test_filter_validation.
         self.assertEqual(
             decoded_status["filter_data"],
+            {"status": [{"value": "alpha", "label": "Alpha"}]},
+        )
+
+        # 7. A preset that stored the same value double-encoded as a JSON
+        #    *string* decodes to the identical parsed list, so list_rows
+        #    (which rejects a bare str for a multichoice) accepts it.
+        decoded_str = tools.fetch_filter_preset(
+            view_id="filer_folder", name="By status (stringified)", source="static"
+        )
+        self.assertEqual(
+            decoded_str["filter_data"],
             {"status": [{"value": "alpha", "label": "Alpha"}]},
         )

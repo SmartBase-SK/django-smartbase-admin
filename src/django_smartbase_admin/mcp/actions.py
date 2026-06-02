@@ -22,6 +22,7 @@ from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
+from django.utils.safestring import mark_safe
 from mcp.types import BlobResourceContents, EmbeddedResource
 
 from django_smartbase_admin.engine.const import Action, BASE_PARAMS_NAME
@@ -40,6 +41,7 @@ from django_smartbase_admin.mcp.form_encoding import (
     form_errors_dict,
     get_form_from_response,
 )
+from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.services.views import SBAdminViewService
 
 logger = logging.getLogger(__name__)
@@ -323,12 +325,6 @@ class SBAdminMCPActionFormService:
             str(object_id) if object_id is not None else None,
         )
 
-        if object_id is not None and issubclass(target_view_cls, RowActionModalView):
-            if view.get_object() is None:
-                raise LookupError(
-                    f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
-                )
-
         # MCP transport is JSON-RPC over POST; force GET while building
         # form kwargs so FormMixin doesn't try to parse request.POST as
         # form data. set_request_payload keeps request.method and
@@ -337,6 +333,33 @@ class SBAdminMCPActionFormService:
         saved_method = request.method
         set_request_payload(request, method="GET")
         try:
+            form_class = (
+                view.get_form_class()
+                if hasattr(view, "get_form_class")
+                else getattr(view, "form_class", None)
+            )
+
+            # Form-less modal (renders HTML in get()): return sanitized HTML.
+            if form_class is None:
+                response = view.get(request, **view.kwargs)
+                html = response.content.decode(response.charset or "utf-8")
+                try:
+                    title = view.get_modal_title()
+                except Exception:
+                    title = getattr(target_view_cls, "modal_title", "")
+                return {
+                    "title": str(title or ""),
+                    "html": sanitize_html(mark_safe(html)),
+                }
+
+            if object_id is not None and issubclass(
+                target_view_cls, RowActionModalView
+            ):
+                if view.get_object() is None:
+                    raise LookupError(
+                        f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
+                    )
+
             form = view.get_form()
         finally:
             set_request_payload(request, method=saved_method)
