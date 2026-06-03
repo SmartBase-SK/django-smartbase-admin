@@ -12,6 +12,7 @@ stock route is reachable again, it fails.
 
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import path, resolve, reverse
 
@@ -20,6 +21,13 @@ from django_smartbase_admin.admin.site import SBAdminSite, sb_admin_site
 from django_smartbase_admin.engine.admin_entrypoint_view import SBAdminEntrypointView
 
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
+
+
+def _resolved_view_class(match):
+    func = match.func
+    while hasattr(func, "__wrapped__"):
+        func = func.__wrapped__
+    return getattr(func, "view_class", None) or getattr(func, "cls", None)
 
 
 @override_settings(ROOT_URLCONF=__name__)
@@ -69,10 +77,19 @@ class ModelChangeUrlRoutingTest(TestCase):
             kwargs={"object_id": "1"},
         )
 
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_superuser(
+            username="sbadmin_url_test",
+            email="sbadmin_url_test@example.com",
+            password="password",
+        )
+        self.client.force_login(self.user)
+
     def test_change_url_with_trailing_slash_resolves_to_model_admin(self):
         match = resolve(self.change_url)
-        self.assertNotEqual(match.func, SBAdminEntrypointView.as_view())
-        self.assertNotEqual(match.kwargs.get("object_id"), "change")
+        self.assertIsNot(_resolved_view_class(match), SBAdminEntrypointView)
+        self.assertEqual(match.url_name, f"{self.admin.get_id()}_change")
 
     def test_change_url_without_trailing_slash_redirects_to_slash_version(self):
         self.assertTrue(self.change_url.endswith("/"))
@@ -91,6 +108,6 @@ class ModelChangeUrlRoutingTest(TestCase):
             },
         )
         match = resolve(action_url)
-        self.assertEqual(match.func, SBAdminEntrypointView.as_view())
+        self.assertIs(_resolved_view_class(match), SBAdminEntrypointView)
         self.assertEqual(match.kwargs["view"], self.admin.get_id())
         self.assertEqual(match.kwargs["action"], "action_list_json")
