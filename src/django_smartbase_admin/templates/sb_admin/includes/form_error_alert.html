@@ -1,0 +1,21 @@
+{% load i18n %}
+
+<div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
+    <div class="flex">
+        <svg class="w-20 h-20 mr-12 text-negative shrink-0">
+            <use xlink:href="#Close-one"></use>
+        </svg>
+        <div>
+            <h5 class="font-semibold">
+                {% blocktrans count errors_count as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
+            </h5>
+            {% if non_field_errors %}
+                <ul class="mt-8 text-12 leading-16">
+                    {% for error in non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+</div>

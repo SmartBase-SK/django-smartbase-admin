@@ -29,17 +29,7 @@
         <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
             {% csrf_token %}
             {% if errors %}
-                <div class="alert bg-negative-50 border border-negative-100 text-negative-900 mb-24">
-                    <div class="flex">
-                        <svg class="w-20 h-20 mr-12 text-negative">
-                            <use xlink:href="#Close-one"></use>
-                        </svg>
-                        <h5 class="font-semibold">
-                            {% blocktrans count errors|length as counter %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktrans %}
-                        </h5>
-                    </div>
-                </div>
-                {{ adminform.form.non_field_errors }}
+                {% include "sb_admin/includes/form_error_alert.html" with errors_count=errors|length non_field_errors=adminform.form.non_field_errors %}
             {% endif %}
             {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
             {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
