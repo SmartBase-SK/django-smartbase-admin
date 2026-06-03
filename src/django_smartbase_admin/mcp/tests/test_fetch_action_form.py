@@ -12,14 +12,17 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django import forms
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
-from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseFormInit
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.actions import SBAdminRowAction
+from django_smartbase_admin.engine.const import ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR
 from django_smartbase_admin.engine.modal_view import RowActionModalView
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
@@ -51,6 +54,19 @@ class HistoryModalView(RowActionModalView):
         return HttpResponse(_HISTORY_HTML)
 
 
+class _ReparentForm(SBAdminBaseFormInit, forms.Form):
+    parent = forms.ModelChoiceField(
+        queryset=Folder.objects.all(),
+        required=False,
+        widget=SBAdminAutocompleteWidget(model=Folder, multiselect=False),
+    )
+
+
+class ReparentModalView(RowActionModalView):
+    form_class = _ReparentForm
+    modal_title = "Reparent"
+
+
 class FolderActionFormTestAdmin(SBAdmin):
     model = Folder
     sbadmin_list_display = ("id", "name")
@@ -61,6 +77,11 @@ class FolderActionFormTestAdmin(SBAdmin):
             SBAdminRowAction(
                 title="History",
                 target_view=HistoryModalView,
+                view=self,
+            ),
+            SBAdminRowAction(
+                title="Reparent",
+                target_view=ReparentModalView,
                 view=self,
             ),
         ]
@@ -74,6 +95,8 @@ class FetchActionFormHtmlTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.folder = Folder.objects.create(name="alpha")
+        cls.beta = Folder.objects.create(name="beta")
+        cls.gamma = Folder.objects.create(name="gamma")
 
     def setUp(self):
         super().setUp()
@@ -117,3 +140,23 @@ class FetchActionFormHtmlTests(TestCase):
         self.assertNotIn("\n", outside_pre)
         self.assertNotIn("  ", outside_pre)
         self.assertFalse(html.startswith(" ") or html.endswith(" "))
+
+    def test_action_form_autocomplete_widget_id_is_action_scoped(self):
+        """An autocomplete-backed action-form field reports the same
+        action-scoped widget_id the UI registers/dispatches (carrying the
+        ``<action_id>::`` prefix) — not a bare id the ``autocomplete`` tool
+        can't resolve. End-to-end dispatch of that id is covered live and by
+        the register_action_autocomplete_views tests in test_dynamic_forms."""
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        form = tools.fetch_action_form(
+            "filer_folder", "ReparentModalView", object_id=str(self.folder.pk)
+        )
+        widget_id = form["fields"]["parent"]["widget_id"]
+        self.assertTrue(
+            widget_id.startswith(
+                "ReparentModalView" + ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR
+            ),
+            widget_id,
+        )

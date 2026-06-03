@@ -330,9 +330,19 @@ class SBAdminMCPActionFormService:
         # form data. set_request_payload keeps request.method and
         # request_data.request_method in sync (the latter is the channel
         # SBAdmin widget / form code reads from).
+        request_data = getattr(request, "request_data", None)
         saved_method = request.method
-        set_request_payload(request, method="GET")
+        saved_action = getattr(request_data, "action", None)
         try:
+            # Force GET so FormMixin doesn't parse the JSON-RPC POST body as
+            # form data, and put the form in the action's context so
+            # autocomplete-backed fields report the same dispatchable
+            # widget_id the UI registers (get_form_kwargs reads
+            # request_data.action for sbadmin_action_id).
+            set_request_payload(request, method="GET")
+            if request_data is not None:
+                request_data.action = action_id
+
             form_class = (
                 view.get_form_class()
                 if hasattr(view, "get_form_class")
@@ -362,6 +372,8 @@ class SBAdminMCPActionFormService:
 
             form = view.get_form()
         finally:
+            if request_data is not None:
+                request_data.action = saved_action
             set_request_payload(request, method=saved_method)
 
         try:
