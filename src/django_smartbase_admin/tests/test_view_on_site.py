@@ -31,14 +31,22 @@ class StockViewOnSiteShadowTest(TestCase):
 
 
 class SBAdminUrlOrderingTest(TestCase):
-    def test_final_catch_all_view_stays_enabled(self):
-        self.assertIs(SBAdminSite.final_catch_all_view, True)
+    def test_final_catch_all_disabled_on_site_class(self):
+        self.assertIs(SBAdminSite.final_catch_all_view, False)
 
-    def test_stock_catch_all_is_last_pattern(self):
+    def test_super_get_urls_has_no_catch_all(self):
+        from django.contrib.admin.sites import AdminSite
+
+        site = SBAdminSite(name="sb_admin_test")
+        site.final_catch_all_view = True
+        with_catch_all = len(AdminSite.get_urls(site))
+        site.final_catch_all_view = False
+        without_catch_all = len(AdminSite.get_urls(site))
+        self.assertEqual(with_catch_all, without_catch_all + 1)
+
+    def test_manual_catch_all_is_last_pattern(self):
         patterns = sb_admin_site.get_urls()
-        stock_urls, catch_all_urls = sb_admin_site._split_stock_admin_urls()
-        self.assertEqual(len(catch_all_urls), 1)
-        self.assertIs(patterns[-1], catch_all_urls[0])
+        self.assertRegex(str(patterns[-1].pattern), r"\(\?P<url>")
 
 
 @override_settings(ROOT_URLCONF=__name__, APPEND_SLASH=True)

@@ -16,7 +16,7 @@ except ImportError:
 
 
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
-from django.urls import URLPattern, URLResolver, path, reverse, reverse_lazy
+from django.urls import URLPattern, URLResolver, path, re_path, reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.functional import LazyObject
 from django.utils.module_loading import import_string
@@ -33,6 +33,10 @@ from django_smartbase_admin.views.global_filter_view import GlobalFilterView
 
 
 class SBAdminSite(admin.AdminSite):
+    # Stock AdminSite appends catch_all inside get_urls(); that blocks SBAdmin action
+    # URLs registered later. We append the same view manually at the end of get_urls().
+    final_catch_all_view = False
+
     login_template = "sb_admin/authentification/login.html"
     logout_template = "sb_admin/authentification/logout.html"
     password_change_template = "sb_admin/authentification/password_change.html"
@@ -121,20 +125,12 @@ class SBAdminSite(admin.AdminSite):
             ),
         ]
 
-    def _split_stock_admin_urls(
-        self,
-    ) -> tuple[list[URLPattern | URLResolver], list[URLPattern | URLResolver]]:
-        """Return stock AdminSite URLs without Django's final catch-all, then that catch-all.
-
-        ``AdminSite.get_urls()`` appends ``re_path(r"(?P<url>.*)$", catch_all_view)``
-        last. SBAdmin action URLs (``accounts_user/action_list_json/...``) must be
-        registered before it, while model change/add routes must stay before both.
-        """
-        stock_urls = list(super().get_urls())
-        catch_all_urls: list[URLPattern | URLResolver] = []
-        if self.final_catch_all_view and stock_urls:
-            catch_all_urls = [stock_urls.pop()]
-        return stock_urls, catch_all_urls
+    def _admin_catch_all_pattern(self) -> URLPattern:
+        """Same pattern as ``AdminSite.get_urls()`` when ``final_catch_all_view`` is True."""
+        return re_path(
+            r"(?P<url>.*)$",
+            self.admin_view(self.catch_all_view),
+        )
 
     def get_urls(self) -> list[URLPattern | URLResolver]:
         from django.contrib.auth.views import (
@@ -259,10 +255,9 @@ class SBAdminSite(admin.AdminSite):
                 ),
             ]
         )
-        stock_urls, stock_catch_all_urls = self._split_stock_admin_urls()
-        urls.extend(stock_urls)
+        urls.extend(super().get_urls())
         urls.extend(self._sbadmin_action_url_patterns())
-        urls.extend(stock_catch_all_urls)
+        urls.append(self._admin_catch_all_pattern())
         return urls
 
     @method_decorator(never_cache)
