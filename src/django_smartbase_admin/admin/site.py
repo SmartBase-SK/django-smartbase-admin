@@ -16,7 +16,7 @@ except ImportError:
 
 
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
-from django.urls import URLPattern, URLResolver, path, reverse, reverse_lazy
+from django.urls import URLPattern, URLResolver, path, re_path, reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.functional import LazyObject
 from django.utils.module_loading import import_string
@@ -33,6 +33,10 @@ from django_smartbase_admin.views.global_filter_view import GlobalFilterView
 
 
 class SBAdminSite(admin.AdminSite):
+    # Stock AdminSite appends catch_all inside get_urls(); that blocks SBAdmin action
+    # URLs registered later. We append the same view manually at the end of get_urls().
+    final_catch_all_view = False
+
     login_template = "sb_admin/authentification/login.html"
     logout_template = "sb_admin/authentification/logout.html"
     password_change_template = "sb_admin/authentification/password_change.html"
@@ -106,6 +110,30 @@ class SBAdminSite(admin.AdminSite):
     def _stock_admin_endpoint_404(request: HttpRequest, *args, **kwargs):
         raise Http404()
 
+    def _sbadmin_action_url_patterns(self) -> list[URLPattern]:
+        entrypoint = self.admin_view(SBAdminEntrypointView.as_view())
+        return [
+            path(
+                "<str:view>/<str:action>/<str:modifier>/",
+                entrypoint,
+                name="sb_admin_base",
+            ),
+            path(
+                "<str:view>/<str:action>/<str:modifier>/<str:object_id>/",
+                entrypoint,
+                name="sb_admin_base",
+            ),
+        ]
+
+    def _admin_catch_all_pattern(self) -> URLPattern:
+        """Same pattern as ``AdminSite.get_urls()`` when ``final_catch_all_view`` is True."""
+        # Stock catch-all must not use SBAdmin's ``admin_view`` — it always runs
+        # ``initialize_admin_view``, which expects a configured SBAdmin request.
+        return re_path(
+            r"(?P<url>.*)$",
+            super().admin_view(self.catch_all_view),
+        )
+
     def get_urls(self) -> list[URLPattern | URLResolver]:
         from django.contrib.auth.views import (
             PasswordResetView,
@@ -177,7 +205,7 @@ class SBAdminSite(admin.AdminSite):
         if settings.DEBUG:
             urls.append(
                 path(
-                    "components",
+                    "components/",
                     TemplateView.as_view(
                         template_name="sb_admin/includes/components.html"
                     ),
@@ -192,12 +220,12 @@ class SBAdminSite(admin.AdminSite):
                     name="sb_admin_base",
                 ),
                 path(
-                    "global-filter",
+                    "global-filter/",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
                 ),
                 path(
-                    "color-scheme",
+                    "color-scheme/",
                     self.admin_view(ColorSchemeView.as_view()),
                     name="color_scheme",
                 ),
@@ -205,16 +233,6 @@ class SBAdminSite(admin.AdminSite):
                     "view-on-site/<str:view>/<path:object_id>/",
                     self.admin_view(ViewOnSiteRedirectView.as_view()),
                     name="view_on_site_redirect",
-                ),
-                path(
-                    "<str:view>/<str:action>/<str:modifier>",
-                    self.admin_view(SBAdminEntrypointView.as_view()),
-                    name="sb_admin_base",
-                ),
-                path(
-                    "<str:view>/<str:action>/<str:modifier>/<str:object_id>",
-                    self.admin_view(SBAdminEntrypointView.as_view()),
-                    name="sb_admin_base",
                 ),
             ]
         )
@@ -240,6 +258,8 @@ class SBAdminSite(admin.AdminSite):
             ]
         )
         urls.extend(super().get_urls())
+        urls.extend(self._sbadmin_action_url_patterns())
+        urls.append(self._admin_catch_all_pattern())
         return urls
 
     @method_decorator(never_cache)
