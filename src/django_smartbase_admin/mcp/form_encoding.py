@@ -36,6 +36,8 @@ from django.forms.widgets import (
     SplitDateTimeWidget,
 )
 from django.http import QueryDict
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from django_smartbase_admin.engine.filter_widgets import AutocompleteParseMixin
 
@@ -95,12 +97,23 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
             subvalues = list(value)
         elif isinstance(widget, SplitDateTimeWidget):
             if isinstance(value, str):
-                parts = value.replace("T", " ", 1).split(" ", 1)
-                subvalues = parts if len(parts) == 2 else [parts[0], ""]
+                parsed = parse_datetime(value)
+                if parsed is not None:
+                    # Accept tz-aware ISO (``Z`` / offset) on the way in;
+                    # localize so the date/time subwidgets get the wall-clock
+                    # value they expect (no offset suffix). Django re-awares
+                    # it via from_current_timezone on save.
+                    if timezone.is_aware(parsed):
+                        parsed = timezone.localtime(parsed)
+                    subvalues = [parsed.date(), parsed.time()]
+                else:
+                    parts = value.replace("T", " ", 1).split(" ", 1)
+                    subvalues = parts if len(parts) == 2 else [parts[0], ""]
             elif hasattr(value, "date") and hasattr(value, "time"):
                 # datetime instance — flow used by form.initial values
                 # in ``_encode_form_native``.
-                subvalues = [value.date(), value.time()]
+                local = timezone.localtime(value) if timezone.is_aware(value) else value
+                subvalues = [local.date(), local.time()]
             else:
                 raise TypeError(
                     f"Unsupported value shape {type(value).__name__!r} for "
@@ -108,11 +121,22 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
                     f"or [date, time] list."
                 )
         else:
-            raise TypeError(
-                f"Unsupported value shape {type(value).__name__!r} for "
-                f"{widget.__class__.__name__}; pass a {len(widget.widgets)}-item "
-                f"list of per-subwidget values."
-            )
+            # Any other MultiWidget (e.g. a datetime-range): fall back to the
+            # widget's own decompress to split a compressed value (a Range,
+            # tuple, …) into per-subwidget parts — the inverse of the read
+            # side's mcp_read_value, so a restated form.initial value works.
+            try:
+                decompressed = list(widget.decompress(value))
+            except Exception:
+                decompressed = None
+            if decompressed is not None and len(decompressed) == len(widget.widgets):
+                subvalues = decompressed
+            else:
+                raise TypeError(
+                    f"Unsupported value shape {type(value).__name__!r} for "
+                    f"{widget.__class__.__name__}; pass a {len(widget.widgets)}-item "
+                    f"list of per-subwidget values."
+                )
         for subname, subwidget, subvalue in zip(
             widget.widgets_names, widget.widgets, subvalues
         ):

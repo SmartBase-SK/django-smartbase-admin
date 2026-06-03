@@ -6,7 +6,7 @@ use the bundled DOT-backed Authorization Server for the MCP endpoint:
     # settings.py
     INSTALLED_APPS = [..., "oauth2_provider", ...]
     DJANGO_MCP_AUTHENTICATION_CLASSES = [
-        "django_smartbase_admin.mcp.oauth.auth.SBAdminMCPOAuth2Authentication",
+        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
     ]
 
     # urls.py — must be mounted BEFORE any catch-all

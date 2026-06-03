@@ -21,6 +21,8 @@ untouched.
 
 from __future__ import annotations
 
+import re
+
 import nh3
 from django.utils.safestring import SafeString
 
@@ -82,23 +84,41 @@ _ALLOWED_ATTRS: dict[str, set[str]] = {
 # Tags whose *content* is removed entirely, not just unwrapped.
 _DROP_CONTENT_TAGS: set[str] = {"script", "style"}
 
+# <pre>/<code> inner whitespace is preserved; everything else is compacted.
+_PRESERVE_WS_RE = re.compile(
+    r"(<(?:pre|code)\b[^>]*>.*?</(?:pre|code)>)", re.DOTALL | re.IGNORECASE
+)
+
+
+def _collapse_whitespace(html: str) -> str:
+    """Drop whitespace between tags and squeeze runs to one space, outside <pre>/<code>."""
+    parts = _PRESERVE_WS_RE.split(html)
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # preserved <pre>/<code> block
+            continue
+        part = re.sub(r">\s+<", "><", part)
+        parts[i] = re.sub(r"\s{2,}", " ", part)
+    return "".join(parts)
+
 
 def sanitize_html(value):
-    """Allowlist-clean a ``SafeString`` HTML value for agent consumption.
+    """Allowlist-clean and compact a ``SafeString`` HTML value for agents.
 
     Keeps structural / layout markup, strips presentational and executable
-    attributes, and removes ``<script>`` / ``<style>`` (content included).
+    attributes, removes ``<script>`` / ``<style>`` (content included), and
+    collapses template whitespace / newlines (outside ``<pre>`` / ``<code>``).
     Anything that is not a ``SafeString`` is returned unchanged, so scalars,
     relational ``{"value", "label"}`` dicts and plain strings are never
     altered.
     """
     if not isinstance(value, SafeString):
         return value
-    return nh3.clean(
+    cleaned = nh3.clean(
         str(value),
         tags=_ALLOWED_TAGS,
         attributes=_ALLOWED_ATTRS,
         clean_content_tags=_DROP_CONTENT_TAGS,
         strip_comments=True,
         link_rel=None,
-    ).strip()
+    )
+    return _collapse_whitespace(cleaned).strip()

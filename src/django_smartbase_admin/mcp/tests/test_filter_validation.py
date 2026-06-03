@@ -199,6 +199,30 @@ class FilterValidationTests(TestCase):
             )
         self.assertIn("not-a-pk", str(ctx.exception))
 
+    @override_settings(
+        SBADMIN_MCP_ADDITIONAL_WIDGET_SHAPES={
+            "GeoBoxFilterWidget": {
+                "value_shape": "{'sw': [lat, lng], 'ne': [lat, lng]}",
+                "example": {"sw": [0, 0], "ne": [1, 1]},
+            },
+            # Same key as a built-in → overrides it.
+            "StringFilterWidget": {"value_shape": "custom", "example": "x"},
+        }
+    )
+    def test_additional_widget_shapes_setting_merges_and_overrides(self):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        shapes = tools.list_admins()["widget_shapes"]
+        # Built-ins still present.
+        self.assertIn("DateFilterWidget", shapes)
+        # Project-declared shape appended.
+        self.assertEqual(
+            shapes["GeoBoxFilterWidget"]["example"], {"sw": [0, 0], "ne": [1, 1]}
+        )
+        # Project entry overrides the built-in of the same name.
+        self.assertEqual(shapes["StringFilterWidget"]["value_shape"], "custom")
+
     def test_date_open_ended_ranges_apply_the_present_bound(self):
         """A null bound is an open-ended range, not 'match nothing' — only
         both-null short-circuits to the empty result."""

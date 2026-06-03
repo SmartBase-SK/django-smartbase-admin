@@ -4,7 +4,8 @@ import math
 from typing import Any, TYPE_CHECKING
 
 from django.contrib.admin.utils import lookup_spawns_duplicates
-from django.db.models import Q, Field
+from django.core.exceptions import FieldError
+from django.db.models import Avg, Count, Field, Max, Min, Q, Sum
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -51,6 +52,15 @@ if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
 
 logger = logging.getLogger(__name__)
+
+# Whitelisted list aggregations: public name -> Django aggregate class.
+LIST_AGGREGATE_FUNCTIONS = {
+    "sum": Sum,
+    "avg": Avg,
+    "min": Min,
+    "max": Max,
+    "count": Count,
+}
 
 
 class SBAdminAction(object):
@@ -700,3 +710,134 @@ class SBAdminListAction(SBAdminAction):
             else {}
         )
         return [file_name, data_list, columns, options]
+
+    def validate_aggregate(self, aggregate, field_map=None) -> list[dict]:
+        """Validate / normalize an ``aggregate`` request into specs.
+
+        ``aggregate`` is a list of ``{"fn", "field"}`` dicts. ``fn`` must be
+        a key of :data:`LIST_AGGREGATE_FUNCTIONS`; ``field`` must name a
+        declared :class:`SBAdminField` (``list_visible`` irrelevant), never
+        an arbitrary ORM path. ``count`` may omit ``field`` (row count);
+        ``sum/avg/min/max`` require a numeric field. Aliases are derived
+        (``f"{fn}_{field}"`` or ``"count"``) — no override is accepted.
+
+        Returns ``{"fn", "field", "alias", "sbfield", "multiplying"}`` specs;
+        raises ``ValueError`` / ``LookupError`` on any bad entry.
+        """
+        if field_map is None:
+            field_map = self.view.get_field_map(self.threadsafe_request)
+        if not isinstance(aggregate, list):
+            raise ValueError("aggregate must be a list of {'fn', 'field'} specs.")
+
+        specs: list[dict] = []
+        seen: set[str] = set()
+        for spec in aggregate:
+            if not isinstance(spec, dict):
+                raise ValueError(f"Each aggregate spec must be a dict, got {spec!r}.")
+            extra_keys = set(spec) - {"fn", "field"}
+            if extra_keys:
+                raise ValueError(
+                    f"Unsupported aggregate key(s) {sorted(extra_keys)}; only "
+                    "'fn' and 'field' are allowed (aliases are derived)."
+                )
+            fn = spec.get("fn")
+            if fn not in LIST_AGGREGATE_FUNCTIONS:
+                raise ValueError(
+                    f"Unknown aggregate fn {fn!r}; allowed: "
+                    f"{sorted(LIST_AGGREGATE_FUNCTIONS)}."
+                )
+            field_name = spec.get("field")
+            sbfield = None
+            if field_name is None:
+                if fn != "count":
+                    raise ValueError(f"{fn!r} aggregate requires a 'field'.")
+                alias = "count"
+            else:
+                sbfield = field_map.get(field_name)
+                if sbfield is None:
+                    raise LookupError(
+                        f"Unknown field {field_name!r}; declared fields: "
+                        f"{sorted(field_map)}."
+                    )
+                if fn != "count" and sbfield.is_non_numeric():
+                    raise ValueError(
+                        f"{fn!r} requires a numeric field; {field_name!r} is not."
+                    )
+                alias = f"{fn}_{field_name}"
+            if alias in seen:
+                raise ValueError(f"Duplicate aggregate {alias!r}.")
+            seen.add(alias)
+            specs.append(
+                {
+                    "fn": fn,
+                    "field": field_name,
+                    "alias": alias,
+                    "sbfield": sbfield,
+                    "multiplying": (
+                        fn == "count"
+                        and sbfield is not None
+                        and sbfield.is_multivalued()
+                    ),
+                }
+            )
+        return specs
+
+    def get_aggregates(self, aggregate, field_map=None) -> dict:
+        """Compute ``{alias: value}`` for ``aggregate`` over the filtered set.
+
+        Reuses the list's filtered, annotated queryset. Non-multiplying
+        metrics batch into one query; a ``count`` over a multi-valued
+        relation runs separately and is merged.
+        """
+        specs = self.validate_aggregate(aggregate, field_map=field_map)
+        # Full base so every aggregable field's annotation is present.
+        queryset = self.get_data_queryset()
+        pk_name = self.get_pk_field().name
+
+        # Resolve each spec to its ORM target and annotate any expression
+        # value the visible-column set doesn't already cover.
+        extra: dict = {}
+        for spec in specs:
+            field = spec["sbfield"]
+            if field is None:
+                spec["target"] = pk_name
+                continue
+            if spec["fn"] == "count" and field.model_field is not None:
+                spec["target"] = field.model_field.name
+                continue
+            spec["target"] = field.field
+            if field.field in queryset.query.annotations or field.annotate is None:
+                continue
+            if field.supporting_annotates:
+                extra.update(field.supporting_annotates)
+            extra[field.field] = field.annotate
+        if extra:
+            queryset = queryset.annotate(**extra)
+
+        # Narrow to the same rows as the count path so aggregates match it.
+        queryset = queryset.filter(self.get_filter_from_request())
+        queryset = self.search_in_queryset(queryset)
+        request = self.threadsafe_request
+        for plugin in request.request_data.configuration.plugins:
+            queryset = plugin.modify_count_queryset(self, request=request, qs=queryset)
+
+        batch: dict = {}
+        isolated: list[tuple[str, Any]] = []
+        for spec in specs:
+            agg = LIST_AGGREGATE_FUNCTIONS[spec["fn"]](spec["target"])
+            if spec["multiplying"]:
+                isolated.append((spec["alias"], agg))
+            else:
+                batch[spec["alias"]] = agg
+
+        # Undetermined-type expressions are only rejected once Django
+        # resolves them against the query.
+        try:
+            result: dict = {}
+            if batch:
+                result.update(queryset.aggregate(**batch))
+            for alias, agg in isolated:
+                result[alias] = queryset.aggregate(**{alias: agg})[alias]
+        except FieldError as exc:
+            raise ValueError(f"Cannot aggregate the requested field(s): {exc}") from exc
+        return result

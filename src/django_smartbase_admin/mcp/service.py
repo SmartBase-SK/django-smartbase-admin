@@ -689,6 +689,9 @@ class SBAdminMCPDetailService:
         so callable readonly methods resolve through ``lookup_field``
         like the change view does.
         """
+        if obj is None:
+            # Add page has no instance; lookup_field would deref obj._meta.
+            return None
         f, _, value = lookup_field(name, obj, model_admin)
         if f is None:
             # Callable display methods often return mark_safe HTML.

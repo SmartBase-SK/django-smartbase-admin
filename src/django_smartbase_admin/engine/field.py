@@ -31,6 +31,23 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
 from django_smartbase_admin.utils import JSONSerializableMixin
 
+# ORM internal types treated as numeric for aggregation.
+NUMERIC_INTERNAL_TYPES = frozenset(
+    {
+        "AutoField",
+        "BigAutoField",
+        "SmallAutoField",
+        "IntegerField",
+        "BigIntegerField",
+        "SmallIntegerField",
+        "PositiveIntegerField",
+        "PositiveSmallIntegerField",
+        "PositiveBigIntegerField",
+        "FloatField",
+        "DecimalField",
+    }
+)
+
 
 class TabulatorFieldOptions(JSONSerializableMixin):
     headerFilter = False
@@ -216,6 +233,32 @@ class SBAdminField(JSONSerializableMixin):
                 pass
             pass
         return model_field
+
+    def is_non_numeric(self) -> bool:
+        """Whether the value type is known and not numeric.
+
+        Returns ``False`` when the type can't be determined (e.g. an
+        annotation with no resolvable ``output_field``), so callers reject
+        only definite non-numbers and defer the ambiguous case.
+        """
+        try:
+            if self.model_field is not None:
+                internal_type = self.model_field.get_internal_type()
+            elif self.annotate is not None:
+                internal_type = self.annotate.output_field.get_internal_type()
+            else:
+                return False
+        except Exception:
+            return False
+        return internal_type not in NUMERIC_INTERNAL_TYPES
+
+    def is_multivalued(self) -> bool:
+        """Whether the field is backed by a reverse-FK / M2M relation (a
+        row-multiplying join when aggregated)."""
+        return bool(
+            self.model_field is not None
+            and (self.model_field.many_to_many or self.model_field.one_to_many)
+        )
 
     def init_field_static(self, view, configuration):
         self.view = view

@@ -22,6 +22,7 @@ from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
+from django.utils.safestring import mark_safe
 from mcp.types import BlobResourceContents, EmbeddedResource
 
 from django_smartbase_admin.engine.const import Action, BASE_PARAMS_NAME
@@ -40,6 +41,7 @@ from django_smartbase_admin.mcp.form_encoding import (
     form_errors_dict,
     get_form_from_response,
 )
+from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.services.views import SBAdminViewService
 
 logger = logging.getLogger(__name__)
@@ -222,6 +224,36 @@ def collect_action_entries(
     return entries
 
 
+def resolve_action_modifier(admin, request, getter_name, action_id):
+    """Derive the modifier for ``action_id`` from its registered action.
+
+    Looks the action up in the route's action list (selected by
+    ``getter_name``, e.g. ``"get_sbadmin_list_actions_processed"``) and
+    returns its modifier via the UI's ``SBAdminBaseView._get_action_modifier``.
+    Returns ``None`` when the action can't be located, so the caller keeps
+    ownership of the fallback.
+    """
+    try:
+        actions = getattr(admin, getter_name)(request) or []
+    except Exception:
+        logger.warning(
+            "MCP actions: %s() failed while resolving modifier for %r on %s",
+            getter_name,
+            action_id,
+            admin.__class__.__name__,
+            exc_info=True,
+        )
+        return None
+
+    for action in actions:
+        if action.get_action_id() == action_id:
+            get_modifier = getattr(admin, "_get_action_modifier", None)
+            if get_modifier is None:
+                return getattr(action, "action_modifier", None)
+            return get_modifier(action)
+    return None
+
+
 def build_modal_view(target_view_cls, admin, request, modifier, object_id=None):
     """Construct and bind a modal view to admin / request / modifier.
 
@@ -293,22 +325,58 @@ class SBAdminMCPActionFormService:
             str(object_id) if object_id is not None else None,
         )
 
-        if object_id is not None and issubclass(target_view_cls, RowActionModalView):
-            if view.get_object() is None:
-                raise LookupError(
-                    f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
-                )
-
         # MCP transport is JSON-RPC over POST; force GET while building
         # form kwargs so FormMixin doesn't try to parse request.POST as
         # form data. set_request_payload keeps request.method and
         # request_data.request_method in sync (the latter is the channel
         # SBAdmin widget / form code reads from).
+        request_data = getattr(request, "request_data", None)
         saved_method = request.method
-        set_request_payload(request, method="GET")
+        saved_action = getattr(request_data, "action", None)
         try:
+            # Force GET so FormMixin doesn't parse the JSON-RPC POST body as
+            # form data, and put the form in the action's context so
+            # autocomplete-backed fields report the same dispatchable
+            # widget_id the UI registers (get_form_kwargs reads
+            # request_data.action for sbadmin_action_id).
+            set_request_payload(request, method="GET")
+            if request_data is not None:
+                request_data.action = action_id
+
+            # Enforce row-object visibility before doing any rendering — for
+            # both form and form-less modals — so an invisible/deleted row
+            # raises LookupError instead of leaking modal HTML.
+            if object_id is not None and issubclass(
+                target_view_cls, RowActionModalView
+            ):
+                if view.get_object() is None:
+                    raise LookupError(
+                        f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
+                    )
+
+            form_class = (
+                view.get_form_class()
+                if hasattr(view, "get_form_class")
+                else getattr(view, "form_class", None)
+            )
+
+            # Form-less modal (renders HTML in get()): return sanitized HTML.
+            if form_class is None:
+                response = view.get(request, **view.kwargs)
+                html = response.content.decode(response.charset or "utf-8")
+                try:
+                    title = view.get_modal_title()
+                except Exception:
+                    title = getattr(target_view_cls, "modal_title", "")
+                return {
+                    "title": str(title or ""),
+                    "html": sanitize_html(mark_safe(html)),
+                }
+
             form = view.get_form()
         finally:
+            if request_data is not None:
+                request_data.action = saved_action
             set_request_payload(request, method=saved_method)
 
         try:
@@ -526,13 +594,19 @@ class SBAdminMCPActionInvokeService:
         Mode A only — ``object_ids`` is the canonical, explicit selection.
         Empty list rejected so accidental "act on everything" is impossible.
         Set ``confirmed=True`` after seeing a ``needs_confirmation`` response.
-        ``modifier`` is the action's ``action_modifier`` as surfaced in
-        discovery; defaults to ``"template"`` (matches URL dispatch's
-        fallback when no modifier is declared).
+        When ``modifier`` is not given it defaults to the matched action's
+        ``action_modifier``.
         """
         if not object_ids:
             raise ValueError(
                 "invoke_selection_action requires a non-empty object_ids list."
+            )
+        if modifier is None:
+            modifier = resolve_action_modifier(
+                admin,
+                request,
+                "get_sbadmin_list_selection_actions_processed",
+                action_id,
             )
         return cls._invoke(
             admin,
@@ -567,11 +641,14 @@ class SBAdminMCPActionInvokeService:
 
         ``filter_data`` / ``full_text_search`` are passed through to
         filter-aware actions; ignored by actions that don't consult them.
-        ``modifier`` is the action's ``action_modifier`` from discovery
-        (e.g. ``IGNORE_LIST_SELECTION`` for whole-list exports);
-        defaults to ``"template"``. Set ``confirmed=True`` after seeing
-        a ``needs_confirmation`` response.
+        When ``modifier`` is not given it defaults to the matched action's
+        ``action_modifier``. Set ``confirmed=True`` after seeing a
+        ``needs_confirmation`` response.
         """
+        if modifier is None:
+            modifier = resolve_action_modifier(
+                admin, request, "get_sbadmin_list_actions_processed", action_id
+            )
         base_params = None
         if filter_data or full_text_search:
             filter_payload = dict(filter_data or {})
