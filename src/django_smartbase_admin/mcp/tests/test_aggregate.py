@@ -22,6 +22,7 @@ urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
 class _Admin(SBAdmin):
     model = Folder
+    search_fields = ("name",)
     sbadmin_list_display = ("id", "name", "id_alias")
 
     # A method field with ``admin_order_field`` → backed by the ``id``
@@ -73,6 +74,22 @@ class AggregateTests(TestCase):
             result["aggregates"],
             {"count": 3, "sum_id": sum(ids), "max_id": max(ids)},
         )
+
+    def test_aggregates_respect_full_text_search(self):
+        ids = [Folder.objects.create(name=n).pk for n in ("alpha", "alpha-two")]
+        Folder.objects.create(name="beta")  # excluded by the search term
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            full_text_search="alpha",
+            aggregate=[{"fn": "count"}, {"fn": "sum", "field": "id"}],
+        )
+
+        # Aggregates must cover the searched set (2 rows), not all 3 — and
+        # agree with the searched total_count.
+        self.assertEqual(result["last_row"], 2)
+        self.assertEqual(result["aggregates"], {"count": 2, "sum_id": sum(ids)})
 
     def test_field_name_resolves_to_orm_identifier(self):
         ids = [Folder.objects.create(name=n).pk for n in ("a", "b", "c")]

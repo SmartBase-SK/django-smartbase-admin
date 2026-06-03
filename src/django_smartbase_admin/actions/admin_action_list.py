@@ -790,6 +790,7 @@ class SBAdminListAction(SBAdminAction):
         relation runs separately and is merged.
         """
         specs = self.validate_aggregate(aggregate, field_map=field_map)
+        # Full base so every aggregable field's annotation is present.
         queryset = self.get_data_queryset()
         pk_name = self.get_pk_field().name
 
@@ -813,7 +814,12 @@ class SBAdminListAction(SBAdminAction):
         if extra:
             queryset = queryset.annotate(**extra)
 
+        # Narrow to the same rows as the count path so aggregates match it.
         queryset = queryset.filter(self.get_filter_from_request())
+        queryset = self.search_in_queryset(queryset)
+        request = self.threadsafe_request
+        for plugin in request.request_data.configuration.plugins:
+            queryset = plugin.modify_count_queryset(self, request=request, qs=queryset)
 
         batch: dict = {}
         isolated: list[tuple[str, Any]] = []

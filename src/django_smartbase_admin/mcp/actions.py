@@ -343,6 +343,17 @@ class SBAdminMCPActionFormService:
             if request_data is not None:
                 request_data.action = action_id
 
+            # Enforce row-object visibility before doing any rendering — for
+            # both form and form-less modals — so an invisible/deleted row
+            # raises LookupError instead of leaking modal HTML.
+            if object_id is not None and issubclass(
+                target_view_cls, RowActionModalView
+            ):
+                if view.get_object() is None:
+                    raise LookupError(
+                        f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
+                    )
+
             form_class = (
                 view.get_form_class()
                 if hasattr(view, "get_form_class")
@@ -361,14 +372,6 @@ class SBAdminMCPActionFormService:
                     "title": str(title or ""),
                     "html": sanitize_html(mark_safe(html)),
                 }
-
-            if object_id is not None and issubclass(
-                target_view_cls, RowActionModalView
-            ):
-                if view.get_object() is None:
-                    raise LookupError(
-                        f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
-                    )
 
             form = view.get_form()
         finally:

@@ -141,6 +141,17 @@ class FetchActionFormHtmlTests(TestCase):
         self.assertNotIn("  ", outside_pre)
         self.assertFalse(html.startswith(" ") or html.endswith(" "))
 
+    def test_formless_modal_invisible_object_raises(self):
+        """A form-less row modal must still enforce row visibility: an
+        invisible/nonexistent object_id raises LookupError rather than
+        leaking the rendered modal HTML."""
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+        with self.assertRaises(LookupError):
+            tools.fetch_action_form(
+                "filer_folder", "HistoryModalView", object_id="99999999"
+            )
+
     def test_action_form_autocomplete_widget_id_is_action_scoped(self):
         """An autocomplete-backed action-form field reports the same
         action-scoped widget_id the UI registers/dispatches (carrying the
