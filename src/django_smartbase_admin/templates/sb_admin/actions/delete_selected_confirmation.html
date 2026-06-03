@@ -27,7 +27,7 @@
             {% trans "Deleting the selected objects would affect related records that your account cannot delete." as warning_text %}
             {% trans "Objects blocked by permissions" as list_title %}
             {% trans "Adjust permissions or ask an administrator before trying again." as list_help %}
-            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=perms_lacking %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=perms_lacking only %}
             <div class="detail-view-action-bar">
                 <div>
                     <h2 class="text-18 font-semibold text-dark-900">{% trans "Bulk deletion is unavailable" %}</h2>
@@ -39,7 +39,7 @@
             {% trans "Some selected objects cannot be deleted while protected related records still exist." as warning_text %}
             {% trans "Protected objects" as list_title %}
             {% trans "Remove or detach these records, then try again." as list_help %}
-            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=protected %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=protected only %}
             <div class="detail-view-action-bar">
                 <div>
                     <h2 class="text-18 font-semibold text-dark-900">{% trans "Bulk deletion is blocked" %}</h2>
@@ -51,7 +51,7 @@
             {% trans "After confirmation, these records will be deleted and cannot be restored from the admin." as warning_text %}
             {% trans "Deletion preview" as list_title %}
             {% trans "Review the exact objects below before confirming." as list_help %}
-            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=deleted_objects %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help tree_objects=deletable_objects object_list=deleted_objects model_count=model_count show_summary=True only %}
 
             <div class="detail-view-action-bar">
                 <div>

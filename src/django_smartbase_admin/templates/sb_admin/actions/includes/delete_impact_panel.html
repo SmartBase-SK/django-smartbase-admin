@@ -17,22 +17,24 @@
         </div>
     </div>
 
-    <div class="pt-20">
-        <p class="text-12 font-semibold uppercase text-dark-600">{% trans "Summary" %}</p>
-        <dl class="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
-            {% for model_name, object_count in model_count %}
-                <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
-                    <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{{ model_name|capfirst }}</dt>
-                    <dd class="badge badge-simple badge-neutral shrink-0">{{ object_count }}</dd>
-                </div>
-            {% empty %}
-                <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
-                    <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{% trans "Items" %}</dt>
-                    <dd class="badge badge-simple badge-neutral shrink-0">0</dd>
-                </div>
-            {% endfor %}
-        </dl>
-    </div>
+    {% if show_summary %}
+        <div class="pt-20">
+            <p class="text-12 font-semibold uppercase text-dark-600">{% trans "Summary" %}</p>
+            <dl class="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
+                {% for model_name, object_count in model_count %}
+                    <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
+                        <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{{ model_name|capfirst }}</dt>
+                        <dd class="badge badge-simple badge-neutral shrink-0">{{ object_count }}</dd>
+                    </div>
+                {% empty %}
+                    <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
+                        <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{% trans "Items" %}</dt>
+                        <dd class="badge badge-simple badge-neutral shrink-0">0</dd>
+                    </div>
+                {% endfor %}
+            </dl>
+        </div>
+    {% endif %}
 </section>
 
 <section class="card mt-16">
@@ -44,7 +46,7 @@
     </div>
  
     <div id="deleted-objects" class="overflow-y-auto text-14 leading-20 text-dark-700">
-        {% for deletable_object in deletable_objects %}
+        {% for deletable_object in tree_objects %}
             <div class="mb-16 border-b border-dark-100 pb-16 last:mb-0 last:border-b-0 last:pb-0">
                 {{ deletable_object|delete_tree }}
             </div>
