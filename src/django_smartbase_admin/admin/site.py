@@ -127,9 +127,11 @@ class SBAdminSite(admin.AdminSite):
 
     def _admin_catch_all_pattern(self) -> URLPattern:
         """Same pattern as ``AdminSite.get_urls()`` when ``final_catch_all_view`` is True."""
+        # Stock catch-all must not use SBAdmin's ``admin_view`` — it always runs
+        # ``initialize_admin_view``, which expects a configured SBAdmin request.
         return re_path(
             r"(?P<url>.*)$",
-            self.admin_view(self.catch_all_view),
+            super().admin_view(self.catch_all_view),
         )
 
     def get_urls(self) -> list[URLPattern | URLResolver]:

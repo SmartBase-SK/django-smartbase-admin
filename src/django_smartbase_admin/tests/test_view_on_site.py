@@ -23,10 +23,15 @@ from django_smartbase_admin.engine.admin_entrypoint_view import SBAdminEntrypoin
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
 
-def _resolved_view_class(match):
+def _unwrapped_func(match):
     func = match.func
     while hasattr(func, "__wrapped__"):
         func = func.__wrapped__
+    return func
+
+
+def _resolved_view_class(match):
+    func = _unwrapped_func(match)
     return getattr(func, "view_class", None) or getattr(func, "cls", None)
 
 
@@ -94,6 +99,8 @@ class ModelChangeUrlRoutingTest(TestCase):
     def test_change_url_without_trailing_slash_redirects_to_slash_version(self):
         self.assertTrue(self.change_url.endswith("/"))
         bare_url = self.change_url.rstrip("/")
+        match = resolve(bare_url)
+        self.assertIs(_unwrapped_func(match), sb_admin_site.catch_all_view)
         response = self.client.get(bare_url)
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], self.change_url)
