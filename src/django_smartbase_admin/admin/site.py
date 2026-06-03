@@ -106,6 +106,36 @@ class SBAdminSite(admin.AdminSite):
     def _stock_admin_endpoint_404(request: HttpRequest, *args, **kwargs):
         raise Http404()
 
+    def _sbadmin_action_url_patterns(self) -> list[URLPattern]:
+        entrypoint = self.admin_view(SBAdminEntrypointView.as_view())
+        return [
+            path(
+                "<str:view>/<str:action>/<str:modifier>/",
+                entrypoint,
+                name="sb_admin_base",
+            ),
+            path(
+                "<str:view>/<str:action>/<str:modifier>/<str:object_id>/",
+                entrypoint,
+                name="sb_admin_base",
+            ),
+        ]
+
+    def _split_stock_admin_urls(
+        self,
+    ) -> tuple[list[URLPattern | URLResolver], list[URLPattern | URLResolver]]:
+        """Return stock AdminSite URLs without Django's final catch-all, then that catch-all.
+
+        ``AdminSite.get_urls()`` appends ``re_path(r"(?P<url>.*)$", catch_all_view)``
+        last. SBAdmin action URLs (``accounts_user/action_list_json/...``) must be
+        registered before it, while model change/add routes must stay before both.
+        """
+        stock_urls = list(super().get_urls())
+        catch_all_urls: list[URLPattern | URLResolver] = []
+        if self.final_catch_all_view and stock_urls:
+            catch_all_urls = [stock_urls.pop()]
+        return stock_urls, catch_all_urls
+
     def get_urls(self) -> list[URLPattern | URLResolver]:
         from django.contrib.auth.views import (
             PasswordResetView,
@@ -177,7 +207,7 @@ class SBAdminSite(admin.AdminSite):
         if settings.DEBUG:
             urls.append(
                 path(
-                    "components",
+                    "components/",
                     TemplateView.as_view(
                         template_name="sb_admin/includes/components.html"
                     ),
@@ -192,12 +222,12 @@ class SBAdminSite(admin.AdminSite):
                     name="sb_admin_base",
                 ),
                 path(
-                    "global-filter",
+                    "global-filter/",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
                 ),
                 path(
-                    "color-scheme",
+                    "color-scheme/",
                     self.admin_view(ColorSchemeView.as_view()),
                     name="color_scheme",
                 ),
@@ -205,16 +235,6 @@ class SBAdminSite(admin.AdminSite):
                     "view-on-site/<str:view>/<path:object_id>/",
                     self.admin_view(ViewOnSiteRedirectView.as_view()),
                     name="view_on_site_redirect",
-                ),
-                path(
-                    "<str:view>/<str:action>/<str:modifier>",
-                    self.admin_view(SBAdminEntrypointView.as_view()),
-                    name="sb_admin_base",
-                ),
-                path(
-                    "<str:view>/<str:action>/<str:modifier>/<str:object_id>",
-                    self.admin_view(SBAdminEntrypointView.as_view()),
-                    name="sb_admin_base",
                 ),
             ]
         )
@@ -239,7 +259,10 @@ class SBAdminSite(admin.AdminSite):
                 ),
             ]
         )
-        urls.extend(super().get_urls())
+        stock_urls, stock_catch_all_urls = self._split_stock_admin_urls()
+        urls.extend(stock_urls)
+        urls.extend(self._sbadmin_action_url_patterns())
+        urls.extend(stock_catch_all_urls)
         return urls
 
     @method_decorator(never_cache)
