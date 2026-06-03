@@ -73,8 +73,12 @@ WIDGET_SHAPES: dict[str, dict] = {
     },
     "BooleanFilterWidget": {"value_shape": "bool", "example": True},
     "MultipleChoiceFilterWidget": {
-        "value_shape": "list of choice values (strings)",
-        "example": [],
+        "value_shape": (
+            "list of choice values from fields[].filter.choices "
+            "(bool, string, or number) — never a bare scalar; "
+            "e.g. [false] not false"
+        ),
+        "example": [False],
     },
     "ChoiceFilterWidget": {
         "value_shape": "single choice value (string)",
@@ -112,8 +116,12 @@ def _filter_info(field) -> dict | None:
     if widget is None:
         return None
 
+    # The filter is keyed by the column ``name`` in list_rows filter_data
+    # (the same identifier ``fields`` / ``sort`` use), so the internal
+    # ``filter_field`` is deliberately not surfaced — one filter identifier,
+    # not two. list_rows still *accepts* a raw ``filter_field`` key (presets
+    # emit those), but the agent never needs to construct one.
     info: dict = {
-        "filter_field": getattr(field, "filter_field", None) or field.name,
         "widget": _widget_category(widget),
     }
     if isinstance(widget, ChoiceFilterWidget) and widget.choices:

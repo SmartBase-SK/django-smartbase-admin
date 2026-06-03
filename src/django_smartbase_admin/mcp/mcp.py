@@ -98,6 +98,57 @@ def _validate_filter_data(
         widgets[key].validate_value(value)
 
 
+def _normalize_filter_keys(filter_data: dict | None, field_map) -> dict | None:
+    """Re-key ``filter_data`` to the ``filter_field`` the list pipeline uses,
+    accepting either a column ``name`` (the same identifier ``fields`` and
+    ``sort`` take) or the ``filter_field`` itself.
+
+    This lets the agent use one identifier — the column name — everywhere,
+    instead of tracking that a column's filter key often differs. An exact
+    ``filter_field`` match wins, so saved presets (whose keys are already
+    ``filter_field``) replay unchanged and a column name that happens to
+    collide with another column's filter_field stays unambiguous.
+    Unrecognised keys pass through so ``_validate_filter_data`` reports them.
+    """
+    if not filter_data:
+        return filter_data
+    name_to_filter = {
+        name: (getattr(f, "filter_field", None) or name)
+        for name, f in (field_map or {}).items()
+    }
+    filter_fields = set(name_to_filter.values())
+    normalized: dict = {}
+    for key, value in filter_data.items():
+        if key in filter_fields:
+            normalized[key] = value
+        elif key in name_to_filter:
+            normalized[name_to_filter[key]] = value
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def _filter_keys_to_names(filter_data: dict | None, field_map) -> dict | None:
+    """Inverse of :func:`_normalize_filter_keys`: re-key filter_data from the
+    stored ``filter_field`` form back to the column ``name``.
+
+    A decoded preset's keys are ``filter_field``-shaped (that's how the list
+    action stores them); rewriting them to the column ``name`` means a fetched
+    preset speaks the same single identifier as the schema and ``list_rows``,
+    so the agent never has to recognise a ``filter_field`` it can't find in
+    ``list_admins``. A ``filter_field`` with no matching column is left as-is
+    (it still round-trips through ``_normalize_filter_keys`` unchanged); when
+    several columns share one ``filter_field`` the first is used — they
+    normalize back to the same key, so the choice is immaterial.
+    """
+    if not filter_data:
+        return filter_data
+    filter_to_name: dict = {}
+    for name, f in (field_map or {}).items():
+        filter_to_name.setdefault(getattr(f, "filter_field", None) or name, name)
+    return {filter_to_name.get(key, key): value for key, value in filter_data.items()}
+
+
 def _validate_sort(admin, request, sort, field_map=None) -> None:
     """Reject unknown sort fields up front with the same clean, listed
     error ``filter_data`` / ``fields`` give. Without this an unknown
@@ -378,6 +429,18 @@ class SBAdminTools(MCPToolset):
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 
+        field_map = admin.get_field_map(request)
+
+        def decode(url_params):
+            decoded = _decode_preset_url_params(url_params)
+            # Hand back column ``name`` keys, the single identifier the agent
+            # uses everywhere else (list_rows still accepts these on replay).
+            if "filter_data" in decoded:
+                decoded["filter_data"] = _filter_keys_to_names(
+                    decoded["filter_data"], field_map
+                )
+            return decoded
+
         if source == "static":
             if not name:
                 raise ValueError("'name' is required when source='static'")
@@ -392,7 +455,7 @@ class SBAdminTools(MCPToolset):
             ]
             for preset in raw_presets:
                 if str(preset.get("name", "")) == name:
-                    return _decode_preset_url_params(preset.get("url_params"))
+                    return decode(preset.get("url_params"))
             raise LookupError(
                 f"No static filter preset named {name!r} on {view_id!r}. "
                 f"Known: {[str(p.get('name', '')) for p in raw_presets]}"
@@ -408,9 +471,9 @@ class SBAdminTools(MCPToolset):
                 # ``id`` is the stable handle; ``name`` is a fallback for
                 # callers that don't have the id cached.
                 if id is not None and preset.get("id") == id:
-                    return _decode_preset_url_params(preset.get("url_params"))
+                    return decode(preset.get("url_params"))
                 if id is None and name and str(preset.get("name", "")) == name:
-                    return _decode_preset_url_params(preset.get("url_params"))
+                    return decode(preset.get("url_params"))
             raise LookupError(
                 f"No saved filter preset matching id={id!r} name={name!r} "
                 f"on {view_id!r}"
@@ -444,12 +507,18 @@ class SBAdminTools(MCPToolset):
             ``list_admins["admin_views"][].fields[].name``. Every row also
             carries a normalized ``"id"`` key for row identity, regardless
             of the model's pk field name (so ``row["id"]`` is always safe).
-          filter_data: ``{filter_field: value}`` mapping. Per filter,
-            read the widget category from
+          filter_data: ``{field: value}`` mapping. Each **key** is a column
+            ``name`` from ``list_admins["admin_views"][].fields[].name`` —
+            the same identifier ``fields`` and ``sort`` use. (Keys returned
+            by ``fetch_filter_preset`` are also accepted as-is, so a preset
+            replays unchanged.) Per filter, read the widget category from
             ``list_admins["admin_views"][].fields[].filter.widget`` and
             copy its ``value_shape`` / ``example`` from
             ``list_admins["widget_shapes"]`` literally — that legend is
-            the single source of truth for the per-widget value shape.
+            the single source of truth for the per-widget value shape. For
+            an autocomplete (related-record) filter, resolve the name to an
+            id with the ``autocomplete`` tool first; pass that id as the
+            entry ``value`` (a free-text name/email is not a valid id).
             Unknown keys are rejected — misspellings raise instead of
             silently returning every row.
           page, page_size: pagination, 1-indexed.
@@ -487,6 +556,7 @@ class SBAdminTools(MCPToolset):
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
         field_map = admin.get_field_map(request)
+        filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)
         columns_data = build_columns_data(admin, request, fields, field_map)
@@ -1180,7 +1250,12 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        _validate_filter_data(admin, request, filter_data)
+        # Callers pass column-name keys (per the schema/presets), so re-key to
+        # the ``filter_field`` the list pipeline uses — same as ``list_rows``,
+        # otherwise a filter-aware action gets the wrong/unknown filter keys.
+        field_map = admin.get_field_map(request)
+        filter_data = _normalize_filter_keys(filter_data, field_map)
+        _validate_filter_data(admin, request, filter_data, field_map)
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,
@@ -1256,4 +1331,15 @@ class SBAdminTools(MCPToolset):
                 "widget_id verbatim from list_admins fields[].filter.widget_id "
                 "or fetch_detail / fetch_add_form fields.<name>.widget_id."
             )
+        except PermissionDenied as exc:
+            # The widget delegates to its target-model admin, which enforces
+            # its own ``view`` permission. When the user can't view that
+            # target, ``action_autocomplete`` raises a *bare* PermissionDenied
+            # (empty message) — the agent then sees only the class name. Keep
+            # the type (callers gate on it) but attach a reason it can act on.
+            raise PermissionDenied(
+                f"Not permitted to use autocomplete widget {widget_id!r} on "
+                f"{view_id!r}: its target-model admin is not viewable by your "
+                "account."
+            ) from exc
         return json.loads(response.content.decode())["data"]

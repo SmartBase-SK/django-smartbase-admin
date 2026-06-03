@@ -11,7 +11,11 @@ from filer.models import Folder
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.field import SBAdminField
-from django_smartbase_admin.engine.filter_widgets import DateFilterWidget
+from django_smartbase_admin.engine.filter_widgets import (
+    AutocompleteFilterWidget,
+    DateFilterWidget,
+    FromValuesAutocompleteWidget,
+)
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
@@ -25,11 +29,19 @@ class _Admin(SBAdmin):
     model = Folder
     sbadmin_list_display = (
         "id",
-        "name",
+        # FromValues returns the column's own value (a name string), not the
+        # pk — the live case that regressed when validation assumed a pk.
+        SBAdminField(name="name", filter_widget=FromValuesAutocompleteWidget()),
         SBAdminField(
             name="uploaded_at",
             filter_field="uploaded_at",
             filter_widget=DateFilterWidget(),
+        ),
+        # FK autocomplete on an integer-pk relation: value must be a pk.
+        SBAdminField(
+            name="parent",
+            filter_field="parent",
+            filter_widget=AutocompleteFilterWidget(model=Folder),
         ),
     )
 
@@ -90,6 +102,102 @@ class FilterValidationTests(TestCase):
         shape = result["widget_shapes"]["DateFilterWidget"]
         self.assertIn("start", shape["value_shape"])
         self.assertEqual(shape["example"], ["2026-06-01", "2026-06-30"])
+
+    def test_filter_key_normalization_round_trips_name_and_filter_field(self):
+        """The agent uses one identifier — the column ``name`` — everywhere.
+        ``_normalize_filter_keys`` accepts a column ``name`` (or a raw
+        ``filter_field``) on input and re-keys to ``filter_field`` for the
+        pipeline; ``_filter_keys_to_names`` is its inverse, used to hand a
+        decoded preset back in column-``name`` terms so the agent never meets
+        a ``filter_field`` it can't find in the schema."""
+        from types import SimpleNamespace
+
+        from django_smartbase_admin.mcp.mcp import (
+            _filter_keys_to_names,
+            _normalize_filter_keys,
+        )
+
+        # Column name differs from its filter_field; another column has no
+        # explicit filter_field (falls back to its own name).
+        field_map = {
+            "closed": SimpleNamespace(filter_field="status__is_closed"),
+            "name": SimpleNamespace(filter_field=None),
+        }
+        v = ["x"]
+
+        # Input normalization: name | filter_field | unknown.
+        self.assertEqual(
+            _normalize_filter_keys({"closed": v}, field_map),
+            {"status__is_closed": v},  # name -> filter_field
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"status__is_closed": v}, field_map),
+            {"status__is_closed": v},  # exact filter_field left untouched
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"name": v}, field_map),
+            {"name": v},  # filter_field falls back to the column name
+        )
+        self.assertEqual(
+            _normalize_filter_keys({"nope": v}, field_map),
+            {"nope": v},  # unknown passes through to be reported downstream
+        )
+        self.assertIsNone(_normalize_filter_keys(None, field_map))
+
+        # Inverse (preset output): filter_field -> column name, and a
+        # filter_field with no matching column is left as-is.
+        self.assertEqual(
+            _filter_keys_to_names({"status__is_closed": v}, field_map),
+            {"closed": v},
+        )
+        self.assertEqual(
+            _filter_keys_to_names({"unmapped": v}, field_map), {"unmapped": v}
+        )
+        # Round trip: a preset key surfaced as a name normalizes back to the
+        # same filter_field on replay.
+        surfaced = _filter_keys_to_names({"status__is_closed": v}, field_map)
+        self.assertEqual(
+            _normalize_filter_keys(surfaced, field_map), {"status__is_closed": v}
+        )
+
+    def test_autocomplete_filter_values_are_not_pre_validated_against_pk(self):
+        """Autocomplete values aren't pre-validated against the pk: the value
+        isn't always a pk (``FromValues`` returns the column's own string), so
+        a non-pk value is accepted and filters normally — the live case that
+        wrongly raised "not a valid id". A genuinely uncoercible value (an
+        email where an integer id is expected) isn't caught up front; it
+        surfaces as the ORM's own error from the list pipeline."""
+        marketing = Folder.objects.create(name="marketing")
+        Folder.objects.create(name="sales", parent=marketing)
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        # FromValues string value (not a pk) is accepted and narrows.
+        result = tools.list_rows(
+            "filer_folder",
+            fields=["name"],
+            filter_data={"name": [{"value": "marketing", "label": "marketing"}]},
+        )
+        self.assertEqual({r["name"] for r in result["data"]}, {"marketing"})
+
+        # Valid FK pk filters normally (returns marketing's children).
+        children = tools.list_rows(
+            "filer_folder",
+            fields=["name"],
+            filter_data={"parent": [{"value": marketing.pk, "label": "marketing"}]},
+        )
+        self.assertEqual({r["name"] for r in children["data"]}, {"sales"})
+
+        # A non-numeric string where an integer pk is expected isn't
+        # pre-validated; the ORM's own coercion error surfaces from the list
+        # pipeline.
+        with self.assertRaises(ValueError) as ctx:
+            tools.list_rows(
+                "filer_folder",
+                fields=["name"],
+                filter_data={"parent": [{"value": "not-a-pk", "label": "x"}]},
+            )
+        self.assertIn("not-a-pk", str(ctx.exception))
 
     def test_date_open_ended_ranges_apply_the_present_bound(self):
         """A null bound is an open-ended range, not 'match nothing' — only
