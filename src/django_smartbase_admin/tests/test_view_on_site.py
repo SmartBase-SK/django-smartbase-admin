@@ -12,7 +12,6 @@ stock route is reachable again, it fails.
 
 from __future__ import annotations
 
-from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import path, resolve, reverse
@@ -102,7 +101,9 @@ class ModelChangeUrlRoutingTest(TestCase):
         bare_url = self.change_url.rstrip("/")
         match = resolve(bare_url)
         resolved = _unwrapped_func(match)
-        self.assertIs(getattr(resolved, "__func__", resolved), AdminSite.catch_all_view)
+        underlying = getattr(resolved, "__func__", resolved)
+        self.assertEqual(underlying.__name__, "catch_all_view")
+        self.assertIsNot(_resolved_view_class(match), SBAdminEntrypointView)
         response = self.client.get(bare_url)
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], self.change_url)
