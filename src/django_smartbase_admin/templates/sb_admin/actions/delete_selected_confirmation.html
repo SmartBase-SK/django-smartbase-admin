@@ -9,63 +9,72 @@
 
 {% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation delete-selected-confirmation{% endblock %}
 
-
 {% block content %}
-    <div class="py-16 md:pb-32 max-xs:px-20">
-        <h1 class="text-24 md:text-30 text-dark-900 font-bold font-heading line-clamp-1 first-letter:uppercase">
-            {% blocktrans %}Delete {{ object }}{% endblocktrans %}
-        </h1>
+    <div class="mx-auto w-full max-w-1180 pb-96">
+        <header class="py-24 md:py-32 max-xs:px-20">
+            <div class="min-w-0">
+                <h1 class="mt-6 text-24 font-bold text-dark-900 md:text-30">
+                    {% blocktrans with objects_name=objects_name %}Delete selected {{ objects_name }}?{% endblocktrans %}
+                </h1>
+                <p class="mt-8 max-w-640 text-16 leading-24 text-dark-600">
+                    {% blocktrans with objects_name=objects_name %}This will delete the selected {{ objects_name }} and the related records listed below.{% endblocktrans %}
+                </p>
+            </div>
+        </header>
+
         {% if perms_lacking %}
-            <p class="mt-8">{% blocktranslate %}Deleting the selected {{ objects_name }} would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:{% endblocktranslate %}</p>
+            {% trans "Missing permissions" as warning_title %}
+            {% trans "Deleting the selected objects would affect related records that your account cannot delete." as warning_text %}
+            {% trans "Objects blocked by permissions" as list_title %}
+            {% trans "Adjust permissions or ask an administrator before trying again." as list_help %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=perms_lacking %}
+            <div class="detail-view-action-bar">
+                <div>
+                    <h2 class="text-18 font-semibold text-dark-900">{% trans "Bulk deletion is unavailable" %}</h2>
+                    <a href="#" class="btn btn-empty cancel-link ml-auto">{% trans "Back" %}</a>
+                </div>
+            </div>
         {% elif protected %}
-            <p class="mt-8">{% blocktranslate %}Deleting the selected {{ objects_name }} would require deleting the following protected related objects:{% endblocktranslate %}</p>
+            {% trans "Protected related objects" as warning_title %}
+            {% trans "Some selected objects cannot be deleted while protected related records still exist." as warning_text %}
+            {% trans "Protected objects" as list_title %}
+            {% trans "Remove or detach these records, then try again." as list_help %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=protected %}
+            <div class="detail-view-action-bar">
+                <div>
+                    <h2 class="text-18 font-semibold text-dark-900">{% trans "Bulk deletion is blocked" %}</h2>
+                    <a href="#" class="btn btn-empty cancel-link ml-auto">{% trans "Back" %}</a>
+                </div>
+            </div>
         {% else %}
-            <p class="mt-8">{% blocktranslate %}Are you sure you want to delete the selected {{ objects_name }}? All of the following objects and their related items will be deleted:{% endblocktranslate %}</p>
+            {% trans "Review the bulk deletion impact" as warning_title %}
+            {% trans "After confirmation, these records will be deleted and cannot be restored from the admin." as warning_text %}
+            {% trans "Deletion preview" as list_title %}
+            {% trans "Review the exact objects below before confirming." as list_help %}
+            {% include "sb_admin/actions/includes/delete_impact_panel.html" with warning_title=warning_title warning_text=warning_text list_title=list_title list_help=list_help object_list=deleted_objects %}
+
+            <div class="detail-view-action-bar">
+                <div>
+                    <h2 class="mr-16 min-w-0 text-18 font-semibold text-dark-900 line-clamp-1">
+                        {% include "sb_admin/includes/change_form_title.html" %}
+                    </h2>
+                    <form method="post" class="ml-auto flex gap-8">
+                        {% csrf_token %}
+                        {% for obj in queryset %}
+                            <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk|unlocalize }}">
+                        {% endfor %}
+                        <input type="hidden" name="action" value="delete_selected">
+                        <input type="hidden" name="post" value="yes">
+                        <a href="#" class="btn btn-empty cancel-link">{% trans "No, take me back" %}</a>
+                        <button type="submit" class="btn btn-destructive">
+                            <svg class="mr-8 h-20 w-20" aria-hidden="true">
+                                <use xlink:href="#Delete"></use>
+                            </svg>
+                            {% trans "Yes, delete selected" %}
+                        </button>
+                    </form>
+                </div>
+            </div>
         {% endif %}
     </div>
-    {% if perms_lacking %}
-        <div class="card">
-            <ul id="deleted-objects">{{ perms_lacking|unordered_list }}</ul>
-        </div>
-    {% elif protected %}
-        <div class="card">
-            <ul id="deleted-objects">{{ protected|unordered_list }}</ul>
-        </div>
-    {% else %}
-        <div class="card mb-24">
-            <header class="mb-24">
-                <span class="text-dark-900">{% translate "Summary" %}</span>
-            </header>
-
-            <ul>
-                {% for model_name, object_count in model_count %}
-                    <li>{{ model_name|capfirst }}: {{ object_count }}</li>
-                {% endfor %}
-            </ul>
-
-            <h2>{% trans "Objects" %}</h2>
-            {% for deletable_object in deletable_objects %}
-                <ul>{{ deletable_object|unordered_list }}</ul>
-            {% endfor %}
-            <ul>{{ deleted_objects|unordered_list }}</ul>
-        </div>
-
-        <div class="detail-view-action-bar">
-            <div>
-                <h2 class="text-dark-900 font-semibold text-18 mr-16 line-clamp-1">
-                    {% include 'sb_admin/includes/change_form_title.html' %}
-                </h2>
-                <form method="post" class="flex ml-auto gap-8">
-                    {% csrf_token %}
-                    {% for obj in queryset %}
-                        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk|unlocalize }}">
-                    {% endfor %}
-                    <input type="hidden" name="action" value="delete_selected">
-                    <input type="hidden" name="post" value="yes">
-                    <a href="#" class="btn btn-empty cancel-link">{% trans "No, take me back" %}</a>
-                    <input type="submit" class="btn btn-destructive" value="{% trans 'Yes, I’m sure' %}">
-                </form>
-            </div>
-        </div>
-    {% endif %}
 {% endblock %}

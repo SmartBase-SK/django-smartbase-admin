@@ -1,0 +1,54 @@
+{% load i18n sb_admin_tags %}
+
+<section class="card">
+    <div class="flex items-start gap-16">
+        <span class="flex h-48 w-48 shrink-0 items-center justify-center rounded-lg bg-negative-50 text-negative">
+            <svg class="h-24 w-24" aria-hidden="true">
+                <use xlink:href="#Attention"></use>
+            </svg>
+        </span>
+        <div class="min-w-0">
+            <p class="text-16 font-semibold text-negative-900">
+                {{ warning_title }}
+            </p>
+            <p class="mt-6 text-14 leading-20 text-dark-700">
+                {{ warning_text }}
+            </p>
+        </div>
+    </div>
+
+    <div class="pt-20">
+        <p class="text-12 font-semibold uppercase text-dark-600">{% trans "Summary" %}</p>
+        <dl class="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
+            {% for model_name, object_count in model_count %}
+                <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
+                    <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{{ model_name|capfirst }}</dt>
+                    <dd class="badge badge-simple badge-neutral shrink-0">{{ object_count }}</dd>
+                </div>
+            {% empty %}
+                <div class="flex min-h-40 min-w-0 items-center justify-between gap-16 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 dark:bg-light">
+                    <dt class="min-w-0 flex-1 truncate text-14 text-dark-700">{% trans "Items" %}</dt>
+                    <dd class="badge badge-simple badge-neutral shrink-0">0</dd>
+                </div>
+            {% endfor %}
+        </dl>
+    </div>
+</section>
+
+<section class="card mt-16">
+    <div class="mb-16 flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-18 font-semibold text-dark-900">{{ list_title }}</h2>
+            <p class="mt-4 text-14 text-dark-600">{{ list_help }}</p>
+        </div>
+    </div>
+ 
+    <div id="deleted-objects" class="overflow-y-auto text-14 leading-20 text-dark-700">
+        {% for deletable_object in deletable_objects %}
+            <div class="mb-16 border-b border-dark-100 pb-16 last:mb-0 last:border-b-0 last:pb-0">
+                {{ deletable_object|delete_tree }}
+            </div>
+        {% endfor %}
+        {{ object_list|delete_tree }}
+    </div>
+</section>

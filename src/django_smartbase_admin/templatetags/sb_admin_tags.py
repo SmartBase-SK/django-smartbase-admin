@@ -46,6 +46,53 @@ def get_json_script(value, element_id):
     return json_script(value, element_id)
 
 
+def _is_delete_tree_branch(value):
+    return isinstance(value, (list, tuple))
+
+
+def _render_delete_tree_branch(items):
+    if not items:
+        return ""
+
+    parts = []
+    for item in items:
+        if _is_delete_tree_branch(item):
+            branch = _render_delete_tree_branch(item)
+            if branch:
+                parts.append(
+                    format_html(
+                        '<div class="ml-16 grid gap-6 border-l border-dark-200 pl-12">{}</div>',
+                        branch,
+                    )
+                )
+            continue
+
+        parts.append(
+            format_html(
+                '<div class="flex items-start gap-10 rounded-sm border border-dark-100 bg-dark-50 px-12 py-8 text-14 leading-20 text-dark-800 dark:bg-light">'
+                '<span class="mt-6 h-6 w-6 shrink-0 rounded bg-negative"></span>'
+                '<span class="min-w-0 break-words">{}</span>'
+                "</div>",
+                item,
+            )
+        )
+
+    return mark_safe("".join(parts))
+
+
+@register.filter
+def delete_tree(value):
+    if not value:
+        return ""
+
+    if not _is_delete_tree_branch(value):
+        value = [value]
+
+    return format_html(
+        '<div class="grid gap-6">{}</div>', _render_delete_tree_branch(value)
+    )
+
+
 @register.simple_tag
 def get_item(dictionary, key):
     return dictionary.get(key, None) if dictionary else None
@@ -274,7 +321,7 @@ def get_log_entry_message(log_entry):
     """
     try:
         return get_change_message_legacy(log_entry)
-    except Exception as e:
+    except Exception:
         return ""
 
 

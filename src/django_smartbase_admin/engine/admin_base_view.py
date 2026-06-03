@@ -1114,6 +1114,8 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
         if not response:
             return redirect(self.get_menu_view_url(request))
+        if isinstance(response, TemplateResponse):
+            response.context_data.update(self.get_global_context(request))
         return response
 
     @sbadmin_action(permission="view")
