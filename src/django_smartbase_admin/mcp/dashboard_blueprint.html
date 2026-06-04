@@ -4,7 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SBAdmin Dashboard</title>
-<!-- Custom dashboard blueprint. Setup, usage and caveats live in the get_dashboard_blueprint MCP tool's "instructions". -->
+<!-- Blueprint for a local dashboard on this admin's live data (MCP resource dashboard://blueprint). -->
+<!-- Build any view below — metrics, tables, charts. Fill CONFIG.clientId after registering an OAuth client; scope + MCP path are filled in on read. -->
+
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a1a; }
   header { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; border-bottom: 1px solid #e5e5e5; }
@@ -31,11 +33,11 @@
 <script type="module">
 /* ============================ CONFIG ============================ */
 const CONFIG = {
-  issuer:      "__MCP_ISSUER__",                // this server (filled in by get_dashboard_blueprint)
-  clientId:    "REPLACE_WITH_CLIENT_ID",        // from Dynamic Client Registration
+  issuer:      location.origin,                 // this server when served same-origin; else set explicitly
+  clientId:    "REPLACE_WITH_CLIENT_ID",        // from Dynamic Client Registration (see header)
   redirectUri: location.origin + location.pathname,
-  scope:       "__MCP_SCOPE__",                 // scope this server exposes (filled in)
-  mcpUrl:      "__MCP_URL__",                    // this server's MCP endpoint (filled in)
+  scope:       "__MCP_SCOPE__",                 // scope this server exposes (filled in on resource read)
+  mcpUrl:      location.origin + "/__MCP_PATH__",  // MCP endpoint (path filled in); set host if off-origin
 };
 
 /* ===================== OAuth 2.1 + PKCE (auth) ===================== */
@@ -127,7 +129,10 @@ async function api(tool, args = {}) {
   return c?.text ? JSON.parse(c.text) : res;
 }
 
-/* ===================== DASHBOARD (fill this in) ===================== */
+/* ===================== DASHBOARD (build it here) =====================
+   Pull data with api(tool, args) and render it any way you like. The card()
+   helper and the examples below are just one option — build tables, charts,
+   or any layout. Discover views/fields via list_admins. */
 async function render() {
   document.getElementById("auth-btn").textContent = TOKEN ? "Disconnect" : "Connect";
   document.getElementById("status").textContent   = TOKEN ? "connected" : "not connected";
