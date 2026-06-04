@@ -28,6 +28,10 @@
                 @apply hidden;
             }
         }
+        &.sbadmin-fieldset-plain {
+            @apply bg-transparent border-0 rounded-none p-0 max-xs:py-0;
+            background-color: transparent;
+        }
     }
     .card.level-1 { --level: 1; }
     .card.level-2 { --level: 2; }

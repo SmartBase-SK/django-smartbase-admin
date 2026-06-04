@@ -132,9 +132,15 @@ class SBAdminBaseView(object):
         return inner_view
 
     def process_list_actions(
-        self, request, actions: list[SBAdminCustomAction]
+        self,
+        request,
+        actions: list[SBAdminCustomAction],
+        object_id: int | str | None = None,
     ) -> list[SBAdminCustomAction]:
-        resolved_actions = self._resolve_action_urls(actions)
+        resolved_actions = self._resolve_action_urls(
+            actions,
+            object_id,
+        )
         return self.process_actions_permissions(request, resolved_actions)
 
     def process_row_actions(
@@ -688,6 +694,8 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_reorder_field = None
     sbadmin_nested: dict | None = None
     sbadmin_list_sticky_header_and_footer = None
+    sbadmin_show_tabulator_header_controls = True
+    sbadmin_filters_open_by_default = False
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
@@ -860,8 +868,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_search_fields(self, request):
         if hasattr(super(SBAdminBaseListView, self), "get_search_fields"):
             return super().get_search_fields(request)
-        else:
-            return []
+        return getattr(self, "search_fields", [])
 
     def get_search_lookup(self, request, field_name: str, prefix: str = "") -> str:
         if prefix == "^":
@@ -904,6 +911,7 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
         sticky_header_and_footer = self.get_sbadmin_list_sticky_header_and_footer(
             request
         )
@@ -916,7 +924,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             "pageSizeWidgetId": f"{view_id}" + "-page-size-widget",
             "baseViewUrl": request.path,
             "tableElSelector": f"#{view_id}-table",
-            "tableAjaxUrl": self.get_ajax_url(),
+            "tableAjaxUrl": self.get_action_url(
+                Action.LIST_JSON.value, object_id=object_id
+            ),
             "tableDataEditUrl": self.get_action_url(Action.TABLE_DATA_EDIT.value),
             "tableActionMoveUrl": self.get_action_url(
                 Action.TABLE_REORDER_ACTION.value
@@ -1011,7 +1021,14 @@ class SBAdminBaseListView(SBAdminBaseView):
                 ]
             except Exception:
                 pass
-        return self.process_list_actions(request, list_actions)
+        return self.process_list_actions(
+            request,
+            list_actions,
+            object_id=self.get_sbadmin_list_action_object_id(request),
+        )
+
+    def get_sbadmin_list_action_object_id(self, request) -> int | str | None:
+        return None
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:
         if not self.sbadmin_list_actions:
@@ -1308,6 +1325,12 @@ class SBAdminBaseListView(SBAdminBaseView):
         else:
             # default
             return "sb_admin/components/filters.html"
+
+    def get_sbadmin_show_tabulator_header_controls(self, request) -> bool:
+        return self.sbadmin_show_tabulator_header_controls
+
+    def get_sbadmin_filters_open_by_default(self, request) -> bool:
+        return self.sbadmin_filters_open_by_default
 
     def get_tabulator_header_template_name(self, request) -> str:
         filters_version = self.get_filters_version(request)

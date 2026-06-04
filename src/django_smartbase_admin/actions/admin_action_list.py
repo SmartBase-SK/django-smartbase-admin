@@ -224,12 +224,19 @@ class SBAdminListAction(SBAdminAction):
             {
                 "const": constants,
                 "tabulator_definition": tabulator_definition,
+                "tabulator_definition_script_id": f"{self.view.get_id()}-tabulator-definition",
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
                 "advanced_filters_data": QueryBuilderService.get_advanced_filters_context_data(
                     self
                 ),
                 "filters_template_name": self.view.get_filters_template_name(
+                    self.threadsafe_request
+                ),
+                "show_tabulator_header_controls": self.view.get_sbadmin_show_tabulator_header_controls(
+                    self.threadsafe_request
+                ),
+                "filters_open_by_default": self.view.get_sbadmin_filters_open_by_default(
                     self.threadsafe_request
                 ),
                 "tabulator_header_template_name": self.view.get_tabulator_header_template_name(

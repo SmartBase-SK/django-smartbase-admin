@@ -7,13 +7,14 @@ from django.db.models.functions import TruncMonth, TruncDay, TruncWeek, TruncYea
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
-from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
+from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER, Action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     DateFilterWidget,
@@ -421,7 +422,8 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
         )
         if not correct_resolutions:
             raise RuntimeError(
-                f"Correct date_resolutions selection {self.date_resolutions}. Available choices {self.DateResolutionsOptions.values}."
+                f"Correct date_resolutions selection {self.date_resolutions}. "
+                f"Available choices {self.DateResolutionsOptions.values}."
             )
         x_axis_annotate = None
         order_by = "x_axis"
@@ -677,9 +679,15 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         context.update(self.get_global_context(request))
         action = SBAdminListAction(self, request)
         data = action.get_template_data()
+        data["filters_toolbar_after_search_template"] = (
+            "sb_admin/dashboard/includes/list_widget_actions.html"
+        )
         context["content_context"] = data
         context["list_base_template"] = "sb_admin/blank_base.html"
         return context
+
+    def get_sbadmin_list_action_object_id(self, request):
+        return getattr(request.request_data, "object_id", None)
 
     def get_tabulator_definition(self, request):
         tabulator_definition = super().get_tabulator_definition(request)
@@ -688,8 +696,24 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             "tableParamsModule",
             "detailViewModule",
             "filterModule",
+            "columnDisplayModule",
         ]
         return tabulator_definition
+
+
+def render_registered_standalone_widget(
+    request, *, view_id: str, object_id: str
+) -> SafeString:
+    widget = request.request_data.configuration.view_map[view_id]
+    widget_request = copy(request)
+    widget_request_data = copy(request.request_data)
+    widget_request_data.view = view_id
+    widget_request_data.action = Action.LIST.value
+    widget_request_data.object_id = object_id
+    widget_request_data.selected_view = widget
+    widget_request.request_data = widget_request_data
+    widget.init_view_dynamic(widget_request, widget_request_data)
+    return mark_safe(widget.render(widget_request))
 
 
 class SbAdminCalendarWidget(SBAdminDashboardWidget):
