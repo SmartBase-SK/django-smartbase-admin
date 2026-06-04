@@ -41,7 +41,7 @@ class SBAdminDashboardView(SBAdminView):
         return self.sub_views
 
     @sbadmin_action
-    def dashboard(self, request, modifier):
+    def dashboard(self, request, modifier, object_id=None):
         context = self.get_global_context(request)
         context["sub_views"] = self.sub_views
         context["direct_sub_views"] = self.direct_sub_views

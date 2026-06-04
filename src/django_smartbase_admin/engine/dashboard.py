@@ -79,7 +79,7 @@ class SBAdminDashboardWidget(SBAdminView):
         return self.get_action_url("action_get_data")
 
     @sbadmin_action(permission="view")
-    def action_get_data(self, request, modifier):
+    def action_get_data(self, request, modifier, object_id=None):
         return JsonResponse(data={"data": self.get_cached_data(request)})
 
     def get_widget_context_data(self, request):
@@ -720,5 +720,5 @@ class SbAdminCalendarWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/calendar_widget.html"
 
     @sbadmin_action(permission="view")
-    def action_get_data(self, request, modifier):
+    def action_get_data(self, request, modifier, object_id=None):
         return JsonResponse(data=self.get_cached_data(request), safe=False)

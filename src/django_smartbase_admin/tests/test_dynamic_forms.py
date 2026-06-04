@@ -32,7 +32,6 @@ from django_smartbase_admin.engine.actions import (
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
 from django_smartbase_admin.engine.const import (
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
-    MODIFIER_OBJECT_ID,
     Action,
 )
 from django_smartbase_admin.engine.dynamic_forms import (
@@ -554,7 +553,7 @@ class RowObjectDynamicRegionModal(RowActionModalView):
 
 
 class CompleteActionAutocompleteWidget(SBAdminAutocompleteWidget):
-    def action_autocomplete(self, request, modifier):
+    def action_autocomplete(self, request, modifier, object_id=None):
         return JsonResponse(
             {
                 "data": [
@@ -681,8 +680,8 @@ class CompleteActionSourceView(SBAdminBaseView):
         return True
 
     @sbadmin_action(permission="view")
-    def complete_method_action(self, request, modifier):
-        return HttpResponse(f"method:{self.get_id()}:{modifier}")
+    def complete_method_action(self, request, modifier, object_id=None):
+        return HttpResponse(f"method:{self.get_id()}:{modifier}:{object_id}")
 
     def target_action(self, source_name):
         return SBAdminFormViewAction(
@@ -1358,7 +1357,6 @@ class DynamicFormTests(SimpleTestCase):
             title="Open modal",
             view=view,
             open_in_modal=True,
-            action_modifier=MODIFIER_OBJECT_ID,
         )
 
         class FieldsetActionsForm(SBAdminBaseFormInit, forms.Form):
@@ -1951,6 +1949,14 @@ class DynamicFormTests(SimpleTestCase):
             ("readonly_summary",),
         )
         self.assertEqual(change_state.active_fields, ("readonly_summary",))
+        self.assertEqual(
+            add_form._dynamic_region_endpoint(self.request),
+            "/sb-admin/sbadmin_dynamic_region/add",
+        )
+        self.assertEqual(
+            change_form._dynamic_region_endpoint(self.request),
+            "/sb-admin/sbadmin_dynamic_region/add/1",
+        )
 
     def test_deferred_dynamic_region_renders_lazy_loader_until_fragment(self):
         form = DeferredDynamicRegionForm(request=self.request)

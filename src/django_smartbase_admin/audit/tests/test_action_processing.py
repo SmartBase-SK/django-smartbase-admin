@@ -18,10 +18,7 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
 )
-from django_smartbase_admin.engine.const import (
-    IGNORE_LIST_SELECTION,
-    MODIFIER_OBJECT_ID,
-)
+from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     RowActionModalView,
@@ -44,6 +41,9 @@ class FakeAdminView(SBAdminBaseView):
     def __init__(self, row_actions=None, has_action_permission=True):
         self.row_actions = row_actions or []
         self.has_action_permission = has_action_permission
+
+    def get_id(self):
+        return "articles"
 
     def get_action_url(self, action, modifier="template", object_id=None):
         url = f"/actions/{action}/{modifier}/"
@@ -77,6 +77,12 @@ class FakeAdminView(SBAdminBaseView):
 
     def get_search_field_placeholder(self, request):
         return ""
+
+    def get_sbadmin_show_tabulator_header_controls(self, request):
+        return True
+
+    def get_sbadmin_filters_open_by_default(self, request):
+        return False
 
     def get_config_url(self, request):
         return ""
@@ -412,11 +418,11 @@ class RowActionIntegrationTests(TestCase):
             self.request, [action], object_id=None
         )
 
-        self.assertEqual(action.action_modifier, MODIFIER_OBJECT_ID)
+        self.assertIsNone(action.action_modifier)
         self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
         self.assertEqual(
             processed_without_object[0].url,
-            f"/actions/PublishArticleView/{IGNORE_LIST_SELECTION}/",
+            "/actions/PublishArticleView/template/",
         )
 
     def test_detail_action_without_object_modifier_keeps_template_modifier(self):
@@ -429,7 +435,7 @@ class RowActionIntegrationTests(TestCase):
 
         processed = view.process_detail_actions(self.request, [action], object_id=123)
 
-        self.assertEqual(processed[0].url, "/actions/contact/template/")
+        self.assertEqual(processed[0].url, "/actions/contact/template/123/")
 
     def test_detail_row_modal_action_infers_current_object(self):
         view = FakeAdminView()
@@ -482,7 +488,6 @@ class RowActionIntegrationTests(TestCase):
         action = SBAdminCustomAction(
             title="Open",
             url=f"/articles/{MODIFIER_OBJECT_ID}/",
-            action_modifier=MODIFIER_OBJECT_ID,
         )
 
         processed = view.process_row_actions(self.request, [action])
@@ -501,7 +506,6 @@ class RowActionIntegrationTests(TestCase):
                     target_view=PublishArticleView,
                     title="Publish",
                     view=view,
-                    action_modifier=MODIFIER_OBJECT_ID,
                 )
             ],
         )
@@ -565,7 +569,7 @@ class ModalActionIntegrationTests(TestCase):
                 return None
 
         response = MissingRowModal.as_view(view=FakeAdminView())(
-            RequestFactory().post("/"), modifier="123"
+            RequestFactory().post("/"), modifier="template", object_id="123"
         )
 
         self.assertEqual(response.status_code, 404)

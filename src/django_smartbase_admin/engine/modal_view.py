@@ -289,7 +289,7 @@ class RowActionModalView(ActionModalView):
             object_id = getattr(self.request.request_data, "object_id", None)
             if object_id is not None:
                 return object_id
-        return self.kwargs.get("modifier")
+        return self.kwargs.get("object_id")
 
     def get_object(self):
         if not hasattr(self, "_resolved_object"):

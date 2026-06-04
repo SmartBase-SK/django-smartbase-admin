@@ -29,10 +29,10 @@ def _make_view(*, has_permission=True):
     view = MagicMock()
 
     @sbadmin_action
-    def allowed_action(request, modifier):
+    def allowed_action(request, modifier, object_id):
         return HttpResponse("ok")
 
-    def unmarked_method(request, modifier):
+    def unmarked_method(request, modifier, object_id):
         return HttpResponse("should not reach")
 
     view.allowed_action = allowed_action
@@ -89,20 +89,27 @@ class TestDelegateToAction(TestCase):
     def test_dynamic_inner_view_is_marked(self):
         from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
 
+        seen_kwargs = {}
         mock_action = MagicMock()
-        mock_action.target_view.as_view.return_value = (
-            lambda request, **kwargs: HttpResponse("ok")
-        )
+
+        def target_callable(request, **kwargs):
+            seen_kwargs.update(kwargs)
+            return HttpResponse("ok")
+
+        mock_action.target_view.as_view.return_value = target_callable
 
         base_view = SBAdminBaseView.__new__(SBAdminBaseView)
         inner = base_view.delegate_to_target_view(mock_action.target_view)
+        response = inner(self.factory.get("/"), "template", "123")
+
         self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
-        self.assertTrue(getattr(inner, "_sbadmin_keep_route_modifier_argument", False))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(seen_kwargs, {"modifier": "template", "object_id": "123"})
 
     @patch(PATCH_FROM_REQUEST)
     def test_decorator_permission_propagated_to_action(self, mock_from_request):
         @sbadmin_action(permission="delete")
-        def restricted_action(request, modifier):
+        def restricted_action(request, modifier, object_id):
             return HttpResponse("ok")
 
         view = MagicMock()
@@ -131,8 +138,9 @@ class TestDelegateToAction(TestCase):
         seen = {}
 
         @sbadmin_action
-        def row_action(request, modifier):
+        def row_action(request, modifier, object_id):
             seen["modifier"] = modifier
+            seen["object_id"] = object_id
             return HttpResponse("ok")
 
         view = MagicMock()
@@ -154,7 +162,8 @@ class TestDelegateToAction(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(seen["modifier"], "123")
+        self.assertEqual(seen["modifier"], "template")
+        self.assertEqual(seen["object_id"], "123")
 
 
 class TestDefaultActionPermission(TestCase):
@@ -184,7 +193,7 @@ class TestDefaultActionPermission(TestCase):
 class TestSbadminActionDecorator(TestCase):
     def test_bare_decorator(self):
         @sbadmin_action
-        def my_action(request, modifier):
+        def my_action(request, modifier, object_id):
             pass
 
         self.assertTrue(my_action._is_sbadmin_action)
@@ -192,7 +201,7 @@ class TestSbadminActionDecorator(TestCase):
 
     def test_decorator_with_kwargs(self):
         @sbadmin_action(permission="delete")
-        def my_action(request, modifier):
+        def my_action(request, modifier, object_id):
             pass
 
         self.assertTrue(my_action._is_sbadmin_action)
@@ -204,10 +213,10 @@ class TestMenuActionAutoMarking(TestCase):
         class MyView(SBAdminView):
             menu_action = "landing"
 
-            def landing(self, request, modifier):
+            def landing(self, request, modifier, object_id):
                 return HttpResponse("ok")
 
-            def not_menu_action(self, request, modifier):
+            def not_menu_action(self, request, modifier, object_id):
                 return HttpResponse("nope")
 
         v = MyView()
@@ -223,7 +232,7 @@ class TestMenuActionAutoMarking(TestCase):
             menu_action = "landing"
 
             @sbadmin_action(permission="delete")
-            def landing(self, request, modifier):
+            def landing(self, request, modifier, object_id):
                 return HttpResponse("ok")
 
         v = MyView()

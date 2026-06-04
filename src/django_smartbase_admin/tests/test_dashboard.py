@@ -43,6 +43,12 @@ class _StandaloneDashboardWidget(SBAdminDashboardListWidget):
     def get_detail_url(self):
         return ""
 
+    def get_action_url(self, action, modifier="template", object_id=None):
+        url = f"/{self.get_id()}/{action}/{modifier}/"
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
+
     @admin.display(description="Display name")
     def display_name(self, object_id, value, **kwargs):
         return value

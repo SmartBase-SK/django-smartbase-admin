@@ -2213,8 +2213,8 @@ class ArticleAdmin(SBAdmin):
         ]
 
     @sbadmin_action
-    def action_archive_article(self, request, modifier):
-        Article.objects.filter(pk=modifier).update(status="archived")
+    def action_archive_article(self, request, modifier, object_id):
+        Article.objects.filter(pk=object_id).update(status="archived")
         messages.success(request, _("Article archived."))
         return self.build_action_response(request)
 ```
@@ -2287,7 +2287,7 @@ Framework consumers call processed getters, not raw getters:
 
 **Key points:**
 - Use `get_sbadmin_row_actions()` when the action needs `view=self`. URL-only actions can also be declared in the `sbadmin_row_actions` class attribute.
-- `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; row action materialization replaces it with the row pk server-side.
+- `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; use it only in direct custom URLs. Row method/modal actions receive the row pk through the `object_id` argument.
 - `RowActionModalView` resolves objects with `self.view.get_queryset(request)` by default. Do not override this with a raw model manager unless you also preserve queryset restrictions.
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
@@ -3679,7 +3679,7 @@ class TopicAdmin(TopicTreeMixin, SBAdmin):
     sbadmin_list_display = ("name", "slug")
 
     @sbadmin_action
-    def action_tree_json(self, request, modifier):
+    def action_tree_json(self, request, modifier, object_id):
         """Emit Fancytree node JSON for the whole tree."""
         qs = self.get_queryset(request)
         data = self.get_tree_data(request, qs, values=["name", "slug"])
@@ -3734,7 +3734,7 @@ class TopicAdmin(TopicTreeMixin, SBAdmin):
 
     @sbadmin_action
     @require_POST
-    def action_tree_reorder(self, request, modifier):
+    def action_tree_reorder(self, request, modifier, object_id):
         tree_widget_data = json.loads(request.body)
         objs_by_path = {obj.path: obj for obj in Topic.objects.all()}
         to_update = self.process_treebeard_tree(tree_widget_data, objs_by_path)
@@ -3941,7 +3941,7 @@ Supported option keys:
 - `collapsible=True` uses Bootstrap collapse; do not activate it with `classes=["collapse"]`.
 - `default_collapsed=True` starts the fieldset closed. Existing JS opens collapsed ancestors when focusing validation errors.
 - `hide_if_empty=True` is visual only: it does not disable, clear, or remove fields from form submission. Fieldsets with validation errors stay visible, and dynamic fieldsets are re-checked after HTMX swaps.
-- Fieldset actions are detail-style links. Use `action_modifier=MODIFIER_OBJECT_ID` when the action should receive the current object id.
+- Fieldset actions are detail-style links. URL-callable fieldset actions receive the current object id through the `object_id` argument.
 - SBAdmin looks up fieldset metadata by the tuple's first value (`name`). Avoid multiple fieldsets with the same name, including multiple `None` fieldsets, when using dynamic regions or collapse metadata.
 - The collapse id is generated from `sbadmin-fieldset`, the form prefix when present, and the fieldset name when present. Prefixed inline rows therefore get separate collapse ids.
 
@@ -4260,6 +4260,8 @@ Override default logo by placing files in your static directory:
 
 Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions go through `delegate_to_action`, which checks for this decorator and runs `has_permission_for_action` before dispatching.
 
+Action URLs always use `/<view>/<action>/<modifier>/` with an optional `/<object_id>/` segment. The method signature is always `(request, modifier, object_id)`. Keep non-object action state in `modifier`; row/detail object primary keys arrive as `object_id`.
+
 ### Permission defaults
 
 The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"` to the decorator. `BULK_DELETE` is special-cased through `has_delete_permission`.
@@ -4290,7 +4292,7 @@ from blog.models import Article
 # ❌ BAD — method is not decorated, returns 404 when called via URL
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    def action_archive_drafts(self, request, modifier):
+    def action_archive_drafts(self, request, modifier, object_id):
         Article.objects.filter(status="draft").update(status="archived")
         messages.success(request, _("Draft articles archived."))
         return self.build_action_response(request)
@@ -4309,7 +4311,7 @@ class ArticleAdmin(SBAdmin):
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     @sbadmin_action
-    def action_archive_drafts(self, request, modifier):
+    def action_archive_drafts(self, request, modifier, object_id):
         Article.objects.filter(status="draft").update(status="archived")
         messages.success(request, _("Draft articles archived."))
         return self.build_action_response(request)
@@ -4328,7 +4330,7 @@ class ArticleAdmin(SBAdmin):
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     @sbadmin_action(permission="delete")
-    def action_delete_archived(self, request, modifier):
+    def action_delete_archived(self, request, modifier, object_id):
         Article.objects.filter(status="archived").delete()
         messages.success(request, _("Archived articles deleted."))
         return self.build_action_response(request)

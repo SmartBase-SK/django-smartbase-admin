@@ -8,5 +8,5 @@ class SBAdminMediaView(SBAdminView):
     label = "Media"
 
     @sbadmin_action
-    def list(self, request, modifier):
+    def list(self, request, modifier, object_id=None):
         return render_to_string("sb_admin/actions/media.html", context={})

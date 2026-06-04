@@ -61,7 +61,6 @@ from django_smartbase_admin.engine.inline_pagination import (
     get_inline_partial_prefix,
 )
 from django_smartbase_admin.engine.dynamic_forms import (
-    SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBAdminDynamicFormMixin,
@@ -646,13 +645,13 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             fieldsets.append((fieldset[0], fieldset_dict))
         return fieldsets
 
-    def get_dynamic_region_object(self, request, modifier):
-        if modifier == SBADMIN_DYNAMIC_REGION_ADD_MODIFIER:
+    def get_dynamic_region_object(self, request, modifier, object_id=None):
+        if object_id is None:
             return None
         if hasattr(self, "get_object"):
-            return self.get_object(request, modifier)
+            return self.get_object(request, object_id)
         try:
-            return self.get_queryset(request).get(pk=modifier)
+            return self.get_queryset(request).get(pk=object_id)
         except self.model.DoesNotExist:
             return None
 
@@ -672,7 +671,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         return form_kwargs
 
     @sbadmin_action
-    def sbadmin_dynamic_region(self, request, modifier):
+    def sbadmin_dynamic_region(self, request, modifier, object_id=None):
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
 
@@ -680,8 +679,8 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if not region_name:
             return HttpResponseBadRequest(f"Missing {SBADMIN_DYNAMIC_REGION_PARAM}.")
 
-        obj = self.get_dynamic_region_object(request, modifier)
-        if modifier != SBADMIN_DYNAMIC_REGION_ADD_MODIFIER and obj is None:
+        obj = self.get_dynamic_region_object(request, modifier, object_id)
+        if object_id is not None and obj is None:
             return HttpResponse("", status=404)
 
         form_class = self.get_dynamic_region_form_class(request, obj)

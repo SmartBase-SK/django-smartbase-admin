@@ -1,7 +1,5 @@
 from django.core.exceptions import ImproperlyConfigured
 
-from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
-
 
 def sbadmin_action(func=None, **kwargs):
     """Mark a view method as callable via SBAdmin URL dispatch.
@@ -22,10 +20,10 @@ def sbadmin_action(func=None, **kwargs):
     Usage::
 
         @sbadmin_action(permission="view")
-        def action_list_json(self, request, modifier): ...
+        def action_list_json(self, request, modifier, object_id): ...
 
         @sbadmin_action(permission="delete")
-        def action_delete_archived(self, request, modifier): ...
+        def action_delete_archived(self, request, modifier, object_id): ...
     """
 
     def decorator(fn):
@@ -211,7 +209,6 @@ class SBAdminRowAction(SBAdminCustomAction):
             open_in_modal=resolved_target_view is not None,
             open_in_new_tab=resolved_open_in_new_tab,
             icon=resolved_icon,
-            action_modifier=MODIFIER_OBJECT_ID,
             sub_actions=resolved_sub_actions,
             mcp_description=mcp_description,
         )

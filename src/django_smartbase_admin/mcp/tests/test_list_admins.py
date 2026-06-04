@@ -212,7 +212,7 @@ class ListAdminsTests(TestCase):
             list_display = ("id", "name")
 
             @sbadmin_action
-            def action_archive_folder(self, request, modifier):
+            def action_archive_folder(self, request, modifier, object_id):
                 from django.http import HttpResponse
 
                 return HttpResponse("")

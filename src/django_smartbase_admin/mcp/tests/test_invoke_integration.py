@@ -150,8 +150,8 @@ class FolderInvokeTestAdmin(SBAdmin):
     inlines = [FolderFileInline]
 
     @sbadmin_action
-    def action_touch(self, request, modifier):
-        obj = self.get_queryset(request).get(pk=modifier)
+    def action_touch(self, request, modifier, object_id):
+        obj = self.get_queryset(request).get(pk=object_id)
         obj.name = f"{obj.name}!"
         obj.save()
         messages.success(request, f"Touched {obj.name}.")
@@ -160,15 +160,15 @@ class FolderInvokeTestAdmin(SBAdmin):
         return HttpResponse("")
 
     @sbadmin_action
-    def action_archive(self, request, modifier):
-        obj = self.get_queryset(request).get(pk=modifier)
+    def action_archive(self, request, modifier, object_id):
+        obj = self.get_queryset(request).get(pk=object_id)
         messages.success(request, f"Archived {obj.name}.")
         from django.http import HttpResponse
 
         return HttpResponse("")
 
     @sbadmin_action
-    def action_export_bytes(self, request, modifier):
+    def action_export_bytes(self, request, modifier, object_id):
         """Returns a small binary blob with Content-Disposition so the
         MCP normalizer embeds it as a resource for download."""
         from django.http import HttpResponse

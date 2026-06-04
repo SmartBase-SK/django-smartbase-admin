@@ -197,21 +197,8 @@ class SBAdminViewService(object):
 
         return action_function(
             request,
-            cls.get_action_modifier_argument(action_function, request_data),
-        )
-
-    @classmethod
-    def get_action_modifier_argument(cls, action_function, request_data):
-        if getattr(action_function, "_sbadmin_keep_route_modifier_argument", False):
-            return request_data.modifier
-        if cls.should_pass_object_id_as_legacy_modifier(request_data):
-            return request_data.object_id
-        return request_data.modifier
-
-    @staticmethod
-    def should_pass_object_id_as_legacy_modifier(request_data) -> bool:
-        return (
-            request_data.object_id is not None and request_data.modifier == "template"
+            request_data.modifier,
+            request_data.object_id,
         )
 
     @classmethod

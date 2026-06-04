@@ -252,7 +252,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
         return None
 
     @sbadmin_action(permission="view")
-    def list(self, request, modifier):
+    def list(self, request, modifier, object_id=None):
         language_choice_change_response = self.handle_language_choice_change(request)
         if language_choice_change_response:
             return language_choice_change_response
@@ -283,7 +283,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
         return translation_obj
 
     @sbadmin_action
-    def detail(self, request, modifier):
+    def detail(self, request, modifier, object_id=None):
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
         language_choice_change_response = self.handle_language_choice_change(request)
         if language_choice_change_response:
@@ -466,7 +466,7 @@ class SBAdminTranslationsView(SBAdminView):
         self.translations_definition = translations_definition
 
     @sbadmin_action
-    def translations(self, request, modifier):
+    def translations(self, request, modifier, object_id=None):
         context = self.get_global_context(request)
         context.update({"sub_views": self.sub_views})
         return TemplateResponse(

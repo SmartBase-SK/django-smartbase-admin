@@ -120,11 +120,12 @@ class SBAdminBaseView(object):
         )
 
     def delegate_to_target_view(self, target_view, action=None):
-        def inner_view(request, modifier):
-            return target_view.as_view(view=self)(request, modifier=modifier)
+        def inner_view(request, modifier, object_id):
+            return target_view.as_view(view=self)(
+                request, modifier=modifier, object_id=object_id
+            )
 
         inner_view._is_sbadmin_action = True
-        inner_view._sbadmin_keep_route_modifier_argument = True
         if action is not None:
             inner_view._sbadmin_action_attrs = {
                 "permission": getattr(action, "permission", None)
@@ -146,13 +147,7 @@ class SBAdminBaseView(object):
     def process_row_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
-        materialized_actions = [
-            self._materialize_modifier_object_id(action, MODIFIER_OBJECT_ID)
-            for action in actions
-        ]
-        resolved_actions = self._resolve_action_urls(
-            materialized_actions, MODIFIER_OBJECT_ID
-        )
+        resolved_actions = self._resolve_action_urls(actions, MODIFIER_OBJECT_ID)
         return self.process_actions_permissions(request, resolved_actions)
 
     def process_detail_actions(
@@ -161,11 +156,7 @@ class SBAdminBaseView(object):
         actions: list[SBAdminCustomAction],
         object_id: int | str | None = None,
     ) -> list[SBAdminCustomAction]:
-        materialized_actions = [
-            self._materialize_modifier_object_id(action, object_id)
-            for action in actions
-        ]
-        resolved_actions = self._resolve_action_urls(materialized_actions, object_id)
+        resolved_actions = self._resolve_action_urls(actions, object_id)
         return self.process_actions_permissions(request, resolved_actions)
 
     def process_inline_actions(
@@ -203,8 +194,8 @@ class SBAdminBaseView(object):
             resolved_action.action_id = action_id
             resolved_action.url = source_view.get_action_url(
                 action_id,
-                modifier=self._get_action_modifier(action, object_id),
-                object_id=self._get_action_url_object_id(action, object_id),
+                modifier=getattr(action, "action_modifier", None) or "template",
+                object_id=object_id,
             )
             return resolved_action
         if action.url:
@@ -213,8 +204,8 @@ class SBAdminBaseView(object):
             resolved_action = copy(action)
             resolved_action.url = source_view.get_action_url(
                 action.action_id,
-                modifier=self._get_action_modifier(action, object_id),
-                object_id=self._get_action_url_object_id(action, object_id),
+                modifier=getattr(action, "action_modifier", None) or "template",
+                object_id=object_id,
             )
             return resolved_action
         return action
@@ -232,71 +223,6 @@ class SBAdminBaseView(object):
         if not hasattr(self, action_id):
             setattr(self, action_id, self.delegate_to_target_view(target_view, action))
         return action_id
-
-    @staticmethod
-    def _get_action_modifier(
-        action: SBAdminCustomAction, object_id: int | str | None = None
-    ) -> str:
-        if SBAdminBaseView._action_uses_object_id(action, object_id):
-            return "template" if object_id is not None else IGNORE_LIST_SELECTION
-        return getattr(action, "action_modifier", None) or "template"
-
-    @staticmethod
-    def _get_action_url_object_id(
-        action: SBAdminCustomAction, object_id: int | str | None
-    ) -> int | str | None:
-        if not SBAdminBaseView._action_uses_object_id(action, object_id):
-            return None
-        return object_id
-
-    @staticmethod
-    def _action_uses_object_id(
-        action: SBAdminCustomAction, object_id: int | str | None = None
-    ) -> bool:
-        if getattr(action, "action_modifier", None) == MODIFIER_OBJECT_ID:
-            return True
-        if isinstance(action, SBAdminRowAction):
-            return True
-        if object_id is None:
-            return False
-        target_view = getattr(action, "target_view", None)
-        if target_view is None:
-            return False
-        from django_smartbase_admin.engine.modal_view import RowActionModalView
-
-        try:
-            return issubclass(target_view, RowActionModalView)
-        except TypeError:
-            return False
-
-    @staticmethod
-    def _materialize_modifier_object_id(
-        action: SBAdminCustomAction, object_id: int | str | None
-    ) -> SBAdminCustomAction:
-        sub_actions = getattr(action, "sub_actions", None)
-        materialized_sub_actions = [
-            SBAdminBaseView._materialize_modifier_object_id(sub_action, object_id)
-            for sub_action in sub_actions or []
-        ]
-        if getattr(action, "action_modifier", None) != MODIFIER_OBJECT_ID:
-            if sub_actions and materialized_sub_actions != sub_actions:
-                new_action = copy(action)
-                new_action.sub_actions = materialized_sub_actions
-                return new_action
-            return action
-        new_action = copy(action)
-        is_direct_url = (
-            bool(action.url)
-            and getattr(action, "target_view", None) is None
-            and not (
-                getattr(action, "view", None) and getattr(action, "action_id", None)
-            )
-        )
-        if not is_direct_url:
-            new_action.url = None
-        if sub_actions:
-            new_action.sub_actions = materialized_sub_actions
-        return new_action
 
     def process_actions(
         self, request, actions: list[SBAdminCustomAction]
@@ -451,7 +377,7 @@ class SBAdminBaseView(object):
         )
 
     @sbadmin_action(permission="view")
-    def action_autocomplete(self, request, modifier):
+    def action_autocomplete(self, request, modifier, object_id=None):
         amap = request.request_data.autocomplete_map
         autocomplete_view = amap.get(modifier)
         if autocomplete_view is None:
@@ -466,7 +392,7 @@ class SBAdminBaseView(object):
         if autocomplete_view is None:
             raise Http404
         autocomplete_view.init_view_dynamic(request, request.request_data)
-        return autocomplete_view.action_autocomplete(request, modifier)
+        return autocomplete_view.action_autocomplete(request, modifier, object_id)
 
     def auto_create_field_from_model_field(self, model_field):
         from django_smartbase_admin.engine.field import SBAdminField
@@ -740,12 +666,14 @@ class SBAdminBaseListView(SBAdminBaseView):
         request.reorder_active = True
 
     @sbadmin_action
-    def action_list_json_reorder(self, request, modifier) -> JsonResponse:
+    def action_list_json_reorder(
+        self, request, modifier, object_id=None
+    ) -> JsonResponse:
         self.activate_reorder(request)
-        return self.action_list_json(request, modifier, page_size=100)
+        return self.action_list_json(request, modifier, object_id, page_size=100)
 
     @sbadmin_action
-    def action_enter_reorder(self, request, modifier):
+    def action_enter_reorder(self, request, modifier, object_id=None):
         self.activate_reorder(request)
         tabulator_definition = self.get_tabulator_definition(request)
         tabulator_definition["modules"] = [
@@ -783,7 +711,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.sbadmin_list_reorder_field
 
     @sbadmin_action
-    def action_table_reorder(self, request, modifier) -> JsonResponse:
+    def action_table_reorder(self, request, modifier, object_id=None) -> JsonResponse:
         self.activate_reorder(request)
         qs = self.get_queryset(request)
         pk_field = SBAdminViewService.get_pk_field_for_model(self.model).name
@@ -818,7 +746,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         return JsonResponse({"message": request.POST})
 
     @sbadmin_action
-    def action_table_data_edit(self, request, modifier) -> HttpResponse:
+    def action_table_data_edit(self, request, modifier, object_id=None) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
         cell_value = request.POST.get("cellValue", "")
@@ -1098,13 +1026,13 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.sbadmin_xlsx_options
 
     @sbadmin_action(permission="view")
-    def action_xlsx_export(self, request, modifier) -> HttpResponse:
+    def action_xlsx_export(self, request, modifier, object_id=None) -> HttpResponse:
         action = self.sbadmin_list_action_class(self, request)
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
     @sbadmin_action
-    def action_bulk_delete(self, request, modifier):
+    def action_bulk_delete(self, request, modifier, object_id=None):
         action = self.sbadmin_list_action_class(self, request)
         if (
             request.request_data.request_method == "POST"
@@ -1136,7 +1064,8 @@ class SBAdminBaseListView(SBAdminBaseView):
         return response
 
     @sbadmin_action(permission="view")
-    def action_config(self, request, config_id=None):
+    def action_config(self, request, modifier=None, object_id=None):
+        config_id = modifier
         config_id = config_id if config_id != "None" else None
 
         config_name = request.POST.get(CONFIG_NAME, None)
@@ -1183,6 +1112,8 @@ class SBAdminBaseListView(SBAdminBaseView):
     def action_list(
         self,
         request,
+        modifier=None,
+        object_id=None,
         page_size=None,
         tabulator_definition=None,
         extra_context=None,
@@ -1222,7 +1153,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         )
 
     @sbadmin_action(permission="view")
-    def action_list_json(self, request, modifier, page_size=None) -> JsonResponse:
+    def action_list_json(
+        self, request, modifier, object_id=None, page_size=None
+    ) -> JsonResponse:
         action = self.sbadmin_list_action_class(self, request, page_size=page_size)
         data = action.get_json_data()
         notifications_html = render_notifications_if_any(request)

@@ -657,10 +657,11 @@ class SBAdminDynamicFormMixin:
         view = getattr(self, "view", None)
         if view is not None and hasattr(view, "get_action_url"):
             object_id = self._sbadmin_dynamic_object_id()
-            modifier = (
-                str(object_id) if object_id else SBADMIN_DYNAMIC_REGION_ADD_MODIFIER
+            return view.get_action_url(
+                SBADMIN_DYNAMIC_REGION_ACTION,
+                SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
+                object_id=object_id,
             )
-            return view.get_action_url(SBADMIN_DYNAMIC_REGION_ACTION, modifier)
         if request is not None:
             return request.path
         return ""
