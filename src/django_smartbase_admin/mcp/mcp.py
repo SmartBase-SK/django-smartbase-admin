@@ -19,7 +19,7 @@ import json
 
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from mcp_server import MCPToolset
+from mcp_server import MCPToolset, mcp_server as global_mcp_server
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
@@ -292,78 +292,6 @@ class SBAdminTools(MCPToolset):
     "errors": ...}`` with no DB change; permission denials raise
     ``PermissionError``; invisible objects raise ``LookupError``.
     """
-
-    def get_dashboard_blueprint(self) -> dict[str, str]:
-        """Return a ready-to-use HTML blueprint for a custom live dashboard.
-
-        Use this when asked to build a local/custom dashboard, report, or UI
-        on top of this admin's data. The blueprint is a single static HTML
-        file — minimal HTML/CSS, a complete OAuth 2.1 (authorization code +
-        PKCE) login against *this* server, and one ``api(tool, args)`` helper
-        that calls these MCP tools over JSON-RPC. ``content`` comes back with
-        this server's URL already filled in; the agent saves it, fills the
-        client_id + scope, and adds cards.
-
-        Returns ``{"filename", "content", "instructions"}`` — follow
-        ``instructions`` to scaffold the dashboard.
-        """
-        from importlib.resources import files
-
-        from django.conf import settings
-
-        content = (
-            files("django_smartbase_admin.mcp") / "dashboard_blueprint.html"
-        ).read_text(encoding="utf-8")
-
-        # Bake this server's URL into the blueprint so the file is ready to
-        # serve without the agent having to know the host.
-        base = self.request.build_absolute_uri("/").rstrip("/")
-        # Keep the endpoint's trailing slash ("mcp/") — POST /mcp (no slash)
-        # doesn't match the route and isn't APPEND_SLASH-redirected.
-        mcp_path = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/").lstrip("/")
-        oauth = getattr(settings, "OAUTH2_PROVIDER", {}) or {}
-        scope = " ".join(
-            oauth.get("DEFAULT_SCOPES") or list((oauth.get("SCOPES") or {}).keys())
-        )
-        content = (
-            content.replace("__MCP_ISSUER__", base)
-            .replace("__MCP_URL__", f"{base}/{mcp_path}")
-            .replace("__MCP_SCOPE__", scope)
-        )
-
-        instructions = (
-            "Build a custom dashboard on this admin's live data. The "
-            "returned 'content' is a static HTML page (minimal HTML/CSS, OAuth "
-            "PKCE login, and an api(tool, args) helper); it has no backend — "
-            "OAuth and every data call go straight from the browser to this "
-            "server, and it must be served over http (a file:// page is Origin "
-            "'null' and is always CORS-blocked).\n\n"
-            "STEPS:\n"
-            "  1. Save 'content' as an .html file — this server's URL is already "
-            "filled into CONFIG.\n"
-            "  2. Register an OAuth client ONCE (redirect_uris = where you serve "
-            "the page) via POST <issuer>/oauth/register, then put the returned "
-            "client_id into CONFIG. The client_id is a public PKCE client id (no "
-            "secret) — safe to hardcode and reused by all users; generate it once "
-            "per deployment, not per session. CONFIG.scope is already prefilled "
-            "with the scope this server exposes.\n"
-            "  3. Serve it over http and open the http URL; click Connect to log "
-            "in.\n"
-            "  4. Add cards: each calls one MCP tool and renders the result. "
-            "Inspect the available tools and their inputs/outputs from this MCP "
-            "server (start with list_admins for views, fields and filters).\n\n"
-            "SERVER PREREQUISITES — only when the page is NOT served same-origin "
-            "behind the admin's gateway: install "
-            "'django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware' in "
-            "MIDDLEWARE (early, before auth; off by default), and add the page's "
-            "exact origin to SBADMIN_MCP_ALLOWED_ORIGINS (default allows only "
-            "claude.ai/cursor.com)."
-        )
-        return {
-            "filename": "custom_dashboard.html",
-            "content": content,
-            "instructions": instructions,
-        }
 
     @_guarded_tool_call
     def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
@@ -1448,3 +1376,51 @@ class SBAdminTools(MCPToolset):
                 "account."
             ) from exc
         return json.loads(response.content.decode())["data"]
+
+
+@global_mcp_server.resource(
+    "dashboard://blueprint",
+    name="custom_dashboard.html",
+    description=(
+        "Blueprint for a local, single-user dashboard on this admin's live "
+        "data — one static HTML page (no backend), run locally, that can "
+        "display whatever you need: metrics, tables, charts/graphs, any custom "
+        "view. It logs in via OAuth 2.1 (auth code + PKCE) to this "
+        "server and calls the MCP tools through an api(tool, args) helper. "
+        "SETUP: (1) save the content as an .html file; (2) register an OAuth "
+        "client via POST <issuer>/oauth/register (redirect_uris = where you "
+        "serve the page) and put the returned client_id into CONFIG — a public "
+        "PKCE id, no secret; CONFIG.scope and the MCP path are prefilled; "
+        "(3) serve it over http, NOT file:// (Origin 'null' is always "
+        "CORS-blocked) — locally on a spare, non-default port so it doesn't "
+        "clash with the admin/other dev servers, e.g. python -m http.server "
+        "8010; (4) build the "
+        "view: call MCP tool(s) via api() (discover views/fields via "
+        "list_admins) and render the results any way you like — cards, tables, "
+        "charts, free-form layout (the example cards are just one option; add a "
+        "chart library for graphs). Same-origin as the admin needs no CORS; "
+        "off-origin, point "
+        "CONFIG.issuer/mcpUrl at this server and enable SBAdminMCPCorsMiddleware "
+        "+ SBADMIN_MCP_ALLOWED_ORIGINS."
+    ),
+    mime_type="text/html",
+)
+def dashboard_blueprint_resource() -> str:
+    """Blueprint HTML with the MCP endpoint path + advertised OAuth scope baked
+    in. Resources have no per-request context, so ``issuer`` / ``mcpUrl``
+    resolve from ``location.origin`` in the page (correct for same-origin
+    hosting); only the endpoint path and scope — static settings — are filled.
+    """
+    from importlib.resources import files
+
+    from django.conf import settings
+
+    html = (files("django_smartbase_admin.mcp") / "dashboard_blueprint.html").read_text(
+        encoding="utf-8"
+    )
+    oauth = getattr(settings, "OAUTH2_PROVIDER", {}) or {}
+    scope = " ".join(
+        oauth.get("DEFAULT_SCOPES") or list((oauth.get("SCOPES") or {}).keys())
+    )
+    mcp_path = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/").lstrip("/")
+    return html.replace("__MCP_PATH__", mcp_path).replace("__MCP_SCOPE__", scope)
