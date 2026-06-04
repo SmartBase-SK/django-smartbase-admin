@@ -78,12 +78,6 @@ class FakeAdminView(SBAdminBaseView):
     def get_search_field_placeholder(self, request):
         return ""
 
-    def get_sbadmin_show_tabulator_header_controls(self, request):
-        return True
-
-    def get_sbadmin_filters_open_by_default(self, request):
-        return False
-
     def get_config_url(self, request):
         return ""
 

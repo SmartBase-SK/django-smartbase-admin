@@ -4,7 +4,7 @@
     {% block table_header %}
         {% with 'filters-collapse-button' as filters_collapse_button_id %}
             {% get_item request.COOKIES filters_collapse_button_id as collapse_opened %}
-            {% if content_context.show_tabulator_header_controls %}
+            {% block tabulator_header_controls %}
                 <div class="flex justify-between max-sm:flex-wrap py-16 md:p-16 md:gap-x-8 gap-y-12">
                     {% include "sb_admin/config/view.html" with current_views=content_context.current_views %}
                     {% block tabulator_custom_header_controls %}
@@ -17,10 +17,10 @@
                             <button
                                 id="{{ filters_collapse_button_id }}"
                                 type="button"
-                                class="btn collapse-btn btn-icon js-save-state{% if not content_context.filters_open_by_default and not collapse_opened %} collapsed{% endif %}"
+                                class="btn collapse-btn btn-icon js-save-state{% block tabulator_filters_collapse_button_class %}{% if not collapse_opened %} collapsed{% endif %}{% endblock %}"
                                 data-bs-toggle="collapse"
                                 role="button"
-                                aria-expanded="{% if content_context.filters_open_by_default or collapse_opened %}true{% else %}false{% endif %}"
+                                aria-expanded="{% block tabulator_filters_collapse_button_expanded %}{% if collapse_opened %}true{% else %}false{% endif %}{% endblock %}"
                                 data-bs-target="#filters-collapse"
                                 aria-controls="filters-collapse">
                                 <svg class="w-16 h-16 md:mr-8">
@@ -32,10 +32,12 @@
                         </div>
                     {% endblock %}
                 </div>
-            {% endif %}
-            <div id="filters-collapse" class="collapse border-t border-dark-200 max-sm:overflow-x-auto custom-scrollbar{% if content_context.filters_open_by_default or collapse_opened %} show{% endif %}">
-                {% include 'sb_admin/components/filters.html' with filters=content_context.filters show_full_text_search=content_context.search_fields %}
-            </div>
+            {% endblock %}
+            {% block tabulator_header_filters %}
+                <div id="filters-collapse" class="collapse border-t border-dark-200 max-sm:overflow-x-auto custom-scrollbar{% if collapse_opened %} show{% endif %}">
+                    {% include 'sb_admin/components/filters.html' with filters=content_context.filters show_full_text_search=content_context.search_fields %}
+                </div>
+            {% endblock %}
         {% endwith %}
     {% endblock %}
     {% include 'sb_admin/actions/partials/selected_rows_actions.html' %}

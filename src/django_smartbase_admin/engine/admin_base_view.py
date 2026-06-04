@@ -620,8 +620,6 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_reorder_field = None
     sbadmin_nested: dict | None = None
     sbadmin_list_sticky_header_and_footer = None
-    sbadmin_show_tabulator_header_controls = True
-    sbadmin_filters_open_by_default = False
     search_field_placeholder = _("Search...")
     filters_version = None
     sbadmin_actions_initialized = False
@@ -670,7 +668,12 @@ class SBAdminBaseListView(SBAdminBaseView):
         self, request, modifier, object_id=None
     ) -> JsonResponse:
         self.activate_reorder(request)
-        return self.action_list_json(request, modifier, object_id, page_size=100)
+        return self.action_list_json(
+            request,
+            modifier,
+            object_id=object_id,
+            page_size=100,
+        )
 
     @sbadmin_action
     def action_enter_reorder(self, request, modifier, object_id=None):
@@ -1258,12 +1261,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         else:
             # default
             return "sb_admin/components/filters.html"
-
-    def get_sbadmin_show_tabulator_header_controls(self, request) -> bool:
-        return self.sbadmin_show_tabulator_header_controls
-
-    def get_sbadmin_filters_open_by_default(self, request) -> bool:
-        return self.sbadmin_filters_open_by_default
 
     def get_tabulator_header_template_name(self, request) -> str:
         filters_version = self.get_filters_version(request)

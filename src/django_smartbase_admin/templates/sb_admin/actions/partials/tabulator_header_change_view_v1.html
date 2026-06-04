@@ -1,0 +1,9 @@
+{% extends "sb_admin/actions/partials/tabulator_header_v1.html" %}
+
+{% block tabulator_header_controls %}{% endblock %}
+
+{% block tabulator_header_filters %}
+    <div id="filters-collapse" class="collapse max-sm:overflow-x-auto custom-scrollbar show">
+        {% include 'sb_admin/components/filters.html' with filters=content_context.filters show_full_text_search=content_context.search_fields %}
+    </div>
+{% endblock %}

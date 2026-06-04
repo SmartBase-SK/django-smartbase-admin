@@ -5,8 +5,9 @@ from django.contrib.auth.models import User
 from django.db.models import F
 from django.test import RequestFactory, SimpleTestCase
 from django.template.loader import render_to_string
+from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
-from django_smartbase_admin.engine.const import Action
+from django_smartbase_admin.engine.const import Action, IGNORE_LIST_SELECTION
 from django_smartbase_admin.engine.dashboard import (
     SBAdminDashboardListWidget,
     render_registered_standalone_widget,
@@ -57,8 +58,6 @@ class _StandaloneDashboardWidget(SBAdminDashboardListWidget):
 class _StandaloneNoHeaderDashboardWidget(_StandaloneDashboardWidget):
     widget_id = "embedded_no_header_dashboard_widget"
     search_fields = ("display_name",)
-    sbadmin_show_tabulator_header_controls = False
-    sbadmin_filters_open_by_default = True
 
 
 class _RenderedRegisteredWidget:
@@ -106,15 +105,19 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             content_context["tabulator_definition_script_id"],
             "embedded_dashboard_widget-tabulator-definition",
         )
-        self.assertTrue(content_context["show_tabulator_header_controls"])
-        self.assertFalse(content_context["filters_open_by_default"])
+        self.assertEqual(
+            content_context["tabulator_header_template_name"],
+            "sb_admin/actions/partials/tabulator_header_change_view_v1.html",
+        )
+        self.assertNotIn("show_tabulator_header_controls", content_context)
+        self.assertNotIn("filters_open_by_default", content_context)
         self.assertTrue(
             content_context["tabulator_definition"]["tableAjaxUrl"].endswith(
                 "/embedded_dashboard_widget/action_list_json/template/price-list-1/"
             )
         )
 
-    def test_dashboard_list_widget_exposes_header_rendering_flags(self):
+    def test_dashboard_list_widget_uses_change_view_header_template(self):
         widget = _StandaloneNoHeaderDashboardWidget()
         request = self.factory.get("/dashboard/widget/")
         request.request_data = SimpleNamespace(
@@ -132,8 +135,10 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
         content_context = widget.get_widget_context_data(request)["content_context"]
 
-        self.assertFalse(content_context["show_tabulator_header_controls"])
-        self.assertTrue(content_context["filters_open_by_default"])
+        self.assertEqual(
+            content_context["tabulator_header_template_name"],
+            "sb_admin/actions/partials/tabulator_header_change_view_v1.html",
+        )
         self.assertEqual(content_context["search_fields"], ("display_name",))
 
     def test_dashboard_list_widget_renders_list_actions_inside_widget(self):
@@ -158,14 +163,50 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             request=request,
         )
 
+        self.assertNotIn("save-view-modal-button", html)
+        self.assertNotIn("filters-collapse-button", html)
+        self.assertIn(
+            'id="filters-collapse" class="collapse max-sm:overflow-x-auto '
+            'custom-scrollbar show"',
+            html,
+        )
         search_index = html.index(
             'id="embedded_no_header_dashboard_widget-sb_admin_full_search"'
         )
         action_index = html.index("action_xlsx_export/__all__/price-list-1/")
         self.assertLess(search_index, action_index)
+        column_picker_index = html.index('xlink:href="#Column"')
+        actions_button_index = html.index('xlink:href="#More"')
+        self.assertLess(column_picker_index, actions_button_index)
+        self.assertIn('title="Columns"', html)
         self.assertIn("btn btn-only-icon", html)
         self.assertIn("action_xlsx_export/__all__/price-list-1/", html)
         self.assertIn("dropdown-menu", html)
+
+    def test_dashboard_list_widget_xlsx_filename_uses_widget_name(self):
+        widget = _StandaloneDashboardWidget(name="Ceny dopravy")
+        request = self.factory.get("/dashboard/widget/")
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            modifier=IGNORE_LIST_SELECTION,
+            object_id="price-list-1",
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        request.LANGUAGE_CODE = "en"
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        action = SBAdminListAction(widget, request, all_params={})
+        action.get_excel_columns = lambda: []
+        action.get_data = lambda **_kwargs: {"data": [], "last_page": 1}
+        file_name = action.get_xlsx_data(request)[0]
+
+        self.assertTrue(file_name.startswith("Ceny dopravy__"))
+        self.assertNotIn("None__", file_name)
 
     def test_render_registered_standalone_widget_clones_request_data_for_widget(self):
         widget = _RenderedRegisteredWidget()

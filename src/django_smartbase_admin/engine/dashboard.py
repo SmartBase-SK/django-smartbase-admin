@@ -689,6 +689,9 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     def get_sbadmin_list_action_object_id(self, request):
         return getattr(request.request_data, "object_id", None)
 
+    def get_tabulator_header_template_name(self, request) -> str:
+        return "sb_admin/actions/partials/tabulator_header_change_view_v1.html"
+
     def get_tabulator_definition(self, request):
         tabulator_definition = super().get_tabulator_definition(request)
         tabulator_definition["modules"] = [

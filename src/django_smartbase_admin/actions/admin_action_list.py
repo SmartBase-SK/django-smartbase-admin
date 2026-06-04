@@ -233,12 +233,6 @@ class SBAdminListAction(SBAdminAction):
                 "filters_template_name": self.view.get_filters_template_name(
                     self.threadsafe_request
                 ),
-                "show_tabulator_header_controls": self.view.get_sbadmin_show_tabulator_header_controls(
-                    self.threadsafe_request
-                ),
-                "filters_open_by_default": self.view.get_sbadmin_filters_open_by_default(
-                    self.threadsafe_request
-                ),
                 "tabulator_header_template_name": self.view.get_tabulator_header_template_name(
                     self.threadsafe_request
                 ),
@@ -672,9 +666,8 @@ class SBAdminListAction(SBAdminAction):
 
     def get_xlsx_data(self, request):
         page_size = XLSX_PAGE_CHUNK_SIZE
-        file_name = (
-            f'{self.view.get_menu_label()}__{timezone.now().strftime("%Y-%m-%d")}.xlsx'
-        )
+        file_name_label = self.view.get_menu_label() or getattr(self.view, "name", None)
+        file_name = f'{file_name_label}__{timezone.now().strftime("%Y-%m-%d")}.xlsx'
         columns = self.get_excel_columns()
         additional_filter = Q()
         if request.request_data.modifier != IGNORE_LIST_SELECTION:

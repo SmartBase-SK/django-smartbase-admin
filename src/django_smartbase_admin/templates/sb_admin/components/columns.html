@@ -5,11 +5,14 @@
             data-bs-toggle="dropdown"
             aria-expanded="false"
             data-bs-popper-placement="bottom-end"
-            class="btn btn-icon">
-        <svg class="w-16 h-16 md:mr-8">
+            class="btn {% if column_picker_icon_only %}btn-only-icon{% else %}btn-icon{% endif %}"
+            title="{% trans 'Columns' %}">
+        <svg class="{% if column_picker_icon_only %}btn-only-icon{% else %}w-16 h-16 md:mr-8{% endif %}">
             <use xlink:href="#Column"></use>
         </svg>
-        <span>{% trans 'Columns' %}</span>
+        {% if not column_picker_icon_only %}
+            <span>{% trans 'Columns' %}</span>
+        {% endif %}
     </button>
     <div class="dropdown-menu w-248 max-h-432">
         <div class="p-12 font-semibold text-dark-900">
