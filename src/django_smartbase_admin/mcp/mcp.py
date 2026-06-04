@@ -293,6 +293,78 @@ class SBAdminTools(MCPToolset):
     ``PermissionError``; invisible objects raise ``LookupError``.
     """
 
+    def get_dashboard_blueprint(self) -> dict[str, str]:
+        """Return a ready-to-use HTML blueprint for a custom live dashboard.
+
+        Use this when asked to build a local/custom dashboard, report, or UI
+        on top of this admin's data. The blueprint is a single static HTML
+        file — minimal HTML/CSS, a complete OAuth 2.1 (authorization code +
+        PKCE) login against *this* server, and one ``api(tool, args)`` helper
+        that calls these MCP tools over JSON-RPC. ``content`` comes back with
+        this server's URL already filled in; the agent saves it, fills the
+        client_id + scope, and adds cards.
+
+        Returns ``{"filename", "content", "instructions"}`` — follow
+        ``instructions`` to scaffold the dashboard.
+        """
+        from importlib.resources import files
+
+        from django.conf import settings
+
+        content = (
+            files("django_smartbase_admin.mcp") / "dashboard_blueprint.html"
+        ).read_text(encoding="utf-8")
+
+        # Bake this server's URL into the blueprint so the file is ready to
+        # serve without the agent having to know the host.
+        base = self.request.build_absolute_uri("/").rstrip("/")
+        # Keep the endpoint's trailing slash ("mcp/") — POST /mcp (no slash)
+        # doesn't match the route and isn't APPEND_SLASH-redirected.
+        mcp_path = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/").lstrip("/")
+        oauth = getattr(settings, "OAUTH2_PROVIDER", {}) or {}
+        scope = " ".join(
+            oauth.get("DEFAULT_SCOPES") or list((oauth.get("SCOPES") or {}).keys())
+        )
+        content = (
+            content.replace("__MCP_ISSUER__", base)
+            .replace("__MCP_URL__", f"{base}/{mcp_path}")
+            .replace("__MCP_SCOPE__", scope)
+        )
+
+        instructions = (
+            "Build a custom dashboard on this admin's live data. The "
+            "returned 'content' is a static HTML page (minimal HTML/CSS, OAuth "
+            "PKCE login, and an api(tool, args) helper); it has no backend — "
+            "OAuth and every data call go straight from the browser to this "
+            "server, and it must be served over http (a file:// page is Origin "
+            "'null' and is always CORS-blocked).\n\n"
+            "STEPS:\n"
+            "  1. Save 'content' as an .html file — this server's URL is already "
+            "filled into CONFIG.\n"
+            "  2. Register an OAuth client ONCE (redirect_uris = where you serve "
+            "the page) via POST <issuer>/oauth/register, then put the returned "
+            "client_id into CONFIG. The client_id is a public PKCE client id (no "
+            "secret) — safe to hardcode and reused by all users; generate it once "
+            "per deployment, not per session. CONFIG.scope is already prefilled "
+            "with the scope this server exposes.\n"
+            "  3. Serve it over http and open the http URL; click Connect to log "
+            "in.\n"
+            "  4. Add cards: each calls one MCP tool and renders the result. "
+            "Inspect the available tools and their inputs/outputs from this MCP "
+            "server (start with list_admins for views, fields and filters).\n\n"
+            "SERVER PREREQUISITES — only when the page is NOT served same-origin "
+            "behind the admin's gateway: install "
+            "'django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware' in "
+            "MIDDLEWARE (early, before auth; off by default), and add the page's "
+            "exact origin to SBADMIN_MCP_ALLOWED_ORIGINS (default allows only "
+            "claude.ai/cursor.com)."
+        )
+        return {
+            "filename": "custom_dashboard.html",
+            "content": content,
+            "instructions": instructions,
+        }
+
     @_guarded_tool_call
     def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
