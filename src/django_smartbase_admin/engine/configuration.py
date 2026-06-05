@@ -237,6 +237,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         registered_views = []
         for view in self.registered_views:
             registered_views.append(view)
+            view.init_view_static(self, None, sb_admin_site)
             sub_views = view.get_sub_views(self)
             if sub_views:
                 registered_views.extend(sub_views)
@@ -254,7 +255,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         request_data.menu_items = menu_items
 
     def init_view_map(self):
-        self.view_map = {view.get_id(): view for view in self.registered_views}
+        self.view_map.update({view.get_id(): view for view in self.registered_views})
         self.view_map.update(
             {
                 view.get_id(): view
@@ -308,6 +309,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         self.init_menu_items_dynamic(request, request_data)
 
     def init_configuration_static(self):
+        self.view_map = {}
         self.init_registered_views()
         self.init_view_map()
         self.init_model_admin_view_map()

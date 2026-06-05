@@ -77,9 +77,11 @@ class SBAdminBaseView(object):
     add_label: str | None = None
     change_label: str | None = None
     delete_confirmation_template = "sb_admin/actions/delete_confirmation.html"
+    widgets = None
+    widget_views = None
 
     def init_view_static(self, configuration, model, admin_site):
-        pass
+        self.init_widgets_static(configuration)
 
     def get_id(self):
         raise NotImplementedError
@@ -249,9 +251,44 @@ class SBAdminBaseView(object):
             result.append(action)
         return result
 
+    def get_widgets(self):
+        return self.widgets or []
+
+    def get_widget_views(self, request, object_id=None):
+        return self.widget_views or []
+
+    def get_widget_id(self, widget, index):
+        return getattr(widget, "widget_id", None) or f"{self.get_id()}_{index}"
+
+    def get_widget_parent_view(self, widget):
+        return None
+
+    def init_widget_view_static(self, widget, configuration, index):
+        widget.widget_id = self.get_widget_id(widget, index)
+        widget.parent_view = self.get_widget_parent_view(widget)
+        widget.init_widget_static(configuration)
+        widget_id = widget.get_id()
+        if widget_id:
+            configuration.view_map[widget_id] = widget
+        return widget
+
+    def init_widgets_static(self, configuration) -> None:
+        self.widget_views = []
+        for index, widget_class in enumerate(self.get_widgets()):
+            widget = widget_class() if isinstance(widget_class, type) else widget_class
+            self.widget_views.append(
+                self.init_widget_view_static(widget, configuration, index)
+            )
+
+    def init_widget_views_dynamic(self, request, request_data=None, **kwargs) -> None:
+        object_id = getattr(request_data, "object_id", None)
+        for widget in self.get_widget_views(request, object_id):
+            widget.init_view_dynamic(request, request_data, **kwargs)
+
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         if not self.has_view_or_change_permission(request):
             raise PermissionDenied
+        self.init_widget_views_dynamic(request, request_data, **kwargs)
 
     def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.init_fields_cache(

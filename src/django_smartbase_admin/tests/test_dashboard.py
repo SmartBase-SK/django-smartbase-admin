@@ -143,6 +143,11 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             content_context["tabulator_header_template_name"],
             "sb_admin/actions/partials/tabulator_header_change_view_v1.html",
         )
+        self.assertEqual(
+            content_context["filters_template_name"],
+            "sb_admin/dashboard/includes/list_widget_filters.html",
+        )
+        self.assertNotIn("filters_toolbar_after_search_template", content_context)
         self.assertNotIn("show_tabulator_header_controls", content_context)
         self.assertNotIn("filters_open_by_default", content_context)
         self.assertTrue(

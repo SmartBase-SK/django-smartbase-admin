@@ -73,7 +73,5 @@
             </div>
         </div>
     {% endif %}
-    {% if content_context.filters_toolbar_after_search_template %}
-        {% include content_context.filters_toolbar_after_search_template %}
-    {% endif %}
+    {% block filters_toolbar_after_search %}{% endblock %}
 </div>

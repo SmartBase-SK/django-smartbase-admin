@@ -110,13 +110,10 @@ class SBAdminDashboardWidget(SBAdminView):
         }
 
     def get_sub_widgets(self):
-        return self.sub_widgets
+        return self.widget_views if self.widget_views is not None else self.sub_widgets
 
-    def get_sub_views(self, configuration):
-        for idx, sub_widget_view in enumerate(self.sub_widgets):
-            sub_widget_view.widget_id = f"{self.get_id()}_{idx}"
-            sub_widget_view.init_widget_static(configuration)
-        return self.sub_widgets
+    def get_widgets(self):
+        return self.sub_widgets or []
 
     def get_template_name(self):
         return self.template_name
@@ -314,7 +311,7 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         init_result = super().init_view_dynamic(request, request_data, **kwargs)
-        for idx, sub_widget in enumerate(self.sub_widgets):
+        for idx, sub_widget in enumerate(self.get_sub_widgets()):
             sub_widget.init_sub_widget_dynamic(f"{self.get_id()}_{idx}", self)
         return init_result
 
@@ -695,12 +692,12 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         context.update(self.get_global_context(request))
         action = SBAdminListAction(self, request)
         data = action.get_template_data()
-        data["filters_toolbar_after_search_template"] = (
-            "sb_admin/dashboard/includes/list_widget_actions.html"
-        )
         context["content_context"] = data
         context["list_base_template"] = "sb_admin/blank_base.html"
         return context
+
+    def get_filters_template_name(self, request) -> str:
+        return "sb_admin/dashboard/includes/list_widget_filters.html"
 
     def get_tabulator_header_template_name(self, request) -> str:
         return "sb_admin/actions/partials/tabulator_header_change_view_v1.html"
