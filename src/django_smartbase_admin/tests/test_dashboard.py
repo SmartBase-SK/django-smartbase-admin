@@ -1,18 +1,22 @@
 from types import SimpleNamespace
 
 from django.contrib import admin
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F
 from django.test import RequestFactory, SimpleTestCase
 from django.template.loader import render_to_string
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
+from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
-from django_smartbase_admin.engine.const import Action, IGNORE_LIST_SELECTION
+from django_smartbase_admin.engine.const import FILTER_DATA_NAME, IGNORE_LIST_SELECTION
 from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardWidget,
     SBAdminDashboardListWidget,
-    render_registered_standalone_widget,
 )
 from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
 
 
 class _DashboardWidget(SBAdminDashboardListWidget):
@@ -45,7 +49,8 @@ class _StandaloneDashboardWidget(SBAdminDashboardListWidget):
         return ""
 
     def get_action_url(self, action, modifier="template", object_id=None):
-        url = f"/{self.get_id()}/{action}/{modifier}/"
+        kwargs = self.get_action_url_kwargs(action, modifier, object_id)
+        url = f"/{kwargs['view']}/{kwargs['action']}/{kwargs['modifier']}/"
         if object_id is not None:
             url = f"{url}{object_id}/"
         return url
@@ -60,14 +65,43 @@ class _StandaloneNoHeaderDashboardWidget(_StandaloneDashboardWidget):
     search_fields = ("display_name",)
 
 
-class _RenderedRegisteredWidget:
+class _RegisteredAdminWidget(SBAdminDashboardWidget):
+    widget_id = "registered_admin_widget"
+
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         self.initialized_request = request
         self.initialized_request_data = request_data
 
-    def render(self, request):
-        self.render_request = request
-        return "<div>Rendered widget</div>"
+
+class _WidgetAdmin(SBAdmin):
+    widgets = [_RegisteredAdminWidget]
+    sbadmin_fieldsets = [(None, {"fields": []})]
+
+    def has_view_or_change_permission(self, request, obj=None):
+        return True
+
+    def init_actions(self, request):
+        pass
+
+
+class _MissingWidgetIdWidget(SBAdminDashboardWidget):
+    pass
+
+
+class _MissingWidgetIdAdmin(_WidgetAdmin):
+    widgets = [_MissingWidgetIdWidget]
+
+
+class _ParentObjectListWidget(_StandaloneDashboardWidget):
+    widget_id = "parent_object_list_widget"
+
+
+class _RenderedTabWidget(SBAdminDashboardWidget):
+    widget_id = "rendered_tab_widget"
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs):
+        self.initialized_request = request
+        self.initialized_request_data = request_data
 
 
 class TestSBAdminDashboardListWidget(SimpleTestCase):
@@ -178,7 +212,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         column_picker_index = html.index('xlink:href="#Column"')
         actions_button_index = html.index('xlink:href="#More"')
         self.assertLess(column_picker_index, actions_button_index)
-        self.assertIn('title="Columns"', html)
+        self.assertRegex(html, r'title="(Columns|Stĺpce)"')
         self.assertIn("btn btn-only-icon", html)
         self.assertIn("action_xlsx_export/__all__/price-list-1/", html)
         self.assertIn("dropdown-menu", html)
@@ -208,30 +242,107 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertTrue(file_name.startswith("Ceny dopravy__"))
         self.assertNotIn("None__", file_name)
 
-    def test_render_registered_standalone_widget_clones_request_data_for_widget(self):
-        widget = _RenderedRegisteredWidget()
-        request = self.factory.get("/dashboard/")
+    def test_admin_widgets_register_with_parent_scoped_ids(self):
+        configuration = SimpleNamespace(view_map={})
+        admin_view = _WidgetAdmin(User, AdminSite())
+
+        admin_view.init_view_static(configuration, User, AdminSite())
+
+        widget = configuration.view_map["auth_user_registered_admin_widget"]
+        self.assertEqual(widget.get_id(), "auth_user_registered_admin_widget")
+        self.assertIs(configuration.view_map[widget.get_id()], widget)
+        self.assertIs(widget.parent_view, admin_view)
+
+    def test_admin_widgets_require_widget_id(self):
+        configuration = SimpleNamespace(view_map={})
+        admin_view = _MissingWidgetIdAdmin(User, AdminSite())
+
+        with self.assertRaisesMessage(
+            ImproperlyConfigured,
+            "_MissingWidgetIdWidget must define widget_id.",
+        ):
+            admin_view.init_view_static(configuration, User, AdminSite())
+
+    def test_admin_widgets_initialize_with_parent_request(self):
+        configuration = SimpleNamespace(view_map={})
+        admin_view = _WidgetAdmin(User, AdminSite())
+        admin_view.init_view_static(configuration, User, AdminSite())
+        request = self.factory.get("/admin/auth/user/1/change/")
         request.request_data = SimpleNamespace(
-            configuration=SimpleNamespace(view_map={"registered_widget": widget}),
-            view="parent_view",
-            action="detail",
-            object_id="parent_object",
-            selected_view="parent_selected_view",
+            configuration=configuration,
+            object_id="1",
+            request_get={},
+            request_method="GET",
+            selected_view=admin_view,
+            autocomplete_map={},
         )
 
-        result = render_registered_standalone_widget(
+        admin_view.init_view_dynamic(request, request.request_data)
+
+        widget = configuration.view_map["auth_user_registered_admin_widget"]
+        self.assertIs(widget.initialized_request, request)
+        self.assertIs(widget.initialized_request_data, request.request_data)
+
+    def test_tabular_context_resolves_widget_classes(self):
+        widget = _RenderedTabWidget()
+        widget.widget_id = "auth_user_rendered_tab_widget"
+        tabs = {"Widget": [_RenderedTabWidget]}
+
+        context = get_tabular_context([], [], tabs, [widget])
+
+        content = context["context"]["Widget"]["content"]
+        self.assertEqual(content, [{"type": "widget", "value": widget}])
+
+    def test_dashboard_list_widget_uses_request_object_id_for_embedded_urls(self):
+        widget = _ParentObjectListWidget()
+        request = self.factory.get("/admin/parent/1/change/")
+        request.LANGUAGE_CODE = "en"
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            modifier=IGNORE_LIST_SELECTION,
+            object_id="parent-object",
+            selected_view=widget,
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        definition = widget.get_tabulator_definition(request)
+
+        self.assertTrue(
+            definition["tableAjaxUrl"].endswith(
+                "/parent_object_list_widget/action_list_json/template/parent-object/"
+            )
+        )
+
+    def test_list_action_reads_registered_view_params(self):
+        widget = _ParentObjectListWidget()
+        request = self.factory.get("/parent_object_list_widget/action_list_json/")
+        request.LANGUAGE_CODE = "en"
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            modifier=IGNORE_LIST_SELECTION,
+            object_id="manual-object",
+            selected_view=widget,
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        action = SBAdminListAction(
+            widget,
             request,
-            view_id="registered_widget",
-            object_id="child_object",
+            all_params={
+                "parent_object_list_widget": {FILTER_DATA_NAME: {"display_name": "Ada"}}
+            },
         )
 
-        self.assertEqual(str(result), "<div>Rendered widget</div>")
-        self.assertIs(widget.initialized_request, widget.render_request)
-        self.assertIsNot(widget.initialized_request, request)
-        self.assertIsNot(widget.initialized_request_data, request.request_data)
-        self.assertEqual(widget.initialized_request_data.view, "registered_widget")
-        self.assertEqual(widget.initialized_request_data.action, Action.LIST.value)
-        self.assertEqual(widget.initialized_request_data.object_id, "child_object")
-        self.assertIs(widget.initialized_request_data.selected_view, widget)
-        self.assertEqual(request.request_data.view, "parent_view")
-        self.assertEqual(request.request_data.object_id, "parent_object")
+        self.assertEqual(action.filter_data, {"display_name": "Ada"})

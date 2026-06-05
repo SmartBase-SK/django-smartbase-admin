@@ -916,9 +916,39 @@ class SBAdmin(
 
     sbadmin_previous_next_buttons_enabled = False
     sbadmin_tabs = None
+    widgets = None
+    widget_views = None
     request_data = None
     menu_label = None
     sbadmin_is_generic_model = False
+
+    def init_widgets_static(self, configuration) -> None:
+        self.widget_views = []
+        for widget_class in self.get_widgets():
+            widget_instance = widget_class()
+            widget_instance.parent_view = self
+            widget_instance.init_widget_static(configuration)
+            configuration.view_map[widget_instance.get_id()] = widget_instance
+            self.widget_views.append(widget_instance)
+
+    def get_widgets(self):
+        return self.widgets or []
+
+    def get_widget_views(self, request, object_id=None):
+        if object_id is None:
+            return []
+        return self.widget_views or []
+
+    def init_view_static(self, configuration, model, admin_site):
+        super().init_view_static(configuration, model, admin_site)
+        self.init_widgets_static(configuration)
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
+        super().init_view_dynamic(request, request_data, **kwargs)
+        object_id = getattr(request_data, "object_id", None)
+        for widget in self.get_widget_views(request, object_id):
+            widget.parent_view = self
+            widget.init_view_dynamic(request, request_data, **kwargs)
 
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
@@ -976,7 +1006,10 @@ class SBAdmin(
         return self.sbadmin_tabs
 
     def get_tabs_context(self, request, object_id) -> dict[str, Iterable]:
-        return {"tabs_context": self.get_sbadmin_tabs(request, object_id)}
+        return {
+            "tabs_context": self.get_sbadmin_tabs(request, object_id),
+            "widgets_context": self.get_widget_views(request, object_id),
+        }
 
     def get_context_data(self, request) -> dict[str, Any]:
         return {

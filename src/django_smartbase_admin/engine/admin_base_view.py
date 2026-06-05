@@ -955,11 +955,8 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.process_list_actions(
             request,
             list_actions,
-            object_id=self.get_sbadmin_list_action_object_id(request),
+            object_id=getattr(request.request_data, "object_id", None),
         )
-
-    def get_sbadmin_list_action_object_id(self, request) -> int | str | None:
-        return None
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:
         if not self.sbadmin_list_actions:

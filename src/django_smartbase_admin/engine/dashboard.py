@@ -1,20 +1,20 @@
 from copy import copy
 from datetime import timedelta
 from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.functions import TruncMonth, TruncDay, TruncWeek, TruncYear
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
-from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER, Action
+from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     DateFilterWidget,
@@ -28,6 +28,7 @@ class SBAdminDashboardWidget(SBAdminView):
     template_name = None
     name = None
     widget_id = None
+    parent_view = None
     annotates = None
     filters = None
     settings = None
@@ -60,6 +61,12 @@ class SBAdminDashboardWidget(SBAdminView):
         )
 
     def init_widget_static(self, configuration):
+        if self.widget_id is None:
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} must define widget_id."
+            )
+        if self.parent_view is not None:
+            self.widget_id = f"{self.parent_view.get_id()}_{self.widget_id}"
         self.view_id = self.widget_id
         for filter in self.get_filters():
             filter.init_field_static(self, configuration)
@@ -77,6 +84,15 @@ class SBAdminDashboardWidget(SBAdminView):
 
     def get_ajax_url(self):
         return self.get_action_url("action_get_data")
+
+    def get_parent_object(self, request):
+        if self.parent_view is None:
+            return None
+        request_data = getattr(request, "request_data", None)
+        object_id = getattr(request_data, "object_id", None)
+        if object_id is None:
+            return None
+        return self.parent_view.get_object(request, object_id)
 
     @sbadmin_action(permission="view")
     def action_get_data(self, request, modifier, object_id=None):
@@ -686,14 +702,12 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         context["list_base_template"] = "sb_admin/blank_base.html"
         return context
 
-    def get_sbadmin_list_action_object_id(self, request):
-        return getattr(request.request_data, "object_id", None)
-
     def get_tabulator_header_template_name(self, request) -> str:
         return "sb_admin/actions/partials/tabulator_header_change_view_v1.html"
 
     def get_tabulator_definition(self, request):
         tabulator_definition = super().get_tabulator_definition(request)
+        tabulator_definition["stickyHeaderAndFooter"] = False
         tabulator_definition["modules"] = [
             "viewsModule",
             "tableParamsModule",
@@ -702,21 +716,6 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             "columnDisplayModule",
         ]
         return tabulator_definition
-
-
-def render_registered_standalone_widget(
-    request, *, view_id: str, object_id: str
-) -> SafeString:
-    widget = request.request_data.configuration.view_map[view_id]
-    widget_request = copy(request)
-    widget_request_data = copy(request.request_data)
-    widget_request_data.view = view_id
-    widget_request_data.action = Action.LIST.value
-    widget_request_data.object_id = object_id
-    widget_request_data.selected_view = widget
-    widget_request.request_data = widget_request_data
-    widget.init_view_dynamic(widget_request, widget_request_data)
-    return mark_safe(widget.render(widget_request))
 
 
 class SbAdminCalendarWidget(SBAdminDashboardWidget):

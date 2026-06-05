@@ -24,7 +24,7 @@
 {% endblock %}
 
 {% block content %}
-    {% get_tabular_context adminform inline_admin_formsets tabs_context as tabular_context %}
+    {% get_tabular_context adminform inline_admin_formsets tabs_context widgets_context as tabular_context %}
 
     {% block header %}
         {% if sbadmin_is_modal %}
@@ -211,6 +211,11 @@
                                             {% include inline_admin_formset.opts.template with sbadmin_inline_tab_slug=sbadmin_tab_slug %}
                                         {% endif %}
                                     {% endwith %}
+                                {% endif %}
+                                {% if tab_content.type == 'widget' %}
+                                    {% block tab_content_widget %}
+                                        {% render_widget tab_content.value request %}
+                                    {% endblock %}
                                 {% endif %}
                             {% endfor %}
                         </div>
