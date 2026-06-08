@@ -4834,6 +4834,13 @@ DJANGO_MCP_ENDPOINT = "mcp/"
 OAUTH2_PROVIDER = {
     "SCOPES": {"sbadmin:write": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
+    # Restrict plain-http redirect URIs to loopback (RFC 8252) so a local
+    # http://localhost dashboard can register one without opening http to
+    # arbitrary hosts. Subclass it if you also customise grant/token handling.
+    "OAUTH2_VALIDATOR_CLASS": "django_smartbase_admin.mcp.oauth.validators.SBAdminMCPOAuth2Validator",
+    # Keep "http" only for that loopback case; everything else stays https
+    # (plus any native custom schemes like cursor:// / claude://).
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["https", "http"],
 }
 ```
 
@@ -4849,6 +4856,16 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
 - **`SBAdminMCPOAuth2Authentication`** (`mcp/oauth/auth.py`) — adds `resource_metadata="…"` to the `WWW-Authenticate` header for header-driven discovery. Native clients fall back to probing `/.well-known/*` directly, so the stock DOT `OAuth2Authentication` also works for them. Keep the subclass for broad compatibility.
 
 (Verified: a Claude Code CLI connection completed OAuth with the plain auth class and no CORS middleware.)
+
+### Local custom dashboards
+
+A ready-to-use single-page dashboard blueprint is exposed as the MCP **resource** `dashboard://blueprint` (read it; full setup is in its description). It logs in via OAuth PKCE and reads live data through an `api(tool, args)` helper over the MCP tools. To run one locally against a deployed (HTTPS) admin:
+
+1. **Serve over http on localhost** — fine as-is: loopback is a browser *secure context* (so `crypto.subtle` PKCE works) and the OAuth/MCP traffic to the admin is HTTPS regardless. Serve on a spare port (`python -m http.server 8010`).
+2. **Allow the origin** — add `http://localhost:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS`. `SBAdminMCPCorsMiddleware` reflects it **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session.
+3. **Connect** — the page self-registers an OAuth client via DCR (`POST <issuer>/oauth/register`) on first connect and caches the `client_id` in `localStorage`; no manual registration. The DCR endpoint and `SBAdminMCPOAuth2Validator` accept the page's plain-http redirect because it's **loopback** (`localhost`, `127.0.0.1`, `::1`); any other http host is rejected.
+
+No HTTPS is needed locally; only if you serve the page on a non-loopback host (LAN IP / custom domain), which isn't a secure context over http — then use a TLS static server (e.g. mkcert) and register an `https://` redirect URI.
 
 ### Cursor — `.cursor/mcp.json`
 

@@ -28,6 +28,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from oauth2_provider.models import get_application_model
 
+from django_smartbase_admin.mcp.oauth.validators import is_non_loopback_http
+
 # Single scope granting full read-write access to the SBAdmin MCP tools.
 # Tool-level authorization is the staff gate plus Django model permissions;
 # the scope is not split read/write, so it must not imply read-only.
@@ -92,6 +94,17 @@ def register(request: HttpRequest) -> JsonResponse:
             {
                 "error": "invalid_redirect_uri",
                 "error_description": "redirect_uris is required",
+            },
+            status=400,
+        )
+    # http is accepted only for loopback (RFC 8252 §7.3); reject here so a
+    # non-loopback http URI can't be registered, matching the authorize-time
+    # check in SBAdminMCPOAuth2Validator.
+    if any(is_non_loopback_http(uri) for uri in redirect_uris):
+        return JsonResponse(
+            {
+                "error": "invalid_redirect_uri",
+                "error_description": "http redirect URIs are allowed only for loopback hosts",
             },
             status=400,
         )

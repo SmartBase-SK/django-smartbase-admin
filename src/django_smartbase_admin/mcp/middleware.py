@@ -7,9 +7,15 @@ cross-origin POST to ``/mcp/`` and send an OAuth preflight to
 ``Access-Control-Allow-Origin`` + matching ``-Methods`` / ``-Headers``,
 the browser blocks every request before it reaches Django.
 
-This middleware adds the required headers on the MCP endpoint plus the
-OAuth discovery / registration / authorization paths, gated by an
-explicit origin allowlist set via ``SBADMIN_MCP_ALLOWED_ORIGINS``.
+This middleware adds the required headers on the MCP endpoint and the
+OAuth discovery / token / registration paths, gated by an explicit
+origin allowlist set via ``SBADMIN_MCP_ALLOWED_ORIGINS``.
+
+No credentials are advertised: the MCP flow authenticates with a
+``Bearer`` token and the OAuth flow is public-client + PKCE, so no
+cross-origin request needs cookies. That is what makes adding a
+``http://localhost:<port>`` dashboard origin safe — an allowed local
+page still can't ride the user's admin session.
 
 Default allowlist covers Claude (``https://claude.ai``) and Cursor
 (``https://cursor.com``) so their install flows work out of the box.
@@ -35,9 +41,6 @@ DEFAULT_ALLOWED_ORIGINS: tuple[str, ...] = (
     "https://cursor.com",
 )
 
-# Paths the middleware decorates. Kept inline rather than reverse()'d
-# because middleware runs on every request — a startup-time URL resolver
-# walk would just trade configuration for an import-order hazard.
 _MCP_PATH_PREFIXES: tuple[str, ...] = (
     "/mcp",
     "/.well-known/oauth-authorization-server",
@@ -46,8 +49,6 @@ _MCP_PATH_PREFIXES: tuple[str, ...] = (
     "/o/",
 )
 
-# Headers MCP clients legitimately send. ``MCP-Protocol-Version`` and
-# ``MCP-Session-Id`` are part of the streamable HTTP transport spec.
 _ALLOWED_REQUEST_HEADERS = (
     "Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id"
 )
@@ -63,13 +64,12 @@ def _allowed_origins() -> frozenset[str]:
     )
 
 
-def _path_is_mcp(path: str) -> bool:
+def _path_needs_cors(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in _MCP_PATH_PREFIXES)
 
 
 def _apply_cors_headers(response: HttpResponse, origin: str) -> None:
     response["Access-Control-Allow-Origin"] = origin
-    response["Access-Control-Allow-Credentials"] = "true"
     response["Access-Control-Allow-Methods"] = _ALLOWED_METHODS
     response["Access-Control-Allow-Headers"] = _ALLOWED_REQUEST_HEADERS
     response["Access-Control-Expose-Headers"] = _EXPOSED_RESPONSE_HEADERS
@@ -84,7 +84,7 @@ class SBAdminMCPCorsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if not _path_is_mcp(request.path):
+        if not _path_needs_cors(request.path):
             return self.get_response(request)
 
         origin = request.META.get("HTTP_ORIGIN", "")
