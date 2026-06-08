@@ -126,6 +126,13 @@ class _ParentScopedChartWidget(SBAdminDashboardChartWidget):
     path_to_parent_instance_id = "id"
     x_axis_annotate = F("username")
 
+    def get_action_url(self, action, modifier="template", object_id=None):
+        kwargs = self.get_action_url_kwargs(action, modifier, object_id)
+        url = f"/{kwargs['view']}/{kwargs['action']}/{kwargs['modifier']}/"
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
+
     def has_view_or_change_permission(self, request, obj=None):
         return True
 
@@ -426,6 +433,19 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         )
 
         self.assertEqual(queryset.query.where.children[0].rhs, [1])
+
+    def test_dashboard_chart_widget_uses_request_object_id_for_ajax_url(self):
+        widget = _ParentScopedChartWidget()
+        request = self.factory.get("/admin/auth/user/1/change/")
+        request.request_data = SimpleNamespace(object_id="parent-object")
+
+        context = widget.get_widget_context_data(request)
+
+        self.assertTrue(
+            context["ajax_url"].endswith(
+                "/parent_scoped_chart_widget/action_get_data/template/parent-object/"
+            )
+        )
 
     def test_dashboard_list_widget_uses_batch_parent_filter_hook(self):
         widget = _CustomParentScopedListWidget()
