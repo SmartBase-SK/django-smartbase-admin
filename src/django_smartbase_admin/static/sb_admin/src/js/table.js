@@ -37,7 +37,6 @@ class SBAdminTable {
         this.moduleInstances = this.initModules(options.modules)
         this.viewId = options.viewId
         this.filterFormId = options.filterFormId
-        this.ensureFilterForm()
         this.advancedFilterId = options.advancedFilterId
         this.columnWidgetId = options.columnWidgetId
         this.paginationWidgetId = options.paginationWidgetId
@@ -66,25 +65,6 @@ class SBAdminTable {
         this.loadFromUrl()
         this.buildTabulatorTable()
         this.afterInit()
-    }
-
-    ensureFilterForm() {
-        if (!this.filterFormId) {
-            return
-        }
-        let filterForm = document.getElementById(this.filterFormId)
-        if (!filterForm) {
-            filterForm = document.createElement("form")
-            filterForm.id = this.filterFormId
-            filterForm.className = "filter-form"
-            filterForm.action = ""
-            filterForm.hidden = true
-            document.body.appendChild(filterForm)
-            return
-        }
-        if (filterForm.parentElement?.closest("form")) {
-            document.body.appendChild(filterForm)
-        }
     }
 
     afterInit() {

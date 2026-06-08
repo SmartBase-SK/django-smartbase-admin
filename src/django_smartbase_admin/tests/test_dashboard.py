@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 
 from django.contrib import admin
+from django.contrib.admin.helpers import Fieldset
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
+from django.db import models
 from django.db.models import F
 from django.test import RequestFactory, SimpleTestCase
 from django.template.loader import render_to_string
@@ -12,11 +14,13 @@ from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.engine.const import FILTER_DATA_NAME, IGNORE_LIST_SELECTION
 from django_smartbase_admin.engine.dashboard import (
+    SbAdminCalendarWidget,
+    SBAdminDashboardChartWidget,
     SBAdminDashboardWidget,
     SBAdminDashboardListWidget,
 )
 from django_smartbase_admin.engine.field import SBAdminField
-from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
 
 
 class _DashboardWidget(SBAdminDashboardListWidget):
@@ -92,16 +96,28 @@ class _MissingWidgetIdAdmin(_WidgetAdmin):
     widgets = [_MissingWidgetIdWidget]
 
 
+class _FieldsetWidgetModel(models.Model):
+    username = models.CharField(max_length=150)
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class _FieldsetWidgetAdmin(_WidgetAdmin):
+    sbadmin_fieldsets = [
+        (
+            "Profile",
+            {
+                "fields": ["username", _RegisteredAdminWidget],
+                "classes": ["detail-view-right"],
+            },
+        )
+    ]
+
+
 class _ParentObjectListWidget(_StandaloneDashboardWidget):
     widget_id = "parent_object_list_widget"
-
-
-class _RenderedTabWidget(SBAdminDashboardWidget):
-    widget_id = "rendered_tab_widget"
-
-    def init_view_dynamic(self, request, request_data=None, **kwargs):
-        self.initialized_request = request
-        self.initialized_request_data = request_data
 
 
 class TestSBAdminDashboardListWidget(SimpleTestCase):
@@ -154,6 +170,9 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             content_context["tabulator_definition"]["tableAjaxUrl"].endswith(
                 "/embedded_dashboard_widget/action_list_json/template/price-list-1/"
             )
+        )
+        self.assertEqual(
+            str(content_context["media"]).count("sb_admin/dist/table.js"), 1
         )
 
     def test_dashboard_list_widget_uses_change_view_header_template(self):
@@ -221,6 +240,41 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertIn("btn btn-only-icon", html)
         self.assertIn("action_xlsx_export/__all__/price-list-1/", html)
         self.assertIn("dropdown-menu", html)
+        self.assertNotIn("sb_admin/dist/table.js", html)
+
+    def test_dashboard_collects_widget_media_once(self):
+        view = SBAdminDashboardView()
+        view.widget_views = [
+            SBAdminDashboardChartWidget(),
+            SBAdminDashboardChartWidget(),
+            _StandaloneDashboardWidget(),
+            _StandaloneDashboardWidget(),
+            SbAdminCalendarWidget(),
+        ]
+        request = self.factory.get("/dashboard/")
+
+        media_html = str(view.get_dashboard_media(request))
+
+        self.assertEqual(media_html.count("sb_admin/dist/chart.js"), 1)
+        self.assertEqual(media_html.count("sb_admin/dist/table.js"), 1)
+        self.assertEqual(media_html.count("sb_admin/js/fullcalendar.min.js"), 1)
+        self.assertEqual(media_html.count("sb_admin/dist/calendar.js"), 1)
+        self.assertEqual(media_html.count("sb_admin/dist/calendar_style.css"), 1)
+
+    def test_change_view_collects_widget_media_once(self):
+        admin_view = _WidgetAdmin(User, AdminSite())
+        admin_view.widget_views = [
+            SBAdminDashboardChartWidget(),
+            SBAdminDashboardChartWidget(),
+            _StandaloneDashboardWidget(),
+            _StandaloneDashboardWidget(),
+        ]
+        request = self.factory.get("/admin/auth/user/1/change/")
+
+        media_html = str(admin_view.get_change_view_widget_media(request))
+
+        self.assertEqual(media_html.count("sb_admin/dist/chart.js"), 1)
+        self.assertEqual(media_html.count("sb_admin/dist/table.js"), 1)
 
     def test_dashboard_list_widget_xlsx_filename_uses_widget_name(self):
         widget = _StandaloneDashboardWidget(name="Ceny dopravy")
@@ -288,15 +342,32 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertIs(widget.initialized_request, request)
         self.assertIs(widget.initialized_request_data, request.request_data)
 
-    def test_tabular_context_resolves_widget_classes(self):
-        widget = _RenderedTabWidget()
-        widget.widget_id = "auth_user_rendered_tab_widget"
-        tabs = {"Widget": [_RenderedTabWidget]}
+    def test_fieldsets_can_place_widgets_by_class(self):
+        configuration = SimpleNamespace(view_map={})
+        admin_view = _FieldsetWidgetAdmin(_FieldsetWidgetModel, AdminSite())
+        admin_view.init_view_static(configuration, _FieldsetWidgetModel, AdminSite())
+        request = self.factory.get("/admin/auth/user/1/change/")
 
-        context = get_tabular_context([], [], tabs, [widget])
+        fieldsets = admin_view.get_fieldsets(request)
 
-        content = context["context"]["Widget"]["content"]
-        self.assertEqual(content, [{"type": "widget", "value": widget}])
+        self.assertEqual(fieldsets[0][1]["fields"], ["username"])
+
+        form_class = admin_view.get_form(request)
+        form = form_class()
+        widget = admin_view.widget_views[0]
+        fieldset = Fieldset(
+            form=form,
+            name="Profile",
+            fields=("username",),
+            classes="detail-view-right",
+            model_admin=admin_view,
+        )
+
+        fieldset_context = form.get_fieldset_context(fieldset, request)
+
+        layout = fieldset_context["fieldset_layout"]
+        self.assertEqual(layout[0]["fieldset"].fields, ("username",))
+        self.assertIs(layout[1]["widget"], widget)
 
     def test_dashboard_list_widget_uses_request_object_id_for_embedded_urls(self):
         widget = _ParentObjectListWidget()

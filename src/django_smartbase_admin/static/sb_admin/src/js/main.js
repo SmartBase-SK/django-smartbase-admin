@@ -30,7 +30,7 @@ import Autocomplete from "./autocomplete"
 import StaticAutocomplete from "./static_autocomplete"
 import ChoicesJS from "./choices"
 import TextTags from "./text_tags"
-import { setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
+import { ensureFilterForms, setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
 import "./inline_paginator"
@@ -38,14 +38,17 @@ import "./inline_paginator"
 const CKEDITOR_READY_MAX_FRAMES = 120
 const PAGE_SCROLL_MARGIN_PX = 24
 const MODAL_SCROLL_MARGIN_PX = 24
+const SBADMIN_MAIN_LOADED_EVENT = 'SBAdminMainLoaded'
 
 class Main {
     constructor() {
         document.body.classList.add('js-ready')
+        ensureFilterForms()
         this.handleColorSchemeChange()
         this.initTooltips()
         this.initDropdowns()
         document.addEventListener('formset:added', (e) => {
+            ensureFilterForms(e.target)
             this.initTooltips(e.target)
             this.initDropdowns(e.target)
             this.initFileInputs(e.target)
@@ -61,6 +64,7 @@ class Main {
 
         if (window.htmx) {
             const processAfterSwap = (target) => {
+                ensureFilterForms(target)
                 this.initFileInputs(target)
                 this.initDropdowns(target)
                 this.initInputs(target)
@@ -787,6 +791,8 @@ class Main {
 
 window.addEventListener('DOMContentLoaded', () => {
     window.SBAdmin = new Main()
+    window.SBAdminMainLoaded = true
+    document.dispatchEvent(new CustomEvent(SBADMIN_MAIN_LOADED_EVENT))
 })
 
 document.body.addEventListener('sbadmin:modal-change-form-response', function (event) {

@@ -223,6 +223,7 @@ class SBAdminListAction(SBAdminAction):
         context_data.update(
             {
                 "const": constants,
+                "media": self.view.get_list_view_media(self.threadsafe_request),
                 "tabulator_definition": tabulator_definition,
                 "tabulator_definition_script_id": f"{self.view.get_id()}-tabulator-definition",
                 "id_column_name": id_column_name,

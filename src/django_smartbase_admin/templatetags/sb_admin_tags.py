@@ -178,17 +178,16 @@ def resolve_fieldset_context(fieldset, request=None):
 
 
 @register.simple_tag
-def get_tabular_context(fieldsets, inlines, tabs, widgets=None):
+def get_tabular_context(fieldsets, inlines, tabs):
     default_tabs = False
     any_error = False
     first_error_tab = True
     tabular_context = {}
     inlines_map = {inline.opts.__class__: inline for inline in inlines}
     fieldsets_map = {fieldset.name: fieldset for fieldset in fieldsets}
-    widgets_map = {widget.__class__: widget for widget in widgets or []}
     if not tabs:
         tabs = {
-            None: [*fieldsets_map.keys(), *inlines_map.keys(), *widgets_map.keys()],
+            None: [*fieldsets_map.keys(), *inlines_map.keys()],
         }
         default_tabs = True
     for key, values in tabs.items():
@@ -196,7 +195,6 @@ def get_tabular_context(fieldsets, inlines, tabs, widgets=None):
             has_error = False
             fieldset_value = fieldsets_map.get(value)
             inline_value = inlines_map.get(value)
-            widget_value = widgets_map.get(value)
             tabular_context[key] = tabular_context.get(
                 key, {"content": [], "error": False, "classes": set()}
             )
@@ -225,10 +223,6 @@ def get_tabular_context(fieldsets, inlines, tabs, widgets=None):
                 has_error = has_error or error_present
                 tabular_context[key]["error"] = (
                     tabular_context[key]["error"] or error_present
-                )
-            if widget_value is not None:
-                tabular_context[key]["content"].append(
-                    {"type": "widget", "value": widget_value}
                 )
             if has_error:
                 any_error = True

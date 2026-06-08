@@ -207,8 +207,12 @@ class SBAdminDynamicFormMixin:
         for item in fieldset_data.get("fields") or ():
             if isinstance(item, SBDynamicRegion):
                 fields.extend(item.fields)
-            else:
+            elif isinstance(item, str):
                 fields.append(item)
+            elif isinstance(item, (list, tuple)):
+                group = tuple(field for field in item if isinstance(field, str))
+                if group:
+                    fields.append(group)
         return tuple(fields)
 
     @staticmethod
@@ -450,7 +454,7 @@ class SBAdminDynamicFormMixin:
     def fieldset_is_empty(
         self,
         fieldset: Fieldset,
-        fieldset_layout: tuple[dict[str, SBDynamicRegionContext | Fieldset], ...],
+        fieldset_layout: tuple[dict[str, SBDynamicRegionContext | Fieldset | Any], ...],
     ) -> bool:
         if not fieldset_layout:
             return not self.fieldset_has_visible_fields(fieldset)
@@ -463,7 +467,23 @@ class SBAdminDynamicFormMixin:
                 region_context
             ):
                 return False
+            if layout_item.get("widget"):
+                return False
         return True
+
+    def get_fieldset_widgets(
+        self, request: HttpRequest | None = None
+    ) -> dict[type, Any]:
+        view = getattr(self, "view", None)
+        if view is None or not hasattr(view, "get_widget_views"):
+            return {}
+        return {
+            widget.__class__: widget
+            for widget in view.get_widget_views(
+                request,
+                self._sbadmin_dynamic_object_id(),
+            )
+        }
 
     def get_fieldset_context(
         self, fieldset: Fieldset, request: HttpRequest | None = None
@@ -498,16 +518,19 @@ class SBAdminDynamicFormMixin:
         fieldset: Fieldset,
         fieldset_data: dict[str, Any] | None,
         request: HttpRequest | None = None,
-    ) -> tuple[dict[str, SBDynamicRegionContext | Fieldset], ...]:
+    ) -> tuple[dict[str, SBDynamicRegionContext | Fieldset | Any], ...]:
         # A fieldset can mix normal fields with SBDynamicRegion markers. When it
         # does, build the exact render order as static Fieldset chunks separated
-        # by region contexts, so templates can render each dynamic region in
-        # place without losing the surrounding fields.
+        # by region/widget contexts, so templates can render each dynamic item
+        # in place without losing the surrounding fields.
         layout = (fieldset_data or {}).get("fields") or ()
-        if not any(isinstance(item, SBDynamicRegion) for item in layout):
+        widgets = self.get_fieldset_widgets(request)
+        has_dynamic_region = any(isinstance(item, SBDynamicRegion) for item in layout)
+        has_widget = any(item in widgets for item in layout)
+        if not has_dynamic_region and not has_widget:
             return ()
 
-        chunks: list[dict[str, SBDynamicRegionContext | Fieldset]] = []
+        chunks: list[dict[str, SBDynamicRegionContext | Fieldset | Any]] = []
         static_fields: list[str | tuple[str, ...]] = []
 
         def flush_static_fields() -> None:
@@ -537,6 +560,11 @@ class SBAdminDynamicFormMixin:
                 chunks.append(
                     {"region": self.get_dynamic_region_context(item, request)}
                 )
+                continue
+            widget = widgets.get(item)
+            if widget is not None:
+                flush_static_fields()
+                chunks.append({"widget": widget})
                 continue
             if isinstance(item, (list, tuple)):
                 group = tuple(field for field in item if isinstance(field, str))

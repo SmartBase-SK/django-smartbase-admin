@@ -982,7 +982,6 @@ class SBAdmin(
     def get_tabs_context(self, request, object_id) -> dict[str, Iterable]:
         return {
             "tabs_context": self.get_sbadmin_tabs(request, object_id),
-            "widgets_context": self.get_widget_views(request, object_id),
         }
 
     def get_context_data(self, request) -> dict[str, Any]:
@@ -1115,12 +1114,21 @@ class SBAdmin(
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
 
+    def get_change_view_widget_media(self, request, obj=None):
+        media = forms.Media()
+        for widget in self.get_widget_views(request, getattr(obj, "pk", None)):
+            if hasattr(widget, "get_media"):
+                media += widget.get_media()
+        return media
+
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
         partial_response = self._render_inline_partial_for_htmx(request, context)
         if partial_response is not None:
             return partial_response
+
+        context["media"] += self.get_change_view_widget_media(request, obj)
 
         if context.get("sbadmin_is_modal"):
             media = context["media"]

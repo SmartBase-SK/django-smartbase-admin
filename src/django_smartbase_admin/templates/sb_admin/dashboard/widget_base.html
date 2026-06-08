@@ -1,6 +1,5 @@
 {% block content %}
-    <form id="{{ widget_id }}-filter-form" action="">
-    </form>
+    <div data-filter-form-id="{{ widget_id }}-filter-form" class="hidden" ></div>
     
     {% block filters %}
         <div class="dashboard-filter flex max-sm:flex-wrap max-xs:pt-16 gap-y-8 justify-between col-span-12">

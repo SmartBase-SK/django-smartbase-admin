@@ -1182,6 +1182,20 @@ class DynamicFormTests(SimpleTestCase):
         self.assertEqual(fieldsets[0].name, "SBAdmin")
         self.assertEqual(fieldsets[0].fields, ("subtitle",))
 
+    def test_fieldset_fields_drop_non_form_layout_items(self):
+        fields = SBAdminDynamicFormMixin.get_fieldset_fields(
+            {
+                "fields": (
+                    "title",
+                    object,
+                    ("subtitle", object),
+                    SBDynamicRegion(name="details", fields=("summary",)),
+                )
+            }
+        )
+
+        self.assertEqual(fields, ("title", ("subtitle",), "summary"))
+
     def test_collapsible_fieldset_defaults_open(self):
         class CollapsibleFieldsetForm(SBAdminBaseFormInit, forms.Form):
             title = forms.CharField()

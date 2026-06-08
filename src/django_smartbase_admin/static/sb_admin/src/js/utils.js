@@ -85,6 +85,29 @@ export const filterInputValueChangeListener = (inputSelector, callbackFunction) 
     })
 }
 
+export const ensureFilterForm = (filterFormId) => {
+    if (!filterFormId) {
+        return
+    }
+    let filterForm = document.getElementById(filterFormId)
+    if (!filterForm) {
+        filterForm = document.createElement("form")
+        filterForm.id = filterFormId
+        filterForm.className = "filter-form"
+        filterForm.action = ""
+        filterForm.hidden = true
+    }
+    if (!filterForm.parentElement || filterForm.parentElement?.closest("form")) {
+        document.body.appendChild(filterForm)
+    }
+}
+
+export const ensureFilterForms = (root = document) => {
+    root.querySelectorAll("[data-filter-form-id]").forEach((marker) => {
+        ensureFilterForm(marker.dataset.filterFormId)
+    })
+}
+
 export const getResultLabel = (valueOrObject, separator=', ') => {
     const labelArray = []
     const entries = Object.values(valueOrObject)

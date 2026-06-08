@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from copy import copy
 from typing import Any, TYPE_CHECKING
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
@@ -662,6 +663,9 @@ class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_actions_initialized = False
     sbadmin_list_action_class = SBAdminListAction
     pg_unaccent_ext_cache = {}
+
+    def get_list_view_media(self, request):
+        return forms.Media(js=("sb_admin/dist/table.js",))
 
     @classmethod
     def _postgres_unaccent_extension_available(cls) -> bool:

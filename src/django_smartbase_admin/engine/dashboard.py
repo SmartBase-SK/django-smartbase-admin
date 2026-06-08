@@ -1,5 +1,6 @@
 from copy import copy
 from datetime import timedelta
+from django import forms
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
@@ -26,6 +27,7 @@ from django_smartbase_admin.utils import to_list
 
 class SBAdminDashboardWidget(SBAdminView):
     template_name = None
+    media = forms.Media()
     name = None
     widget_id = None
     parent_view = None
@@ -114,6 +116,16 @@ class SBAdminDashboardWidget(SBAdminView):
 
     def get_widgets(self):
         return self.sub_widgets or []
+
+    def get_media(self):
+        media = forms.Media()
+        widget_media = self.media
+        if widget_media:
+            media += widget_media
+        for widget in self.get_sub_widgets():
+            if hasattr(widget, "get_media"):
+                media += widget.get_media()
+        return media
 
     def get_template_name(self):
         return self.template_name
@@ -225,6 +237,7 @@ class SBAdminChartAggregateSubWidget(object):
 
 class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/chart_widget.html"
+    media = forms.Media(js=("sb_admin/dist/chart.js",))
     x_axis_annotate = None
     y_axis_annotate = None
     chart_type = None
@@ -642,6 +655,7 @@ class SBAdminDashboardLineChartWidgetByDate(SBAdminDashboardChartWidgetByDate):
 
 class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/list_widget.html"
+    media = forms.Media(js=("sb_admin/dist/table.js",))
     cache_enabled = False
     sbadmin_table_history_enabled = False
 
@@ -717,6 +731,10 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
 
 class SbAdminCalendarWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/calendar_widget.html"
+    media = forms.Media(
+        css={"all": ("sb_admin/dist/calendar_style.css",)},
+        js=("sb_admin/js/fullcalendar.min.js", "sb_admin/dist/calendar.js"),
+    )
 
     @sbadmin_action(permission="view")
     def action_get_data(self, request, modifier, object_id=None):
