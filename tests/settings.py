@@ -75,7 +75,7 @@ OAUTH2_PROVIDER = {
 # django-mcp-server: enforce OAuth on the MCP endpoint via DRF auth class
 # that reads DOT's AccessToken table.
 DJANGO_MCP_AUTHENTICATION_CLASSES = [
-    "django_smartbase_admin.mcp.oauth.auth.SBAdminMCPOAuth2Authentication",
+    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
 ]
 DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
@@ -102,7 +102,6 @@ USE_TZ = True
 ROOT_URLCONF = "tests.mcp_urls"
 
 MIDDLEWARE = [
-    "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

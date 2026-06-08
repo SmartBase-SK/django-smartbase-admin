@@ -1,11 +1,11 @@
 """CORS middleware for MCP + OAuth endpoints.
 
 Browser-hosted MCP clients (claude.ai's Cowork integration, the various
-ChatGPT bridges, Cursor's web client) cross-origin POST to ``/mcp/`` and
-send an OAuth preflight to ``/.well-known/oauth-protected-resource``.
-Without ``Access-Control-Allow-Origin`` + matching ``-Methods`` /
-``-Headers``, the browser blocks every request before it reaches Django
-and the client's "Install" button stays disabled.
+ChatGPT bridges, Cursor's web client) and custom browser dashboards
+cross-origin POST to ``/mcp/`` and send an OAuth preflight to
+``/.well-known/oauth-protected-resource``. Without
+``Access-Control-Allow-Origin`` + matching ``-Methods`` / ``-Headers``,
+the browser blocks every request before it reaches Django.
 
 This middleware adds the required headers on the MCP endpoint plus the
 OAuth discovery / registration / authorization paths, gated by an

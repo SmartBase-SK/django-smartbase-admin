@@ -4818,11 +4818,11 @@ Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
 
 DJANGO_MCP_AUTHENTICATION_CLASSES = [
-    # Spec-compliant 401 + WWW-Authenticate (RFC 9728 / MCP authorization).
-    # Plain DOT ``OAuth2Authentication`` omits ``resource_metadata`` and MCP
-    # clients (Cursor / Claude / Cowork) can't discover OAuth — Install
-    # button stays greyed out.
-    "django_smartbase_admin.mcp.oauth.auth.SBAdminMCPOAuth2Authentication",
+    # DOT bearer-token auth backed by the AccessToken table. Clients
+    # discover OAuth via the /.well-known/* metadata documents (they fall
+    # back to probing those when the 401's WWW-Authenticate carries no
+    # resource_metadata pointer, per the MCP authorization spec).
+    "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
 ]
 DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "name": "sbadmin",
@@ -4835,21 +4835,11 @@ OAUTH2_PROVIDER = {
     "SCOPES": {"sbadmin:write": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
 }
-
-# Browser-hosted MCP clients (claude.ai's Cowork, cursor.com) cross-origin
-# POST to /mcp/ and preflight the OAuth discovery routes. Without CORS the
-# browser blocks every request and the client's "Install" button stays
-# disabled. Middleware is scoped to MCP + OAuth paths only.
-MIDDLEWARE = [
-    "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
-    # ... your other middleware ...
-]
-# Defaults to ("https://claude.ai", "https://cursor.com"); override to
-# expand or lock down.
-SBADMIN_MCP_ALLOWED_ORIGINS = ["https://claude.ai", "https://cursor.com"]
 ```
 
-Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass. Override `authenticate_header(request)` to return `Bearer ..., resource_metadata="<absolute /.well-known/oauth-protected-resource URL>"` so MCP clients can discover OAuth.
+This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
+
+Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
 
 ### Two browser-only extras
 

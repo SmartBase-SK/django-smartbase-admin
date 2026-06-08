@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+
 from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.engine.fake_inline import is_fake_inline_batch_safe
 from django_smartbase_admin.engine.filter_widgets import (
@@ -22,10 +24,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     MultipleChoiceFilterWidget,
     NumberRangeFilterWidget,
 )
-from django_smartbase_admin.mcp.actions import (
-    action_entries_for,
-    collect_action_entries,
-)
+from django_smartbase_admin.mcp.actions import collect_action_entries
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 
 logger = logging.getLogger(__name__)
@@ -93,6 +92,20 @@ WIDGET_SHAPES: dict[str, dict] = {
     },
     "StringFilterWidget": {"value_shape": "string (substring match)", "example": ""},
 }
+
+
+def get_widget_shapes() -> dict[str, dict]:
+    """Built-in ``WIDGET_SHAPES`` plus any project-declared additions.
+
+    Projects with custom filter widgets can document their ``filter_data``
+    shape by setting ``SBADMIN_MCP_ADDITIONAL_WIDGET_SHAPES`` (same
+    ``{name: {"value_shape", "example"}}`` form) — entries are merged on
+    top of the built-ins, so a project can also override a built-in shape.
+    Resolved per request so ``override_settings`` and runtime changes take
+    effect.
+    """
+    additional = getattr(settings, "SBADMIN_MCP_ADDITIONAL_WIDGET_SHAPES", None) or {}
+    return {**WIDGET_SHAPES, **additional}
 
 
 def _widget_category(widget) -> str:
@@ -281,28 +294,16 @@ def _fieldset_action_entries(admin, request) -> list[dict]:
 
     entries: list[dict] = []
     for fieldset, fieldset_data in fieldsets:
-        try:
-            actions = admin.get_sbadmin_fieldset_actions_processed(
-                request, fieldset, fieldset_data, None
-            )
-        except Exception:
-            logger.warning(
-                "MCP schema: fieldset action collection failed on %s",
-                admin.__class__.__name__,
-                exc_info=True,
-            )
-            continue
-        for action in actions or []:
-            try:
-                for entry in action_entries_for(action):
-                    entry["fieldset"] = str(fieldset) if fieldset is not None else None
-                    entries.append(entry)
-            except Exception:
-                logger.warning(
-                    "MCP schema: skipping fieldset action on %s",
-                    admin.__class__.__name__,
-                    exc_info=True,
-                )
+        for entry in collect_action_entries(
+            admin,
+            "get_sbadmin_fieldset_actions_processed",
+            request,
+            fieldset=fieldset,
+            fieldset_data=fieldset_data,
+            object_id=None,
+        ):
+            entry["fieldset"] = str(fieldset) if fieldset is not None else None
+            entries.append(entry)
     return entries
 
 

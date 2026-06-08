@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SBAdmin Dashboard</title>
+<!-- Blueprint for a local dashboard on this admin's live data (MCP resource dashboard://blueprint). -->
+<!-- Build any view below — metrics, tables, charts. Fill CONFIG.clientId after registering an OAuth client; scope + MCP path are filled in on read. -->
+<!-- Serve on a spare port, e.g. python -m http.server 8010. -->
+
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a1a; }
+  header { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; border-bottom: 1px solid #e5e5e5; }
+  header h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  button { font: inherit; padding: .4rem .8rem; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; }
+  #status { font-size: .85rem; color: #666; }
+  main { padding: 1rem; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; }
+  .card h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; margin: 0 0 .5rem; }
+  .metric { font-size: 2rem; font-weight: 600; }
+  .err { color: #b00020; font-size: .85rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dashboard</h1>
+  <span id="status">not connected</span>
+  <span class="spacer"></span>
+  <button id="auth-btn">Connect</button>
+</header>
+<main id="dashboard"></main>
+
+<script type="module">
+/* ============================ CONFIG ============================ */
+const CONFIG = {
+  issuer:      location.origin,                 // this server when served same-origin; else set explicitly
+  clientId:    "REPLACE_WITH_CLIENT_ID",        // from Dynamic Client Registration (see header)
+  redirectUri: location.origin + location.pathname,
+  scope:       "__MCP_SCOPE__",                 // scope this server exposes (filled in on resource read)
+  mcpUrl:      location.origin + "/__MCP_PATH__",  // MCP endpoint (path filled in); set host if off-origin
+};
+
+/* ===================== OAuth 2.1 + PKCE (auth) ===================== */
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const sha256 = (s) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+const rand   = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+
+let TOKEN = sessionStorage.getItem("sbadmin_token") || null;
+
+async function discover() {
+  const r = await fetch(CONFIG.issuer + "/.well-known/oauth-authorization-server");
+  if (!r.ok) throw new Error("OAuth discovery failed");
+  return r.json();                              // -> { authorization_endpoint, token_endpoint, ... }
+}
+
+async function login() {
+  const meta = await discover();
+  const verifier = rand();
+  const state = rand();
+  sessionStorage.setItem("pkce_verifier", verifier);
+  sessionStorage.setItem("oauth_state", state);
+  const url = new URL(meta.authorization_endpoint);
+  url.search = new URLSearchParams({
+    response_type: "code",
+    client_id: CONFIG.clientId,
+    redirect_uri: CONFIG.redirectUri,
+    scope: CONFIG.scope,
+    state,
+    code_challenge: b64url(await sha256(verifier)),
+    code_challenge_method: "S256",
+  });
+  location.assign(url);                         // full-page redirect through login
+}
+
+async function handleRedirect() {
+  const p = new URLSearchParams(location.search);
+  const code = p.get("code");
+  if (!code) return;
+  if (p.get("state") !== sessionStorage.getItem("oauth_state")) throw new Error("state mismatch");
+  const meta = await discover();
+  const r = await fetch(meta.token_endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: CONFIG.redirectUri,
+      client_id: CONFIG.clientId,
+      code_verifier: sessionStorage.getItem("pkce_verifier"),
+    }),
+  });
+  if (!r.ok) throw new Error("token exchange failed: " + r.status);
+  TOKEN = (await r.json()).access_token;
+  sessionStorage.setItem("sbadmin_token", TOKEN);
+  history.replaceState({}, "", CONFIG.redirectUri);   // strip ?code from the URL
+}
+
+function logout() { TOKEN = null; sessionStorage.removeItem("sbadmin_token"); render(); }
+
+/* ===================== DATA (live, via MCP) =====================
+   Calls one MCP tool over JSON-RPC and returns its JSON result.
+   This is the ONLY data function — swap it if a REST read-facade
+   is added later. Verify the result-unwrapping against your server
+   (structuredContent vs content[0].text) the first time.            */
+async function api(tool, args = {}) {
+  if (!TOKEN) throw new Error("not authenticated");
+  const r = await fetch(CONFIG.mcpUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + TOKEN,
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-06-18",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: tool, arguments: args },
+    }),
+  });
+  if (r.status === 401) { logout(); throw new Error("session expired — reconnect"); }
+  if (!r.ok) throw new Error(tool + " failed: " + r.status);
+  const text = await r.text();
+  const json = JSON.parse(text.includes("data:") ? text.split("data:").pop() : text);
+  if (json.error) throw new Error(json.error.message || "rpc error");
+  const res = json.result ?? json;
+  if (res.structuredContent) return res.structuredContent;
+  const c = res.content?.[0];
+  return c?.text ? JSON.parse(c.text) : res;
+}
+
+/* ===================== DASHBOARD (build it here) =====================
+   Pull data with api(tool, args) and render it any way you like. The card()
+   helper and the examples below are just one option — build tables, charts,
+   or any layout. Discover views/fields via list_admins. */
+async function render() {
+  document.getElementById("auth-btn").textContent = TOKEN ? "Disconnect" : "Connect";
+  document.getElementById("status").textContent   = TOKEN ? "connected" : "not connected";
+  const dash = document.getElementById("dashboard");
+  dash.innerHTML = "";
+  if (!TOKEN) return;
+
+  // ---- EXAMPLE (runs anywhere): number of admin views you can access ----
+  card(dash, "Admin views", async (el) => {
+    const res = await api("list_admins", {});
+    el.innerHTML = `<div class="metric">${res.admin_views.length}</div>`;
+  });
+
+  // ---- TEMPLATE: a metric from a list view's filtered total ----
+  // card(dash, "<title>", async (el) => {
+  //   const res = await api("list_rows", {
+  //     view_id: "<view_id>", fields: ["id"],
+  //     filter_data: { "<field>": ["<value>"] }, page_size: 1,
+  //   });
+  //   el.innerHTML = `<div class="metric">${res.last_row}</div>`;
+  // });
+
+  // ---- TEMPLATE: an aggregate ----
+  // card(dash, "<title>", async (el) => {
+  //   const res = await api("list_rows", {
+  //     view_id: "<view_id>", fields: ["id"],
+  //     aggregate: [{ fn: "count" }, { fn: "sum", field: "<field>" }],
+  //   });
+  //   el.innerHTML = `<div class="metric">${res.aggregates.count}</div>`;
+  // });
+}
+
+function card(parent, title, fill) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `<h2>${title}</h2><div>…</div>`;
+  parent.appendChild(el);
+  fill(el.lastElementChild).catch((e) =>
+    (el.lastElementChild.innerHTML = `<span class="err">${e.message}</span>`));
+}
+
+/* ============================ BOOT ============================ */
+document.getElementById("auth-btn").onclick = () => (TOKEN ? logout() : login());
+(async () => { try { await handleRedirect(); } catch (e) { console.error(e); } render(); })();
+</script>
+</body>
+</html>

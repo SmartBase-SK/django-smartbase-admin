@@ -19,7 +19,7 @@ import json
 
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from mcp_server import MCPToolset
+from mcp_server import MCPToolset, mcp_server as global_mcp_server
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
@@ -54,7 +54,7 @@ from django_smartbase_admin.mcp.bridge import (
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
-from django_smartbase_admin.mcp.schema import WIDGET_SHAPES, admin_entry
+from django_smartbase_admin.mcp.schema import admin_entry, get_widget_shapes
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -203,6 +203,14 @@ def _decode_preset_url_params(url_params) -> dict:
         url_params = json.loads(url_params) if url_params else {}
     url_params = url_params or {}
     raw_filter = dict(url_params.get(FILTER_DATA_NAME, {}) or {})
+    # Some presets store a multi-value filter as a JSON string; parse it back
+    # to a list. Plain scalar strings (substring filters) are left untouched.
+    for _key, _value in list(raw_filter.items()):
+        if isinstance(_value, str) and _value[:1] in "[{":
+            try:
+                raw_filter[_key] = json.loads(_value)
+            except ValueError:
+                pass
     table_params = url_params.get(TABLE_PARAMS_NAME, {}) or {}
 
     # Advanced-filter presets keep their predicates in advancedFilterData,
@@ -378,7 +386,7 @@ class SBAdminTools(MCPToolset):
         # Saves repeating ``invoke_with`` on every individual action.
         return {
             "admin_views": admins,
-            "widget_shapes": WIDGET_SHAPES,
+            "widget_shapes": get_widget_shapes(),
             "action_invokers": ACTION_INVOKERS,
         }
 
@@ -491,6 +499,7 @@ class SBAdminTools(MCPToolset):
         sort: list | None = None,
         full_text_search: str | None = None,
         include_inlines: list | None = None,
+        aggregate: list | None = None,
     ) -> dict:
         """List rows for one admin — same data the UI list shows.
 
@@ -521,7 +530,11 @@ class SBAdminTools(MCPToolset):
             entry ``value`` (a free-text name/email is not a valid id).
             Unknown keys are rejected — misspellings raise instead of
             silently returning every row.
-          page, page_size: pagination, 1-indexed.
+          page: 1-indexed page number (default 1).
+          page_size: rows per page (default 20). No enforced maximum —
+            set it high to pull the whole filtered set in one call (use
+            ``last_row`` from a first probe to size it). Mind context cost
+            on large sets.
           sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
             entries, applied in order. ``field`` is a column name from
             ``list_admins["admin_views"][].fields[].name``; unknown
@@ -546,8 +559,17 @@ class SBAdminTools(MCPToolset):
             inline name in ``row["_truncated_inlines"]`` and only the
             first page is attached.
 
+          aggregate: optional list of ``{"fn", "field"}`` specs, each a
+            total over the WHOLE filtered set (independent of paging).
+            ``fn`` is one of ``sum / avg / min / max / count``; ``field``
+            must be a declared column from ``list_admins`` —
+            ``sum/avg/min/max`` need a numeric one, ``count`` may omit
+            ``field`` for a row count. Results land under ``aggregates``,
+            keyed ``f"{fn}_{field}"`` (or ``"count"``).
+
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
-        plus any pagination metadata the list view emits.
+        plus any pagination metadata the list view emits, and ``aggregates``
+        when the ``aggregate`` argument is supplied.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -589,6 +611,12 @@ class SBAdminTools(MCPToolset):
             method="GET",
         )
 
+        # Totals over the whole filtered set, validated before the page fetch.
+        aggregates = None
+        if aggregate is not None:
+            action = admin.sbadmin_list_action_class(admin, request)
+            aggregates = action.get_aggregates(aggregate, field_map=field_map)
+
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
         # the JSON and drop UI-only payload (notifications, per-row action
@@ -613,6 +641,8 @@ class SBAdminTools(MCPToolset):
         strip_html_cells(admin, request, rows)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
+        if aggregates is not None:
+            result["aggregates"] = aggregates
         return result
 
     @_guarded_tool_call
@@ -889,7 +919,10 @@ class SBAdminTools(MCPToolset):
           view_id: handle from ``list_admins``.
           object_id: optional row id; ``None`` returns all entries for
             the model.
-          page, page_size: pagination, 1-indexed.
+          page: 1-indexed page number (default 1).
+          page_size: rows per page (default 20). No enforced maximum —
+            set it high to pull the full history in one call (use
+            ``last_row`` to size it).
 
         Returns ``{"data": [<entry>, ...], "page": int, "page_size": int,
         "last_row": int}`` where each ``<entry>`` is ``{"id", "timestamp",
@@ -1343,3 +1376,51 @@ class SBAdminTools(MCPToolset):
                 "account."
             ) from exc
         return json.loads(response.content.decode())["data"]
+
+
+@global_mcp_server.resource(
+    "dashboard://blueprint",
+    name="custom_dashboard.html",
+    description=(
+        "Blueprint for a local, single-user dashboard on this admin's live "
+        "data — one static HTML page (no backend), run locally, that can "
+        "display whatever you need: metrics, tables, charts/graphs, any custom "
+        "view. It logs in via OAuth 2.1 (auth code + PKCE) to this "
+        "server and calls the MCP tools through an api(tool, args) helper. "
+        "SETUP: (1) save the content as an .html file; (2) register an OAuth "
+        "client via POST <issuer>/oauth/register (redirect_uris = where you "
+        "serve the page) and put the returned client_id into CONFIG — a public "
+        "PKCE id, no secret; CONFIG.scope and the MCP path are prefilled; "
+        "(3) serve it over http, NOT file:// (Origin 'null' is always "
+        "CORS-blocked) — locally on a spare, non-default port so it doesn't "
+        "clash with the admin/other dev servers, e.g. python -m http.server "
+        "8010; (4) build the "
+        "view: call MCP tool(s) via api() (discover views/fields via "
+        "list_admins) and render the results any way you like — cards, tables, "
+        "charts, free-form layout (the example cards are just one option; add a "
+        "chart library for graphs). Same-origin as the admin needs no CORS; "
+        "off-origin, point "
+        "CONFIG.issuer/mcpUrl at this server and enable SBAdminMCPCorsMiddleware "
+        "+ SBADMIN_MCP_ALLOWED_ORIGINS."
+    ),
+    mime_type="text/html",
+)
+def dashboard_blueprint_resource() -> str:
+    """Blueprint HTML with the MCP endpoint path + advertised OAuth scope baked
+    in. Resources have no per-request context, so ``issuer`` / ``mcpUrl``
+    resolve from ``location.origin`` in the page (correct for same-origin
+    hosting); only the endpoint path and scope — static settings — are filled.
+    """
+    from importlib.resources import files
+
+    from django.conf import settings
+
+    html = (files("django_smartbase_admin.mcp") / "dashboard_blueprint.html").read_text(
+        encoding="utf-8"
+    )
+    oauth = getattr(settings, "OAUTH2_PROVIDER", {}) or {}
+    scope = " ".join(
+        oauth.get("DEFAULT_SCOPES") or list((oauth.get("SCOPES") or {}).keys())
+    )
+    mcp_path = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/").lstrip("/")
+    return html.replace("__MCP_PATH__", mcp_path).replace("__MCP_SCOPE__", scope)

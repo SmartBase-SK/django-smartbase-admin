@@ -39,4 +39,8 @@ Rules: copy ``widget_id`` only from prior tool output (never invent it).
 Inline dict keys use ``inline_name`` from ``list_admins`` (inline class name).
 Create flow: ``fetch_add_form`` then ``create_object``; inline FK ids on add often
 need ``autocomplete`` on another admin with the same ``filter.target_model``.
+
+Custom dashboard: to build a local, single-user dashboard — any creative live
+view of this data (metrics, tables, charts/graphs) — read the
+``dashboard://blueprint`` resource (setup is in its description).
 """

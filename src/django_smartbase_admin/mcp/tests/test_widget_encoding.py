@@ -32,7 +32,7 @@ from django.forms.widgets import (
 from django.http import QueryDict
 from django.utils.datastructures import MultiValueDict
 
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.mcp.form_encoding import write_widget_input
@@ -171,6 +171,29 @@ class WriteMultiWidgetTests(TestCase):
         write_widget_input(qd, "when", widget, None)
         self.assertEqual(
             widget.value_from_datadict(qd, MultiValueDict(), "when"), [None, None]
+        )
+
+    def test_split_datetime_accepts_naive_iso_string(self):
+        qd = _empty_qd()
+        widget = SplitDateTimeWidget()
+        write_widget_input(qd, "when", widget, "2024-05-26T14:30:00")
+        self.assertEqual(
+            widget.value_from_datadict(qd, MultiValueDict(), "when"),
+            [date(2024, 5, 26), time(14, 30)],
+        )
+
+    @override_settings(TIME_ZONE="UTC")
+    def test_split_datetime_accepts_tz_aware_iso_string(self):
+        # tz-aware ISO (what fetch_* returns) must be accepted on the way in,
+        # not rejected — localized to wall-clock for the date/time subwidgets.
+        # Pin TIME_ZONE=UTC so the Z value localizes 1:1 (the localization
+        # itself is covered by it converting offsets at all).
+        qd = _empty_qd()
+        widget = SplitDateTimeWidget()
+        write_widget_input(qd, "when", widget, "2024-05-26T14:30:00Z")
+        self.assertEqual(
+            widget.value_from_datadict(qd, MultiValueDict(), "when"),
+            [date(2024, 5, 26), time(14, 30)],
         )
 
 
