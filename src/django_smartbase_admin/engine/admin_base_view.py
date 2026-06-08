@@ -1029,7 +1029,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         self, request
     ) -> list[SBAdminCustomAction]:
         return self.process_list_actions(
-            request, self.get_sbadmin_list_selection_actions(request)
+            request,
+            self.get_sbadmin_list_selection_actions(request),
+            object_id=getattr(request.request_data, "object_id", None),
         )
 
     def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:
@@ -1077,7 +1079,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             and request.headers.get("X-TabulatorRequest", None) == "true"
         ):
             return redirect(
-                self.get_action_url("action_bulk_delete")
+                self.get_action_url(
+                    "action_bulk_delete", object_id=request.request_data.object_id
+                )
                 + "?"
                 + urllib.parse.urlencode(
                     {

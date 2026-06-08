@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.contrib.admin.helpers import Fieldset
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models import F
@@ -76,6 +77,14 @@ class _RegisteredAdminWidget(SBAdminDashboardWidget):
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         self.initialized_request = request
         self.initialized_request_data = request_data
+
+
+class _CachedParentScopedWidget(SBAdminDashboardWidget):
+    widget_id = "cached_parent_scoped_widget"
+    cache_enabled = True
+
+    def get_data(self, request):
+        return {"object_id": request.request_data.object_id}
 
 
 class _WidgetAdmin(SBAdmin):
@@ -475,6 +484,37 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             )
         )
 
+    def test_dashboard_list_widget_uses_request_object_id_for_selection_actions(self):
+        widget = _ParentObjectListWidget()
+        request = self.factory.get("/admin/parent/1/change/")
+        request.LANGUAGE_CODE = "en"
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            modifier=IGNORE_LIST_SELECTION,
+            object_id="parent-object",
+            selected_view=widget,
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        actions = widget.get_sbadmin_list_selection_actions_processed(request)
+
+        self.assertTrue(
+            actions[0].url.endswith(
+                "/parent_object_list_widget/action_xlsx_export/template/parent-object/"
+            )
+        )
+        self.assertTrue(
+            actions[1].url.endswith(
+                "/parent_object_list_widget/action_bulk_delete/template/parent-object/"
+            )
+        )
+
     def test_dashboard_widget_filters_queryset_by_parent_request(self):
         widget = _ParentScopedChartWidget()
         request = self.factory.get("/admin/auth/user/1/change/")
@@ -497,6 +537,33 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             context["ajax_url"].endswith(
                 "/parent_scoped_chart_widget/action_get_data/template/parent-object/"
             )
+        )
+
+    def test_dashboard_widget_cache_key_includes_request_object_id(self):
+        cache.clear()
+        widget = _CachedParentScopedWidget()
+        base_request_data = {
+            "global_filter": {},
+            "request_get": {},
+            "request_post": {},
+            "user": SimpleNamespace(id=1),
+        }
+        first_request = self.factory.get("/admin/auth/user/1/change/")
+        first_request.request_data = SimpleNamespace(
+            **base_request_data,
+            object_id="parent-1",
+        )
+        second_request = self.factory.get("/admin/auth/user/2/change/")
+        second_request.request_data = SimpleNamespace(
+            **base_request_data,
+            object_id="parent-2",
+        )
+
+        self.assertEqual(
+            widget.get_cached_data(first_request), {"object_id": "parent-1"}
+        )
+        self.assertEqual(
+            widget.get_cached_data(second_request), {"object_id": "parent-2"}
         )
 
     def test_dashboard_list_widget_uses_batch_parent_filter_hook(self):

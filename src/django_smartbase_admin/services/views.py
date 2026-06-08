@@ -250,7 +250,12 @@ class SBAdminViewService(object):
 
     @classmethod
     def get_cache_key_for_user(cls, request_data) -> str:
-        return f"{request_data.user.id}_{pickle.dumps(request_data.global_filter)}_{pickle.dumps(request_data.request_get)}_{pickle.dumps(request_data.request_post)}"
+        return (
+            f"{request_data.user.id}_{pickle.dumps(request_data.object_id)}"
+            f"_{pickle.dumps(request_data.global_filter)}"
+            f"_{pickle.dumps(request_data.request_get)}"
+            f"_{pickle.dumps(request_data.request_post)}"
+        )
 
     @classmethod
     def get_filter_fields_and_values_from_request(
