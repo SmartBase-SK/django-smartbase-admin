@@ -22,6 +22,9 @@ class SBAdminDashboardView(SBAdminView):
     def get_title(self):
         return self.title or settings.PROJECT_NAME
 
+    def get_widget_id(self, widget, index):
+        return f"{self.get_id()}_{index}"
+
     def get_dashboard_media(self, request):
         media = forms.Media()
         for widget in self.get_widget_views(request):

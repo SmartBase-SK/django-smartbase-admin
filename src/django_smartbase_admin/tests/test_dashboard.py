@@ -322,6 +322,19 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertEqual(media_html.count("sb_admin/dist/calendar.js"), 1)
         self.assertEqual(media_html.count("sb_admin/dist/calendar_style.css"), 1)
 
+    def test_dashboard_widgets_use_index_based_ids(self):
+        configuration = SimpleNamespace(view_map={})
+        view = SBAdminDashboardView(
+            widgets=[_DashboardWidget(), _StandaloneDashboardWidget()]
+        )
+
+        view.init_view_static(configuration, None, AdminSite())
+
+        self.assertEqual(view.widget_views[0].get_id(), "dashboard_0")
+        self.assertEqual(view.widget_views[1].get_id(), "dashboard_1")
+        self.assertIs(configuration.view_map["dashboard_0"], view.widget_views[0])
+        self.assertIs(configuration.view_map["dashboard_1"], view.widget_views[1])
+
     def test_change_view_collects_widget_media_once(self):
         admin_view = _WidgetAdmin(User, AdminSite())
         admin_view.widget_views = [
