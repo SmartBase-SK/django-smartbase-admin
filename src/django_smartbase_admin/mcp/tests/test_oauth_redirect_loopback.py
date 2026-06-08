@@ -40,14 +40,22 @@ class LoopbackRedirectTests(TestCase):
 
     def test_validator_rejects_non_loopback_http_only(self):
         validator = SBAdminMCPOAuth2Validator()
-        with patch.object(OAuth2Validator, "validate_redirect_uri", return_value=True) as parent:
+        with patch.object(
+            OAuth2Validator, "validate_redirect_uri", return_value=True
+        ) as parent:
             self.assertFalse(
-                validator.validate_redirect_uri("c", "http://evil.example/cb", SimpleNamespace())
+                validator.validate_redirect_uri(
+                    "c", "http://evil.example/cb", SimpleNamespace()
+                )
             )
             parent.assert_not_called()
-        with patch.object(OAuth2Validator, "validate_redirect_uri", return_value=True) as parent:
+        with patch.object(
+            OAuth2Validator, "validate_redirect_uri", return_value=True
+        ) as parent:
             self.assertTrue(
-                validator.validate_redirect_uri("c", "http://localhost:8010/", SimpleNamespace())
+                validator.validate_redirect_uri(
+                    "c", "http://localhost:8010/", SimpleNamespace()
+                )
             )
             parent.assert_called_once()
 
