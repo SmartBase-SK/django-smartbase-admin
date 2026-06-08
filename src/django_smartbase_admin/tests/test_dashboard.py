@@ -19,6 +19,7 @@ from django_smartbase_admin.engine.dashboard import (
     SBAdminDashboardWidget,
     SBAdminDashboardListWidget,
 )
+from django_smartbase_admin.engine.dynamic_forms import SBDynamicRegion
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
 
@@ -114,6 +115,29 @@ class _FieldsetWidgetAdmin(_WidgetAdmin):
             },
         )
     ]
+
+
+class _DynamicRegionWidgetAdmin(_WidgetAdmin):
+    sbadmin_fieldsets = [
+        (
+            "Profile",
+            {
+                "fields": [
+                    SBDynamicRegion(
+                        name="profile_region",
+                        fields=("username", _RegisteredAdminWidget),
+                    )
+                ],
+            },
+        )
+    ]
+
+    def get_action_url(self, action, modifier="template", object_id=None):
+        kwargs = self.get_action_url_kwargs(action, modifier, object_id)
+        url = f"/{kwargs['view']}/{kwargs['action']}/{kwargs['modifier']}/"
+        if object_id is not None:
+            url = f"{url}{object_id}/"
+        return url
 
 
 class _ParentObjectListWidget(_StandaloneDashboardWidget):
@@ -396,6 +420,34 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         layout = fieldset_context["fieldset_layout"]
         self.assertEqual(layout[0]["fieldset"].fields, ("username",))
         self.assertIs(layout[1]["widget"], widget)
+
+    def test_dynamic_regions_can_place_widgets_by_class(self):
+        configuration = SimpleNamespace(view_map={})
+        admin_view = _DynamicRegionWidgetAdmin(_FieldsetWidgetModel, AdminSite())
+        admin_view.init_view_static(configuration, _FieldsetWidgetModel, AdminSite())
+        request = self.factory.get("/admin/auth/user/1/change/")
+
+        fieldsets = admin_view.get_fieldsets(request)
+
+        self.assertEqual(fieldsets[0][1]["fields"], ["username"])
+
+        form_class = admin_view.get_form(request)
+        form = form_class()
+        widget = admin_view.widget_views[0]
+        region = admin_view.sbadmin_fieldsets[0][1]["fields"][0]
+        region_context = form.get_dynamic_region_context(region, request)
+
+        self.assertEqual(region_context.fieldset.fields, ("username",))
+        self.assertEqual(region_context.state.active_fields, ("username",))
+        self.assertEqual(
+            region_context.state.active_layout,
+            ("username", _RegisteredAdminWidget),
+        )
+        self.assertEqual(
+            region_context.fieldset_layout[0]["fieldset"].fields,
+            ("username",),
+        )
+        self.assertIs(region_context.fieldset_layout[1]["widget"], widget)
 
     def test_dashboard_list_widget_uses_request_object_id_for_embedded_urls(self):
         widget = _ParentObjectListWidget()

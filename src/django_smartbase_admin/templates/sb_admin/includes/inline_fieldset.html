@@ -15,19 +15,7 @@
         {% if fieldset_context.collapsible %}
             <div id="{{ fieldset_context.collapse_id }}" class="collapse pt-24 sbadmin-fieldset-collapse{% if fieldset_context.collapse_open %} show{% endif %}">
         {% endif %}
-            {% if fieldset_context.fieldset_layout %}
-                {% for layout_item in fieldset_context.fieldset_layout %}
-                    {% if layout_item.region %}
-                        {% include 'sb_admin/includes/dynamic_region.html' with dynamic_region=layout_item.region %}
-                    {% elif layout_item.widget %}
-                        {% render_widget layout_item.widget request %}
-                    {% else %}
-                        {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=layout_item.fieldset %}
-                    {% endif %}
-                {% endfor %}
-            {% else %}
-                {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=fieldset_context.fieldset %}
-            {% endif %}
+            {% include 'sb_admin/includes/fieldset_layout.html' with fieldset_layout=fieldset_context.fieldset_layout fieldset=fieldset_context.fieldset %}
         {% if fieldset_context.collapsible %}
             </div>
         {% endif %}

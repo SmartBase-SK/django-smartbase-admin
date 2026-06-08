@@ -1,0 +1,15 @@
+{% load sb_admin_tags %}
+
+{% if fieldset_layout %}
+    {% for layout_item in fieldset_layout %}
+        {% if layout_item.region %}
+            {% include 'sb_admin/includes/dynamic_region.html' with dynamic_region=layout_item.region %}
+        {% elif layout_item.widget %}
+            {% render_widget layout_item.widget request %}
+        {% else %}
+            {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=layout_item.fieldset %}
+        {% endif %}
+    {% endfor %}
+{% elif fieldset %}
+    {% include 'sb_admin/includes/inline_fieldset_fields.html' with fieldset=fieldset %}
+{% endif %}

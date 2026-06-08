@@ -17,7 +17,7 @@
         {% if region.template %}
             {% include region.template with form=form region=region region_state=region_state active_field_names=region_state.active_field_names %}
         {% elif not dynamic_region.is_deferred_initial %}
-            {% include "sb_admin/includes/inline_fieldset_fields.html" with fieldset=dynamic_fieldset %}
+            {% include 'sb_admin/includes/fieldset_layout.html' with fieldset_layout=dynamic_region.fieldset_layout fieldset=dynamic_fieldset %}
         {% endif %}
     {% endif %}
 </div>
