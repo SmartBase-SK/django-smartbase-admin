@@ -85,8 +85,10 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_settings(self):
         return self.settings
 
-    def get_ajax_url(self):
-        return self.get_action_url("action_get_data")
+    def get_ajax_url(self, request=None):
+        return self.get_action_url(
+            "action_get_data", object_id=self.get_parent_instance_id(request)
+        )
 
     def get_parent_instance_id(self, request):
         request_data = getattr(request, "request_data", None)
@@ -120,7 +122,7 @@ class SBAdminDashboardWidget(SBAdminView):
         return {
             "widget_id": self.get_id(),
             "widget_name": self.name,
-            "ajax_url": self.get_ajax_url,
+            "ajax_url": self.get_ajax_url(request),
             "filters": self.get_filters(),
             "settings": self.get_settings(),
             "sub_widgets": self.get_sub_widgets(),

@@ -883,7 +883,6 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_tabulator_definition(self, request) -> dict[str, Any]:
         view_id = self.get_id()
-        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
         sticky_header_and_footer = self.get_sbadmin_list_sticky_header_and_footer(
             request
         )
@@ -896,9 +895,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "pageSizeWidgetId": f"{view_id}" + "-page-size-widget",
             "baseViewUrl": request.path,
             "tableElSelector": f"#{view_id}-table",
-            "tableAjaxUrl": self.get_action_url(
-                Action.LIST_JSON.value, object_id=object_id
-            ),
+            "tableAjaxUrl": self.get_ajax_url(request),
             "tableDataEditUrl": self.get_action_url(Action.TABLE_DATA_EDIT.value),
             "tableActionMoveUrl": self.get_action_url(
                 Action.TABLE_REORDER_ACTION.value
@@ -1269,8 +1266,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         config_views.extend(current_views)
         return {"current_views": config_views}
 
-    def get_ajax_url(self) -> str:
-        return self.get_action_url(Action.LIST_JSON.value)
+    def get_ajax_url(self, request=None) -> str:
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        return self.get_action_url(Action.LIST_JSON.value, object_id=object_id)
 
     def get_detail_url(self) -> str:
         return self.get_action_url(
