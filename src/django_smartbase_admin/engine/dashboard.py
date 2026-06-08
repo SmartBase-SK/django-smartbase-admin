@@ -38,6 +38,7 @@ class SBAdminDashboardWidget(SBAdminView):
     global_filter_data_map = None
     cache_enabled = False
     SUB_WIDGET_NAME_SUFFIX = "_sub_widget"
+    path_to_parent_instance_id = None
 
     def __init__(
         self,
@@ -87,14 +88,29 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_ajax_url(self):
         return self.get_action_url("action_get_data")
 
-    def get_parent_object(self, request):
-        if self.parent_view is None:
-            return None
+    def get_parent_instance_id(self, request):
         request_data = getattr(request, "request_data", None)
-        object_id = getattr(request_data, "object_id", None)
-        if object_id is None:
-            return None
-        return self.parent_view.get_object(request, object_id)
+        return getattr(request_data, "object_id", None)
+
+    def filter_queryset_by_parent_instance_ids(
+        self, request, queryset, parent_instance_ids
+    ):
+        if self.path_to_parent_instance_id is None:
+            return queryset
+        parent_instance_ids = list(parent_instance_ids)
+        if not parent_instance_ids:
+            return queryset.none()
+        return queryset.filter(
+            **{f"{self.path_to_parent_instance_id}__in": parent_instance_ids}
+        )
+
+    def _filter_queryset_by_parent_request(self, request, queryset):
+        parent_instance_id = self.get_parent_instance_id(request)
+        if parent_instance_id is None:
+            return queryset
+        return self.filter_queryset_by_parent_instance_ids(
+            request, queryset, [parent_instance_id]
+        )
 
     @sbadmin_action(permission="view")
     def action_get_data(self, request, modifier, object_id=None):
@@ -305,7 +321,7 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
         qs = super().get_queryset(request)
         filters = self.get_filters_from_request(request)
         qs = qs.annotate(**self.get_annotates(request)).filter(filters)
-        return qs
+        return self._filter_queryset_by_parent_request(request, qs)
 
     def get_data_queryset(self, request):
         active_sub_widget = self.get_active_sub_widget(request)
@@ -692,6 +708,10 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             f"sb_admin:{self.get_model_path()}_change",
             kwargs={"object_id": OBJECT_ID_PLACEHOLDER},
         )
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        return self._filter_queryset_by_parent_request(request, qs)
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)

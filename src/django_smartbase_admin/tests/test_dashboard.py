@@ -120,6 +120,27 @@ class _ParentObjectListWidget(_StandaloneDashboardWidget):
     widget_id = "parent_object_list_widget"
 
 
+class _ParentScopedChartWidget(SBAdminDashboardChartWidget):
+    widget_id = "parent_scoped_chart_widget"
+    model = _FieldsetWidgetModel
+    path_to_parent_instance_id = "id"
+    x_axis_annotate = F("username")
+
+    def has_view_or_change_permission(self, request, obj=None):
+        return True
+
+
+class _CustomParentScopedListWidget(_StandaloneDashboardWidget):
+    widget_id = "custom_parent_scoped_list_widget"
+    model = _FieldsetWidgetModel
+
+    def filter_queryset_by_parent_instance_ids(
+        self, request, queryset, parent_instance_ids
+    ):
+        self.filtered_parent_instance_ids = list(parent_instance_ids)
+        return queryset.filter(id__in=parent_instance_ids)
+
+
 class TestSBAdminDashboardListWidget(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -394,6 +415,36 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
                 "/parent_object_list_widget/action_list_json/template/parent-object/"
             )
         )
+
+    def test_dashboard_widget_filters_queryset_by_parent_request(self):
+        widget = _ParentScopedChartWidget()
+        request = self.factory.get("/admin/auth/user/1/change/")
+        request.request_data = SimpleNamespace(object_id="1")
+
+        queryset = widget._filter_queryset_by_parent_request(
+            request, _FieldsetWidgetModel.objects.all()
+        )
+
+        self.assertEqual(queryset.query.where.children[0].rhs, [1])
+
+    def test_dashboard_list_widget_uses_batch_parent_filter_hook(self):
+        widget = _CustomParentScopedListWidget()
+        request = self.factory.get("/admin/auth/user/1/change/")
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            object_id="7",
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+            global_filter_instance=[],
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+
+        widget.get_queryset(request)
+
+        self.assertEqual(widget.filtered_parent_instance_ids, ["7"])
 
     def test_list_action_reads_registered_view_params(self):
         widget = _ParentObjectListWidget()
