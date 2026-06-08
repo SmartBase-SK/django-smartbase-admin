@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 10:26+0200\n"
+"POT-Creation-Date: 2026-06-08 12:40+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -275,11 +275,6 @@ msgstr ""
 msgid "Translations"
 msgstr ""
 
-msgid "Please correct the error below."
-msgid_plural "Please correct the errors below."
-msgstr[0] ""
-msgstr[1] ""
-
 msgid "Save"
 msgstr ""
 
@@ -307,40 +302,88 @@ msgid "Enter a new password for the user <strong>%(username)s</strong>."
 msgstr ""
 
 #, python-format
-msgid "Delete %(object)s"
+msgid "Delete \"%(escaped_object)s\"?"
 msgstr ""
 
 #, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgid "This will delete this %(object_name)s and the related records listed below."
 msgstr ""
 
-#, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgid "Missing permissions"
 msgstr ""
 
-#, python-format
-msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgid "Deleting this object would affect related records that your account cannot delete."
 msgstr ""
 
-msgid "Objects"
+msgid "Objects blocked by permissions"
+msgstr ""
+
+msgid "Adjust permissions or ask an administrator before trying again."
+msgstr ""
+
+msgid "Deletion is unavailable"
+msgstr ""
+
+msgid "Protected related objects"
+msgstr ""
+
+msgid "This object cannot be deleted while protected related records still exist."
+msgstr ""
+
+msgid "Protected objects"
+msgstr ""
+
+msgid "Remove or detach these records, then try again."
+msgstr ""
+
+msgid "Deletion is blocked"
+msgstr ""
+
+msgid "Review the deletion impact"
+msgstr ""
+
+msgid "After confirmation, these records will be deleted and cannot be restored from the admin."
+msgstr ""
+
+msgid "Deletion preview"
+msgstr ""
+
+msgid "Review the exact objects below before confirming."
 msgstr ""
 
 msgid "No, take me back"
 msgstr ""
 
-msgid "Yes, I’m sure"
+msgid "Yes, delete"
 msgstr ""
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgid "Delete selected %(objects_name)s?"
 msgstr ""
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgid "This will delete the selected %(objects_name)s and the related records listed below."
 msgstr ""
 
-#, python-format
-msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgid "Deleting the selected objects would affect related records that your account cannot delete."
+msgstr ""
+
+msgid "Bulk deletion is unavailable"
+msgstr ""
+
+msgid "Some selected objects cannot be deleted while protected related records still exist."
+msgstr ""
+
+msgid "Bulk deletion is blocked"
+msgstr ""
+
+msgid "Review the bulk deletion impact"
+msgstr ""
+
+msgid "Yes, delete selected"
+msgstr ""
+
+msgid "Items"
 msgstr ""
 
 msgid "Add"
@@ -423,6 +466,13 @@ msgstr ""
 
 msgid "No related changes in this request."
 msgstr ""
+
+msgid "Please correct the error below."
+msgid_plural ""
+"\n"
+"                    Please correct the errors below."
+msgstr[0] ""
+msgstr[1] ""
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -549,6 +599,9 @@ msgid "Cancel"
 msgstr ""
 
 msgid "Calendar"
+msgstr ""
+
+msgid "Actions"
 msgstr ""
 
 msgid "Timezone"

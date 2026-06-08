@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 10:25+0200\n"
+"POT-Creation-Date: 2026-06-08 12:40+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -279,13 +279,6 @@ msgstr "Motiv"
 msgid "Translations"
 msgstr "Překlady"
 
-msgid "Please correct the error below."
-msgid_plural "Please correct the errors below."
-msgstr[0] "Opravte prosím níže uvedenou chybu."
-msgstr[1] "Opravte prosím níže uvedené chyby."
-msgstr[2] "Opravte prosím níže uvedené chyby."
-msgstr[3] "Opravte prosím níže uvedené chyby."
-
 msgid "Save"
 msgstr "Uložit"
 
@@ -313,43 +306,89 @@ msgid "Enter a new password for the user <strong>%(username)s</strong>."
 msgstr "Zadejte nové heslo pro uživatele <strong>%(username)s</strong>."
 
 #, python-format
-msgid "Delete %(object)s"
-msgstr "Smazat %(object)s"
+msgid "Delete \"%(escaped_object)s\"?"
+msgstr "Smazat \"%(escaped_object)s\"?"
 
 #, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Smazání %(object_name)s '%(escaped_object)s' by vedlo ke smazání souvisejících objektů, ale váš účet nemá oprávnění k odstranění následujících typů objektů:"
+msgid "This will delete this %(object_name)s and the related records listed below."
+msgstr "Tímto smažete tento objekt %(object_name)s a související záznamy uvedené níže."
 
-#, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
-msgstr "Smazání %(object_name)s '%(escaped_object)s' by vyžadovalo smazání následujících chráněných souvisejících objektů:"
+msgid "Missing permissions"
+msgstr "Chybějící oprávnění"
 
-#, python-format
-msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
-msgstr "Opravdu chcete smazat %(object_name)s \"%(escaped_object)s\"? Všechny následující související položky budou smazány:"
+msgid "Deleting this object would affect related records that your account cannot delete."
+msgstr "Smazání tohoto objektu by ovlivnilo související záznamy, které váš účet nemůže smazat."
 
-msgid "Objects"
-msgstr "Objekty"
+msgid "Objects blocked by permissions"
+msgstr "Objekty blokované oprávněními"
+
+msgid "Adjust permissions or ask an administrator before trying again."
+msgstr "Před dalším pokusem upravte oprávnění nebo požádejte správce."
+
+msgid "Deletion is unavailable"
+msgstr "Smazání není dostupné"
+
+msgid "Protected related objects"
+msgstr "Chráněné související objekty"
+
+msgid "This object cannot be deleted while protected related records still exist."
+msgstr "Tento objekt nelze smazat, dokud stále existují chráněné související záznamy."
+
+msgid "Protected objects"
+msgstr "Chráněné objekty"
+
+msgid "Remove or detach these records, then try again."
+msgstr "Odstraňte nebo odpojte tyto záznamy a zkuste to znovu."
+
+msgid "Deletion is blocked"
+msgstr "Smazání je zablokováno"
+
+msgid "Review the deletion impact"
+msgstr "Zkontrolujte dopad smazání"
+
+msgid "After confirmation, these records will be deleted and cannot be restored from the admin."
+msgstr "Po potvrzení budou tyto záznamy smazány a z administrace je nebude možné obnovit."
+
+msgid "Deletion preview"
+msgstr "Náhled smazání"
+
+msgid "Review the exact objects below before confirming."
+msgstr "Před potvrzením zkontrolujte přesné objekty uvedené níže."
 
 msgid "No, take me back"
 msgstr "Ne, vrátit se zpět"
 
-#, fuzzy
-#| msgid "Yes, I'm sure"
-msgid "Yes, I’m sure"
-msgstr "Ano, jsem si jistý"
+msgid "Yes, delete"
+msgstr "Ano, smazat"
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Smazání vybraných %(objects_name)s by vedlo ke smazání souvisejících objektů, ale váš účet nemá oprávnění k odstranění následujících typů objektů:"
+msgid "Delete selected %(objects_name)s?"
+msgstr "Smazat vybrané %(objects_name)s?"
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
-msgstr "Smazání vybraných %(objects_name)s by vyžadovalo smazání následujících chráněných souvisejících objektů:"
+msgid "This will delete the selected %(objects_name)s and the related records listed below."
+msgstr "Tímto smažete vybrané %(objects_name)s a související záznamy uvedené níže."
 
-#, python-format
-msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
-msgstr "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující objekty a jejich související položky budou smazány:"
+msgid "Deleting the selected objects would affect related records that your account cannot delete."
+msgstr "Smazání vybraných objektů by ovlivnilo související záznamy, které váš účet nemůže smazat."
+
+msgid "Bulk deletion is unavailable"
+msgstr "Hromadné smazání není dostupné"
+
+msgid "Some selected objects cannot be deleted while protected related records still exist."
+msgstr "Některé vybrané objekty nelze smazat, dokud stále existují chráněné související záznamy."
+
+msgid "Bulk deletion is blocked"
+msgstr "Hromadné smazání je zablokováno"
+
+msgid "Review the bulk deletion impact"
+msgstr "Zkontrolujte dopad hromadného smazání"
+
+msgid "Yes, delete selected"
+msgstr "Ano, smazat vybrané"
+
+msgid "Items"
+msgstr "Položky"
 
 msgid "Add"
 msgstr "Přidat"
@@ -431,6 +470,18 @@ msgstr "Objekt"
 
 msgid "No related changes in this request."
 msgstr "Žádné související změny v tomto požadavku."
+
+#, fuzzy
+#| msgid "Please correct the error below."
+#| msgid_plural "Please correct the errors below."
+msgid "Please correct the error below."
+msgid_plural ""
+"\n"
+"                    Please correct the errors below."
+msgstr[0] "Opravte prosím níže uvedenou chybu."
+msgstr[1] "Opravte prosím níže uvedené chyby."
+msgstr[2] "Opravte prosím níže uvedené chyby."
+msgstr[3] "Opravte prosím níže uvedené chyby."
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -572,6 +623,11 @@ msgstr "Zrušit"
 
 msgid "Calendar"
 msgstr "Kalendář"
+
+#, fuzzy
+#| msgid "Action"
+msgid "Actions"
+msgstr "Akce"
 
 msgid "Timezone"
 msgstr "Časové pásmo"
@@ -1003,3 +1059,31 @@ msgstr " z "
 
 msgid "Language"
 msgstr "Jazyk"
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Smazání %(object_name)s '%(escaped_object)s' by vedlo ke smazání souvisejících objektů, ale váš účet nemá oprávnění k odstranění následujících typů objektů:"
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+#~ msgstr "Smazání %(object_name)s '%(escaped_object)s' by vyžadovalo smazání následujících chráněných souvisejících objektů:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+#~ msgstr "Opravdu chcete smazat %(object_name)s \"%(escaped_object)s\"? Všechny následující související položky budou smazány:"
+
+#~ msgid "Objects"
+#~ msgstr "Objekty"
+
+#, fuzzy
+#~| msgid "Yes, I'm sure"
+#~ msgid "Yes, I’m sure"
+#~ msgstr "Ano, jsem si jistý"
+
+#, python-format
+#~ msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Smazání vybraných %(objects_name)s by vedlo ke smazání souvisejících objektů, ale váš účet nemá oprávnění k odstranění následujících typů objektů:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+#~ msgstr "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující objekty a jejich související položky budou smazány:"

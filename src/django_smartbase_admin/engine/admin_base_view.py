@@ -993,7 +993,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.process_list_actions(
             request,
             list_actions,
-            object_id=getattr(request.request_data, "object_id", None),
+            object_id=getattr(
+                getattr(request, "request_data", None), "object_id", None
+            ),
         )
 
     def get_sbadmin_list_actions(self, request) -> list[SBAdminCustomAction]:
@@ -1031,7 +1033,9 @@ class SBAdminBaseListView(SBAdminBaseView):
         return self.process_list_actions(
             request,
             self.get_sbadmin_list_selection_actions(request),
-            object_id=getattr(request.request_data, "object_id", None),
+            object_id=getattr(
+                getattr(request, "request_data", None), "object_id", None
+            ),
         )
 
     def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:

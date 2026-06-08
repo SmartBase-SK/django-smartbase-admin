@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 10:25+0200\n"
+"POT-Creation-Date: 2026-06-08 12:40+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -279,12 +279,6 @@ msgstr "Téma"
 msgid "Translations"
 msgstr "Preklady"
 
-msgid "Please correct the error below."
-msgid_plural "Please correct the errors below."
-msgstr[0] "Opravte chybu nižšie."
-msgstr[1] "Opravte chyby nižšie."
-msgstr[2] "Opravte chyby nižšie."
-
 msgid "Save"
 msgstr "Uložiť"
 
@@ -312,41 +306,89 @@ msgid "Enter a new password for the user <strong>%(username)s</strong>."
 msgstr "Vytvorte nové heslo pre používateľa <strong>%(username)s</strong>."
 
 #, python-format
-msgid "Delete %(object)s"
-msgstr "Zmazať %(object)s"
+msgid "Delete \"%(escaped_object)s\"?"
+msgstr "Odstrániť \"%(escaped_object)s\"?"
 
 #, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+msgid "This will delete this %(object_name)s and the related records listed below."
+msgstr "Týmto sa odstráni tento objekt %(object_name)s a súvisiace záznamy uvedené nižšie."
 
-#, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
-msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie týchto súvisiacich objektov:"
+msgid "Missing permissions"
+msgstr "Chýbajúce oprávnenia"
 
-#, python-format
-msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
-msgstr "Ste si istý že chcete odstrániť %(object_name)s \"%(escaped_object)s\"? Všetky nasledujúce položky budú odstránené:"
+msgid "Deleting this object would affect related records that your account cannot delete."
+msgstr "Odstránenie tohto objektu by ovplyvnilo súvisiace záznamy, ktoré váš účet nemôže odstrániť."
 
-msgid "Objects"
-msgstr "Objekty"
+msgid "Objects blocked by permissions"
+msgstr "Objekty zablokované oprávneniami"
+
+msgid "Adjust permissions or ask an administrator before trying again."
+msgstr "Pred ďalším pokusom upravte oprávnenia alebo požiadajte správcu."
+
+msgid "Deletion is unavailable"
+msgstr "Odstránenie nie je dostupné"
+
+msgid "Protected related objects"
+msgstr "Chránené súvisiace objekty"
+
+msgid "This object cannot be deleted while protected related records still exist."
+msgstr "Tento objekt nemožno odstrániť, kým stále existujú chránené súvisiace záznamy."
+
+msgid "Protected objects"
+msgstr "Chránené objekty"
+
+msgid "Remove or detach these records, then try again."
+msgstr "Odstráňte alebo odpojte tieto záznamy a potom to skúste znova."
+
+msgid "Deletion is blocked"
+msgstr "Odstránenie je zablokované"
+
+msgid "Review the deletion impact"
+msgstr "Skontrolujte dopad odstránenia"
+
+msgid "After confirmation, these records will be deleted and cannot be restored from the admin."
+msgstr "Po potvrdení budú tieto záznamy odstránené a z administrácie ich nebude možné obnoviť."
+
+msgid "Deletion preview"
+msgstr "Náhľad odstránenia"
+
+msgid "Review the exact objects below before confirming."
+msgstr "Pred potvrdením skontrolujte presné objekty uvedené nižšie."
 
 msgid "No, take me back"
 msgstr "Nie, ísť späť"
 
-msgid "Yes, I’m sure"
-msgstr "Áno, som si istý"
+msgid "Yes, delete"
+msgstr "Áno, odstrániť"
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+msgid "Delete selected %(objects_name)s?"
+msgstr "Odstrániť vybrané %(objects_name)s?"
 
 #, python-format
-msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
-msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie týchto súvisiacich objektov:"
+msgid "This will delete the selected %(objects_name)s and the related records listed below."
+msgstr "Týmto sa odstránia vybrané %(objects_name)s a súvisiace záznamy uvedené nižšie."
 
-#, python-format
-msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
-msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky nasledujúce položky a ich súvisiace objekty budú odstránené:"
+msgid "Deleting the selected objects would affect related records that your account cannot delete."
+msgstr "Odstránenie vybraných objektov by ovplyvnilo súvisiace záznamy, ktoré váš účet nemôže odstrániť."
+
+msgid "Bulk deletion is unavailable"
+msgstr "Hromadné odstránenie nie je dostupné"
+
+msgid "Some selected objects cannot be deleted while protected related records still exist."
+msgstr "Niektoré vybrané objekty nemožno odstrániť, kým stále existujú chránené súvisiace záznamy."
+
+msgid "Bulk deletion is blocked"
+msgstr "Hromadné odstránenie je zablokované"
+
+msgid "Review the bulk deletion impact"
+msgstr "Skontrolujte dopad hromadného odstránenia"
+
+msgid "Yes, delete selected"
+msgstr "Áno, odstrániť vybrané"
+
+msgid "Items"
+msgstr "Položky"
 
 msgid "Add"
 msgstr "Pridať"
@@ -432,6 +474,17 @@ msgstr "Objekty"
 
 msgid "No related changes in this request."
 msgstr "V tejto požiadavke nie sú žiadne súvisiace zmeny."
+
+#, fuzzy
+#| msgid "Please correct the error below."
+#| msgid_plural "Please correct the errors below."
+msgid "Please correct the error below."
+msgid_plural ""
+"\n"
+"                    Please correct the errors below."
+msgstr[0] "Opravte chybu nižšie."
+msgstr[1] "Opravte chyby nižšie."
+msgstr[2] "Opravte chyby nižšie."
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -563,6 +616,11 @@ msgstr "Zrušiť"
 
 msgid "Calendar"
 msgstr "Kalendár"
+
+#, fuzzy
+#| msgid "Action"
+msgid "Actions"
+msgstr "Akcia"
 
 msgid "Timezone"
 msgstr "Časové pásmo"
@@ -991,3 +1049,29 @@ msgstr " z "
 
 msgid "Language"
 msgstr "Jazyk"
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+#~ msgstr "Odstránenie %(object_name)s '%(escaped_object)s' vyžaduje odstránenie týchto súvisiacich objektov:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+#~ msgstr "Ste si istý že chcete odstrániť %(object_name)s \"%(escaped_object)s\"? Všetky nasledujúce položky budú odstránené:"
+
+#~ msgid "Objects"
+#~ msgstr "Objekty"
+
+#~ msgid "Yes, I’m sure"
+#~ msgstr "Áno, som si istý"
+
+#, python-format
+#~ msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Odstránenie vybraných %(objects_name)s vyžaduje odstránenie súvisiacich objektov ale váš účet nemá potrebné povolenia na odstránenie týchto objektov:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+#~ msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky nasledujúce položky a ich súvisiace objekty budú odstránené:"

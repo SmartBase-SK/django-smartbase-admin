@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 10:25+0200\n"
+"POT-Creation-Date: 2026-06-08 12:40+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -277,11 +277,6 @@ msgstr "Design"
 msgid "Translations"
 msgstr "Übersetzungen"
 
-msgid "Please correct the error below."
-msgid_plural "Please correct the errors below."
-msgstr[0] "Bitte korrigieren Sie den untenstehenden Fehler."
-msgstr[1] "Bitte korrigieren Sie die untenstehenden Fehler."
-
 msgid "Save"
 msgstr "Speichern"
 
@@ -308,44 +303,101 @@ msgstr "Passwort ändern"
 msgid "Enter a new password for the user <strong>%(username)s</strong>."
 msgstr "Geben Sie ein neues Passwort für den Benutzer <strong>%(username)s</strong> ein."
 
-#, python-format
-msgid "Delete %(object)s"
+#, fuzzy, python-format
+#| msgid "Delete %(object)s"
+msgid "Delete \"%(escaped_object)s\"?"
 msgstr "%(object)s löschen"
 
 #, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+msgid "This will delete this %(object_name)s and the related records listed below."
+msgstr ""
 
-#, python-format
-msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
-msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde das Löschen der folgenden geschützten verwandten Objekte erfordern:"
+msgid "Missing permissions"
+msgstr ""
 
-#, python-format
-msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
-msgstr "Möchten Sie %(object_name)s \"%(escaped_object)s\" wirklich löschen? Alle folgenden verwandten Einträge werden gelöscht:"
+msgid "Deleting this object would affect related records that your account cannot delete."
+msgstr ""
 
-msgid "Objects"
-msgstr "Objekte"
+msgid "Objects blocked by permissions"
+msgstr ""
+
+msgid "Adjust permissions or ask an administrator before trying again."
+msgstr ""
+
+msgid "Deletion is unavailable"
+msgstr ""
+
+#, fuzzy
+#| msgid "No other affected objects."
+msgid "Protected related objects"
+msgstr "Keine weiteren betroffenen Objekte."
+
+msgid "This object cannot be deleted while protected related records still exist."
+msgstr ""
+
+#, fuzzy
+#| msgid "Affected Objects"
+msgid "Protected objects"
+msgstr "Betroffene Objekte"
+
+msgid "Remove or detach these records, then try again."
+msgstr ""
+
+msgid "Deletion is blocked"
+msgstr ""
+
+msgid "Review the deletion impact"
+msgstr ""
+
+msgid "After confirmation, these records will be deleted and cannot be restored from the admin."
+msgstr ""
+
+#, fuzzy
+#| msgid "Reader reviews"
+msgid "Deletion preview"
+msgstr "Leserrezensionen"
+
+msgid "Review the exact objects below before confirming."
+msgstr ""
 
 msgid "No, take me back"
 msgstr "Nein, zurück"
 
-#, fuzzy
-#| msgid "Yes, I'm sure"
-msgid "Yes, I’m sure"
-msgstr "Ja, ich bin sicher"
+msgid "Yes, delete"
+msgstr ""
 
-#, python-format
-msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
-msgstr "Das Löschen der ausgewählten %(objects_name)s würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+#, fuzzy, python-format
+#| msgid "Delete %(object)s"
+msgid "Delete selected %(objects_name)s?"
+msgstr "%(object)s löschen"
 
-#, python-format
-msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+#, fuzzy, python-format
+#| msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgid "This will delete the selected %(objects_name)s and the related records listed below."
 msgstr "Das Löschen der ausgewählten %(objects_name)s würde das Löschen der folgenden geschützten verwandten Objekte erfordern:"
 
-#, python-format
-msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
-msgstr "Möchten Sie die ausgewählten %(objects_name)s wirklich löschen? Alle folgenden Objekte und ihre verwandten Einträge werden gelöscht:"
+msgid "Deleting the selected objects would affect related records that your account cannot delete."
+msgstr ""
+
+msgid "Bulk deletion is unavailable"
+msgstr ""
+
+msgid "Some selected objects cannot be deleted while protected related records still exist."
+msgstr ""
+
+msgid "Bulk deletion is blocked"
+msgstr ""
+
+msgid "Review the bulk deletion impact"
+msgstr ""
+
+#, fuzzy
+#| msgid "Delete Selected"
+msgid "Yes, delete selected"
+msgstr "Auswahl löschen"
+
+msgid "Items"
+msgstr ""
 
 msgid "Add"
 msgstr "Hinzufügen"
@@ -427,6 +479,16 @@ msgstr "Objekt"
 
 msgid "No related changes in this request."
 msgstr "Keine verwandten Änderungen in dieser Anfrage."
+
+#, fuzzy
+#| msgid "Please correct the error below."
+#| msgid_plural "Please correct the errors below."
+msgid "Please correct the error below."
+msgid_plural ""
+"\n"
+"                    Please correct the errors below."
+msgstr[0] "Bitte korrigieren Sie den untenstehenden Fehler."
+msgstr[1] "Bitte korrigieren Sie die untenstehenden Fehler."
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
@@ -568,6 +630,11 @@ msgstr "Abbrechen"
 
 msgid "Calendar"
 msgstr "Kalender"
+
+#, fuzzy
+#| msgid "Action"
+msgid "Actions"
+msgstr "Aktion"
 
 msgid "Timezone"
 msgstr "Zeitzone"
@@ -1000,3 +1067,31 @@ msgstr " von "
 
 msgid "Language"
 msgstr ""
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+
+#, python-format
+#~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+#~ msgstr "Das Löschen von %(object_name)s '%(escaped_object)s' würde das Löschen der folgenden geschützten verwandten Objekte erfordern:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+#~ msgstr "Möchten Sie %(object_name)s \"%(escaped_object)s\" wirklich löschen? Alle folgenden verwandten Einträge werden gelöscht:"
+
+#~ msgid "Objects"
+#~ msgstr "Objekte"
+
+#, fuzzy
+#~| msgid "Yes, I'm sure"
+#~ msgid "Yes, I’m sure"
+#~ msgstr "Ja, ich bin sicher"
+
+#, python-format
+#~ msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+#~ msgstr "Das Löschen der ausgewählten %(objects_name)s würde zum Löschen verwandter Objekte führen, aber Ihr Konto hat keine Berechtigung, die folgenden Objekttypen zu löschen:"
+
+#, python-format
+#~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+#~ msgstr "Möchten Sie die ausgewählten %(objects_name)s wirklich löschen? Alle folgenden Objekte und ihre verwandten Einträge werden gelöscht:"
