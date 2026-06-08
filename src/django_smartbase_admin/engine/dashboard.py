@@ -1,6 +1,8 @@
 from copy import copy
 from datetime import timedelta
+from django import forms
 from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.functions import TruncMonth, TruncDay, TruncWeek, TruncYear
@@ -25,8 +27,10 @@ from django_smartbase_admin.utils import to_list
 
 class SBAdminDashboardWidget(SBAdminView):
     template_name = None
+    media = forms.Media()
     name = None
     widget_id = None
+    parent_view = None
     annotates = None
     filters = None
     settings = None
@@ -34,6 +38,7 @@ class SBAdminDashboardWidget(SBAdminView):
     global_filter_data_map = None
     cache_enabled = False
     SUB_WIDGET_NAME_SUFFIX = "_sub_widget"
+    path_to_parent_instance_id = None
 
     def __init__(
         self,
@@ -59,6 +64,12 @@ class SBAdminDashboardWidget(SBAdminView):
         )
 
     def init_widget_static(self, configuration):
+        if self.widget_id is None:
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} must define widget_id."
+            )
+        if self.parent_view is not None:
+            self.widget_id = f"{self.parent_view.get_id()}_{self.widget_id}"
         self.view_id = self.widget_id
         for filter in self.get_filters():
             filter.init_field_static(self, configuration)
@@ -74,18 +85,44 @@ class SBAdminDashboardWidget(SBAdminView):
     def get_settings(self):
         return self.settings
 
-    def get_ajax_url(self):
-        return self.get_action_url("action_get_data")
+    def get_ajax_url(self, request=None):
+        return self.get_action_url(
+            "action_get_data", object_id=self.get_parent_instance_id(request)
+        )
+
+    def get_parent_instance_id(self, request):
+        request_data = getattr(request, "request_data", None)
+        return getattr(request_data, "object_id", None)
+
+    def filter_queryset_by_parent_instance_ids(
+        self, request, queryset, parent_instance_ids
+    ):
+        if self.path_to_parent_instance_id is None:
+            return queryset
+        parent_instance_ids = list(parent_instance_ids)
+        if not parent_instance_ids:
+            return queryset.none()
+        return queryset.filter(
+            **{f"{self.path_to_parent_instance_id}__in": parent_instance_ids}
+        )
+
+    def _filter_queryset_by_parent_request(self, request, queryset):
+        parent_instance_id = self.get_parent_instance_id(request)
+        if parent_instance_id is None:
+            return queryset
+        return self.filter_queryset_by_parent_instance_ids(
+            request, queryset, [parent_instance_id]
+        )
 
     @sbadmin_action(permission="view")
-    def action_get_data(self, request, modifier):
+    def action_get_data(self, request, modifier, object_id=None):
         return JsonResponse(data={"data": self.get_cached_data(request)})
 
     def get_widget_context_data(self, request):
         return {
             "widget_id": self.get_id(),
             "widget_name": self.name,
-            "ajax_url": self.get_ajax_url,
+            "ajax_url": self.get_ajax_url(request),
             "filters": self.get_filters(),
             "settings": self.get_settings(),
             "sub_widgets": self.get_sub_widgets(),
@@ -93,13 +130,20 @@ class SBAdminDashboardWidget(SBAdminView):
         }
 
     def get_sub_widgets(self):
-        return self.sub_widgets
+        return self.widget_views if self.widget_views is not None else self.sub_widgets
 
-    def get_sub_views(self, configuration):
-        for idx, sub_widget_view in enumerate(self.sub_widgets):
-            sub_widget_view.widget_id = f"{self.get_id()}_{idx}"
-            sub_widget_view.init_widget_static(configuration)
-        return self.sub_widgets
+    def get_widgets(self):
+        return self.sub_widgets or []
+
+    def get_media(self):
+        media = forms.Media()
+        widget_media = self.media
+        if widget_media:
+            media += widget_media
+        for widget in self.get_sub_widgets():
+            if hasattr(widget, "get_media"):
+                media += widget.get_media()
+        return media
 
     def get_template_name(self):
         return self.template_name
@@ -211,6 +255,7 @@ class SBAdminChartAggregateSubWidget(object):
 
 class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/chart_widget.html"
+    media = forms.Media(js=("sb_admin/dist/chart.js",))
     x_axis_annotate = None
     y_axis_annotate = None
     chart_type = None
@@ -278,7 +323,7 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
         qs = super().get_queryset(request)
         filters = self.get_filters_from_request(request)
         qs = qs.annotate(**self.get_annotates(request)).filter(filters)
-        return qs
+        return self._filter_queryset_by_parent_request(request, qs)
 
     def get_data_queryset(self, request):
         active_sub_widget = self.get_active_sub_widget(request)
@@ -297,7 +342,7 @@ class SBAdminDashboardChartWidget(SBAdminDashboardWidget):
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         init_result = super().init_view_dynamic(request, request_data, **kwargs)
-        for idx, sub_widget in enumerate(self.sub_widgets):
+        for idx, sub_widget in enumerate(self.get_sub_widgets()):
             sub_widget.init_sub_widget_dynamic(f"{self.get_id()}_{idx}", self)
         return init_result
 
@@ -421,7 +466,8 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
         )
         if not correct_resolutions:
             raise RuntimeError(
-                f"Correct date_resolutions selection {self.date_resolutions}. Available choices {self.DateResolutionsOptions.values}."
+                f"Correct date_resolutions selection {self.date_resolutions}. "
+                f"Available choices {self.DateResolutionsOptions.values}."
             )
         x_axis_annotate = None
         order_by = "x_axis"
@@ -627,6 +673,7 @@ class SBAdminDashboardLineChartWidgetByDate(SBAdminDashboardChartWidgetByDate):
 
 class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/list_widget.html"
+    media = forms.Media(js=("sb_admin/dist/table.js",))
     cache_enabled = False
     sbadmin_table_history_enabled = False
 
@@ -664,6 +711,10 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             kwargs={"object_id": OBJECT_ID_PLACEHOLDER},
         )
 
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        return self._filter_queryset_by_parent_request(request, qs)
+
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
@@ -681,20 +732,32 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         context["list_base_template"] = "sb_admin/blank_base.html"
         return context
 
+    def get_filters_template_name(self, request) -> str:
+        return "sb_admin/dashboard/includes/list_widget_filters.html"
+
+    def get_tabulator_header_template_name(self, request) -> str:
+        return "sb_admin/actions/partials/tabulator_header_change_view_v1.html"
+
     def get_tabulator_definition(self, request):
         tabulator_definition = super().get_tabulator_definition(request)
+        tabulator_definition["stickyHeaderAndFooter"] = False
         tabulator_definition["modules"] = [
             "viewsModule",
             "tableParamsModule",
             "detailViewModule",
             "filterModule",
+            "columnDisplayModule",
         ]
         return tabulator_definition
 
 
 class SbAdminCalendarWidget(SBAdminDashboardWidget):
     template_name = "sb_admin/dashboard/calendar_widget.html"
+    media = forms.Media(
+        css={"all": ("sb_admin/dist/calendar_style.css",)},
+        js=("sb_admin/js/fullcalendar.min.js", "sb_admin/dist/calendar.js"),
+    )
 
     @sbadmin_action(permission="view")
-    def action_get_data(self, request, modifier):
+    def action_get_data(self, request, modifier, object_id=None):
         return JsonResponse(data=self.get_cached_data(request), safe=False)

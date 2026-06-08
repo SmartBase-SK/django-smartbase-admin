@@ -61,7 +61,6 @@ from django_smartbase_admin.engine.inline_pagination import (
     get_inline_partial_prefix,
 )
 from django_smartbase_admin.engine.dynamic_forms import (
-    SBADMIN_DYNAMIC_REGION_ADD_MODIFIER,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBAdminDynamicFormMixin,
@@ -559,6 +558,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
                 inline_view_instance.init_view_static(
                     configuration, inline_view_instance.model, admin_site
                 )
+        super().init_view_static(configuration, model, admin_site)
 
     def get_sbadmin_fake_inlines(self, request, obj) -> Iterable:
         return self.sbadmin_fake_inlines or []
@@ -646,13 +646,13 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
             fieldsets.append((fieldset[0], fieldset_dict))
         return fieldsets
 
-    def get_dynamic_region_object(self, request, modifier):
-        if modifier == SBADMIN_DYNAMIC_REGION_ADD_MODIFIER:
+    def get_dynamic_region_object(self, request, modifier, object_id=None):
+        if object_id is None:
             return None
         if hasattr(self, "get_object"):
-            return self.get_object(request, modifier)
+            return self.get_object(request, object_id)
         try:
-            return self.get_queryset(request).get(pk=modifier)
+            return self.get_queryset(request).get(pk=object_id)
         except self.model.DoesNotExist:
             return None
 
@@ -672,7 +672,7 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         return form_kwargs
 
     @sbadmin_action
-    def sbadmin_dynamic_region(self, request, modifier):
+    def sbadmin_dynamic_region(self, request, modifier, object_id=None):
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
 
@@ -680,8 +680,8 @@ class SBAdminInlineAndAdminCommon(SBAdminFormFieldWidgetsMixin):
         if not region_name:
             return HttpResponseBadRequest(f"Missing {SBADMIN_DYNAMIC_REGION_PARAM}.")
 
-        obj = self.get_dynamic_region_object(request, modifier)
-        if modifier != SBADMIN_DYNAMIC_REGION_ADD_MODIFIER and obj is None:
+        obj = self.get_dynamic_region_object(request, modifier, object_id)
+        if object_id is not None and obj is None:
             return HttpResponse("", status=404)
 
         form_class = self.get_dynamic_region_form_class(request, obj)
@@ -921,6 +921,9 @@ class SBAdmin(
     menu_label = None
     sbadmin_is_generic_model = False
 
+    def get_widget_parent_view(self, widget):
+        return self
+
     def save_formset(self, request, form, formset, change):
         if not change and hasattr(formset, "inline_instance"):
             # update inline_instance parent_instance on formset when creating new object
@@ -977,7 +980,9 @@ class SBAdmin(
         return self.sbadmin_tabs
 
     def get_tabs_context(self, request, object_id) -> dict[str, Iterable]:
-        return {"tabs_context": self.get_sbadmin_tabs(request, object_id)}
+        return {
+            "tabs_context": self.get_sbadmin_tabs(request, object_id),
+        }
 
     def get_context_data(self, request) -> dict[str, Any]:
         return {
@@ -1109,12 +1114,21 @@ class SBAdmin(
     def changelist_view(self, request, extra_context=None):
         return self.action_list(request, extra_context=extra_context)
 
+    def get_change_view_widget_media(self, request, obj=None):
+        media = forms.Media()
+        for widget in self.get_widget_views(request, getattr(obj, "pk", None)):
+            if hasattr(widget, "get_media"):
+                media += widget.get_media()
+        return media
+
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
         partial_response = self._render_inline_partial_for_htmx(request, context)
         if partial_response is not None:
             return partial_response
+
+        context["media"] += self.get_change_view_widget_media(request, obj)
 
         if context.get("sbadmin_is_modal"):
             media = context["media"]

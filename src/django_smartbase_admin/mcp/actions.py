@@ -260,10 +260,10 @@ def build_modal_view(target_view_cls, admin, request, modifier, object_id=None):
     Shared by form discovery (``get_action_form_data``), unbound-form
     construction for invoke (``_build_unbound_form``), and the
     rebuild-for-error-extraction step (``_normalize_modal_response``).
-    Caller switches ``request.method`` as needed. ``object_id`` mirrors
-    the URL kwarg ``RowActionModalView.get_object_id`` looks up first,
-    so the unbound-form build can resolve the row even though the real
-    ``delegate_to_action`` hasn't run yet to populate ``request_data``.
+    Caller switches ``request.method`` as needed. ``object_id`` mirrors the
+    URL kwarg ``RowActionModalView.get_object_id`` reads, so the unbound-form
+    build can resolve the row before ``delegate_to_action`` populates
+    ``request_data``.
     """
     view = target_view_cls(view=admin)
     view.request = request
@@ -273,9 +273,7 @@ def build_modal_view(target_view_cls, admin, request, modifier, object_id=None):
     if object_id is not None:
         kwargs["object_id"] = object_id
         # ``RowActionModalView.get_object_id`` checks
-        # ``request_data.object_id`` first — populate it so the
-        # fallback to ``kwargs["modifier"]`` doesn't pick up
-        # ``"template"`` and miscast it as a pk.
+        # ``request_data.object_id`` first, matching URL dispatch.
         rd = getattr(request, "request_data", None)
         if rd is not None:
             rd.object_id = object_id
@@ -322,7 +320,8 @@ class SBAdminMCPActionFormService:
             target_view_cls,
             admin,
             request,
-            str(object_id) if object_id is not None else None,
+            "template",
+            object_id=str(object_id) if object_id is not None else None,
         )
 
         # MCP transport is JSON-RPC over POST; force GET while building
@@ -749,6 +748,7 @@ class SBAdminMCPActionInvokeService:
                 admin=admin,
                 request=request,
                 modifier=modifier,
+                object_id=object_id,
             )
         messages = captured_messages(request)
         if messages:
@@ -869,6 +869,7 @@ class SBAdminMCPActionInvokeService:
         admin,
         request,
         modifier,
+        object_id=None,
     ) -> dict:
         """Modal success/failure detection via HX-Trigger from
         ``build_success_response`` — form_invalid responses don't carry
@@ -895,8 +896,10 @@ class SBAdminMCPActionInvokeService:
         # Fallback: response wasn't a TemplateResponse with a form in
         # context. Rebuild the form to surface whatever validation errors
         # the original dispatch would have raised.
-        view = build_modal_view(target_view_cls, admin, request, modifier)
-        if modifier is not None and issubclass(target_view_cls, RowActionModalView):
+        view = build_modal_view(
+            target_view_cls, admin, request, modifier, object_id=object_id
+        )
+        if object_id is not None and issubclass(target_view_cls, RowActionModalView):
             view.get_object()
         form = view.get_form()
         form.is_valid()

@@ -765,7 +765,7 @@ class AutocompleteFilterWidget(
         )
 
     @sbadmin_action(permission="view")
-    def action_autocomplete(self, request, modifier):
+    def action_autocomplete(self, request, modifier, object_id=None):
         result = self.search(request, request.request_data.request_post)
         return JsonResponse({"data": result})
 
@@ -1016,7 +1016,7 @@ class SBAdminTreeWidgetMixin:
         super().__init__(*args, **kwargs)
 
     @sbadmin_action(permission="view")
-    def action_autocomplete(self, request, modifier):
+    def action_autocomplete(self, request, modifier, object_id=None):
         result = self.format_tree_data(request, self.get_queryset(request))
         return JsonResponse(data=result, safe=False)
 

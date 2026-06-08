@@ -78,5 +78,6 @@ OVERRIDE_CONTENT_OF_NOTIFICATION = "override_notification_content"
 # read by ``SBAdminTable._handleAjaxNotifications`` in ``table.js``.
 SB_ADMIN_AJAX_NOTIFICATIONS_KEY = "sb_admin_notifications"
 FIELDSET_HIDE_HEADER_CLASS = "hide-header"
+FIELDSET_PLAIN_CLASS = "sbadmin-fieldset-plain"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"
 SUPPORTED_FILE_TYPE_ICONS = ["doc", "docx", "csv", "xls", "xlsx", "pdf", "ppt", "zip"]

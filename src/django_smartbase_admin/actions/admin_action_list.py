@@ -233,7 +233,9 @@ class SBAdminListAction(SBAdminAction):
         context_data.update(
             {
                 "const": constants,
+                "media": self.view.get_list_view_media(self.threadsafe_request),
                 "tabulator_definition": tabulator_definition,
+                "tabulator_definition_script_id": f"{self.view.get_id()}-tabulator-definition",
                 "id_column_name": id_column_name,
                 "filters": self.get_filters(),
                 "advanced_filters_data": QueryBuilderService.get_advanced_filters_context_data(
@@ -675,9 +677,8 @@ class SBAdminListAction(SBAdminAction):
 
     def get_xlsx_data(self, request):
         page_size = XLSX_PAGE_CHUNK_SIZE
-        file_name = (
-            f'{self.view.get_menu_label()}__{timezone.now().strftime("%Y-%m-%d")}.xlsx'
-        )
+        file_name_label = self.view.get_menu_label() or getattr(self.view, "name", None)
+        file_name = f'{file_name_label}__{timezone.now().strftime("%Y-%m-%d")}.xlsx'
         columns = self.get_excel_columns()
         additional_filter = Q()
         if request.request_data.modifier != IGNORE_LIST_SELECTION:

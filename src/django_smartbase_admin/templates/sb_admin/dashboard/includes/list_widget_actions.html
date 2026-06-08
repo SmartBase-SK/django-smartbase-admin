@@ -1,0 +1,35 @@
+{% load i18n %}
+
+{% include 'sb_admin/components/columns.html' with column_picker_icon_only=True %}
+
+{% if content_context.list_actions %}
+    <div class="relative flex-shrink-0">
+        <button
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                data-bs-popper-placement="bottom-end"
+                class="btn btn-only-icon"
+                title="{% trans 'Actions' %}">
+            <svg class="btn-only-icon">
+                <use xlink:href="#More"></use>
+            </svg>
+        </button>
+        <div class="dropdown-menu max-h-432">
+            <ul>
+                {% for list_action in content_context.list_actions %}
+                    {% if list_action.sub_actions %}
+                        {% for list_sub_action in list_action.sub_actions %}
+                            <li>
+                                {% include list_sub_action.template with action=list_sub_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link" %}
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        <li>
+                            {% include list_action.template with action=list_action view_id=view_id dropdown=True extra_classes="dropdown-menu-link" %}
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endif %}

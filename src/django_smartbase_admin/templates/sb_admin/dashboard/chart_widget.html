@@ -1,10 +1,9 @@
 {% extends "sb_admin/dashboard/widget_base.html" %}
-{% load sb_admin_tags static %}
+{% load sb_admin_tags %}
 
 {% block content_inner %}
     <div id="{{ widget_id }}" class="card p-16 col-span-12">
         <div class="mt-16">
-            <script type="text/javascript" src="{% static 'sb_admin/dist/chart.js' %}"></script>
             <div class="flex flex-wrap -m-8 mb-16">
                 {% for sub_widget in sub_widgets %}
                     <div class="w-1/2 md:w-1/4 p-8">
@@ -15,31 +14,40 @@
             <canvas id="{{ widget_id }}-chart"></canvas>
             {{ initial_data|get_json_script:'initial_data' }}
             <script>
-                window.SBAdminChart = window.SBAdminChart || {};
-                window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
-                    "formId": "{{ widget_id }}-filter-form",
-                    "widgetId": "{{ widget_id }}",
-                    "ajaxUrl": "{{ ajax_url }}",
-                    "chartType": "{{ chart_type }}",
-                    "chartOptions": {
-                        scales: {
-                            x: {
-                                ticks: {
-                                    font: {
-                                        weight: 600,
-                                    }
-                                }
-                            },
-                            y: {
-                                ticks: {
-                                    font: {
-                                        weight: 600,
+                (function() {
+                    const initChart = function() {
+                        window.SBAdminChart = window.SBAdminChart || {};
+                        window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                            "formId": "{{ widget_id }}-filter-form",
+                            "widgetId": "{{ widget_id }}",
+                            "ajaxUrl": "{{ ajax_url }}",
+                            "chartType": "{{ chart_type }}",
+                            "chartOptions": {
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            font: {
+                                                weight: 600,
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        ticks: {
+                                            font: {
+                                                weight: 600,
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
+                        });
+                    };
+                    if (window.SBAdminMainLoaded) {
+                        initChart();
+                        return;
                     }
-                });
+                    document.addEventListener('SBAdminMainLoaded', initChart, {once: true});
+                })();
             </script>
         </div>
     </div>

@@ -53,8 +53,8 @@ class SBAdminWizardView(SBAdminView, TemplateView):
         self._check_wizard_permission(request)
         return super().dispatch(request, *args, **kwargs)
 
-    def wizard(self, request, modifier):
-        object_id = getattr(request.request_data, "object_id", None)
+    def wizard(self, request, modifier, object_id=None):
+        object_id = object_id or getattr(request.request_data, "object_id", None)
         kwargs = {"id": object_id} if object_id is not None else {}
         self.setup(request, **kwargs)
         return self.dispatch(request, **kwargs)

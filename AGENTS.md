@@ -35,6 +35,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Fieldset Options](#fieldset-options) | Supported keys for `fieldsets` / `sbadmin_fieldsets`, including descriptions, classes, dynamic regions, and collapse |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
+| [Detail View Widgets](#detail-view-widgets) | Embedding dashboard-style list/chart widgets inside detail fieldsets |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
@@ -79,6 +80,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Collapse a form fieldset?** → [Fieldset Options](#fieldset-options)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
+- **List or chart inside detail page?** → [Detail View Widgets](#detail-view-widgets)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
 - **Regenerate translations?** → [Internationalization](#internationalization)
@@ -2213,8 +2215,8 @@ class ArticleAdmin(SBAdmin):
         ]
 
     @sbadmin_action
-    def action_archive_article(self, request, modifier):
-        Article.objects.filter(pk=modifier).update(status="archived")
+    def action_archive_article(self, request, modifier, object_id):
+        Article.objects.filter(pk=object_id).update(status="archived")
         messages.success(request, _("Article archived."))
         return self.build_action_response(request)
 ```
@@ -2287,7 +2289,7 @@ Framework consumers call processed getters, not raw getters:
 
 **Key points:**
 - Use `get_sbadmin_row_actions()` when the action needs `view=self`. URL-only actions can also be declared in the `sbadmin_row_actions` class attribute.
-- `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; row action materialization replaces it with the row pk server-side.
+- `MODIFIER_OBJECT_ID` is the literal token `"__object_id__"`; use it only in direct custom URLs. Row method/modal actions receive the row pk through the `object_id` argument.
 - `RowActionModalView` resolves objects with `self.view.get_queryset(request)` by default. Do not override this with a raw model manager unless you also preserve queryset restrictions.
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
@@ -3679,7 +3681,7 @@ class TopicAdmin(TopicTreeMixin, SBAdmin):
     sbadmin_list_display = ("name", "slug")
 
     @sbadmin_action
-    def action_tree_json(self, request, modifier):
+    def action_tree_json(self, request, modifier, object_id):
         """Emit Fancytree node JSON for the whole tree."""
         qs = self.get_queryset(request)
         data = self.get_tree_data(request, qs, values=["name", "slug"])
@@ -3734,7 +3736,7 @@ class TopicAdmin(TopicTreeMixin, SBAdmin):
 
     @sbadmin_action
     @require_POST
-    def action_tree_reorder(self, request, modifier):
+    def action_tree_reorder(self, request, modifier, object_id):
         tree_widget_data = json.loads(request.body)
         objs_by_path = {obj.path: obj for obj in Topic.objects.all()}
         to_update = self.process_treebeard_tree(tree_widget_data, objs_by_path)
@@ -3941,7 +3943,7 @@ Supported option keys:
 - `collapsible=True` uses Bootstrap collapse; do not activate it with `classes=["collapse"]`.
 - `default_collapsed=True` starts the fieldset closed. Existing JS opens collapsed ancestors when focusing validation errors.
 - `hide_if_empty=True` is visual only: it does not disable, clear, or remove fields from form submission. Fieldsets with validation errors stay visible, and dynamic fieldsets are re-checked after HTMX swaps.
-- Fieldset actions are detail-style links. Use `action_modifier=MODIFIER_OBJECT_ID` when the action should receive the current object id.
+- Fieldset actions are detail-style links. URL-callable fieldset actions receive the current object id through the `object_id` argument.
 - SBAdmin looks up fieldset metadata by the tuple's first value (`name`). Avoid multiple fieldsets with the same name, including multiple `None` fieldsets, when using dynamic regions or collapse metadata.
 - The collapse id is generated from `sbadmin-fieldset`, the form prefix when present, and the fieldset name when present. Prefixed inline rows therefore get separate collapse ids.
 
@@ -4248,6 +4250,103 @@ In this example, the "Content" tab has a two-column layout (main fields on the l
 
 ---
 
+## Detail View Widgets
+
+SBAdmin admins can register dashboard-style widgets and place them inside detail/change fieldsets. Use this when related data belongs on the object page but should stay read-only and self-contained, for example a compact related-row list or a small aggregate chart.
+
+Prefer `SBAdminDashboardListWidget` for detail pages when users need to inspect related records. Use chart widgets only for compact summaries that answer one question; do not turn a detail page into a dashboard wall.
+
+```python
+from django.contrib import admin
+from django.db.models import Count, F
+
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardChartWidget,
+    SBAdminDashboardListWidget,
+)
+
+from blog.models import Article, ArticleTag, Comment
+
+
+class ArticleCommentsWidget(SBAdminDashboardListWidget):
+    widget_id = "comments"
+    name = "Comments"
+    model = Comment
+    path_to_parent_instance_id = "article_id"
+    sbadmin_list_display = ("id", "text", "created_at")
+    search_fields = ("text",)
+
+
+class ArticleTagBreakdownWidget(SBAdminDashboardChartWidget):
+    widget_id = "tag_breakdown"
+    name = "Tags"
+    model = ArticleTag
+    chart_type = "pie"
+    path_to_parent_instance_id = "article_id"
+    x_axis_annotate = F("tag__name")
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+
+
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    widgets = [ArticleCommentsWidget, ArticleTagBreakdownWidget]
+
+    sbadmin_fieldsets = (
+        (
+            "Content",
+            {
+                "fields": ("title", "status", "category"),
+            },
+        ),
+        (
+            "Related",
+            {
+                "fields": (ArticleCommentsWidget, ArticleTagBreakdownWidget),
+            },
+        ),
+    )
+```
+
+### How Parent Scoping Works
+
+When a widget is rendered on an admin detail page, SBAdmin prefixes the widget id with the parent admin id and registers the widget in the configuration `view_map`. The widget AJAX URL includes the current detail object's `object_id`, and dashboard widgets use `path_to_parent_instance_id` to filter their queryset.
+
+For the example above, the `ArticleCommentsWidget` queryset is filtered with `article_id=<current article pk>`.
+
+### Widget Placement Contract
+
+The fieldset `fields` entry uses the widget class, not a string. The same class must be declared in `widgets` so SBAdmin can initialize it, register its URL actions, collect its media, and pass the current request context.
+
+```python
+# ❌ BAD - no registered widget instance exists for the fieldset marker.
+class ArticleAdmin(SBAdmin):
+    sbadmin_fieldsets = (
+        ("Related", {"fields": (ArticleCommentsWidget,)}),
+    )
+
+
+# ✅ GOOD - registered in widgets and placed by class in the fieldset.
+class ArticleAdmin(SBAdmin):
+    widgets = [ArticleCommentsWidget]
+    sbadmin_fieldsets = (
+        ("Related", {"fields": (ArticleCommentsWidget,)}),
+    )
+```
+
+**Key points:**
+- Every detail widget must define `widget_id`; SBAdmin raises `ImproperlyConfigured` when it is missing.
+- Admin-owned widgets get parent-scoped ids such as `blog_article_comments`, avoiding collisions with standalone dashboard widgets.
+- `path_to_parent_instance_id` should point from the widget model to the parent detail object pk, for example `"article_id"` or `"article__id"`.
+- `SBAdminDashboardListWidget` brings table media and list behavior; `SBAdminDashboardChartWidget` brings chart media. SBAdmin collects widget media for the change view automatically.
+- Widget action methods follow the same [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action) contract as other actions: `(request, modifier, object_id)`.
+
+**Source:** `django_smartbase_admin/engine/admin_base_view.py` — widget registration on admins; `django_smartbase_admin/engine/dynamic_forms.py` — fieldset widget placement; `django_smartbase_admin/engine/dashboard.py` — dashboard list/chart widgets and parent filtering; `django_smartbase_admin/admin/admin_base.py` — change-view widget media collection
+
+---
+
 ## Logo Customization
 
 Override default logo by placing files in your static directory:
@@ -4259,6 +4358,8 @@ Override default logo by placing files in your static directory:
 ## URL-Callable Action Methods (`@sbadmin_action`)
 
 Mark view methods as URL-callable with `@sbadmin_action`. All URL-routed actions go through `delegate_to_action`, which checks for this decorator and runs `has_permission_for_action` before dispatching.
+
+Action URLs always use `/<view>/<action>/<modifier>/` with an optional `/<object_id>/` segment. The method signature is always `(request, modifier, object_id)`. Keep non-object action state in `modifier`; row/detail object primary keys arrive as `object_id`.
 
 ### Permission defaults
 
@@ -4290,7 +4391,7 @@ from blog.models import Article
 # ❌ BAD — method is not decorated, returns 404 when called via URL
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    def action_archive_drafts(self, request, modifier):
+    def action_archive_drafts(self, request, modifier, object_id):
         Article.objects.filter(status="draft").update(status="archived")
         messages.success(request, _("Draft articles archived."))
         return self.build_action_response(request)
@@ -4309,7 +4410,7 @@ class ArticleAdmin(SBAdmin):
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     @sbadmin_action
-    def action_archive_drafts(self, request, modifier):
+    def action_archive_drafts(self, request, modifier, object_id):
         Article.objects.filter(status="draft").update(status="archived")
         messages.success(request, _("Draft articles archived."))
         return self.build_action_response(request)
@@ -4328,7 +4429,7 @@ class ArticleAdmin(SBAdmin):
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
     @sbadmin_action(permission="delete")
-    def action_delete_archived(self, request, modifier):
+    def action_delete_archived(self, request, modifier, object_id):
         Article.objects.filter(status="archived").delete()
         messages.success(request, _("Archived articles deleted."))
         return self.build_action_response(request)
@@ -4336,7 +4437,9 @@ class ArticleAdmin(SBAdmin):
 
 **Key points:**
 - Import from `django_smartbase_admin.engine.actions`
+- All examples, tutorials, and overrides must use the three-argument action signature: `def action_name(self, request, modifier, object_id=None)`. Do not document the old two-argument `(request, modifier)` form except in explicit migration "before" examples.
 - All built-in action methods (`action_list_json`, `action_autocomplete`, `action_config`, etc.) are already decorated — read-only ones carry `permission="view"` (see [Permission defaults](#permission-defaults))
+- When overriding a built-in decorated action, accept `object_id=None` and pass it through to `super()`, for example `return super().action_bulk_delete(request, modifier, object_id)`.
 - Bare `@sbadmin_action` on a custom method requires the **`change`** permission by default; pass `permission="view"` for read-only endpoints
 - `SBAdminFormViewAction` modal views (see [Selection Actions](#selection-actions-bulk-actions)) are automatically marked — no decorator needed
 - `SBAdminCustomAction` or `SBAdminRowAction` with direct `action_id` requires the decorator on the target method
@@ -4376,6 +4479,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_fieldsets` | tuple | Custom fieldset configuration for change form |
 | `sbadmin_tabs` | dict | Organize fieldsets and inlines into tabs (see [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)) |
 | `sbadmin_detail_actions` | list | Actions shown on detail/change page |
+| `widgets` | list | Dashboard-style widgets registered on this admin; place them in fieldsets by widget class (see [Detail View Widgets](#detail-view-widgets)) |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
 

@@ -105,7 +105,7 @@
     {% endblock %}
     {% block tabulator_card %}
         <div class="list-view-card card p-0">
-            <form id="{{ view_id }}-filter-form" class="filter-form" action=""></form>
+            <div data-filter-form-id="{{ view_id }}-filter-form" class="hidden" ></div>
             {% block tabulator_custom_header %}
                 {% include content_context.tabulator_header_template_name %}
             {% endblock %}
@@ -132,14 +132,21 @@
     {% endblock %}
 {% endblock %}
 {% block additional_js %}
-    <script type="text/javascript" src="{% static 'sb_admin/dist/table.js' %}"></script>
+    {% block list_media_js %}{{ content_context.media.js }}{% endblock %}
     {% block after_table_bundle %}{% endblock %}
-    {{ content_context.tabulator_definition|get_json_script:'tabulator_definition' }}
+    {{ content_context.tabulator_definition|get_json_script:content_context.tabulator_definition_script_id }}
     <script>
-        const tabulatorDefinition = window.loadJSONScriptData('tabulator_definition');
-        window.SBAdminTable = window.SBAdminTable || {};
-        window.addEventListener('DOMContentLoaded', () => {
-            window.SBAdminTable["{{ view_id }}"] = new window.SBAdminTableClass(tabulatorDefinition);
-        })
+        (() => {
+            const tabulatorDefinition = window.loadJSONScriptData('{{ content_context.tabulator_definition_script_id }}');
+            const initTable = () => {
+                window.SBAdminTable = window.SBAdminTable || {};
+                window.SBAdminTable["{{ view_id }}"] = new window.SBAdminTableClass(tabulatorDefinition);
+            };
+            if (window.SBAdminMainLoaded) {
+                initTable();
+                return;
+            }
+            document.addEventListener('SBAdminMainLoaded', initTable, {once: true});
+        })();
     </script>
 {% endblock %}
