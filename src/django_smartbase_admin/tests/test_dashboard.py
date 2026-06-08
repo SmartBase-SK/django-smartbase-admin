@@ -97,7 +97,7 @@ class _MissingWidgetIdAdmin(_WidgetAdmin):
     widgets = [_MissingWidgetIdWidget]
 
 
-class _FieldsetWidgetModel(models.Model):
+class FieldsetWidgetTestModel(models.Model):
     username = models.CharField(max_length=150)
 
     class Meta:
@@ -146,7 +146,7 @@ class _ParentObjectListWidget(_StandaloneDashboardWidget):
 
 class _ParentScopedChartWidget(SBAdminDashboardChartWidget):
     widget_id = "parent_scoped_chart_widget"
-    model = _FieldsetWidgetModel
+    model = FieldsetWidgetTestModel
     path_to_parent_instance_id = "id"
     x_axis_annotate = F("username")
 
@@ -163,7 +163,7 @@ class _ParentScopedChartWidget(SBAdminDashboardChartWidget):
 
 class _CustomParentScopedListWidget(_StandaloneDashboardWidget):
     widget_id = "custom_parent_scoped_list_widget"
-    model = _FieldsetWidgetModel
+    model = FieldsetWidgetTestModel
 
     def filter_queryset_by_parent_instance_ids(
         self, request, queryset, parent_instance_ids
@@ -396,8 +396,8 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
     def test_fieldsets_can_place_widgets_by_class(self):
         configuration = SimpleNamespace(view_map={})
-        admin_view = _FieldsetWidgetAdmin(_FieldsetWidgetModel, AdminSite())
-        admin_view.init_view_static(configuration, _FieldsetWidgetModel, AdminSite())
+        admin_view = _FieldsetWidgetAdmin(FieldsetWidgetTestModel, AdminSite())
+        admin_view.init_view_static(configuration, FieldsetWidgetTestModel, AdminSite())
         request = self.factory.get("/admin/auth/user/1/change/")
 
         fieldsets = admin_view.get_fieldsets(request)
@@ -423,8 +423,8 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
     def test_dynamic_regions_can_place_widgets_by_class(self):
         configuration = SimpleNamespace(view_map={})
-        admin_view = _DynamicRegionWidgetAdmin(_FieldsetWidgetModel, AdminSite())
-        admin_view.init_view_static(configuration, _FieldsetWidgetModel, AdminSite())
+        admin_view = _DynamicRegionWidgetAdmin(FieldsetWidgetTestModel, AdminSite())
+        admin_view.init_view_static(configuration, FieldsetWidgetTestModel, AdminSite())
         request = self.factory.get("/admin/auth/user/1/change/")
 
         fieldsets = admin_view.get_fieldsets(request)
@@ -481,7 +481,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         request.request_data = SimpleNamespace(object_id="1")
 
         queryset = widget._filter_queryset_by_parent_request(
-            request, _FieldsetWidgetModel.objects.all()
+            request, FieldsetWidgetTestModel.objects.all()
         )
 
         self.assertEqual(queryset.query.where.children[0].rhs, [1])

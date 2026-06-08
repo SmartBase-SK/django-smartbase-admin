@@ -259,7 +259,7 @@ class SBAdminBaseView(object):
         return self.widget_views or []
 
     def get_widget_id(self, widget, index):
-        return getattr(widget, "widget_id", None) or f"{self.get_id()}_{index}"
+        return getattr(widget, "widget_id", None)
 
     def get_widget_parent_view(self, widget):
         return None

@@ -81,6 +81,9 @@ class FakeAdminView(SBAdminBaseView):
     def get_config_url(self, request):
         return ""
 
+    def get_list_view_media(self, request):
+        return forms.Media()
+
     def has_add_permission(self, request):
         return False
 
