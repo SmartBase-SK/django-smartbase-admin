@@ -129,10 +129,24 @@ class RowList:
         self.rows = rows
 
     def filter(self, *args, **kwargs):
-        return self
+        rows = self.rows
+        for key, value in kwargs.items():
+            if key.endswith("__in"):
+                field_name = key.removesuffix("__in")
+                allowed = set(value)
+                rows = [row for row in rows if row.get(field_name) in allowed]
+            else:
+                rows = [row for row in rows if row.get(key) == value]
+        return RowList(rows)
 
     def order_by(self, *args):
         return self
+
+    def none(self):
+        return RowList([])
+
+    def union(self, other, all=False):
+        return RowList([*self.rows, *other.rows])
 
     def __iter__(self):
         return iter(self.rows)
@@ -380,7 +394,10 @@ class RowActionIntegrationTests(TestCase):
 
         with patch(
             "django_smartbase_admin.plugins.nested.resolve_nested",
-            return_value={"parent_field": "parent"},
+            return_value={
+                "parent_field": "parent",
+                "only_show_filtered_children": False,
+            },
         ):
             result = TabulatorNestedPlugin.modify_final_data(
                 action,

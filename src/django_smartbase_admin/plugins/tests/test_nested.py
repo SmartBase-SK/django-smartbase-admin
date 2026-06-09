@@ -8,21 +8,16 @@ through the same code path production uses.
 ``filer.Folder`` is the self-referential model (same shape as
 ``Category.parent`` in ``AGENTS.md``); it ships with the default
 test settings so no custom app registration is needed.
-
-The data-query path uses ``ArrayAgg`` which is Postgres-only, so
-tests that consume the sliced page (``view.action_list_json``) are
-marked ``@postgres_only``. The Tabulator-definition and config-
-validation paths run on any backend.
 """
 
 import json
-from unittest import skipUnless
 from unittest.mock import MagicMock
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
-from django.db.models import Q
+from django.db.models import IntegerField, Q, Value
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import path
 from filer.models import Folder
 
@@ -32,6 +27,7 @@ from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.plugins.nested import (
     LAST_CHILD_FIELD,
     TabulatorNestedPlugin,
+    _is_direct_parent_sort_source,
     resolve_nested,
 )
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -53,11 +49,6 @@ if not sb_admin_site.is_registered(Folder):
 
 # Local URLconf so ``reverse("sb_admin:...")`` works inside tests.
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
-
-postgres_only = skipUnless(
-    connection.vendor == "postgresql",
-    "Plugin data path uses ArrayAgg (Postgres-only).",
-)
 
 
 def build_list_request(user, model):
@@ -136,6 +127,15 @@ class TabulatorNestedPluginTests(TestCase):
         view.sbadmin_nested = {"parent_field": "parent"}
         self.assertEqual(resolve_nested(view), {"parent_field": "parent"})
 
+        view.sbadmin_nested = {
+            "parent_field": "parent",
+            "parent_field_guarantees_root": True,
+        }
+        self.assertEqual(
+            resolve_nested(view),
+            {"parent_field": "parent", "parent_field_guarantees_root": True},
+        )
+
         bad_configs = [
             ({"element_column": "name"}, "parent_field"),
             ({"parent_field": "parent", "bogus": 1}, "unknown keys"),
@@ -163,7 +163,6 @@ class TabulatorNestedPluginTests(TestCase):
         opts = view.get_tabulator_definition(request)["tabulatorOptions"]
         self.assertNotIn("dataTree", opts)
 
-    @postgres_only
     def test_action_list_json_paginates_by_parent_groups(self):
         """Full HTTP entry point ``view.action_list_json``:
 
@@ -188,7 +187,22 @@ class TabulatorNestedPluginTests(TestCase):
             {self.child_a1.pk, self.child_a2.pk},
         )
 
-    @postgres_only
+    def test_action_list_json_uses_union_parent_groups(self):
+        view, request = self._make_view_and_request()
+
+        with CaptureQueriesContext(connection) as captured:
+            view.action_list_json(request, modifier="template")
+
+        parent_group_queries = [
+            query["sql"]
+            for query in captured.captured_queries
+            if "parent_real_id" in query["sql"]
+        ]
+
+        self.assertTrue(parent_group_queries)
+        self.assertTrue(any("UNION" in query for query in parent_group_queries))
+        self.assertFalse(any("COALESCE" in query for query in parent_group_queries))
+
     def test_action_list_json_respects_restrict_queryset_on_fk_parent(self):
         """``restrict_queryset`` must gate what can act as a parent,
         otherwise a child whose parent was filtered out would leak as
@@ -205,7 +219,6 @@ class TabulatorNestedPluginTests(TestCase):
         self.assertEqual(payload["last_row"], 1)
         self.assertEqual([row["id"] for row in payload["data"]], [self.root_b.pk])
 
-    @postgres_only
     def test_action_list_json_preserves_parent_group_order(self):
         """Parent groups should follow the active list ordering, not
         primary-key order and not any child-row sort values."""
@@ -231,7 +244,76 @@ class TabulatorNestedPluginTests(TestCase):
             [a_parent.pk, z_parent.pk],
         )
 
-    @postgres_only
+    def test_simple_parent_sort_uses_unannotated_data_queryset(self):
+        """Cheap sort lookups use SBAdmin's scoped queryset without annotations."""
+        view, request = self._make_view_and_request()
+        action = view.sbadmin_list_action_class(view, request)
+        action.get_data_queryset = MagicMock(wraps=action.get_data_queryset)
+        filtered_qs = Folder.objects.order_by("name")
+
+        qs = TabulatorNestedPlugin._build_parent_group_qs(
+            action,
+            filtered_qs,
+            {"parent_field": "parent"},
+        )
+        list(qs)
+
+        action.get_data_queryset.assert_any_call(visible_fields=[])
+
+    def test_direct_parent_sort_source_accepts_model_paths_and_base_annotations(self):
+        view, request = self._make_view_and_request()
+        action = view.sbadmin_list_action_class(view, request)
+        base_qs = Folder.objects.annotate(
+            _computed=Value(1, output_field=IntegerField())
+        )
+
+        self.assertTrue(
+            _is_direct_parent_sort_source(action.view.model, base_qs, "parent__name")
+        )
+        self.assertTrue(
+            _is_direct_parent_sort_source(action.view.model, base_qs, "_computed")
+        )
+        self.assertFalse(
+            _is_direct_parent_sort_source(
+                action.view.model, base_qs, "_missing_annotation"
+            )
+        )
+
+    def test_hydration_uses_unfiltered_base_queryset_for_parent_rows(self):
+        """A child-only filter still needs the parent row for tree rendering."""
+        view, request = self._make_view_and_request()
+        action = view.sbadmin_list_action_class(view, request)
+
+        payload = action.get_data(additional_filter=Q(pk=self.child_a1.pk))
+
+        self.assertEqual(payload["last_row"], 1)
+        self.assertEqual([row["id"] for row in payload["data"]], [self.root_a.pk])
+        self.assertEqual(
+            [child["id"] for child in payload["data"][0]["_children"]],
+            [self.child_a1.pk],
+        )
+
+    def test_unfiltered_child_hydration_shows_all_direct_children_after_child_filter(
+        self,
+    ):
+        """``only_show_filtered_children=False`` must not inherit table filters."""
+        view, request = self._make_view_and_request(
+            sbadmin_nested={
+                "parent_field": "parent",
+                "only_show_filtered_children": False,
+            }
+        )
+        action = view.sbadmin_list_action_class(view, request)
+
+        payload = action.get_data(additional_filter=Q(pk=self.child_a1.pk))
+
+        self.assertEqual(payload["last_row"], 1)
+        self.assertEqual([row["id"] for row in payload["data"]], [self.root_a.pk])
+        self.assertEqual(
+            {child["id"] for child in payload["data"][0]["_children"]},
+            {self.child_a1.pk, self.child_a2.pk},
+        )
+
     def test_action_list_json_preserves_child_order_within_group(self):
         """Children under a parent should follow the active list ordering
         after hydration, not the database's default row order."""
@@ -258,7 +340,6 @@ class TabulatorNestedPluginTests(TestCase):
         self.assertNotIn(LAST_CHILD_FIELD, payload["data"][0]["_children"][0])
         self.assertTrue(payload["data"][0]["_children"][1][LAST_CHILD_FIELD])
 
-    @postgres_only
     def test_only_show_filtered_children_false_shows_all_direct_children(self):
         """With ``only_show_filtered_children=False`` every direct child
         of a visible parent appears — not just the ones that matched
@@ -280,7 +361,6 @@ class TabulatorNestedPluginTests(TestCase):
             {self.child_a1.pk, self.child_a2.pk},
         )
 
-    @postgres_only
     def test_xlsx_export_flattens_children_into_sibling_rows(self):
         """XLSX columns are flat, so the plugin's ``modify_xlsx_data``
         unbundles each parent's ``_children`` into sibling rows right
@@ -302,7 +382,6 @@ class TabulatorNestedPluginTests(TestCase):
         for row in data_list:
             self.assertNotIn("_children", row)
 
-    @postgres_only
     def test_action_list_json_is_noop_without_sbadmin_nested(self):
         """Plugin is registered globally on the configuration, but only
         admins that opt in via ``sbadmin_nested`` get the tree
