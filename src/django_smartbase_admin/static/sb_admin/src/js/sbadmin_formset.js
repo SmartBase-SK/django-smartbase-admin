@@ -3,7 +3,7 @@
  * Clones markup from <template> and replaces __prefix__ with the row index.
  */
 
-import {shouldProcessAfterSwap} from './utils'
+import { shouldProcessAfterSwap } from './utils'
 
 const FORMSET_SELECTOR = '.sbadmin-formset-dynamic'
 const ROW_SELECTOR = '.sbadmin-formset-row'
@@ -110,6 +110,19 @@ export default class SBAdminFormset {
         )
     }
 
+    syncDeletedRows(formset) {
+        if (!formset) return
+        const formsWrap = formset.querySelector('.sbadmin-formset-forms')
+        if (!formsWrap) return
+        formsWrap.querySelectorAll(ROW_SELECTOR).forEach((row) => {
+            const deleteInput = row.querySelector(
+                'input[type="checkbox"][name$="-DELETE"]'
+            )
+            const isDeleted = Boolean(deleteInput && deleteInput.checked)
+            row.classList.toggle('hidden', isDeleted)
+        })
+    }
+
     syncDeleteButtons(formset) {
         if (!formset) return
         const formsWrap = formset.querySelector('.sbadmin-formset-forms')
@@ -149,6 +162,7 @@ export default class SBAdminFormset {
             deleteInput.checked = true
         }
         row.classList.add('hidden')
+        this.syncDeletedRows(formset)
         this.syncDeleteButtons(formset)
     }
 
