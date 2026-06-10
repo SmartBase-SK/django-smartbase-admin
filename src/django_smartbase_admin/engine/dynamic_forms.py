@@ -15,6 +15,25 @@ SBADMIN_DYNAMIC_REGION_PARAM = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_PREFIX_PARAM = "sbadmin_dynamic_region_prefix"
 SBADMIN_DYNAMIC_REGION_ACTION = "sbadmin_dynamic_region"
 SBADMIN_DYNAMIC_REGION_ADD_MODIFIER = "add"
+_FORMSET_PREFIX_PLACEHOLDER = "__prefix__"
+_FORMSET_PREFIX_PLACEHOLDER_TOKEN = "\x00"
+
+
+def _dynamic_region_wrapper_id_from_parts(value: str) -> str:
+    """Build a wrapper id from joined prefix/region parts.
+
+    Django formset empty forms keep ``__prefix__`` in the prefix so
+    ``sbadmin_formset.js`` can substitute the row index. Slugify collapses
+    that token; underscore-to-hyphen replacement turns it into ``---prefix---``.
+    """
+    if _FORMSET_PREFIX_PLACEHOLDER in value:
+        protected = value.replace(
+            _FORMSET_PREFIX_PLACEHOLDER, _FORMSET_PREFIX_PLACEHOLDER_TOKEN
+        )
+        return protected.replace("_", "-").replace(
+            _FORMSET_PREFIX_PLACEHOLDER_TOKEN, _FORMSET_PREFIX_PLACEHOLDER
+        )
+    return slugify(value).replace("_", "-")
 
 
 def field_names_from_layout(layout: Iterable[Any]) -> tuple[str, ...]:
@@ -141,7 +160,7 @@ class SBDynamicRegion:
         if prefix:
             pieces.append(str(prefix))
         pieces.append(self.name)
-        return slugify("-".join(pieces)).replace("_", "-")
+        return _dynamic_region_wrapper_id_from_parts("-".join(pieces))
 
     def resolve(
         self, form: forms.Form, request: HttpRequest | None = None
@@ -535,6 +554,7 @@ class SBAdminDynamicFormMixin:
         collapsible = bool(fieldset_data.get("collapsible", False))
         default_collapsed = bool(fieldset_data.get("default_collapsed", False))
         hide_if_empty = bool(fieldset_data.get("hide_if_empty", False))
+        skip_header = bool(fieldset_data.get("skip_header", False))
         fieldset_layout = self.get_fieldset_layout(fieldset, fieldset_data, request)
         fieldset_empty = (
             hide_if_empty
@@ -551,6 +571,7 @@ class SBAdminDynamicFormMixin:
             "actions": self.get_fieldset_actions(fieldset, fieldset_data, request),
             "hide_if_empty": hide_if_empty,
             "empty": fieldset_empty,
+            "skip_header": skip_header,
         }
 
     def get_fieldset_layout(

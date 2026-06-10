@@ -280,6 +280,9 @@
 
     .alert {
         @apply rounded-lg p-16 text-14;
+        >.errorlist:first-child {
+            @apply mt-0;
+        }
     }
 
     #save-view-modal-button {
@@ -486,6 +489,7 @@
       .loader:after {
         width: 42px;
         height: 42px;
+        flex-shrink: 0;
       }
       .loader {
         animation-play-state: paused;

@@ -77,11 +77,11 @@ class Main {
                 this.scheduleScrollToFirstErrorField(target)
             }
 
-            window.htmx.on("htmx:afterSwap", (detail) => {
-                if (!shouldProcessAfterSwap(detail)) {
+            window.htmx.on("htmx:afterSwap", (event) => {
+                if (!shouldProcessAfterSwap(event)) {
                     return
                 }
-                processAfterSwap(detail.target)
+                processAfterSwap(event.detail.elt)
             })
 
             window.htmx.on("htmx:oobAfterSwap", (event) => {
@@ -91,15 +91,11 @@ class Main {
                     return
                 }
                 event.detail.__seen = true
-                const target = event.detail?.target || event.target
-                if (!target) {
-                    return
-                }
-                processAfterSwap(target)
+                processAfterSwap(event.detail.elt)
             })
 
-            window.htmx.on("htmx:afterSettle", (detail) => {
-                this.switchCKEditorTheme(detail.target)
+            window.htmx.on("htmx:afterSettle", (event) => {
+                this.switchCKEditorTheme(event.detail.elt)
             })
         }
 

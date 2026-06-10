@@ -6,7 +6,7 @@
     {% endif %}
 
     {% block header %}
-        {% if not skip_header %}
+        {% if not skip_header and not fieldset_context.skip_header %}
             {% include "sb_admin/includes/fieldset_header.html" %}
         {% endif %}
     {% endblock %}
