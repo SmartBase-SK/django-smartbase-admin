@@ -1196,6 +1196,27 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertEqual(fields, ("title", ("subtitle",), "summary"))
 
+    def test_skip_header_fieldset_omits_fieldset_header(self):
+        class SkipHeaderFieldsetForm(SBAdminBaseFormInit, forms.Form):
+            title = forms.CharField()
+
+            class Meta:
+                sbadmin_fieldsets = (
+                    (
+                        "Details",
+                        {
+                            "fields": ("title",),
+                            "skip_header": True,
+                        },
+                    ),
+                )
+
+        html = self.render_fieldset(SkipHeaderFieldsetForm(request=self.request))
+
+        self.assertNotIn('data-bs-toggle="collapse"', html)
+        self.assertNotIn("<header", html)
+        self.assertIn('name="title"', html)
+
     def test_collapsible_fieldset_defaults_open(self):
         class CollapsibleFieldsetForm(SBAdminBaseFormInit, forms.Form):
             title = forms.CharField()
@@ -2261,3 +2282,32 @@ class DynamicFormTests(SimpleTestCase):
         self.assertNotIn("htmx-indicator", html)
         self.assertIn('id="sbadmin-dynamic-region-secondary-region"', html)
         self.assertIn('id="sbadmin-dynamic-region-secondary-region-loading"', html)
+
+
+class SBDynamicRegionWrapperIdTests(SimpleTestCase):
+    def test_get_wrapper_id_preserves_formset_prefix_placeholder(self):
+        region = SBDynamicRegion(
+            name="carrier_type_region",
+            trigger_fields=("shipper",),
+            fields=("carrier_type",),
+        )
+        form = forms.Form(prefix="settings_shipper_mappings-__prefix__")
+        wrapper_id = region.get_wrapper_id(form)
+        self.assertEqual(
+            wrapper_id,
+            "sbadmin-dynamic-region-settings-shipper-mappings-__prefix__-carrier-type-region",
+        )
+        self.assertNotIn("---prefix---", wrapper_id)
+
+    def test_get_wrapper_id_slugifies_normal_prefix(self):
+        region = SBDynamicRegion(
+            name="carrier_type_region",
+            trigger_fields=("shipper",),
+            fields=("carrier_type",),
+        )
+        form = forms.Form(prefix="settings_shipper_mappings-0")
+        wrapper_id = region.get_wrapper_id(form)
+        self.assertEqual(
+            wrapper_id,
+            "sbadmin-dynamic-region-settings-shipper-mappings-0-carrier-type-region",
+        )
