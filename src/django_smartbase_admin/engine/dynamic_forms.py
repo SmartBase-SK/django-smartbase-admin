@@ -554,7 +554,7 @@ class SBAdminDynamicFormMixin:
         collapsible = bool(fieldset_data.get("collapsible", False))
         default_collapsed = bool(fieldset_data.get("default_collapsed", False))
         hide_if_empty = bool(fieldset_data.get("hide_if_empty", False))
-        skip_header = bool(fieldset_data.get("skip_header", False)),
+        skip_header = bool(fieldset_data.get("skip_header", False))
         fieldset_layout = self.get_fieldset_layout(fieldset, fieldset_data, request)
         fieldset_empty = (
             hide_if_empty
