@@ -1072,6 +1072,8 @@ class SBAdminAutocompleteWidget(
             if parsed_value:
                 if self.is_multiselect() and not isinstance(parsed_value, list):
                     parsed_value = [parsed_value]
+                elif not self.is_multiselect() and isinstance(parsed_value, list):
+                    parsed_value = next(iter(parsed_value), None)
 
                 try:
                     items = self.get_selected_option_items_from_cache(
@@ -1108,9 +1110,10 @@ class SBAdminAutocompleteWidget(
                         )
 
         elif self._should_preselect_parent_instance(threadsafe_request):
+            parsed_value = threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
             selected_options = [
                 {
-                    "value": threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR),
+                    "value": parsed_value,
                     "label": threadsafe_request.GET.get(
                         SBADMIN_PARENT_INSTANCE_LABEL_VAR, ""
                     ),
