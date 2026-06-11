@@ -90,7 +90,7 @@
         {{ fs.management_form }}
         <div class="sbadmin-formset-forms">
             {% for form in fs.forms %}
-            <div id="{{ fs.prefix }}-{{ forloop.counter0 }}" class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30">
+            <div id="{{ fs.prefix }}-{{ forloop.counter0 }}" class="sbadmin-formset-row mb-24 p-16 border border-dark-100 rounded-lg bg-dark-25/30{% if fs.can_delete and form.DELETE.value %} hidden{% endif %}">
                 {% if fs.can_delete %}
                 <div class="mb-8 text-14 text-dark-600">{% trans "Row" %} {{ forloop.counter }}</div>
                 {% endif %}

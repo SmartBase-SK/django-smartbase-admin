@@ -500,6 +500,7 @@ class SBAdminTools(MCPToolset):
         full_text_search: str | None = None,
         include_inlines: list | None = None,
         aggregate: list | None = None,
+        group_by: list | None = None,
     ) -> dict:
         """List rows for one admin — same data the UI list shows.
 
@@ -564,12 +565,23 @@ class SBAdminTools(MCPToolset):
             ``fn`` is one of ``sum / avg / min / max / count``; ``field``
             must be a declared column from ``list_admins`` —
             ``sum/avg/min/max`` need a numeric one, ``count`` may omit
-            ``field`` for a row count. Results land under ``aggregates``,
-            keyed ``f"{fn}_{field}"`` (or ``"count"``).
+            ``field`` for a row count. Without ``group_by`` the results
+            land under ``aggregates``, keyed ``f"{fn}_{field}"`` (or
+            ``"count"``).
+          group_by: optional list of declared column names to break the
+            ``aggregate`` totals down by (SQL ``GROUP BY``) — e.g.
+            ``group_by=["queue"]`` with ``aggregate=[{"fn": "count"}]`` for
+            tickets-per-queue in one call instead of one call per queue.
+            Multi-valued (relation) columns are rejected. Requires
+            ``aggregate``. Results land under ``groups`` as a list of
+            ``{**group_columns, **aggregate_aliases}`` rows ordered by the
+            group columns; a column grouped on a foreign key comes back as
+            the bare pk (resolve names with ``autocomplete``).
 
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
-        plus any pagination metadata the list view emits, and ``aggregates``
-        when the ``aggregate`` argument is supplied.
+        plus any pagination metadata the list view emits, ``aggregates``
+        when ``aggregate`` is supplied without ``group_by``, and ``groups``
+        when ``group_by`` is supplied.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -613,9 +625,13 @@ class SBAdminTools(MCPToolset):
 
         # Totals over the whole filtered set, validated before the page fetch.
         aggregates = None
+        if group_by and aggregate is None:
+            raise ValueError("group_by requires aggregate.")
         if aggregate is not None:
             action = admin.sbadmin_list_action_class(admin, request)
-            aggregates = action.get_aggregates(aggregate, field_map=field_map)
+            aggregates = action.get_aggregates(
+                aggregate, field_map=field_map, group_by=group_by
+            )
 
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
@@ -642,7 +658,7 @@ class SBAdminTools(MCPToolset):
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
         if aggregates is not None:
-            result["aggregates"] = aggregates
+            result["groups" if group_by else "aggregates"] = aggregates
         return result
 
     @_guarded_tool_call

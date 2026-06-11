@@ -11,17 +11,15 @@ registering :class:`TabulatorNestedPlugin` on
         "element_column": "<tree_toggle_column>", # optional: column that shows the expand/collapse toggle
         "start_expanded": False,                  # optional
         "only_show_filtered_children": True,      # optional, default True
+        "parent_field_guarantees_root": False,    # optional, default False
     }
 
 Why the pipeline looks the way it does:
 
 * Pagination has to be on **parent groups** (so "1 page = N roots +
-  their children"), not raw rows. The grouping
-  ``parent_real_id = COALESCE(parent_field, pk)`` collapses each
-  child onto its parent's pk and lets roots (``parent_field IS
-  NULL``) fall into their own group in one query — no subqueries,
-  no two-phase counting. That's what ``modify_count_queryset`` /
-  ``modify_data_queryset`` return.
+  their children"), not raw rows. The grouping query unions root pks
+  with matching child parent pks, then lets SQL's normal ``UNION``
+  distinct step collapse duplicates.
 
 * The page slice knows *which parent groups* are visible but not the
   rows themselves. ``modify_base_queryset`` stashes the **unfiltered**
@@ -30,24 +28,21 @@ Why the pipeline looks the way it does:
   Two filter shapes, same downstream tree-assembly loop:
 
     - ``only_show_filtered_children=True``:
-      ``pk__in=(parent_ids | filtered_child_ids)`` — only the
-      children that matched the filter.
+      parent rows unioned with matching filtered child rows.
     - ``only_show_filtered_children=False``:
-      ``Q(pk__in=parent_ids) | Q(parent_field__in=parent_ids)`` —
-      all direct reports of each visible root.
+      parent rows unioned with all direct reports of each visible
+      root.
 
 Only one level is rendered. Grandchildren and deeper rows are
-dropped at the grouping step (see ``_build_grouped_qs``) so they
-don't surface as bogus single-row top-level groups via the
-``COALESCE`` trick.
+dropped at the parent-group step (see ``_build_parent_group_qs``) so they
+don't surface as bogus single-row top-level groups unless
+``parent_field_guarantees_root=True`` opts out of that guard.
 """
 
 from typing import TYPE_CHECKING, Any
 
-from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
-from django.db.models import F, Max, Q, OuterRef, Subquery
-from django.db.models.functions import Coalesce
+from django.db.models import F, OuterRef, Subquery
 
 from django_smartbase_admin.plugins.base import SBAdminPlugin
 
@@ -69,6 +64,7 @@ _KNOWN_KEYS = {
     "element_column",
     "start_expanded",
     "only_show_filtered_children",
+    "parent_field_guarantees_root",
 }
 
 
@@ -119,6 +115,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         definition: dict[str, Any],
         **kwargs: Any,
     ) -> dict[str, Any]:
+        """Tell Tabulator to render returned rows as a one-level tree."""
         nested = resolve_nested(view, request)
         if nested is None:
             return definition
@@ -143,6 +140,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         values: list[str],
         **kwargs: Any,
     ) -> "QuerySet":
+        """Remember the unfiltered row queryset used later for hydration."""
         nested = resolve_nested(action.view, request)
         if nested is None:
             return qs
@@ -165,12 +163,14 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         qs: "QuerySet",
         **kwargs: Any,
     ) -> "QuerySet":
+        """Count parent groups, not raw package/category rows."""
         nested = resolve_nested(action.view, request)
         if nested is None:
             return qs
-        # Count needs distinct parent groups only — skip the
-        # ``ArrayAgg`` aggregation entirely.
-        return cls._build_grouped_qs(action, qs, nested, include_children_ids=False)
+        # Count needs distinct parent groups only.
+        return cls._build_parent_group_qs(
+            action, qs, nested, include_sort_columns=False
+        )
 
     @classmethod
     def modify_data_queryset(
@@ -182,6 +182,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         page_size: int,
         **kwargs: Any,
     ) -> "QuerySet":
+        """Return the parent-group page and stash child ids for hydration."""
         nested = resolve_nested(action.view, request)
         if nested is None:
             return qs
@@ -189,10 +190,21 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         # to child rows too — otherwise groups sort correctly but
         # children land in whatever order the hydration query returned.
         store = cls.get_request_data_plugin_store(request)
+        parent_field: str = nested["parent_field"]
+        pk_name = action.get_pk_field().name
+
+        # This queryset keeps the active filters/search, so final
+        # hydration can include only children that actually matched.
+        child_qs = qs.filter(**{f"{parent_field}__isnull": False})
+        if not nested.get("parent_field_guarantees_root", False):
+            child_qs = child_qs.filter(
+                **{f"{parent_field}__in": cls._visible_parent_ids(action, nested)}
+            )
+        store["filtered_child_ids_qs"] = child_qs.order_by().values(pk_name)
         store["order_by"] = [
             expr for expr in qs.query.order_by if isinstance(expr, str)
         ]
-        return cls._build_grouped_qs(action, qs, nested)
+        return cls._build_parent_group_qs(action, qs, nested)
 
     @classmethod
     def modify_final_data(
@@ -202,6 +214,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         data: list[dict[str, Any]],
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
+        """Replace page-group rows with hydrated parents and ``_children``."""
         nested = resolve_nested(action.view, request)
         if nested is None:
             return data
@@ -209,16 +222,13 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         parent_field: str = nested["parent_field"]
         only_filtered = nested.get("only_show_filtered_children", True)
 
-        parent_ids: set = set()
-        filtered_child_ids: set = set()
+        # ``data`` currently contains one dict per visible parent group,
+        # not full parent/child rows.
+        parent_ids: set[Any] = set()
         for group in data:
             root_id = group.get(PARENT_REAL_ID)
             if root_id is not None:
                 parent_ids.add(root_id)
-            for cid in group.get(CHILDREN_IDS) or ():
-                if cid == root_id:
-                    continue
-                filtered_child_ids.add(cid)
         if not parent_ids:
             return []
 
@@ -230,13 +240,24 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         base_qs = store.get("base_qs")
         if base_qs is None:
             return data
+
+        # Build both sides from ``base_qs`` so UNION ALL has an
+        # identical selected-column shape on every supported backend.
+        parent_qs = base_qs.filter(**{f"{pk_name}__in": list(parent_ids)}).order_by()
         if only_filtered:
-            row_filter = Q(**{f"{pk_name}__in": list(parent_ids | filtered_child_ids)})
+            filtered_child_ids_qs = store.get("filtered_child_ids_qs")
+            if filtered_child_ids_qs is None:
+                child_qs = base_qs.none()
+            else:
+                child_qs = base_qs.filter(
+                    **{f"{pk_name}__in": Subquery(filtered_child_ids_qs)}
+                )
         else:
-            row_filter = Q(**{f"{pk_name}__in": list(parent_ids)}) | Q(
-                **{f"{parent_field}__in": list(parent_ids)}
-            )
-        hydrated = base_qs.filter(row_filter)
+            child_qs = base_qs
+        child_qs = child_qs.filter(
+            **{f"{parent_field}__in": list(parent_ids)}
+        ).order_by()
+        hydrated = parent_qs.union(child_qs, all=True)
         # Apply the caller's sort to children too so each parent's
         # ``_children`` list follows the same order the user chose
         # at the top level. Groups themselves are already sorted by
@@ -246,10 +267,15 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         if order_by:
             hydrated = hydrated.order_by(*order_by)
         rows = list(hydrated)
+
+        # Format hydrated rows the same way normal list rows are
+        # formatted before nesting them under their parent.
         raw_rows_by_pk = {row[pk_name]: dict(row) for row in rows}
         action.process_final_data(rows)
         action.inject_row_actions(rows, raw_rows_by_pk=raw_rows_by_pk)
 
+        # Group direct children by their root parent id; grandchildren
+        # are already excluded unless the admin opted out via config.
         by_id = {row[pk_name]: row for row in rows}
         children_by_parent: dict[Any, list[dict[str, Any]]] = {}
         for row in rows:
@@ -303,51 +329,22 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         return flattened
 
     @classmethod
-    def _build_grouped_qs(
+    def _build_parent_group_qs(
         cls,
         action: "SBAdminListAction",
         filtered_qs: "QuerySet",
         nested: dict,
-        include_children_ids: bool = True,
+        include_sort_columns: bool = True,
     ) -> "QuerySet":
-        """Group ``filtered_qs`` by ``parent_real_id`` in one query.
+        """Return visible parent group ids from root and child matches.
 
-        Trick: ``COALESCE(parent_field, pk)``. Roots
-        (``parent_field IS NULL``) resolve to their own pk and form
-        their own group naturally — no subquery needed to find
-        "parents that matched".
-
-        Only one level is supported. Rows are kept iff they are a
-        root themselves or their parent is a visible root; anything
-        deeper (grandchildren, ...) is dropped by that same filter,
-        which also re-enforces ``restrict_queryset`` on the parent
-        side of the FK (Django's FK JOIN doesn't invoke the parent's
-        manager).
-
-        Caller ordering is preserved but rewritten to aggregate-per-
-        group: the sort columns are pulled from the **parent row**
-        (``parent_field IS NULL``) via ``MAX(CASE WHEN ...)``. Left
-        raw, Django's compiler auto-appends them to ``GROUP BY`` to
-        keep the generated SQL valid, which splits every parent into
-        one row per distinct child sort value and duplicates groups
-        in both count and data queries.
+        The caller slices this queryset for pagination. ``UNION`` is
+        deliberate: if both a parent and one of its children match the
+        active filters, SQL de-duplicates that parent id before count
+        and pagination run.
         """
         parent_field: str = nested["parent_field"]
         pk_name = action.get_pk_field().name
-        parent_real_id = Coalesce(F(parent_field), F(pk_name))
-
-        # Pks allowed to act as parents in the tree: rows passing
-        # ``restrict_queryset`` AND themselves roots. One subquery, two
-        # jobs: drops grandchildren (their parent isn't a root so it
-        # isn't in this set) and keeps ``restrict_queryset`` honored on
-        # the parent side of the FK — otherwise a child whose parent
-        # was filtered out leaks in as a phantom top-level group and
-        # vanishes from the rendered page during hydration.
-        visible_parent_ids = (
-            action.view.get_queryset(action.threadsafe_request)
-            .filter(**{f"{parent_field}__isnull": True})
-            .values(pk_name)
-        )
 
         # Capture caller ordering before we clear it; only simple
         # column strings are rewritable. Non-string expressions
@@ -357,59 +354,122 @@ class TabulatorNestedPlugin(SBAdminPlugin):
             expr for expr in filtered_qs.query.order_by if isinstance(expr, str)
         ]
 
-        grouped = (
-            filtered_qs.filter(
-                Q(**{f"{parent_field}__isnull": True})
-                | Q(**{f"{parent_field}__in": visible_parent_ids})
-            )
-            # Drop caller ordering now — we re-apply it per group
-            # below. Django's compiler auto-appends order-by columns
-            # to ``GROUP BY`` on ``.values().annotate()`` queries,
-            # which would split every parent into duplicate rows
-            # (one per distinct child sort value).
+        parent_branch = (
+            filtered_qs.filter(**{f"{parent_field}__isnull": True})
             .order_by()
-            .annotate(**{PARENT_REAL_ID: parent_real_id})
-            .values(PARENT_REAL_ID)
+            .annotate(**{PARENT_REAL_ID: F(pk_name)})
         )
 
-        if not include_children_ids:
-            # Count path: distinct parent groups; ordering irrelevant.
-            return grouped.distinct()
+        # Child matches page by their root parent id. The root guard is
+        # the safe default; projects with enforced one-level nesting can
+        # opt out with ``parent_field_guarantees_root=True``.
+        child_branch = filtered_qs.filter(**{f"{parent_field}__isnull": False})
+        if not nested.get("parent_field_guarantees_root", False):
+            child_branch = child_branch.filter(
+                **{f"{parent_field}__in": cls._visible_parent_ids(action, nested)}
+            )
+        child_branch = child_branch.order_by().annotate(
+            **{PARENT_REAL_ID: F(parent_field)}
+        )
 
-        grouped = grouped.annotate(**{CHILDREN_IDS: ArrayAgg(pk_name)})
+        if not include_sort_columns:
+            return parent_branch.values(PARENT_REAL_ID).union(
+                child_branch.values(PARENT_REAL_ID)
+            )
 
-        if not order_strings:
-            return grouped
-
-        # Re-apply caller ordering as per-group aggregates. Each
-        # group contains exactly one parent row (``parent_field IS
-        # NULL``), so ``MAX(CASE WHEN parent_row THEN col END)``
-        # yields that parent's value — the group sorts by the
-        # parent, not by any of its children.
-        parent_row = Q(**{f"{parent_field}__isnull": True})
-        column_fields_map = {cf.field: cf for cf in action.column_fields}
-        sort_annotations: dict = {}
+        column_fields_map = {column.field: column for column in action.column_fields}
+        values = [PARENT_REAL_ID]
         new_order: list[str] = []
         for idx, expr in enumerate(order_strings):
             desc = expr.startswith("-")
             field = expr.lstrip("-+")
             alias = f"_nested_sort_{idx}"
             visible_field = column_fields_map.get(field)
-            sort_parent_qs = action.get_data_queryset(
-                visible_fields=[visible_field] if visible_field else []
+            base_sort_qs = action.get_data_queryset(visible_fields=[]).order_by()
+            is_direct_parent_sort = _is_direct_parent_sort_source(
+                action.view.model, base_sort_qs, field
             )
-            sort_annotations[alias] = Max(
-                Subquery(
-                    sort_parent_qs.filter(id=OuterRef("parent_real_id")).values(field)[
-                        :1
-                    ]
+            if is_direct_parent_sort:
+                # Simple model/display fields can sort by the parent's
+                # raw column without rebuilding the annotated list queryset.
+                sort_parent_qs = base_sort_qs
+                parent_branch = parent_branch.annotate(**{alias: F(field)})
+                child_branch = child_branch.annotate(
+                    **{
+                        alias: Subquery(
+                            sort_parent_qs.filter(pk=OuterRef(parent_field)).values(
+                                field
+                            )[:1]
+                        )
+                    }
                 )
-            )
+            else:
+                # Complex annotations fall back to the list queryset so
+                # custom SBAdminField annotations still sort correctly.
+                sort_parent_qs = action.get_data_queryset(
+                    visible_fields=[visible_field] if visible_field else []
+                ).order_by()
+                parent_branch = parent_branch.annotate(
+                    **{
+                        alias: Subquery(
+                            sort_parent_qs.filter(pk=OuterRef(pk_name)).values(field)[
+                                :1
+                            ]
+                        )
+                    }
+                )
+                child_branch = child_branch.annotate(
+                    **{
+                        alias: Subquery(
+                            sort_parent_qs.filter(pk=OuterRef(parent_field)).values(
+                                field
+                            )[:1]
+                        )
+                    }
+                )
+            values.append(alias)
             new_order.append(f"-{alias}" if desc else alias)
-        return grouped.annotate(**sort_annotations).order_by(*new_order)
+        return (
+            parent_branch.values(*values)
+            .union(child_branch.values(*values))
+            .order_by(*new_order)
+        )
+
+    @classmethod
+    def _visible_parent_ids(
+        cls, action: "SBAdminListAction", nested: dict
+    ) -> "QuerySet":
+        """Parent ids allowed to own tree rows under current permissions."""
+        parent_field: str = nested["parent_field"]
+        pk_name = action.get_pk_field().name
+        return (
+            action.view.get_queryset(action.threadsafe_request)
+            .filter(**{f"{parent_field}__isnull": True})
+            .values(pk_name)
+        )
+
+
+def _is_direct_parent_sort_source(model, base_qs: "QuerySet", source: str) -> bool:
+    if not isinstance(source, str):
+        return False
+    source = source.lstrip("-+")
+    if source in base_qs.query.annotations:
+        return True
+    current_model = model
+    parts = source.split("__")
+    for part in parts:
+        try:
+            field = current_model._meta.get_field(part)
+        except FieldDoesNotExist:
+            return False
+        current_model = getattr(field, "related_model", None)
+        if current_model is None and part != parts[-1]:
+            return False
+    return True
 
 
 def _validate(view, nested: dict) -> None:
+    """Validate nested plugin config once per resolved view."""
     if not isinstance(nested, dict):
         raise ImproperlyConfigured(
             f"sbadmin_nested must be a dict, got {type(nested).__name__}"

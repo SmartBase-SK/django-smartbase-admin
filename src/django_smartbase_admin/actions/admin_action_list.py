@@ -5,7 +5,7 @@ from typing import Any, TYPE_CHECKING
 
 from django.contrib.admin.utils import lookup_spawns_duplicates
 from django.core.exceptions import FieldError
-from django.db.models import Avg, Count, Field, Max, Min, Q, Sum
+from django.db.models import Avg, Count, Field, Max, Min, Q, Sum, Value
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -783,14 +783,49 @@ class SBAdminListAction(SBAdminAction):
             )
         return specs
 
-    def get_aggregates(self, aggregate, field_map=None) -> dict:
-        """Compute ``{alias: value}`` for ``aggregate`` over the filtered set.
+    def validate_group_by(self, group_by, field_map=None) -> list:
+        """Resolve ``group_by`` names to declared SBAdminFields to GROUP BY on.
 
-        Reuses the list's filtered, annotated queryset. Non-multiplying
-        metrics batch into one query; a ``count`` over a multi-valued
-        relation runs separately and is merged.
+        A multi-valued (relation) field is rejected — grouping on it fans
+        the rows out. ``None`` / ``[]`` → no grouping; raises ``ValueError``
+        / ``LookupError`` on a bad entry.
+        """
+        if not group_by:
+            return []
+        if not isinstance(group_by, list):
+            raise ValueError("group_by must be a list of declared field names.")
+        if field_map is None:
+            field_map = self.view.get_field_map(self.threadsafe_request)
+
+        fields = []
+        for name in group_by:
+            sbfield = field_map.get(name)
+            if sbfield is None:
+                raise LookupError(
+                    f"Unknown field {name!r}; declared fields: {sorted(field_map)}."
+                )
+            if sbfield.is_multivalued():
+                raise ValueError(f"Cannot group by multi-valued field {name!r}.")
+            fields.append(sbfield)
+        return fields
+
+    def get_aggregates(self, aggregate, field_map=None, group_by=None):
+        """Compute ``aggregate`` totals over the filtered set.
+
+        Reuses the list's filtered, annotated queryset and runs a single
+        ``values(*group).annotate(**aggs)``. No ``group_by`` collapses to
+        one constant group (``Value(1)``), so the scalar rollup is just the
+        degenerate case of the same query.
+
+        Without ``group_by`` returns a scalar ``{alias: value}`` dict; with
+        ``group_by`` returns a list of ``{**group_fields, **aliases}`` rows,
+        ordered by the group columns. Each metric runs in its own query and
+        is merged by group key, so a metric that traverses a to-many
+        relation (a multi-valued ``count``, or an annotated field that
+        aggregates a related set) can never fan-out-inflate a sibling.
         """
         specs = self.validate_aggregate(aggregate, field_map=field_map)
+        group_fields = self.validate_group_by(group_by, field_map=field_map)
         # Full base so every aggregable field's annotation is present.
         queryset = self.get_data_queryset()
         pk_name = self.get_pk_field().name
@@ -812,6 +847,23 @@ class SBAdminListAction(SBAdminAction):
             if field.supporting_annotates:
                 extra.update(field.supporting_annotates)
             extra[field.field] = field.annotate
+
+        # Resolve group targets the same way; a computed (annotated) group
+        # column needs its expression present before ``.values()``.
+        group_targets: list[str] = []
+        for field in group_fields:
+            target = (
+                field.model_field.name if field.model_field is not None else field.field
+            )
+            group_targets.append(target)
+            if (
+                field.model_field is None
+                and target not in queryset.query.annotations
+                and field.annotate is not None
+            ):
+                if field.supporting_annotates:
+                    extra.update(field.supporting_annotates)
+                extra[target] = field.annotate
         if extra:
             queryset = queryset.annotate(**extra)
 
@@ -822,23 +874,34 @@ class SBAdminListAction(SBAdminAction):
         for plugin in request.request_data.configuration.plugins:
             queryset = plugin.modify_count_queryset(self, request=request, qs=queryset)
 
-        batch: dict = {}
-        isolated: list[tuple[str, Any]] = []
-        for spec in specs:
-            agg = LIST_AGGREGATE_FUNCTIONS[spec["fn"]](spec["target"])
-            if spec["multiplying"]:
-                isolated.append((spec["alias"], agg))
-            else:
-                batch[spec["alias"]] = agg
+        # GROUP BY: no group_by → a single constant group, so the scalar
+        # case falls out of the same path.
+        if group_targets:
+            base = queryset.values(*group_targets)
+        else:
+            base = queryset.annotate(_sb_group=Value(1)).values("_sb_group")
 
-        # Undetermined-type expressions are only rejected once Django
-        # resolves them against the query.
+        # One query per metric, merged by group key — a metric that
+        # traverses a to-many relation never shares a query with (and so
+        # never inflates) another. Undetermined-type expressions are only
+        # rejected once Django resolves them against the query.
+        merged: dict = {}
+        order: list = []
         try:
-            result: dict = {}
-            if batch:
-                result.update(queryset.aggregate(**batch))
-            for alias, agg in isolated:
-                result[alias] = queryset.aggregate(**{alias: agg})[alias]
+            for spec in specs:
+                alias = spec["alias"]
+                agg = LIST_AGGREGATE_FUNCTIONS[spec["fn"]](spec["target"])
+                for row in base.annotate(**{alias: agg}).order_by(*group_targets):
+                    key = tuple(row[t] for t in group_targets)
+                    slot = merged.get(key)
+                    if slot is None:
+                        slot = {t: row[t] for t in group_targets}
+                        merged[key] = slot
+                        order.append(key)
+                    slot[alias] = row[alias]
         except FieldError as exc:
             raise ValueError(f"Cannot aggregate the requested field(s): {exc}") from exc
-        return result
+
+        if not group_targets:
+            return merged[order[0]] if order else {}
+        return [merged[key] for key in order]

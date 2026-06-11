@@ -3571,6 +3571,7 @@ Result: root categories render as top-level rows with an expand chevron; one lev
 | `element_column` | str | first visible column | Column that gets the tree expand/collapse chevron (`dataTreeElementColumn`). Accepts either a column name from `sbadmin_list_display` or a raw Tabulator field id. |
 | `start_expanded` | bool | `False` | Render all parent rows expanded on first load. |
 | `only_show_filtered_children` | bool | `True` | If `True`, children only appear when they match the current filter; parents always hydrate even if they didn't match. If `False`, all direct children of each visible parent are included. |
+| `parent_field_guarantees_root` | bool | `False` | Set to `True` only when the FK is guaranteed to point directly at a root row (no grandchildren / deeper nesting). Skips the root-guard subquery for faster parent grouping. |
 
 Example with all keys:
 
@@ -3584,6 +3585,7 @@ class CategoryAdmin(SBAdmin):
         "element_column": "name",           # chevron on the name column
         "start_expanded": True,
         "only_show_filtered_children": False,
+        "parent_field_guarantees_root": False,
     }
 ```
 
@@ -3612,7 +3614,6 @@ Return `None` to disable the tree for that request — the admin renders a norma
 - Pagination counts parent groups; `list_per_page` controls roots-per-page, not rows-per-page.
 - Filters apply to the whole tree by default (`only_show_filtered_children=True`). Parents still hydrate even when only a child matched.
 - `restrict_queryset` is re-enforced on the parent side of the FK automatically — a child whose parent was filtered out won't leak as a phantom root.
-- **PostgreSQL required** at the data-query level (uses `ArrayAgg`).
 
 **Source:** `django_smartbase_admin/plugins/nested.py` — `TabulatorNestedPlugin`, `resolve_nested`
 
