@@ -17,6 +17,7 @@ from oauth2_provider.oauth2_validators import OAuth2Validator
 from django_smartbase_admin.mcp.oauth.validators import (
     SBAdminMCPOAuth2Validator,
     is_non_loopback_http,
+    loopback_redirect_allowed,
 )
 from django_smartbase_admin.mcp.oauth.views import register
 
@@ -58,6 +59,45 @@ class LoopbackRedirectTests(TestCase):
                 )
             )
             parent.assert_called_once()
+
+    def test_validator_ignores_port_for_loopback_redirects(self):
+        """RFC 8252 §7.3: native clients bind a fresh loopback port per run."""
+        registered = ["http://localhost:33418/callback"]
+        # Port differs, loopback hosts are interchangeable -> allowed.
+        self.assertTrue(
+            loopback_redirect_allowed("http://localhost:52756/callback", registered)
+        )
+        self.assertTrue(
+            loopback_redirect_allowed("http://127.0.0.1:52756/callback", registered)
+        )
+        # Scheme, path or host mismatch -> refused.
+        self.assertFalse(
+            loopback_redirect_allowed("https://localhost:52756/callback", registered)
+        )
+        self.assertFalse(
+            loopback_redirect_allowed("http://localhost:52756/other", registered)
+        )
+        self.assertFalse(
+            loopback_redirect_allowed("http://evil.example:52756/callback", registered)
+        )
+
+        # End-to-end through the validator: DOT's exact match fails on the
+        # port, the loopback fallback recovers it; no client -> no fallback.
+        validator = SBAdminMCPOAuth2Validator()
+        request = SimpleNamespace(
+            client=SimpleNamespace(redirect_uris="http://localhost:33418/callback")
+        )
+        with patch.object(OAuth2Validator, "validate_redirect_uri", return_value=False):
+            self.assertTrue(
+                validator.validate_redirect_uri(
+                    "c", "http://localhost:52756/callback", request
+                )
+            )
+            self.assertFalse(
+                validator.validate_redirect_uri(
+                    "c", "http://localhost:52756/callback", SimpleNamespace()
+                )
+            )
 
     def test_dcr_register_enforces_loopback_for_http(self):
         rf = RequestFactory()

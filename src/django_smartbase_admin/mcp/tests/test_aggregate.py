@@ -23,7 +23,9 @@ urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 class _Admin(SBAdmin):
     model = Folder
     search_fields = ("name",)
-    sbadmin_list_display = ("id", "name", "id_alias")
+    # ``children`` is the reverse of the self-FK ``parent`` → a one-to-many
+    # (multi-valued) field, used to exercise the join fan-out path.
+    sbadmin_list_display = ("id", "name", "id_alias", "parent", "children")
 
     # A method field with ``admin_order_field`` → backed by the ``id``
     # column via an annotation, so its ORM identifier is suffixed
@@ -103,6 +105,98 @@ class AggregateTests(TestCase):
         # "id_alias" resolves to its ORM alias "id_alias_annt"; summing the
         # raw name would raise FieldError.
         self.assertEqual(result["aggregates"], {"sum_id_alias": sum(ids)})
+
+    def test_group_by_breaks_totals_down_per_group(self):
+        # Two parents (themselves parent=None), children nested under them →
+        # group the count/sum by the parent FK so each parent surfaces once
+        # with its own totals.
+        a = Folder.objects.create(name="a")
+        b = Folder.objects.create(name="b")
+        a_ids = [Folder.objects.create(name=n, parent=a).pk for n in ("a1", "a2")]
+        b_ids = [Folder.objects.create(name=n, parent=b).pk for n in ("b1",)]
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            group_by=["parent"],
+            aggregate=[{"fn": "count"}, {"fn": "sum", "field": "id"}],
+        )
+
+        # No top-level scalar aggregates; a "groups" list instead, one row
+        # per parent, ordered by the group column (NULLs first in sqlite).
+        self.assertNotIn("aggregates", result)
+        self.assertEqual(
+            result["groups"],
+            [
+                {"parent": None, "count": 2, "sum_id": a.pk + b.pk},
+                {"parent": a.pk, "count": 2, "sum_id": sum(a_ids)},
+                {"parent": b.pk, "count": 1, "sum_id": sum(b_ids)},
+            ],
+        )
+
+    def test_aggregate_without_group_by_still_returns_scalar_dict(self):
+        # Back-compat: the degenerate single-constant-group path keeps the
+        # original scalar shape under "aggregates".
+        ids = [Folder.objects.create(name=n).pk for n in ("a", "b")]
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            aggregate=[{"fn": "count"}, {"fn": "sum", "field": "id"}],
+        )
+        self.assertNotIn("groups", result)
+        self.assertEqual(result["aggregates"], {"count": 2, "sum_id": sum(ids)})
+
+        # An empty filtered set still yields every requested alias (Django
+        # drops the constant group from GROUP BY, so the rollup query always
+        # returns one row) — not an empty dict.
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            full_text_search="no-match",
+            aggregate=[{"fn": "count"}, {"fn": "sum", "field": "id"}],
+        )
+        self.assertEqual(result["aggregates"], {"count": 0, "sum_id": None})
+
+    def test_count_over_relation_does_not_inflate_sibling_sum(self):
+        # A parent with 3 children: counting the multi-valued ``children``
+        # relation adds a row-multiplying join. Run in one shared query, that
+        # join would triple the parent's id in ``sum_id``. Each metric runs
+        # in its own query, so the sum stays correct alongside the count.
+        p = Folder.objects.create(name="p")
+        child_ids = [
+            Folder.objects.create(name=n, parent=p).pk for n in ("c1", "c2", "c3")
+        ]
+        all_ids = [p.pk, *child_ids]
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            aggregate=[
+                {"fn": "count", "field": "children"},
+                {"fn": "sum", "field": "id"},
+            ],
+        )
+
+        # 3 children joined, but the sum is over the 4 real rows — not inflated
+        # by the fan-out (a shared-query bug would give 3*p.pk + child sum).
+        self.assertEqual(
+            result["aggregates"],
+            {"count_children": 3, "sum_id": sum(all_ids)},
+        )
+
+    def test_invalid_group_by_specs_are_rejected(self):
+        tools = self._tools()
+        base = dict(view_id="filer_folder", fields=["id", "name"])
+
+        # Undeclared group field.
+        with self.assertRaises(LookupError):
+            tools.list_rows(**base, aggregate=[{"fn": "count"}], group_by=["nope"])
+        # group_by without aggregate is meaningless.
+        with self.assertRaises(ValueError):
+            tools.list_rows(**base, group_by=["name"])
+        # Grouping on a multi-valued relation fans the rows out → rejected.
+        with self.assertRaises(ValueError):
+            tools.list_rows(**base, aggregate=[{"fn": "count"}], group_by=["children"])
 
     def test_invalid_aggregate_specs_are_rejected(self):
         tools = self._tools()
