@@ -3,10 +3,34 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from filer.models import Folder
 
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
+from django_smartbase_admin.engine.admin_base_view import (
+    SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
+    SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
+)
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+
+
+class AutocompleteParentPreselectConfiguration:
+    def __init__(self, show_related_buttons=False):
+        self.show_related_buttons = show_related_buttons
+
+    def autocomplete_show_related_buttons(self, *args, **kwargs):
+        return self.show_related_buttons
+
+    def apply_global_filter_to_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def restrict_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def has_permission(self, *args, **kwargs):
+        return True
 
 
 class ForwardedFkReachabilityTest(TestCase):
@@ -67,3 +91,99 @@ class AutocompleteCreatePermissionTest(TestCase):
         admin = MagicMock()
         admin.has_add_permission.return_value = True
         self._check(admin)
+
+
+class AutocompleteParentPreselectTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.parent = Folder.objects.create(name="parent")
+        self.existing = Folder.objects.create(name="existing")
+
+    def tearDown(self):
+        SBAdminThreadLocalService.clear_request()
+
+    def _request(self, parent_field="modal_folder_parent", show_related_buttons=False):
+        request = self.factory.get(
+            "/",
+            data={
+                SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: parent_field,
+                SBADMIN_PARENT_INSTANCE_PK_VAR: str(self.parent.pk),
+                SBADMIN_PARENT_INSTANCE_LABEL_VAR: str(self.parent),
+            },
+        )
+        request.request_data = SimpleNamespace(
+            configuration=AutocompleteParentPreselectConfiguration(
+                show_related_buttons=show_related_buttons
+            ),
+            request_post={},
+        )
+        SBAdminThreadLocalService.set_request(request)
+        return request
+
+    def _widget(self):
+        widget = SBAdminAutocompleteWidget(
+            form_field=SimpleNamespace(
+                empty_label="---------",
+                error_messages={"invalid_choice": "bad"},
+            ),
+            model=Folder,
+            multiselect=False,
+            attrs={"id": "modal_folder_parent"},
+        )
+        widget.field_name = "parent"
+        widget.form = SimpleNamespace(errors={})
+        return widget
+
+    def test_parent_instance_is_selected_when_widget_matches_request_field(self):
+        self._request()
+
+        context = self._widget().get_context("parent", None, {})
+
+        self.assertEqual(
+            json.loads(context["widget"]["value"]),
+            [{"value": str(self.parent.pk), "label": str(self.parent)}],
+        )
+        self.assertEqual(
+            context["widget"]["value_list"],
+            [{"value": str(self.parent.pk), "label": str(self.parent)}],
+        )
+        self.assertNotIn("preselect_field", context["widget"]["attrs"])
+
+    def test_parent_instance_is_ignored_when_widget_does_not_match_request_field(self):
+        self._request(parent_field="modal_folder_other")
+
+        context = self._widget().get_context("parent", None, {})
+
+        self.assertIsNone(context["widget"].get("value"))
+        self.assertNotIn("value_list", context["widget"])
+
+    def test_parent_instance_does_not_override_existing_value(self):
+        self._request()
+        existing_value = json.dumps(
+            [{"value": str(self.existing.pk), "label": str(self.existing)}]
+        )
+
+        context = self._widget().get_context("parent", existing_value, {})
+
+        self.assertEqual(
+            json.loads(context["widget"]["value"]),
+            [{"value": self.existing.pk, "label": str(self.existing)}],
+        )
+
+    def test_parent_instance_preselect_sets_related_edit_url(self):
+        self._request(show_related_buttons=True)
+        original_admin = sb_admin_site._registry.pop(Folder, None)
+        folder_admin = MagicMock()
+        folder_admin.has_view_or_change_permission.return_value = True
+        folder_admin.get_queryset.return_value = Folder.objects.all()
+        folder_admin.get_detail_url.side_effect = lambda pk: f"/folders/{pk}/change/"
+        folder_admin.has_add_permission.return_value = False
+        sb_admin_site._registry[Folder] = folder_admin
+        try:
+            context = self._widget().get_context("parent", None, {})
+        finally:
+            sb_admin_site._registry.pop(Folder, None)
+            if original_admin:
+                sb_admin_site._registry[Folder] = original_admin
+
+        self.assertIn("related_edit_url", context["widget"]["attrs"])

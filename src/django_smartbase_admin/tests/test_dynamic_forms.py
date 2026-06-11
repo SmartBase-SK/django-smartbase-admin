@@ -38,11 +38,15 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
     SBAdminDynamicFormMixin,
-    SBDynamicRegionSource,
     SBDynamicRegion,
+    SBDynamicRegionSource,
     SBInactiveFieldPolicy,
 )
-from django_smartbase_admin.engine.modal_view import ActionModalView, RowActionModalView
+from django_smartbase_admin.engine.modal_view import (
+    ActionModalView,
+    RowActionModalView,
+    SBAdminStandaloneFormView,
+)
 from django_smartbase_admin.services.thread_local import (
     SBAdminThreadLocalService,
     sb_admin_request,
@@ -517,6 +521,10 @@ class DynamicRegionActionModal(ActionModalView):
 
 class CrossFieldsetDynamicRegionModal(ActionModalView):
     form_class = CrossFieldsetRegionForm
+
+
+class DynamicRegionStandaloneView(SBAdminStandaloneFormView):
+    form_class = DynamicRegionForm
 
 
 class RowObjectDynamicRegionForm(SBAdminBaseForm):
@@ -1582,6 +1590,29 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="download_url"', html)
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
+
+    def test_standalone_form_view_dynamic_region_initial_is_built_from_request_data(
+        self,
+    ):
+        request = RequestFactory().post(
+            "/standalone/action/",
+            {
+                SBADMIN_DYNAMIC_REGION_PARAM: "details",
+                "mode": "digital",
+            },
+        )
+        SBAdminThreadLocalService.set_request(request)
+        view = DynamicRegionStandaloneView(view=FakeView())
+        view.setup(request)
+
+        response = view.post(request)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="download_url"', html)
+        self.assertIn('name="billing_period"', html)
+        self.assertNotIn('name="weight"', html)
+        self.assertNotIn("This field is required", html)
 
     def test_action_modal_dynamic_region_response_includes_related_regions(self):
         request = RequestFactory().post(

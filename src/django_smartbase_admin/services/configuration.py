@@ -1,6 +1,10 @@
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.utils.text import slugify
+from django_smartbase_admin.services.request_cache import (
+    RequestCacheKey,
+    cache_on_request,
+)
 
 
 class SBAdminConfigurationService(object):
@@ -27,7 +31,11 @@ class SBAdminUserConfigurationService(object):
     def get_user_config(cls, request):
         """Delegate to the configuration class's get_user_config method."""
         configuration_class = import_string(settings.SB_ADMIN_CONFIGURATION)
-        return configuration_class.get_user_config(request)
+        return cache_on_request(
+            RequestCacheKey.USER_CONFIG,
+            lambda: configuration_class.get_user_config(request),
+            request=request,
+        )
 
     @classmethod
     def get_saved_views(cls, request, view_id):

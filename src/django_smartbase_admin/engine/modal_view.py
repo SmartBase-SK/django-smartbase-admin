@@ -28,42 +28,14 @@ class SBAdminActionError(Exception):
     """Raise inside an action modal hook to surface as a non-field form error."""
 
 
-class ActionModalView(FormView):
-    template_name = "sb_admin/partials/modal/modal_content.html"
+class SBAdminDynamicFormViewMixin:
     form_class = None
-    modal_title = ""
     view = None
-    render_notifications = True
 
-    # When True, the first valid submit runs ``get_confirmation_data``
-    # and renders the confirmation step; ``process_form_valid`` only
-    # runs on a second submit carrying ``_confirmed=1``.
-    requires_confirmation: bool = False
-    confirmation_template_name: str = "sb_admin/partials/modal/modal_confirmation.html"
-    # ``.format(**data)``-ed at render time with the dict returned by
-    # ``get_confirmation_data``.
-    confirmation_message: str | None = None
-    CONFIRMATION_POST_KEY = "_confirmed"
-
-    def __init__(self, view=None, *args, **kwargs):
-        self.view = view
+    def __init__(self, view=None, *args, **kwargs) -> None:
+        if view is not None:
+            self.view = view
         super().__init__(*args, **kwargs)
-
-    def build_success_response(self, request):
-        content = (
-            render_notifications_html(request) if self.render_notifications else ""
-        )
-        response = HttpResponse(content)
-        trigger_client_event(response, "hideModal", {})
-        trigger_client_event(
-            response,
-            TABLE_RELOAD_DATA_EVENT_NAME,
-            {},
-        )
-        return response
-
-    def process_form_valid(self, request, form):
-        return self.build_success_response(request)
 
     def build_dynamic_region_response(self, request, form, region_name):
         region = form.get_dynamic_region(region_name, request)
@@ -134,6 +106,47 @@ class ActionModalView(FormView):
         kwargs.pop("data", None)
         kwargs.pop("files", None)
         return kwargs
+
+
+class SBAdminStandaloneFormView(SBAdminDynamicFormViewMixin, FormView):
+    def post(self, request, *args, **kwargs):
+        if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):
+            return self.build_dynamic_region_response(
+                request, self.get_dynamic_region_form(request), region_name
+            )
+        return super().post(request, *args, **kwargs)
+
+
+class ActionModalView(SBAdminDynamicFormViewMixin, FormView):
+    template_name = "sb_admin/partials/modal/modal_content.html"
+    modal_title = ""
+    render_notifications = True
+
+    # When True, the first valid submit runs ``get_confirmation_data``
+    # and renders the confirmation step; ``process_form_valid`` only
+    # runs on a second submit carrying ``_confirmed=1``.
+    requires_confirmation: bool = False
+    confirmation_template_name: str = "sb_admin/partials/modal/modal_confirmation.html"
+    # ``.format(**data)``-ed at render time with the dict returned by
+    # ``get_confirmation_data``.
+    confirmation_message: str | None = None
+    CONFIRMATION_POST_KEY = "_confirmed"
+
+    def build_success_response(self, request):
+        content = (
+            render_notifications_html(request) if self.render_notifications else ""
+        )
+        response = HttpResponse(content)
+        trigger_client_event(response, "hideModal", {})
+        trigger_client_event(
+            response,
+            TABLE_RELOAD_DATA_EVENT_NAME,
+            {},
+        )
+        return response
+
+    def process_form_valid(self, request, form):
+        return self.build_success_response(request)
 
     def post(self, request, *args, **kwargs):
         if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):

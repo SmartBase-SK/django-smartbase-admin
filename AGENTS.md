@@ -12,7 +12,8 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Form Widgets](#form-widgets) | input prefix/suffix text and icon buttons, `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview) | Full SBAdmin pages backed by a regular Django form instead of a model change view |
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
@@ -53,7 +54,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **XLSX custom formatting per column?** → [XLSX Export Field Formatting](#xlsx-export-field-formatting)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
+- **Copy-to-clipboard text input?** → [Input prefix and suffix](#input-prefix-and-suffix-text-and-number-widgets)
 - **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
+- **Full admin page with a non-model form?** → [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview)
 - **Show/hide fields based on another form field?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
 - **Refresh choices or layout without reloading the whole form?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
 - **Dynamic form sections in stacked inlines?** → [Dynamic regions in stacked inlines](#dynamic-regions-in-stacked-inlines)
@@ -1221,7 +1224,11 @@ class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
 
 ### Input prefix and suffix (text and number widgets)
 
-Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or `SBAdminNumberWidget` (e.g. currency, units, URL stem). Omit both for a normal input.
+Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or
+`SBAdminNumberWidget` for passive text affixes (e.g. currency, units, URL stem).
+Use `prefix_icon` / `suffix_icon` with `prefix_button_attrs` /
+`suffix_button_attrs` when the affix should be a clickable icon button. Omit all
+affix options for a normal input.
 
 ```python
 from django import forms
@@ -1243,12 +1250,36 @@ class ArticleForm(SBAdminBaseForm):
             "slug": SBAdminTextInputWidget(prefix="https://blog.example.com/"),
             "price": SBAdminNumberWidget(suffix="€"),
             "discount": SBAdminNumberWidget(prefix="-", suffix="%"),
+            "public_url": SBAdminTextInputWidget(
+                attrs={"readonly": "readonly"},
+                suffix_icon="Minus-the-top",
+                suffix_button_attrs={
+                    "title": "Copy URL",
+                    "aria-label": "Copy URL",
+                    "data-sbadmin-copy-button": True,
+                    "data-sbadmin-copy-label": "Copy URL",
+                    "data-sbadmin-copied-label": "Copied",
+                },
+            ),
         }
 ```
 
 **Key points:**
-- Addons are display-only; they do not change the stored field value.
-- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in and forward `prefix` / `suffix` in `__init__`).
+- `prefix` / `suffix` are passive text affixes; `prefix_icon` / `suffix_icon`
+  render clickable icon buttons.
+- Each side accepts only one affix shape: use either `prefix` or `prefix_icon`,
+  and either `suffix` or `suffix_icon`.
+- `prefix_button_attrs` and `suffix_button_attrs` are normal HTML attributes.
+  Always include `title` and `aria-label` for icon-only buttons.
+- Copy-to-clipboard behavior is globally delegated from `main.js` via
+  `data-sbadmin-copy-button`. Copy buttons can omit `data-sbadmin-copy-target`;
+  `main.js` falls back to the nearest input inside the affix wrapper.
+- Read-only inputs add `input-affix--readonly` to the wrapper so affix addons
+  match the read-only input styling.
+- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in
+  and forward `prefix` / `suffix` plus the icon-button args in `__init__`).
+- `SBAdminCopyableTextInputWidget` remains available as a compatibility wrapper,
+  but new code should prefer the generic icon-button affix API.
 
 ### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
 
@@ -1332,6 +1363,103 @@ tags_config = SBAdminJsonEditorField(
 - Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
 - `add_to_top=True` reorders the **root** array only; nested arrays still append.
 - Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
+
+---
+
+## Standalone Form Views (`SBAdminStandaloneFormView`)
+
+Use `SBAdminStandaloneFormView` for a full SBAdmin page backed by a regular
+Django form instead of a model add/change view. Typical uses include calculators,
+import screens, report builders, and other workflows that should live in the
+SBAdmin navigation but do not edit one model instance.
+
+```python
+from django import forms
+from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.engine.admin_view import SBAdminView
+from django_smartbase_admin.engine.modal_view import SBAdminStandaloneFormView
+
+
+class ArticleReportForm(forms.Form):
+    status = forms.ChoiceField(
+        label="Status",
+        choices=(("draft", "Draft"), ("published", "Published")),
+    )
+
+
+class ArticleReportFormView(SBAdminStandaloneFormView):
+    template_name = "blog/article_report.html"
+    form_class = ArticleReportForm
+
+    def get_context_data(self, **kwargs):
+        context = self.view.get_global_context(self.request)
+        context.update(super().get_context_data(**kwargs))
+        context["page_title"] = self.view.title
+        return context
+
+    def form_valid(self, form):
+        rows = build_article_report(status=form.cleaned_data["status"])
+        return self.render_to_response(self.get_context_data(form=form, rows=rows))
+
+
+class ArticleReportView(SBAdminView):
+    label = "Article report"
+    title = "Article report"
+    view_id = "article_report"
+    menu_action = "report"
+
+    @sbadmin_action(permission="view")
+    def report(self, request, modifier, object_id=None):
+        return ArticleReportFormView.as_view(view=self)(request)
+```
+
+Register the `SBAdminView` in the role configuration and point a menu item at
+its `view_id`:
+
+```python
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="article_report"),
+    menu_items=[
+        SBAdminMenuItem(label="Article report", icon="Table-report", view_id="article_report"),
+    ],
+    registered_views=[
+        ArticleReportView(),
+    ],
+)
+```
+
+Template example:
+
+```django
+{% extends "sb_admin/sb_admin_base.html" %}
+
+{% block content %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Run report</button>
+    </form>
+
+    {% if rows %}
+        {# Render report output here. #}
+    {% endif %}
+{% endblock %}
+```
+
+**Key points:**
+- Pass `view=self` through `ArticleReportFormView.as_view(view=self)` so the
+  form view can use SBAdmin context, permissions, dynamic forms, and fieldsets.
+- Merge `self.view.get_global_context(self.request)` into `get_context_data()`
+  so the template gets the navigation shell, notifications, view id, and SBAdmin
+  request metadata.
+- Use `get_form_kwargs()` for request-aware forms or runtime configuration.
+- If the form uses `SBDynamicRegion`, `SBAdminStandaloneFormView` already handles
+  dynamic-region POST fragments; do not hand-roll region response code.
+- Keep permission decisions on the owning `SBAdminView` / role configuration.
 
 ---
 

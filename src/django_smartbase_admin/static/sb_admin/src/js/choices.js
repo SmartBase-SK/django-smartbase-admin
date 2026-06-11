@@ -12,7 +12,7 @@ const withSanitizedLabel = (obj) => (
         : obj
 )
 
-export const choicesJSOptions = (choiceInput) => ({
+export const choicesJSOptions = (choiceInput, options = {}) => ({
     'allowHTML': true,
     'classNames': {
         'inputCloned': 'input choices__input choices__input--cloned'
@@ -23,7 +23,7 @@ export const choicesJSOptions = (choiceInput) => ({
     shouldSort: false,
     resetScrollPosition: false,
     callbackOnCreateTemplates: () => {
-        return {
+        const templates = {
             item: (templateOptions, item, removeItemButton) => {
                 const originalItem = Choices.defaults.templates.item.call(this, templateOptions, withSanitizedLabel(item), removeItemButton)
                 if (removeItemButton) {
@@ -56,6 +56,16 @@ export const choicesJSOptions = (choiceInput) => ({
                 return originalItem
             }
         }
+
+        if (options.detachSearchInputFromForm) {
+            templates.input = (templateOptions, placeholderValue) => {
+                const originalInput = Choices.defaults.templates.input.call(this, templateOptions, placeholderValue)
+                originalInput.setAttribute('form', '')
+                return originalInput
+            }
+        }
+
+        return templates
     },
 })
 

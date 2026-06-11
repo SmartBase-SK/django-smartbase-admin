@@ -66,7 +66,7 @@ export default class Autocomplete {
         const deleteButton = wrapperEl.querySelector(`.js-clear-autocomplete`)
         const options = JSON.parse(choiceInput.dataset.autocompleteOptions || "{}")
         const choicesJS = new Choices(choiceInput, {
-            ...choicesJSOptions(choiceInput),
+            ...choicesJSOptions(choiceInput, {detachSearchInputFromForm: true}),
             placeholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
             searchChoices: false,
             searchPlaceholderValue: window.sb_admin_translation_strings?.["search"] || 'Search',
@@ -198,12 +198,6 @@ export default class Autocomplete {
     }
 
     loadChoicesFromValue(inputEl, choicesJS) {
-        document.querySelectorAll('.filter-dropdown-button.show').forEach((el) => {
-            el.classList.remove('show')
-        })
-        document.querySelectorAll('.dropdown-menu.show').forEach((el) => {
-            el.classList.remove('show')
-        })
         choicesJS.SBinitialiseValue = null
         choicesJS.SBinitialised = false
         if (inputEl.value) {
