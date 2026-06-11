@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import RequestFactory, TestCase
 from filer.models import Folder
 
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
@@ -13,6 +14,23 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+
+
+class AutocompleteParentPreselectConfiguration:
+    def __init__(self, show_related_buttons=False):
+        self.show_related_buttons = show_related_buttons
+
+    def autocomplete_show_related_buttons(self, *args, **kwargs):
+        return self.show_related_buttons
+
+    def apply_global_filter_to_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def restrict_queryset(self, qs, *args, **kwargs):
+        return qs
+
+    def has_permission(self, *args, **kwargs):
+        return True
 
 
 class ForwardedFkReachabilityTest(TestCase):
@@ -84,7 +102,7 @@ class AutocompleteParentPreselectTest(TestCase):
     def tearDown(self):
         SBAdminThreadLocalService.clear_request()
 
-    def _request(self, parent_field="modal_folder_parent"):
+    def _request(self, parent_field="modal_folder_parent", show_related_buttons=False):
         request = self.factory.get(
             "/",
             data={
@@ -94,8 +112,8 @@ class AutocompleteParentPreselectTest(TestCase):
             },
         )
         request.request_data = SimpleNamespace(
-            configuration=SimpleNamespace(
-                autocomplete_show_related_buttons=lambda *args, **kwargs: False,
+            configuration=AutocompleteParentPreselectConfiguration(
+                show_related_buttons=show_related_buttons
             ),
             request_post={},
         )
@@ -136,7 +154,7 @@ class AutocompleteParentPreselectTest(TestCase):
 
         context = self._widget().get_context("parent", None, {})
 
-        self.assertNotIn("value", context["widget"])
+        self.assertIsNone(context["widget"].get("value"))
         self.assertNotIn("value_list", context["widget"])
 
     def test_parent_instance_does_not_override_existing_value(self):
@@ -151,3 +169,21 @@ class AutocompleteParentPreselectTest(TestCase):
             json.loads(context["widget"]["value"]),
             [{"value": self.existing.pk, "label": str(self.existing)}],
         )
+
+    def test_parent_instance_preselect_sets_related_edit_url(self):
+        self._request(show_related_buttons=True)
+        original_admin = sb_admin_site._registry.pop(Folder, None)
+        folder_admin = MagicMock()
+        folder_admin.has_view_or_change_permission.return_value = True
+        folder_admin.get_queryset.return_value = Folder.objects.all()
+        folder_admin.get_detail_url.side_effect = lambda pk: f"/folders/{pk}/change/"
+        folder_admin.has_add_permission.return_value = False
+        sb_admin_site._registry[Folder] = folder_admin
+        try:
+            context = self._widget().get_context("parent", None, {})
+        finally:
+            sb_admin_site._registry.pop(Folder, None)
+            if original_admin:
+                sb_admin_site._registry[Folder] = original_admin
+
+        self.assertIn("related_edit_url", context["widget"]["attrs"])

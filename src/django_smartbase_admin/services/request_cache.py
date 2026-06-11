@@ -14,6 +14,19 @@ T = TypeVar("T")
 class RequestCacheKey:
     USER_CONFIG = "services.configuration.user_config"
 
+    @classmethod
+    def autocomplete_selected_options(
+        cls, widget_id: str, formset_prefix: str, value_field: str
+    ) -> str:
+        return ":".join(
+            (
+                "admin.widgets.autocomplete.selected_options",
+                widget_id,
+                formset_prefix,
+                value_field,
+            )
+        )
+
 
 def get_request():
     try:
