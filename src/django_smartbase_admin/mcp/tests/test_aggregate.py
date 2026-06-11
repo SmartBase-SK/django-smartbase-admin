@@ -146,6 +146,17 @@ class AggregateTests(TestCase):
         self.assertNotIn("groups", result)
         self.assertEqual(result["aggregates"], {"count": 2, "sum_id": sum(ids)})
 
+        # An empty filtered set still yields every requested alias (Django
+        # drops the constant group from GROUP BY, so the rollup query always
+        # returns one row) — not an empty dict.
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            full_text_search="no-match",
+            aggregate=[{"fn": "count"}, {"fn": "sum", "field": "id"}],
+        )
+        self.assertEqual(result["aggregates"], {"count": 0, "sum_id": None})
+
     def test_count_over_relation_does_not_inflate_sibling_sum(self):
         # A parent with 3 children: counting the multi-valued ``children``
         # relation adds a row-multiplying join. Run in one shared query, that
