@@ -7,7 +7,7 @@
                 <input form="{{ filter_widget.view_id }}-filter-form" type="hidden"
                        id="{{ filter_widget.input_id }}" name="{{ filter_widget.input_name }}"
                        {% if not all_filters_visible %}disabled{% endif %}{% if filter_widget.get_default_value %} value="{{ filter_widget.get_default_value }}"{% endif %}>
-                <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete"
+                <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete" dir="ltr"
                         data-autocomplete-data-id="{{ autocomplete_data_id }}">
                 </select>
             </div>

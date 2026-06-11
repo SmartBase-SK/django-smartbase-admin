@@ -22,7 +22,8 @@
                 <select {% if widget.attrs.multiple %}multiple{% endif %}
                         id="{{ widget.attrs.id }}"
                         name="{{ widget.name }}"
-                        class="js-static-autocomplete">
+                        class="js-static-autocomplete"
+                        dir="ltr">
                     {% for group, options, index in widget.optgroups %}
                         {% for option in options %}
                             <option value="{{ option.value|stringformat:'s' }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>

@@ -16,6 +16,7 @@ export class FilterModule extends SBAdminTableModule {
     loadFromUrl() {
         const params = this.table.getParamsFromUrl()
         const filterData = params[this.table.constants.FILTER_DATA_NAME]
+        this.closeOpenDropdowns()
         document.querySelector(`#${this.table.filterFormId}`).reset()
         document.querySelectorAll(`[form=${this.table.filterFormId}]`).forEach((el) => {
             const wrapperEl = el.closest('.filter-wrapper')
@@ -38,6 +39,12 @@ export class FilterModule extends SBAdminTableModule {
                 }
             })
         }
+    }
+
+    closeOpenDropdowns() {
+        document.querySelectorAll('.js-filter-dropdown-button.show').forEach((el) => {
+            window.bootstrap5?.Dropdown?.getInstance(el)?.hide()
+        })
     }
 
     getFormField(field) {
