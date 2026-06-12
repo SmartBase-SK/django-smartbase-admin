@@ -2648,6 +2648,12 @@ class ArticleAdmin(SBAdmin):
     inlines = [ArticleTagInline]
 ```
 
+When an admin overrides `get_inlines()` to show different inlines per request/object,
+keep every possible real inline class in the static `inlines` attribute as a
+superset. SBAdmin registers inline views and their autocomplete action URLs from
+that static list during configuration initialization; `get_inlines()` should only
+decide which already-registered inline classes render for the current object.
+
 **Available inline classes:**
 - `SBAdminTableInline` - Tabular layout (like `TabularInline`)
 - `SBAdminStackedInline` - Stacked layout (like `StackedInline`)
