@@ -127,9 +127,7 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
             )
             messages.success(request, msg)
             redirect_url = self.keep_preserved_filters(request, request.path)
-            redirect_url = SBAdminViewService.keep_back_url(
-                request, redirect_url
-            )
+            redirect_url = SBAdminViewService.keep_back_url(request, redirect_url)
             return HttpResponseRedirect(redirect_url)
         if "_save" in request.POST:
             msg = format_html(

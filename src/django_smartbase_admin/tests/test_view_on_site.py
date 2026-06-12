@@ -140,9 +140,7 @@ class NavigationReturnToTest(TestCase):
 
     def test_validate_accepts_in_namespace_url(self):
         request = self.factory.get(self.current_path)
-        self.assertTrue(
-            SBAdminViewService.validate_back_url(request, self.admin_url)
-        )
+        self.assertTrue(SBAdminViewService.validate_back_url(request, self.admin_url))
 
     def test_validate_rejects_external_host(self):
         request = self.factory.get(self.current_path)
@@ -249,9 +247,7 @@ class NavigationReturnToTest(TestCase):
             "/sb-admin/x/", data={SB_ADMIN_BACK_URL: "/sb-admin/origin/"}
         )
         result = SBAdminViewService.keep_back_url(request, "/sb-admin/detail/")
-        self.assertEqual(
-            result, "/sb-admin/detail/?back_url=%2Fsb-admin%2Forigin%2F"
-        )
+        self.assertEqual(result, "/sb-admin/detail/?back_url=%2Fsb-admin%2Forigin%2F")
 
     def test_keep_back_url_noop_without_param(self):
         request = self.factory.get("/sb-admin/x/")

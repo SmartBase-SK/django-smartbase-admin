@@ -247,9 +247,7 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
                         self.get_id(), request.request_data.object_id
                     )
                 )
-                redirect_url = SBAdminViewService.keep_back_url(
-                    request, redirect_url
-                )
+                redirect_url = SBAdminViewService.keep_back_url(request, redirect_url)
             response["HX-Redirect"] = redirect_url
             return response
         return None
