@@ -37,6 +37,9 @@
                             {% endif %}
                             <form action="" method="post" class="translation-form" id="{{ FORM_BASE_ID }}{{ language_code }}">
                                 {% csrf_token %}
+                                {% if back_url %}
+                                    <input type="hidden" name="back_url" value="{{ back_url }}">
+                                {% endif %}
                                 <input type="hidden" name="{{ TRANSLATION_MODEL_KEY }}" value="{{ form.model_table }}">
                                 {{ form.media }}
                             </form>

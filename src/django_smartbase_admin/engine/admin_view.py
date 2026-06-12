@@ -13,6 +13,7 @@ from django_smartbase_admin.engine.const import (
     DEFAULT_PAGE_SIZE,
 )
 from django_smartbase_admin.services.configuration import SBAdminConfigurationService
+from django_smartbase_admin.services.views import SBAdminViewService
 
 
 class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
@@ -108,8 +109,11 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
         return f"{url}{f'?{changelist_filters}' if changelist_filters else ''}"
 
     def get_back_url(self, request):
-        return self.add_preserved_filters(
+        default_url = self.add_preserved_filters(
             request, self.get_action_url(Action.LIST.value)
+        )
+        return SBAdminViewService.resolve_back_url(
+            request, default_url, current_path=request.path
         )
 
     def get_detail_change_response(self, request, msg_dict):
@@ -123,6 +127,9 @@ class SBAdminView(SBAdminBaseQuerysetMixin, SBAdminBaseView):
             )
             messages.success(request, msg)
             redirect_url = self.keep_preserved_filters(request, request.path)
+            redirect_url = SBAdminViewService.keep_back_url(
+                request, redirect_url
+            )
             return HttpResponseRedirect(redirect_url)
         if "_save" in request.POST:
             msg = format_html(
