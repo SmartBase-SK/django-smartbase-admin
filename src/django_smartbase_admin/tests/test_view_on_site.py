@@ -169,6 +169,19 @@ class NavigationReturnToTest(TestCase):
         self.assertFalse(SBAdminViewService.validate_back_url(request, None))
         self.assertFalse(SBAdminViewService.validate_back_url(request, ""))
 
+    def test_validate_accepts_url_under_script_prefix(self):
+        from django.urls import set_script_prefix, get_script_prefix
+
+        original_prefix = get_script_prefix()
+        try:
+            set_script_prefix("/corp/")
+            request = self.factory.get(self.current_path)
+            self.assertTrue(
+                SBAdminViewService.validate_back_url(request, "/corp" + self.admin_url)
+            )
+        finally:
+            set_script_prefix(original_prefix)
+
     def test_resolve_prefers_post_over_get(self):
         request = self.factory.post(
             self.current_path, data={SB_ADMIN_BACK_URL: self.admin_url}

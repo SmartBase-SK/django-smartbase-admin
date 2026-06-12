@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q, FilteredRelation, F
 from django.http import Http404, HttpRequest
 from django.shortcuts import redirect
-from django.urls import reverse, resolve, Resolver404
+from django.urls import reverse, resolve, Resolver404, get_script_prefix
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from django_smartbase_admin.engine.const import (
@@ -363,8 +363,12 @@ class SBAdminViewService(object):
         path = urlsplit(url).path
         if current_path and path == current_path:
             return False
+        script_prefix = get_script_prefix()
+        resolve_path = path
+        if script_prefix != "/" and resolve_path.startswith(script_prefix):
+            resolve_path = "/" + resolve_path[len(script_prefix) :]
         try:
-            match = resolve(path)
+            match = resolve(resolve_path)
         except Resolver404:
             return False
         return match.namespace == "sb_admin"
