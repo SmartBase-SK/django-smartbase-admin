@@ -19,6 +19,8 @@ from django_smartbase_admin.engine.inline_pagination import (
     PaginationFormSetBase,
     get_inline_admin_formset_by_prefix,
     get_inline_partial_prefix,
+    resolve_search_fields_from_inline_table,
+    resolve_search_lookups_for_model_field,
 )
 from django_smartbase_admin.templatetags.sb_paginated_inline import (
     build_tabulator_style_page_items,
@@ -76,6 +78,139 @@ class InlinePaginationTests(SimpleTestCase):
         formset.prefix = "permissions"
 
         self.assertEqual(formset.get_page_num(), 4)
+
+    def test_search_key_uses_inline_prefix(self):
+        formset = object.__new__(PaginationFormSetBase)
+        formset.prefix = "permissions"
+        formset.search_key_suffix = "-q"
+
+        self.assertEqual(formset.get_search_key(), "permissions-q")
+
+    def test_search_term_uses_get_and_strips_value(self):
+        formset = object.__new__(PaginationFormSetBase)
+        formset.prefix = "permissions"
+        formset.search_key_suffix = "-q"
+        formset.request = RequestFactory().get("/admin/?permissions-q=%20Test%20")
+
+        self.assertEqual(formset.get_search_term(), "Test")
+
+    def test_search_term_falls_back_to_post(self):
+        formset = object.__new__(PaginationFormSetBase)
+        formset.prefix = "permissions"
+        formset.search_key_suffix = "-q"
+        formset.request = RequestFactory().post(
+            "/admin/",
+            data={"permissions-q": "Hello"},
+        )
+
+        self.assertEqual(formset.get_search_term(), "Hello")
+
+    def test_default_search_fields_use_text_model_fields_without_inline(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        formset = object.__new__(PaginationFormSetBase)
+        formset.model = ContentType
+        formset.inline_search_enabled = True
+        formset.request = RequestFactory().get("/admin/")
+
+        self.assertEqual(
+            formset.get_search_fields(),
+            ["app_label", "model"],
+        )
+
+    def test_search_fields_use_inline_table_columns(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        class Inline:
+            model = ContentType
+            fields = ("app_label",)
+            inline_search_fields = None
+
+            def get_fields(self, request, obj=None):
+                return self.fields
+
+            def get_inline_search_fields(self, request, obj=None):
+                return resolve_search_fields_from_inline_table(self, request, obj)
+
+        inline = Inline()
+        formset = object.__new__(PaginationFormSetBase)
+        formset.model = ContentType
+        formset.inline_search_enabled = True
+        formset.inline_admin = inline
+        formset.instance = None
+        formset.request = RequestFactory().get("/admin/")
+
+        self.assertEqual(formset.get_search_fields(), ["app_label"])
+
+    def test_resolve_search_lookups_for_foreign_key_columns(self):
+        from django.db import models
+
+        class Related(models.Model):
+            name = models.CharField(max_length=100)
+            slug = models.SlugField(max_length=50)
+
+            class Meta:
+                app_label = "contenttypes"
+
+        class Parent(models.Model):
+            group = models.ForeignKey(Related, on_delete=models.CASCADE)
+
+            class Meta:
+                app_label = "contenttypes"
+
+        self.assertEqual(
+            resolve_search_lookups_for_model_field(Parent, "group"),
+            ["group__name", "group__slug"],
+        )
+        self.assertEqual(
+            resolve_search_lookups_for_model_field(Parent, "missing_method"),
+            [],
+        )
+
+    def test_resolve_search_fields_from_inline_table_skips_row_class_field(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        class Inline:
+            model = ContentType
+            fields = ("app_label", "get_sbadmin_row_class")
+
+            def get_fields(self, request, obj=None):
+                return self.fields
+
+        self.assertEqual(
+            resolve_search_fields_from_inline_table(
+                Inline(), RequestFactory().get("/admin/")
+            ),
+            ["app_label"],
+        )
+
+    def test_filter_queryset_by_search_applies_distinct_for_related_lookups(self):
+        class FakeQuerySet:
+            def __init__(self):
+                self.filter_args = None
+                self.distinct_called = False
+
+            def filter(self, *args, **kwargs):
+                self.filter_args = (args, kwargs)
+                return self
+
+            def distinct(self):
+                self.distinct_called = True
+                return self
+
+        formset = object.__new__(PaginationFormSetBase)
+        formset.get_search_term = lambda: "abc"
+        formset.get_search_fields = lambda: ["name", "author__name"]
+        formset.get_search_lookup = lambda field_name, prefix="": (
+            f"{field_name}__icontains"
+        )
+
+        queryset = FakeQuerySet()
+        filtered = formset.filter_queryset_by_search(queryset)
+
+        self.assertIs(filtered, queryset)
+        self.assertIsNotNone(queryset.filter_args)
+        self.assertTrue(queryset.distinct_called)
 
     def test_show_all_keeps_full_queryset(self):
         formset = object.__new__(PaginationFormSetBase)

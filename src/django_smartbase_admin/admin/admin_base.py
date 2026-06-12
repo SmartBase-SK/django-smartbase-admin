@@ -56,6 +56,7 @@ from django_smartbase_admin.audit.views import (
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
 from django_smartbase_admin.engine.inline_pagination import (
+    InlinePaginated,
     TabularInlinePaginated,
     get_inline_admin_formset_by_prefix,
     get_inline_partial_prefix,
@@ -1318,6 +1319,7 @@ class SBAdminInline(
     ordering = None
     all_base_fields_form = None
     sb_admin_add_modal = False
+    inline_search_enabled = True
     validate_min = False
     validate_max = False
 
@@ -1477,6 +1479,10 @@ class SBAdminInline(
         is_sortable_active: bool = self.sortable_field_name and (
             self.has_add_permission(request) or self.has_change_permission(request)
         )
+        inline_search_enabled = getattr(self, "inline_search_enabled", False)
+        inline_search_mode = (
+            "server" if isinstance(self, InlinePaginated) else "client"
+        )
         add_url = None
         try:
             if self.sb_admin_add_modal and self.has_add_permission(request):
@@ -1495,6 +1501,8 @@ class SBAdminInline(
                 request
             ),
             "is_sortable_active": is_sortable_active,
+            "inline_search_enabled": inline_search_enabled,
+            "inline_search_mode": inline_search_mode,
             "add_url": add_url,
         }
         if self.parent_instance:

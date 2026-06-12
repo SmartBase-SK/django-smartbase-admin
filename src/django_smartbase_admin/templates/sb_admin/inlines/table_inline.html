@@ -1,5 +1,5 @@
 {% load admin_urlname admin_urlquote from admin_urls %}
-{% load i18n nested_admin static widget_tweaks sb_admin_tags %}
+{% load i18n nested_admin static widget_tweaks sb_admin_tags sb_paginated_inline %}
 
 {% call_method inline_admin_formset.opts "get_context_data" request as context_data %}
 {% with inline_admin_formset.formset.is_nested as is_nested %}
@@ -51,6 +51,31 @@
                                 {% include list_action.template with action=list_action action_link_mode="detail" extra_classes="btn" %}
                             {% endif %}
                         {% endfor %}
+                        {% if context_data.inline_search_enabled %}
+                            <div class="w-200 max-sm:w-160">
+                                <input
+                                    type="search"
+                                    class="input font-normal inline-search-plus-{{ inline_admin_formset.formset.prefix }}"
+                                    data-sbadmin-inline-search-mode="{{ context_data.inline_search_mode }}"
+                                    placeholder="{% trans 'Search...' %}"
+                                    autocomplete="off"
+                                    {% if context_data.inline_search_mode == "server" %}
+                                        name="{{ inline_admin_formset.formset.get_search_key }}"
+                                        value="{{ inline_admin_formset.formset.search_term }}"
+                                        hx-get=""
+                                        hx-trigger="keyup changed delay:300ms, search"
+                                        hx-indicator="#{{ inline_admin_formset.formset.prefix }}-pagination-loading"
+                                        hx-target="#{{ inline_admin_formset.formset.prefix }}-group"
+                                        hx-select="#{{ inline_admin_formset.formset.prefix }}-group"
+                                        hx-swap="outerHTML"
+                                        hx-headers='{"{{ SBADMIN_INLINE_PREFIX_HEADER }}": "{{ inline_admin_formset.formset.prefix }}"}'
+                                        hx-push-url="true"
+                                        hx-params="{{ inline_admin_formset.formset.get_search_key }}"
+                                        {% hx_vals inline_admin_formset.formset.pagination_key 1 %}
+                                    {% endif %}
+                                >
+                            </div>
+                        {% endif %}
                         {% block table_inline_header_extra %}{% endblock %}
                         {% if inline_admin_formset.has_add_permission %}
                             {% if context_data.add_url and not sbadmin_is_modal %}
@@ -248,6 +273,20 @@
                                 }());
                             </script>
                         {% endblock %}
+                        <script>
+                            (function() {
+                                const config = {
+                                    prefix: "{{ inline_admin_formset.formset.prefix|escapejs }}",
+                                    searchMode: "{{ context_data.inline_search_mode|default:'client'|escapejs }}"
+                                };
+                                if (window.SBAdminInlinePaginator && window.SBAdminInlinePaginator.init) {
+                                    window.SBAdminInlinePaginator.init(config);
+                                    return;
+                                }
+                                window.SBAdminInlinePaginatorQueue = window.SBAdminInlinePaginatorQueue || [];
+                                window.SBAdminInlinePaginatorQueue.push(config);
+                            }());
+                        </script>
 
                     </fieldset>
                 </div>
