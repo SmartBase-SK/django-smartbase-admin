@@ -851,6 +851,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 | `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
+| `mcp_readonly` | Make MCP requests read-only for non-superusers. Default `False`; set `True` to block MCP add/change/delete and mutating actions while leaving browser admin writes unchanged. | [MCP Read-Only Toggle](#mcp-read-only-toggle) |
 
 ### URL Params Compression Toggle
 
@@ -869,6 +870,30 @@ _role_config = SBAdminRoleConfiguration(
 - `True` (default): shorter URL payloads using LZ-String.
 - `False`: plain JSON payloads in URLs (useful for debugging or compatibility checks).
 - Decoding remains backward compatible in both modes (plain JSON and compressed payloads are both accepted).
+
+### MCP Read-Only Toggle
+
+`SBAdminRoleConfiguration.mcp_readonly` controls whether MCP requests can mutate data. It is off by default. When enabled, requests marked with `request.is_mcp` deny `add`, `change`, and `delete` model permissions plus any custom action whose resolved permission is not `"view"`. Superusers bypass the read-only gate.
+
+```python
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[...],
+    registered_views=[...],
+    mcp_readonly=True,  # default is False
+)
+```
+
+```python
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    mcp_readonly = True
+```
+
+**Key points:**
+- Browser/admin UI requests are unchanged; only MCP requests (`request.is_mcp`) are gated.
+- Read-only custom actions must declare `permission="view"` on `@sbadmin_action(...)` or `SBAdminCustomAction(...)`.
+- Mutating custom actions default to `"change"` if no permission is declared.
+- The gate runs in `SBAdminViewService.has_permission()` before project-specific `has_permission()` overrides, so a custom permission system cannot accidentally bypass it.
 
 **Typical subclass combining all three:**
 
@@ -4498,16 +4523,16 @@ Action URLs always use `/<view>/<action>/<modifier>/` with an optional `/<object
 
 ### Permission defaults
 
-The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"` to the decorator. `BULK_DELETE` is special-cased through `has_delete_permission`.
+The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` or `SBAdminCustomAction` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"`. Actions that need stronger permissions declare them directly, for example the built-in bulk delete action carries `permission="delete"`.
 
-| Action kind | Decorator | Default check |
+| Action kind | Declaration | Default check |
 |-------------|-----------|---------------|
 | Read-only (list/json/autocomplete/xlsx/config/dashboard data) | `@sbadmin_action(permission="view")` | `has_permission(..., "view")` |
 | State-changing custom action | `@sbadmin_action` (bare) | `has_permission(..., "change")` |
 | Mutation needing a stronger permission | `@sbadmin_action(permission="delete")` (or `"add"`) | `has_permission(..., <kwarg>)` |
-| `Action.BULK_DELETE.value` | bare | `view.has_delete_permission(request, obj)` |
+| Custom action object needing stronger permission | `SBAdminCustomAction(..., permission="delete")` | `has_permission(..., "delete")` |
 
-The kwarg is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
+The permission value is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Actions declared directly with `SBAdminCustomAction(..., permission=...)` use the same path. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
 
 Built-in read-only endpoints already carry `permission="view"`: `action_list`, `action_list_json`, `action_autocomplete` (on admins, filter widgets, and the tree widget), `action_xlsx_export`, `action_config`, dashboard widget `action_get_data`, audit log `action_list_json`, translations `list`. The reorder family (`action_table_reorder`, `action_table_data_edit`, `action_list_json_reorder`, `action_enter_reorder`) is intentionally left at the default — entering reorder mode is treated as a mutation.
 

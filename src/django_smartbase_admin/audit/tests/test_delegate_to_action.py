@@ -2,12 +2,15 @@
 
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.test import RequestFactory, TestCase
 
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
+from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
+from django_smartbase_admin.engine.const import Action
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -188,6 +191,124 @@ class TestDefaultActionPermission(TestCase):
             )
 
         self.assertEqual(has_perm.call_args.args[-1], "change")
+
+
+class MCPReadonlyRoleConfiguration(SBAdminRoleConfiguration):
+    mcp_readonly = True
+
+
+class MCPReadonlyOverrideRoleConfiguration(MCPReadonlyRoleConfiguration):
+    def has_permission(
+        self, request, request_data, view, model=None, obj=None, permission=None
+    ):
+        return True
+
+
+class TestMCPReadonlyPermissions(TestCase):
+    def _request(self, *, is_mcp=True, is_superuser=False, has_perm=True):
+        request = RequestFactory().get("/")
+        request.is_mcp = is_mcp
+        request.user = MagicMock(is_superuser=is_superuser, is_staff=True)
+        request.user.has_perm.return_value = has_perm
+        return request
+
+    def test_mcp_readonly_blocks_model_writes_only_for_mcp_requests(self):
+        config = MCPReadonlyRoleConfiguration()
+        view = MagicMock()
+
+        mcp_request = self._request(is_mcp=True)
+        self.assertTrue(
+            config.has_permission(mcp_request, MagicMock(), view, Group, None, "view")
+        )
+        self.assertFalse(
+            config.has_permission(mcp_request, MagicMock(), view, Group, None, "add")
+        )
+        self.assertFalse(
+            config.has_permission(mcp_request, MagicMock(), view, Group, None, "change")
+        )
+        self.assertFalse(
+            config.has_permission(mcp_request, MagicMock(), view, Group, None, "delete")
+        )
+
+        browser_request = self._request(is_mcp=False)
+        self.assertTrue(
+            config.has_permission(
+                browser_request, MagicMock(), view, Group, None, "change"
+            )
+        )
+
+    def test_mcp_readonly_blocks_mutating_actions_but_allows_view_actions(self):
+        config = MCPReadonlyRoleConfiguration()
+        request = self._request()
+        view = MagicMock()
+
+        mutate_action = SBAdminCustomAction.__new__(SBAdminCustomAction)
+        mutate_action.action_id = "mutate"
+        mutate_action.permission = None
+
+        view_action = SBAdminCustomAction.__new__(SBAdminCustomAction)
+        view_action.action_id = "inspect"
+        view_action.permission = "view"
+
+        delete_action = SBAdminCustomAction.__new__(SBAdminCustomAction)
+        delete_action.action_id = Action.BULK_DELETE.value
+        delete_action.permission = "delete"
+
+        self.assertFalse(
+            config.has_action_permission(
+                request, MagicMock(), view, Group, None, mutate_action
+            )
+        )
+        self.assertFalse(
+            config.has_action_permission(
+                request, MagicMock(), view, Group, None, delete_action
+            )
+        )
+        self.assertTrue(
+            config.has_action_permission(
+                request, MagicMock(), view, Group, None, view_action
+            )
+        )
+        view.has_delete_permission.assert_not_called()
+
+    def test_mcp_readonly_does_not_block_superusers(self):
+        config = MCPReadonlyRoleConfiguration()
+        request = self._request(is_superuser=True)
+
+        self.assertTrue(
+            config.has_permission(
+                request, MagicMock(), MagicMock(), Group, None, "change"
+            )
+        )
+
+    def test_service_gate_applies_before_custom_has_permission_override(self):
+        request = self._request()
+        request.request_data = MagicMock()
+        request.request_data.configuration = MCPReadonlyOverrideRoleConfiguration()
+
+        self.assertFalse(
+            SBAdminViewService.has_permission(
+                request, view=MagicMock(), model=Group, permission="change"
+            )
+        )
+        self.assertTrue(
+            SBAdminViewService.has_permission(
+                request, view=MagicMock(), model=Group, permission="view"
+            )
+        )
+
+    def test_default_bulk_delete_action_declares_delete_permission(self):
+        view = SBAdminBaseListView.__new__(SBAdminBaseListView)
+        view.model = Group
+        view.sbadmin_list_selection_actions = None
+
+        action = next(
+            action
+            for action in view.get_sbadmin_list_selection_actions(MagicMock())
+            if action.action_id == Action.BULK_DELETE.value
+        )
+
+        self.assertEqual(action.permission, "delete")
 
 
 class TestSbadminActionDecorator(TestCase):
