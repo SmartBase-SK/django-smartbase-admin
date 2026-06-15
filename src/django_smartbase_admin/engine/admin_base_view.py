@@ -1074,7 +1074,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
-    @sbadmin_action
+    @sbadmin_action(permission="delete")
     def action_bulk_delete(self, request, modifier, object_id=None):
         action = self.sbadmin_list_action_class(self, request)
         if (

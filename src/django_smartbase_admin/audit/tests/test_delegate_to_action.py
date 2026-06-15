@@ -135,6 +135,37 @@ class TestDelegateToAction(TestCase):
         self.assertEqual(action_arg.permission, "delete")
 
     @patch(PATCH_FROM_REQUEST)
+    def test_bulk_delete_url_dispatch_requires_delete_permission(
+        self, mock_from_request
+    ):
+        def action_bulk_delete(request, modifier, object_id):
+            return HttpResponse("ok")
+
+        action_bulk_delete._is_sbadmin_action = True
+        action_bulk_delete._sbadmin_action_attrs = getattr(
+            SBAdminBaseListView.action_bulk_delete, "_sbadmin_action_attrs"
+        )
+
+        view = MagicMock()
+        view.action_bulk_delete = action_bulk_delete
+        view.has_permission_for_action.return_value = True
+        view.init_view_dynamic = MagicMock()
+
+        rd = _make_request_data(Action.BULK_DELETE.value)
+        rd.selected_view = view
+        mock_from_request.return_value = rd
+
+        SBAdminViewService.delegate_to_action(
+            self.factory.get("/"),
+            view="v",
+            action=Action.BULK_DELETE.value,
+            modifier="template",
+        )
+
+        action_arg = view.has_permission_for_action.call_args.args[1]
+        self.assertEqual(action_arg.permission, "delete")
+
+    @patch(PATCH_FROM_REQUEST)
     def test_object_id_is_passed_to_method_action_for_template_modifier(
         self, mock_from_request
     ):
