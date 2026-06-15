@@ -204,6 +204,13 @@ class MCPReadonlyOverrideRoleConfiguration(MCPReadonlyRoleConfiguration):
         return True
 
 
+class LegacyRoleConfiguration:
+    def has_permission(
+        self, request, request_data, view, model=None, obj=None, permission=None
+    ):
+        return True
+
+
 class TestMCPReadonlyPermissions(TestCase):
     def _request(self, *, is_mcp=True, is_superuser=False, has_perm=True):
         request = RequestFactory().get("/")
@@ -294,6 +301,17 @@ class TestMCPReadonlyPermissions(TestCase):
         self.assertTrue(
             SBAdminViewService.has_permission(
                 request, view=MagicMock(), model=Group, permission="view"
+            )
+        )
+
+    def test_service_gate_allows_legacy_configuration_without_mcp_helper(self):
+        request = self._request()
+        request.request_data = MagicMock()
+        request.request_data.configuration = LegacyRoleConfiguration()
+
+        self.assertTrue(
+            SBAdminViewService.has_permission(
+                request, view=MagicMock(), model=Group, permission="change"
             )
         )
 

@@ -983,6 +983,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                         title=_("History"),
                         url=url,
                         no_params=True,
+                        permission="view",
                     ),
                 ]
             except Exception:

@@ -212,7 +212,13 @@ class SBAdminViewService(object):
     @classmethod
     def has_permission(cls, request, view=None, model=None, obj=None, permission=None):
         configuration = request.request_data.configuration
-        if configuration.is_mcp_readonly_permission(request, permission):
+        is_mcp_readonly_permission = getattr(
+            configuration, "is_mcp_readonly_permission", None
+        )
+        if (
+            callable(is_mcp_readonly_permission)
+            and is_mcp_readonly_permission(request, permission) is True
+        ):
             return False
         return configuration.has_permission(
             request, request.request_data, view, model, obj, permission
