@@ -519,6 +519,28 @@ class DynamicRegionActionModal(ActionModalView):
     form_class = DynamicRegionForm
 
 
+class EmptyConfirmationActionModal(ActionModalView):
+    form_class = forms.Form
+    requires_confirmation = True
+    confirmation_message = "Delete {name}?"
+
+    def get_confirmation_data(self, request, form):
+        return {"name": "row"}
+
+
+class VisibleFieldConfirmationForm(forms.Form):
+    name = forms.CharField()
+
+
+class VisibleFieldConfirmationActionModal(ActionModalView):
+    form_class = VisibleFieldConfirmationForm
+    requires_confirmation = True
+    confirmation_message = "Submit {name}?"
+
+    def get_confirmation_data(self, request, form):
+        return {"name": form.cleaned_data["name"]}
+
+
 class CrossFieldsetDynamicRegionModal(ActionModalView):
     form_class = CrossFieldsetRegionForm
 
@@ -1571,6 +1593,33 @@ class DynamicFormTests(SimpleTestCase):
         form = modal.get_form()
 
         self.assertEqual(form.fields["mode"].widget.attrs["hx-post"], "/modal/action/")
+
+    def test_empty_action_modal_can_render_confirmation_on_get(self):
+        request = RequestFactory().get("/modal/action/")
+        SBAdminThreadLocalService.set_request(request)
+        modal = EmptyConfirmationActionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.content.decode()
+
+        self.assertIn("Delete row?", html)
+        self.assertIn('name="_confirmed" value="1"', html)
+
+    def test_action_modal_with_visible_fields_keeps_form_on_get_before_confirmation(
+        self,
+    ):
+        request = RequestFactory().get("/modal/action/")
+        SBAdminThreadLocalService.set_request(request)
+        modal = VisibleFieldConfirmationActionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.rendered_content
+
+        self.assertIn('id="sb-admin-modal-form"', html)
+        self.assertNotIn("Submit", html)
+        self.assertNotIn('name="_confirmed" value="1"', html)
 
     def test_action_modal_dynamic_region_initial_is_built_from_request_data(self):
         request = RequestFactory().post(

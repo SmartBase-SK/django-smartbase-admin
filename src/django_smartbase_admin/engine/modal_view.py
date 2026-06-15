@@ -148,6 +148,21 @@ class ActionModalView(SBAdminDynamicFormViewMixin, FormView):
     def process_form_valid(self, request, form):
         return self.build_success_response(request)
 
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        if self.should_confirm_on_get(request, form):
+            try:
+                preview = self.get_confirmation_data(request, form)
+            except SBAdminActionError as e:
+                form.add_error(None, str(e))
+                return self.form_invalid(form)
+            if preview is not None:
+                return self._build_confirmation_response(request, form, preview)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def should_confirm_on_get(self, request, form) -> bool:
+        return self.requires_confirmation and not form.visible_fields()
+
     def post(self, request, *args, **kwargs):
         if region_name := request.POST.get(SBADMIN_DYNAMIC_REGION_PARAM):
             return self.build_dynamic_region_response(
