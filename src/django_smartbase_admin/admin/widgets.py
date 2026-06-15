@@ -1154,19 +1154,26 @@ class SBAdminAutocompleteWidget(
             if parsed_value and related_model_admin.has_view_or_change_permission(
                 request
             ):
-                try:
-                    related_row = (
-                        related_model_admin.get_queryset(request)
-                        .filter(**{self.get_value_field(): parsed_value})
-                        .values("pk")
-                        .first()
-                    )
-                except (ValueError, TypeError):
-                    related_row = None
-                if related_row is not None:
+                value_field = self.get_value_field()
+                pk_field = self.model._meta.pk.name
+                if value_field == pk_field:
                     context["widget"]["attrs"]["related_edit_url"] = (
-                        related_model_admin.get_detail_url(related_row["pk"])
+                        related_model_admin.get_detail_url(parsed_value)
                     )
+                else:
+                    try:
+                        related_row = (
+                            related_model_admin.get_queryset(request)
+                            .filter(**{value_field: parsed_value})
+                            .values("pk")
+                            .first()
+                        )
+                    except (ValueError, TypeError):
+                        related_row = None
+                    if related_row is not None:
+                        context["widget"]["attrs"]["related_edit_url"] = (
+                            related_model_admin.get_detail_url(related_row["pk"])
+                        )
             if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
                     related_model_admin.get_new_url(request)

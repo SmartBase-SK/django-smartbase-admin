@@ -187,3 +187,33 @@ class AutocompleteParentPreselectTest(TestCase):
                 sb_admin_site._registry[Folder] = original_admin
 
         self.assertIn("related_edit_url", context["widget"]["attrs"])
+        folder_admin.get_queryset.assert_not_called()
+        self.assertEqual(
+            context["widget"]["attrs"]["related_edit_url"],
+            f"/folders/{self.parent.pk}/change/",
+        )
+
+    def test_custom_value_field_resolves_related_edit_url_pk(self):
+        request = self._request(show_related_buttons=True)
+        original_admin = sb_admin_site._registry.pop(Folder, None)
+        folder_admin = MagicMock()
+        folder_admin.has_view_or_change_permission.return_value = True
+        folder_admin.get_queryset.return_value = Folder.objects.all()
+        folder_admin.get_detail_url.side_effect = lambda pk: f"/folders/{pk}/change/"
+        folder_admin.has_add_permission.return_value = False
+        sb_admin_site._registry[Folder] = folder_admin
+        widget = self._widget()
+        widget.value_field = "name"
+        context = {"widget": {"attrs": {}}}
+        try:
+            widget.add_related_buttons_urls(self.parent.name, request, context)
+        finally:
+            sb_admin_site._registry.pop(Folder, None)
+            if original_admin:
+                sb_admin_site._registry[Folder] = original_admin
+
+        folder_admin.get_queryset.assert_called_once_with(request)
+        self.assertEqual(
+            context["widget"]["attrs"]["related_edit_url"],
+            f"/folders/{self.parent.pk}/change/",
+        )
