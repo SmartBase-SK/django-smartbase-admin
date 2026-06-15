@@ -2,12 +2,14 @@ import json
 import pickle
 import urllib
 from typing import Any, TYPE_CHECKING
+from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, FilteredRelation, F
-from django.http import Http404
+from django.http import Http404, HttpRequest
 from django.shortcuts import redirect
-from django.urls import reverse
+from django.urls import reverse, resolve, Resolver404, get_script_prefix
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from django_smartbase_admin.engine.const import (
     BASE_PARAMS_NAME,
@@ -16,6 +18,7 @@ from django_smartbase_admin.engine.const import (
     ADVANCED_FILTER_DATA_NAME,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     TABLE_TAB_ADVANCED_FITLERS,
+    SB_ADMIN_BACK_URL,
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
@@ -334,3 +337,78 @@ class SBAdminViewService(object):
                     f"{annotate_name}__{model_field.name}"
                 )
         return {**lang_annotates, **field_annotates}
+
+    @classmethod
+    def _get_back_url_param(cls, request: HttpRequest) -> str | None:
+        if request.method == "POST":
+            value = request.POST.get(SB_ADMIN_BACK_URL)
+            if value:
+                return value
+        return request.GET.get(SB_ADMIN_BACK_URL) or None
+
+    @classmethod
+    def validate_back_url(
+        cls, request: HttpRequest, url: str | None, *, current_path: str | None = None
+    ) -> bool:
+        """A ``back_url`` is valid only if it is a same-host SBAdmin URL.
+
+        Guards against open redirects (external host / scheme) and self-loops.
+        """
+        if not url:
+            return False
+        if not url_has_allowed_host_and_scheme(
+            url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            return False
+        path = urlsplit(url).path
+        if current_path and path == current_path:
+            return False
+        script_prefix = get_script_prefix()
+        resolve_path = path
+        if script_prefix != "/" and resolve_path.startswith(script_prefix):
+            resolve_path = "/" + resolve_path[len(script_prefix) :]
+        try:
+            match = resolve(resolve_path)
+        except Resolver404:
+            return False
+        return match.namespace == "sb_admin"
+
+    @classmethod
+    def resolve_back_url(
+        cls,
+        request: HttpRequest,
+        default_url: str,
+        *,
+        current_path: str | None = None,
+    ) -> str:
+        """Best back URL, in priority order: ``POST[back_url]`` (hidden field),
+        ``GET[back_url]`` (query param), then ``default_url``."""
+        candidate = cls._get_back_url_param(request)
+        if cls.validate_back_url(request, candidate, current_path=current_path):
+            return candidate
+        return default_url
+
+    @classmethod
+    def append_back_url(cls, target_url: str, back_url: str | None) -> str:
+        """Add/replace ``back_url`` on ``target_url`` preserving other params."""
+        if not back_url:
+            return target_url
+        parts = urlsplit(target_url)
+        query = [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key != SB_ADMIN_BACK_URL
+        ]
+        query.append((SB_ADMIN_BACK_URL, back_url))
+        return urlunsplit(parts._replace(query=urlencode(query)))
+
+    @classmethod
+    def url_with_current_back_url(cls, request: HttpRequest, target_url: str) -> str:
+        """Point an outgoing link at ``target_url`` with a ``back_url`` back to
+        the current page (so Save/Back on the target returns here)."""
+        return cls.append_back_url(target_url, request.get_full_path())
+
+    @classmethod
+    def keep_back_url(cls, request: HttpRequest, url: str) -> str:
+        """Carry the request's existing ``back_url`` onto ``url`` (redirects)."""
+        return cls.append_back_url(url, cls._get_back_url_param(request))

@@ -31,7 +31,12 @@ from django.forms.models import (
     ModelFormMetaclass,
     modelform_factory,
 )
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch, resolve
@@ -824,6 +829,11 @@ class SBAdminTranslationStatusMixin:
                 translations_view_id, obj.id
             )
         )
+        request = SBAdminThreadLocalService.get_request()
+        if request is not None:
+            translations_edit_url = SBAdminViewService.url_with_current_back_url(
+                request, translations_edit_url
+            )
         result = f"<a href='{translations_edit_url}' class='btn btn-small absolute top-24 right-24'>{_('Edit')}</a>"
         languages = SBAdminTranslationsService.get_all_languages()
         translations = (
@@ -1258,15 +1268,32 @@ class SBAdmin(
             trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
         return response
 
+    def _apply_back_url(self, request, response):
+        """On a terminal Save, redirect to ``back_url`` instead of the default
+        changelist. Only applies to a redirect response with ``_save`` in POST."""
+        if not isinstance(response, HttpResponseRedirect):
+            return response
+        if "_save" not in request.POST:
+            return response
+        default_url = response.url
+        target = SBAdminViewService.resolve_back_url(
+            request, default_url, current_path=request.path
+        )
+        if target != default_url:
+            return HttpResponseRedirect(target)
+        return response
+
     def response_add(self, request, obj, post_url_continue=None):
         if is_modal(request):
             return self.get_modal_save_response(request, obj)
-        return super().response_add(request, obj, post_url_continue)
+        return self._apply_back_url(
+            request, super().response_add(request, obj, post_url_continue)
+        )
 
     def response_change(self, request, obj):
         if is_modal(request):
             return self.get_modal_save_response(request, obj)
-        return super().response_change(request, obj)
+        return self._apply_back_url(request, super().response_change(request, obj))
 
     @classmethod
     def set_generic_relation_from_parent(cls, request, obj):

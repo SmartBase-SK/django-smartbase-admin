@@ -77,6 +77,7 @@ OVERRIDE_CONTENT_OF_NOTIFICATION = "override_notification_content"
 # JSON key carrying rendered Django-messages HTML on list-action responses;
 # read by ``SBAdminTable._handleAjaxNotifications`` in ``table.js``.
 SB_ADMIN_AJAX_NOTIFICATIONS_KEY = "sb_admin_notifications"
+SB_ADMIN_BACK_URL = "back_url"
 FIELDSET_HIDE_HEADER_CLASS = "hide-header"
 FIELDSET_PLAIN_CLASS = "sbadmin-fieldset-plain"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"

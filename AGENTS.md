@@ -45,6 +45,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
+| [Return Navigation (`back_url`)](#return-navigation-back_url) | Back/Save returns to the originating page via `SBAdminViewService`, `back_url` query param + hidden field |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -5294,6 +5295,55 @@ Default template: `sb_admin/wizard/wizard_step.html`
 
 **Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/dist/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
 
+
+---
+
+## Return Navigation (`back_url`)
+
+Back / Save on a change form or custom view (translations, …) returns to the
+page the user **came from** instead of always the model changelist. The
+originating URL is carried **explicitly** through a `back_url` query param
+(outgoing cross-model links) and a hidden field (POST forms), resolved by
+`SBAdminViewService` (`services/views.py`).
+
+`HTTP_REFERER` is **not** used at all. It is unreliable on POST (points at the
+form itself) and on a navigation target it points wherever the user last came
+from (detail → translations → back-to-detail would leave the referer on
+translations and loop back there). So the originating URL must be put on the
+link that navigates *to* the other model.
+
+```python
+from django_smartbase_admin.services.views import SBAdminViewService
+
+# On a link that navigates to another model, carry a back_url back to here:
+url = SBAdminViewService.url_with_current_back_url(request, target_url)
+
+# Resolve where Back/Save should go (priority: POST hidden field > GET param > default):
+back_url = SBAdminViewService.resolve_back_url(
+    request, default_url, current_path=request.path
+)
+```
+
+`validate_back_url` rejects external hosts (open-redirect guard), non-`sb_admin`
+paths, and self-loops. The change form / translations templates render the
+hidden field straight from the `back_url` context value (the same value the Back
+button uses), so a custom form participates just by having `back_url` in context:
+
+```html
+<input type="hidden" name="back_url" value="{{ back_url }}">
+```
+
+**Adding a new cross-model link:** append the param on the outgoing link — in
+Python via `url_with_current_back_url(request, target_url)`, or in a template
+with `?back_url={{ request.get_full_path|urlencode }}`.
+
+Wired globally in `change_form.html`, `translations-detail.html`,
+`response_change`/`response_add` (terminal Save only — `_continue`/`_addanother`
+keep Django defaults), `get_change_view_context`, `SBAdminView.get_back_url`
+(+ `_continue` keeps `back_url`), the `sbadmin_translation_status` Edit link,
+and the inline "Change" links (`stacked_inline.html`, `table_inline.html`).
+Out of scope: modal/popup links (autocomplete add/edit, filer — `_popup=1`,
+they don't navigate away) and the wizard.
 
 ---
 
