@@ -520,7 +520,7 @@
     .sticky-table-head,
     .sticky-table-col {
         position: sticky !important;
-        right: 0;
+        right: -1px;
         z-index: 1;
         @apply overflow-hidden !border-l-0 pl-8;
         &:before {

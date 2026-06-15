@@ -96,6 +96,18 @@
             .js-datetimepicker {
                 @apply h-full;
             }
+            > .errorlist {
+                @apply sr-only;
+            }
+            > .djn-inline-field-error-tooltip {
+                @apply absolute right-8 top-1/2 -translate-y-1/2;
+                @apply text-negative cursor-help;
+                @apply w-24 h-24 p-4 border border-negative-100 rounded-full bg-light shadow-s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1;
+            }
         }
         &:last-child {
             >tr:last-child {
@@ -113,11 +125,6 @@
             td {
                 @apply bg-primary-50;
                 @apply h-56;
-            }
-        }
-        &.has-errors {
-            td {
-                vertical-align: top;
             }
         }
     }

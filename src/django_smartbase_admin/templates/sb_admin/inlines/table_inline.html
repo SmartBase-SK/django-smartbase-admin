@@ -205,6 +205,11 @@
                                                             {% else %}
                                                                 {% sb_admin_render_inline_table_field field.field %}
                                                                 {% if field.field.errors %}
+                                                                    <button type="button" class="js-tooltip djn-inline-field-error-tooltip" data-bs-toggle="tooltip" data-bs-container="body" data-bs-trigger="hover focus click" data-bs-placement="bottom" title="{{ field.field.errors|striptags }}" aria-label="{{ field.field.errors|striptags }}">
+                                                                        <svg class="w-16 h-16" aria-hidden="true">
+                                                                            <use xlink:href="#Attention"></use>
+                                                                        </svg>
+                                                                    </button>
                                                                     {{ field.field.errors.as_ul }}
                                                                 {% endif %}
                                                             {% endif %}

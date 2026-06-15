@@ -240,13 +240,17 @@ class Main {
     initTooltips(target) {
         target = target || document
         const tooltipTriggerList = [].slice.call(target.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map((tooltipTriggerEl) => {
+        tooltipTriggerList.forEach((tooltipTriggerEl) => {
             const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
-            if (tooltipEl) {
-                return new Tooltip(tooltipTriggerEl, { container: tooltipEl })
+            const tooltipContainer = tooltipTriggerEl.dataset.bsContainer || tooltipEl
+            if (tooltipContainer) {
+                new Tooltip(tooltipTriggerEl, { container: tooltipContainer })
             }
-            return null
         })
+        const firstInlineErrorTooltip = target.querySelector('.djn-inline-field-error-tooltip[data-bs-toggle="tooltip"]')
+        if (firstInlineErrorTooltip) {
+            Tooltip.getInstance(firstInlineErrorTooltip)?.show()
+        }
     }
 
     handleLocationHashFromTabs() {

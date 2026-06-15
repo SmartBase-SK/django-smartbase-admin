@@ -108,9 +108,6 @@ class SBAdminBaseView(object):
         return self.has_permission(request, obj, "delete")
 
     def has_permission_for_action(self, request, action: SBAdminCustomAction) -> bool:
-        if getattr(action, "action_id", None) == Action.BULK_DELETE.value:
-            if not self.has_delete_permission(request):
-                return False
         return self.has_permission(
             request=request,
             obj=None,
@@ -991,6 +988,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                         title=_("History"),
                         url=url,
                         no_params=True,
+                        permission="view",
                     ),
                 ]
             except Exception:
@@ -1028,6 +1026,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     view=self,
                     action_id=Action.BULK_DELETE.value,
                     css_class="btn-destructive",
+                    permission="delete",
                 ),
             ]
         return self.sbadmin_list_selection_actions
@@ -1080,7 +1079,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
-    @sbadmin_action
+    @sbadmin_action(permission="delete")
     def action_bulk_delete(self, request, modifier, object_id=None):
         action = self.sbadmin_list_action_class(self, request)
         if (
