@@ -2177,6 +2177,43 @@ class ArticleAdmin(SBAdmin):
         ]
 ```
 
+### `requires_confirmation` on Action Modals
+
+Use `requires_confirmation = True` when an action should show a final confirmation step before running `process_form_valid(...)`. The first valid submit renders `confirmation_template_name`; the action is processed only after the confirmation submit posts `_confirmed=1`.
+
+For actions without visible form fields, the confirmation step is rendered immediately on `GET`. For actions with visible fields, the modal shows the form first, validates the submitted values, then renders the confirmation step. Override `get_confirmation_data(...)` to build the preview data; return `None` to skip confirmation for that request, or raise `SBAdminActionError` to show a non-field error.
+
+```python
+from django_smartbase_admin.engine.exceptions import SBAdminActionError
+
+
+class ConfirmArchiveForm(SBAdminBaseFormInit, forms.Form):
+    pass
+
+
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmArchiveForm
+    modal_title = _("Archive Selected Articles")
+    requires_confirmation = True
+    confirmation_message = _("Archive {count} selected article(s)?")
+
+    def get_confirmation_data(self, request, form):
+        selection_queryset = self.get_selection_queryset(request, form)
+        count = selection_queryset.count()
+        if not count:
+            raise SBAdminActionError(_("Select at least one article."))
+        return {"count": count}
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        count = selection_queryset.update(status="archived")
+        messages.success(request, _("%d article(s) archived.") % count)
+```
+
+**Key points:**
+- `confirmation_message` is formatted with `confirmation_message.format(**data)`, where `data` is returned by `get_confirmation_data(...)`.
+- The confirmation template replays the form's hidden fields and selected rows, so `process_form_valid(...)` receives the same valid form on the second submit.
+- Use `requires_confirmation` for action flows backed by `ActionModalView`, `ListActionModalView`, or `RowActionModalView`; direct `SBAdminCustomAction` methods are not modal form flows and should implement their own confirmation UI if needed.
+
 ### SBAdminCustomAction Parameters
 
 `SBAdminFormViewAction` extends `SBAdminCustomAction`. Available parameters:
