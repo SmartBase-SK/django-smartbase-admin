@@ -364,8 +364,7 @@ class SBAdminBaseView(object):
                 self.register_action_autocomplete_views(request, action.sub_actions)
 
             target_view = getattr(action, "target_view", None)
-            form_class = getattr(target_view, "form_class", None)
-            if not form_class:
+            if target_view is None:
                 continue
             action_id = self.get_form_view_action_id(
                 target_view, getattr(action, "action_id", None)
@@ -380,8 +379,13 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            if hasattr(action_view, "get_form_class"):
-                form_class = action_view.get_form_class()
+            form_class = (
+                action_view.get_form_class()
+                if hasattr(action_view, "get_form_class")
+                else getattr(target_view, "form_class", None)
+            )
+            if not form_class:
+                continue
             form_kwargs = (
                 action_view.get_unbound_form_kwargs()
                 if hasattr(action_view, "get_unbound_form_kwargs")

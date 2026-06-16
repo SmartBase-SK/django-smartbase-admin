@@ -1482,6 +1482,45 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertIsNone(FormWithExternalViewRegions.view)
 
+    def test_action_autocomplete_registration_supports_dynamic_form_class(self):
+        dynamic_form_class = complete_action_form_class("dynamic")
+
+        class DynamicActionModal(CompleteActionModal):
+            source_name = "dynamic"
+
+            def get_form_class(self):
+                return dynamic_form_class
+
+        view = CompleteParentActionView()
+        self.request.user = SimpleNamespace(is_anonymous=True)
+        self.request.request_data = CompleteActionRequestData(
+            view=view.get_id(),
+            action=Action.AUTOCOMPLETE.value,
+            modifier=(
+                f"{DynamicActionModal.__name__}"
+                f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}unused"
+            ),
+            object_id="42",
+            user=self.request.user,
+            request_meta=self.request.META,
+            request_get=self.request.GET,
+            request_post=self.request.POST,
+            configuration=CompleteActionConfiguration(),
+            autocomplete_map={},
+        )
+
+        view.register_action_autocomplete_views(
+            self.request,
+            [SimpleNamespace(target_view=DynamicActionModal)],
+        )
+
+        widget_id = (
+            f"{DynamicActionModal.__name__}"
+            f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}"
+            f"{view.get_id()}_lookup_CompleteActionAutocompleteWidget_CompleteDynamicActionForm"
+        )
+        self.assertIn(widget_id, self.request.request_data.autocomplete_map)
+
     def test_actions_and_autocomplete_initialize_all_action_sources(self):
         parent_view = CompleteParentActionView()
         inline_view = CompleteInlineActionView()
