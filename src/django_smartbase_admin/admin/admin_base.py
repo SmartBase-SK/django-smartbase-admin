@@ -268,7 +268,7 @@ class SBAdminFormFieldWidgetsMixin:
             "class", None
         )  # remove origin classes to prevent override our custom widget class
         kwargs = {}
-        if choices:
+        if choices and widget != SBAdminHiddenWidget:
             kwargs["choices"] = choices
         if isinstance(form_field, RichTextFormField):
             kwargs["config_name"] = getattr(

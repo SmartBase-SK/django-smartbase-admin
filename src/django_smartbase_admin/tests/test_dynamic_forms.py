@@ -1031,6 +1031,17 @@ class DynamicFormTests(SimpleTestCase):
     def tearDown(self):
         sb_admin_request.reset(self.request_token)
 
+    def test_hidden_model_choice_field_keeps_hidden_widget(self):
+        class HiddenModelChoiceForm(SBAdminBaseFormInit, forms.Form):
+            parent_node = forms.ModelChoiceField(
+                queryset=DynamicRegionDemoModel.objects.none(),
+                widget=forms.HiddenInput,
+            )
+
+        form = HiddenModelChoiceForm(request=self.request)
+
+        self.assertIsInstance(form.fields["parent_node"].widget, SBAdminHiddenWidget)
+
     def render_fieldset(self, form, index=0):
         fieldsets = []
         for fieldset in form.fieldsets():
