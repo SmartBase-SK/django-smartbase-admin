@@ -587,7 +587,11 @@ class SBAdminDynamicFormMixin:
         layout = (fieldset_data or {}).get("fields") or ()
         widgets = self.get_fieldset_widgets(request)
         has_dynamic_region = any(isinstance(item, SBDynamicRegion) for item in layout)
-        has_widget = any(item in widgets for item in layout)
+        has_widget = any(
+            item in widgets
+            for item in layout
+            if not isinstance(item, (list, tuple, SBDynamicRegion))
+        )
         if not has_dynamic_region and not has_widget:
             return ()
 
@@ -622,15 +626,15 @@ class SBAdminDynamicFormMixin:
                     {"region": self.get_dynamic_region_context(item, request)}
                 )
                 continue
-            widget = widgets.get(item)
-            if widget is not None:
-                flush_static_fields()
-                chunks.append({"widget": widget})
-                continue
             if isinstance(item, (list, tuple)):
                 group = tuple(field for field in item if isinstance(field, str))
                 if group:
                     static_fields.append(group)
+                continue
+            widget = widgets.get(item)
+            if widget is not None:
+                flush_static_fields()
+                chunks.append({"widget": widget})
                 continue
             static_fields.append(item)
         flush_static_fields()
