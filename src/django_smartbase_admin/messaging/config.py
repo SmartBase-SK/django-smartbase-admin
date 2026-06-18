@@ -97,11 +97,14 @@ class UsersAudience(SBAdminMessageAudience):
     def get_form_field(self, request):
         from django import forms
         from django.contrib.auth import get_user_model
+        from django_smartbase_admin.admin.widgets import SBAdminAutocompleteWidget
 
+        user_model = get_user_model()
         return forms.ModelMultipleChoiceField(
-            queryset=get_user_model().objects.all(),
+            queryset=user_model.objects.all(),
             required=False,
             label=self.label,
+            widget=SBAdminAutocompleteWidget(model=user_model, multiselect=True),
         )
 
     def serialize(self, cleaned_value):
@@ -124,11 +127,13 @@ class GroupsAudience(SBAdminMessageAudience):
     def get_form_field(self, request):
         from django import forms
         from django.contrib.auth.models import Group
+        from django_smartbase_admin.admin.widgets import SBAdminMultipleChoiceWidget
 
         return forms.ModelMultipleChoiceField(
             queryset=Group.objects.all(),
             required=False,
             label=self.label,
+            widget=SBAdminMultipleChoiceWidget,
         )
 
     def serialize(self, cleaned_value):
@@ -198,9 +203,7 @@ class SBAdminMessagingConfig:
         self.message_types = list(
             message_types if message_types is not None else DEFAULT_MESSAGE_TYPES
         )
-        self.audiences = list(
-            audiences if audiences is not None else DEFAULT_AUDIENCES
-        )
+        self.audiences = list(audiences if audiences is not None else DEFAULT_AUDIENCES)
         self.poll_interval_seconds = poll_interval_seconds
 
     # --- lookup helpers -------------------------------------------------

@@ -1,0 +1,39 @@
+{% load i18n %}
+<div class="break-normal">
+    <div class="flex items-start gap-12">
+        <div class="min-w-0">
+            <h3 class="font-semibold text-18 text-dark-900">{{ message.title }}</h3>
+            <div class="text-12 mt-8">{{ message.created_at|date:"l, j. F Y" }} {{ message.created_at|time:"H:i" }}</div>
+        </div>
+    </div>
+
+    {% if message.content %}
+        <div class="message-content text-dark-900 mt-16">
+            {{ message.content|safe }}
+        </div>
+    {% endif %}
+
+    {% with attachments=message.attachments.all %}
+        {% if attachments %}
+            <div class="mt-24 pt-16 border-t border-dark-200">
+                <div class="text-13 text-dark-500 mb-8">{% trans 'Attachments' %}</div>
+                <ul class="border border-dark-200 rounded">
+                    {% for attachment in attachments %}
+                        {% if attachment.file %}
+                            <li class="flex items-center justify-between p-12 border-b border-dark-200 last:border-b-0">
+                                <span class="flex items-center min-w-0 mr-16">
+                                    <svg class="w-16 h-16 mr-8 shrink-0 text-dark-400">
+                                        <use xlink:href="#Paperclip"></use>
+                                    </svg>
+                                    <span class="truncate">{{ attachment.filename }}</span>
+                                </span>
+                                <a href="{{ attachment.file.url }}" target="_blank" rel="noopener"
+                                   class="text-primary shrink-0 hover:underline">{% trans 'Download' %}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    {% endwith %}
+</div>

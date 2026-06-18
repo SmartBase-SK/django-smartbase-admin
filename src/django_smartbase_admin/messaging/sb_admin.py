@@ -16,7 +16,9 @@ from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
+from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import datetime_formatter
 from django_smartbase_admin.messaging.config import NotificationStyle
 from django_smartbase_admin.messaging.forms import (
     MessageForm,
@@ -32,6 +34,17 @@ from django_smartbase_admin.messaging.services import (
     get_messaging_config,
     sync_recipients,
 )
+
+
+def render_message_card(message):
+    """Render the read-only message detail card (header, content, attachments)."""
+    from django.utils.safestring import mark_safe
+
+    if not message:
+        return "-"
+    return mark_safe(
+        render_to_string("sb_admin/messaging/detail_card.html", {"message": message})
+    )
 
 
 class MessageAttachmentInline(SBAdminTableInline):
@@ -79,39 +92,74 @@ class MessageAdmin(SBAdmin):
     inlines = [MessageAttachmentInline, MessageRecipientStatusInline]
 
     def get_sbadmin_fieldsets(self, request, object_id=None):
+        # Created message → single read-only detail card. Otherwise the editable
+        # authoring form (content fields + recipient selectors on the right).
+        if object_id is not None:
+            return [(None, {"fields": ["message_card"]})]
+        fieldsets = [(None, {"fields": ["title", "type", "content"]})]
         messaging_config = get_messaging_config(request)
         audience_fields = []
         if messaging_config:
             for audience in messaging_config.audiences:
                 if audience.get_form_field(request) is not None:
                     audience_fields.append(audience_field_name(audience.key))
-        fieldsets = [(None, {"fields": ["title", "type", "content"]})]
         if audience_fields:
-            fieldsets.append((_("Recipients"), {"fields": audience_fields}))
+            fieldsets.append(
+                (
+                    _("Recipients"),
+                    {
+                        "fields": audience_fields,
+                        "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+                    },
+                )
+            )
         return fieldsets
 
+    def get_readonly_fields(self, request, obj=None):
+        # A created message is immutable — render it as the read-only card.
+        if obj is not None:
+            return ("message_card",)
+        return super().get_readonly_fields(request, obj)
+
+    def get_inlines(self, request, obj=None):
+        # Add: attachments editable. Existing message: only the (read-only)
+        # recipient status inline — attachments are shown inside the card.
+        if obj is None:
+            return [MessageAttachmentInline]
+        return [MessageRecipientStatusInline]
+
+    def message_card(self, obj):
+        return render_message_card(obj)
+
+    message_card.short_description = ""
+
     def get_form(self, request, obj=None, **kwargs):
+        # The config-driven authoring form (type choices + recipient selectors)
+        # is only needed while creating. An existing message is read-only.
         messaging_config = get_messaging_config(request)
-        if messaging_config:
+        if messaging_config and obj is None:
             kwargs["form"] = build_message_form_class(messaging_config, request)
         return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, obj, form, change):
         messaging_config = get_messaging_config(request)
-        if not change and obj.created_by_id is None:
-            user = getattr(request, "user", None)
-            obj.created_by = user if (user and user.is_authenticated) else None
-        if messaging_config:
-            targeting = {}
-            for audience in getattr(form, "_sbadmin_audiences", []):
-                name = audience_field_name(audience.key)
-                if name in form.cleaned_data:
-                    targeting[audience.key] = audience.serialize(
-                        form.cleaned_data[name]
-                    )
-            obj.targeting = targeting
+        # Recipients are resolved once, at creation; an existing message is
+        # read-only so editing never recomputes targeting or recipients.
+        if not change:
+            if obj.created_by_id is None:
+                user = getattr(request, "user", None)
+                obj.created_by = user if (user and user.is_authenticated) else None
+            if messaging_config:
+                targeting = {}
+                for audience in getattr(form, "_sbadmin_audiences", []):
+                    name = audience_field_name(audience.key)
+                    if name in form.cleaned_data:
+                        targeting[audience.key] = audience.serialize(
+                            form.cleaned_data[name]
+                        )
+                obj.targeting = targeting
         super().save_model(request, obj, form, change)
-        if messaging_config:
+        if not change and messaging_config:
             sync_recipients(obj, request, messaging_config)
 
 
@@ -138,19 +186,15 @@ class MessageInboxAdmin(SBAdmin):
             name="received_at",
             title=_("Received"),
             annotate=F("message__created_at"),
+            python_formatter=datetime_formatter,
             filter_disabled=True,
         ),
         SBAdminField(name="read_at", title=_("Read"), filter_disabled=True),
     )
     ordering = ["-message__created_at"]
 
-    sbadmin_fieldsets = [
-        (
-            None,
-            {"fields": ["message_title", "message_content", "message_attachments"]},
-        ),
-    ]
-    readonly_fields = ["message_title", "message_content", "message_attachments"]
+    sbadmin_fieldsets = [(None, {"fields": ["message_card"]})]
+    readonly_fields = ["message_card"]
 
     # --- permissions: any authenticated user, read-only, own rows only -----
 
@@ -169,33 +213,41 @@ class MessageInboxAdmin(SBAdmin):
             return qs.filter(user=user).select_related("message")
         return qs.none()
 
+    # --- list: titled like the menu, highlight rows but no checkboxes ------
+
+    @sbadmin_action(permission="view")
+    def action_list(self, request, *args, **kwargs):
+        response = super().action_list(request, *args, **kwargs)
+        # Title the list like its menu entry ("My messages") rather than the
+        # MessageRecipient model's verbose name.
+        if hasattr(response, "context_data"):
+            response.context_data["list_title"] = self.get_menu_label()
+        return response
+
+    def get_sbadmin_list_selection_actions(self, request):
+        # No bulk actions in the inbox.
+        return []
+
+    def get_tabulator_definition(self, request):
+        # Drop the checkbox-selection column (selectionModule) but keep the
+        # "highlight" row hover so rows still read as clickable to the detail.
+        definition = super().get_tabulator_definition(request)
+        definition["modules"] = [
+            module
+            for module in definition.get("modules", [])
+            if module != "selectionModule"
+        ]
+        options = definition.get("tabulatorOptions")
+        if isinstance(options, dict):
+            options["selectableRows"] = "highlight"
+        return definition
+
     # --- detail (read-only message reader) ---------------------------------
 
-    def message_title(self, obj):
-        return obj.message.title if obj else "-"
+    def message_card(self, obj):
+        return render_message_card(obj.message if obj else None)
 
-    message_title.short_description = _("Title")
-
-    def message_content(self, obj):
-        from django.utils.safestring import mark_safe
-
-        return mark_safe(obj.message.content) if obj else "-"
-
-    message_content.short_description = _("Content")
-
-    def message_attachments(self, obj):
-        from django.utils.safestring import mark_safe
-
-        if not obj:
-            return "-"
-        return mark_safe(
-            render_to_string(
-                "sb_admin/messaging/attachments.html",
-                {"attachments": obj.message.attachments.all()},
-            )
-        )
-
-    message_attachments.short_description = _("Attachments")
+    message_card.short_description = ""
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         # Opening the detail marks the message as read.

@@ -56,8 +56,15 @@ class MessageAttachment(models.Model):
         verbose_name = _("Attachment")
         verbose_name_plural = _("Attachments")
 
+    @property
+    def filename(self):
+        """Base file name without the upload directory path."""
+        import os
+
+        return os.path.basename(self.file.name) if self.file else ""
+
     def __str__(self):
-        return self.file.name if self.file else f"Attachment #{self.pk}"
+        return self.filename or f"Attachment #{self.pk}"
 
 
 class MessageRecipient(models.Model):
