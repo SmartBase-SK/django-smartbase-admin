@@ -34,11 +34,12 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="font-semibold text-18">{{ modal.message.title }}</h3>
+                        <h3 class="font-semibold text-18">
+                            {% if modal.message.created_by %}{% trans 'From' %} {{ modal.message.created_by.get_full_name|default:modal.message.created_by.email|default:modal.message.created_by }}{% endif %}
+                        </h3>
                     </div>
                     <div class="modal-body">
-                        {{ modal.message.content|safe }}
-                        {% include 'sb_admin/messaging/attachments.html' with attachments=modal.message.attachments.all %}
+                        {% include 'sb_admin/messaging/detail_card.html' with message=modal.message %}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-primary"

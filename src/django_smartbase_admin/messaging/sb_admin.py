@@ -34,6 +34,7 @@ from django_smartbase_admin.messaging.services import (
     get_messaging_config,
     sync_recipients,
 )
+from django_smartbase_admin.utils import SBAdminNoHistoryDetailMixin
 
 
 def render_message_card(message):
@@ -69,7 +70,7 @@ class MessageRecipientStatusInline(SBAdminTableInline):
         return False
 
 
-class MessageAdmin(SBAdmin):
+class MessageAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
     """Management UI for authoring/editing messages (Django model perms)."""
 
     form = MessageForm
@@ -163,7 +164,7 @@ class MessageAdmin(SBAdmin):
             sync_recipients(obj, request, messaging_config)
 
 
-class MessageInboxAdmin(SBAdmin):
+class MessageInboxAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
     """Per-user inbox over MessageRecipient + notification poll/acknowledge."""
 
     sbadmin_list_history_enabled = False
@@ -243,6 +244,17 @@ class MessageInboxAdmin(SBAdmin):
         return definition
 
     # --- detail (read-only message reader) ---------------------------------
+
+    def get_change_label(self, request, object_id=None):
+        # Title the detail page with the sender (message author), not the
+        # MessageRecipient's "<message_id> → <user_id>" repr.
+        if object_id is not None:
+            obj = self.get_object(request, object_id)
+            sender = getattr(getattr(obj, "message", None), "created_by", None)
+            if sender:
+                label = sender.get_full_name() or sender.email or str(sender)
+                return f"{_('From')} {label}"
+        return super().get_change_label(request, object_id)
 
     def message_card(self, obj):
         return render_message_card(obj.message if obj else None)
