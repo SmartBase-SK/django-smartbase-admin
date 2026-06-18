@@ -602,7 +602,21 @@ class SBAdminBaseView(object):
             ),
             **self.get_color_scheme_context(request),
             **self.get_language_form_context(request),
+            **self.get_messaging_context(request),
         }
+
+    def get_messaging_context(self, request) -> dict[str, Any]:
+        """Inject the notification poller URL/interval when messaging is enabled.
+
+        Kept defensive (returns ``{}`` on any error or when disabled) so the
+        global context never breaks pages on projects without messaging.
+        """
+        try:
+            from django_smartbase_admin.messaging.services import get_poller_context
+
+            return get_poller_context(request)
+        except Exception:
+            return {}
 
     def get_model_path(self) -> str:
         return SBAdminViewService.get_model_path(self.model)

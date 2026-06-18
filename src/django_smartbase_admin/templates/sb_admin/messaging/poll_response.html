@@ -1,0 +1,62 @@
+{% load i18n %}
+{# Out-of-band fragments returned by the notification poller. #}
+
+{% if toasts %}
+    <div id="notification-messages" hx-swap-oob="beforeend" class="messagelist">
+        {% for toast in toasts %}
+            <div class="alert border shadow bg-{{ toast.type.color }}-50 border-{{ toast.type.color }}-100 text-{{ toast.type.color }}-900 group"
+                 remove-me="12s">
+                <div class="flex items-center">
+                    <a href="{{ toast.detail_url }}"
+                       class="flex items-center flex-1 no-underline text-current">
+                        {% if toast.type.icon %}
+                            <svg class="w-20 h-20 mr-12 text-{{ toast.type.color }} shrink-0">
+                                <use xlink:href="#{{ toast.type.icon }}"></use>
+                            </svg>
+                        {% endif %}
+                        <h5 class="font-semibold">{{ toast.message.title }}</h5>
+                    </a>
+                    <div class="ml-16 flex-center js-alert-close p-8 -m-8 cursor-pointer">
+                        <svg class="w-16 h-16 transition-colors group-hover:text-{{ toast.type.color }}">
+                            <use xlink:href="#Close"></use>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div id="messaging-modal-slot" hx-swap-oob="innerHTML">
+    {% if modal %}
+        <div id="messaging-modal-{{ modal.recipient.pk }}" class="modal fade" tabindex="-1"
+             data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="font-semibold text-18">{{ modal.message.title }}</h3>
+                    </div>
+                    <div class="modal-body">
+                        {{ modal.message.content|safe }}
+                        {% include 'sb_admin/messaging/attachments.html' with attachments=modal.message.attachments.all %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary"
+                                data-bs-dismiss="modal"
+                                hx-post="{{ modal.acknowledge_url }}" hx-swap="none">
+                            {% trans 'Acknowledge' %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var el = document.getElementById("messaging-modal-{{ modal.recipient.pk }}");
+                if (el && window.bootstrap5 && window.bootstrap5.Modal) {
+                    new window.bootstrap5.Modal(el).show();
+                }
+            })();
+        </script>
+    {% endif %}
+</div>
