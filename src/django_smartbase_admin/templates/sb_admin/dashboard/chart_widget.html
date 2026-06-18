@@ -16,11 +16,19 @@
             <script>
                 (function() {
                     const initChart = function() {
+                        if (typeof window.SBAdminChartClass !== 'function') {
+                            document.addEventListener('SBAdminChartClassLoaded', initChart, {once: true});
+                            return;
+                        }
                         window.SBAdminChart = window.SBAdminChart || {};
                         window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
-                            "formId": "{{ widget_id }}-filter-form",
-                            "widgetId": "{{ widget_id }}",
+                            {% if parent_widget_id %}
+                            "parentWidgetId": "{{ parent_widget_id }}",
+                            {% else %}
+                            "formId": "{{ filter_form_id }}",
                             "ajaxUrl": "{{ ajax_url }}",
+                            {% endif %}
+                            "widgetId": "{{ widget_id }}",
                             "chartType": "{{ chart_type }}",
                             "chartOptions": {
                                 scales: {
@@ -42,11 +50,7 @@
                             }
                         });
                     };
-                    if (window.SBAdminMainLoaded) {
-                        initChart();
-                        return;
-                    }
-                    document.addEventListener('SBAdminMainLoaded', initChart, {once: true});
+                    initChart();
                 })();
             </script>
         </div>

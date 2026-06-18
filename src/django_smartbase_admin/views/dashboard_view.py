@@ -35,7 +35,7 @@ class SBAdminDashboardView(SBAdminView):
     @sbadmin_action
     def dashboard(self, request, modifier, object_id=None):
         context = self.get_global_context(request)
-        context["direct_sub_views"] = self.widget_views
+        context["direct_sub_views"] = self.get_widget_views(request, object_id)
         context["dashboard_media"] = self.get_dashboard_media(request)
         context["title"] = self.get_title()
         return TemplateResponse(

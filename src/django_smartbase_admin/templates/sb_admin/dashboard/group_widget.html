@@ -1,0 +1,23 @@
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load sb_admin_tags %}
+
+{% block filters %}
+{% endblock %}
+
+{% block content_inner %}
+    <section id="{{ widget_id }}"
+             class="col-span-12 flex flex-col gap-24"
+             data-dashboard-group-id="{{ widget_id }}"
+             data-filter-form-id="{{ widget_id }}-filter-form"
+             data-ajax-url="{{ ajax_url }}">
+        <div class="flex flex-wrap gap-16">
+            {% include "sb_admin/components/filters.html" with filters=settings all_filters_visible=True default_button=True view_id=widget_id %}
+            {% include "sb_admin/components/filters.html" with filters=filters all_filters_visible=True default_button=True view_id=widget_id %}
+        </div>
+        <div class="grid grid-cols-12 gap-24">
+            {% for sub_widget in sub_widgets %}
+                {% render_widget sub_widget request %}
+            {% endfor %}
+        </div>
+    </section>
+{% endblock %}

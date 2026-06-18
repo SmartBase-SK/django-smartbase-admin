@@ -36,6 +36,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Fieldset Options](#fieldset-options) | Supported keys for `fieldsets` / `sbadmin_fieldsets`, including descriptions, classes, dynamic regions, and collapse |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
+| [Dashboard Widgets](#dashboard-widgets) | Standalone dashboards: simple widgets, parent widgets with subwidgets, grouped AJAX widgets |
 | [Detail View Widgets](#detail-view-widgets) | Embedding dashboard-style list/chart widgets inside detail fieldsets |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
@@ -84,6 +85,8 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Collapse a form fieldset?** → [Fieldset Options](#fieldset-options)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
+- **Building a dashboard page?** → [Dashboard Widgets](#dashboard-widgets)
+- **One AJAX call for several dashboard widgets?** → [Grouped AJAX parent widget](#3-widget-with-subwidgets-and-grouped-ajax)
 - **List or chart inside detail page?** → [Detail View Widgets](#detail-view-widgets)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
@@ -4445,6 +4448,375 @@ In this example, the "Content" tab has a two-column layout (main fields on the l
 - Override `get_sbadmin_tabs(request, object_id)` for dynamic tab configuration
 
 **Source:** `django_smartbase_admin/admin/admin_base.py` — `SBAdmin.sbadmin_tabs`, `get_sbadmin_tabs()`, `get_tabs_context()`; `django_smartbase_admin/templatetags/sb_admin_tags.py` — `get_tabular_context()`
+
+---
+
+## Dashboard Widgets
+
+Use `SBAdminDashboardView` in `registered_views` to build standalone dashboard pages. Dashboard widgets are regular SBAdmin views: each widget has a stable `widget_id`, permission checks, optional settings/filters, a template, media, and an AJAX `action_get_data` endpoint.
+
+Register dashboards from the configuration:
+
+```python
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+
+class AdminConfiguration(SBAdminRoleConfiguration):
+    default_view = SBAdminMenuItem(view_id="dashboard")
+    menu_items = [
+        SBAdminMenuItem(label=_("Dashboard"), icon="All-application", view_id="dashboard"),
+    ]
+    registered_views = [
+        SBAdminDashboardView(
+            widgets=[
+                # Put widget instances here.
+            ],
+            title=_("Dashboard"),
+        ),
+    ]
+```
+
+### 1. Simple Widget
+
+Use `SBAdminDashboardHtmlWidget` when the server can render the whole widget as HTML. This is the smallest dashboard widget and works well for counters, static tables, status panels, or summaries.
+
+```python
+# dashboard_widgets.py
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import SBAdminDashboardHtmlWidget
+
+
+SAMPLE_REVENUE_ROWS = [
+    {"currency": "EUR", "amount": "1 234,50 €", "orders": 23},
+    {"currency": "CZK", "amount": "5 600 Kč", "orders": 8},
+    {"currency": "HUF", "amount": "125 000 Ft", "orders": 4},
+]
+
+
+class RevenueTableWidget(SBAdminDashboardHtmlWidget):
+    widget_id = "revenue_table"
+    name = _("Revenue")
+    content_template_name = "dashboard/revenue_table.html"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_html_context_data(self, request):
+        return {"rows": SAMPLE_REVENUE_ROWS}
+```
+
+```django
+{# templates/dashboard/revenue_table.html #}
+{% load i18n %}
+
+<h3 class="text-16 font-semibold mb-20">{% trans "Revenue" %}</h3>
+<table class="w-full text-14">
+    <thead>
+        <tr class="border-b border-dark-200 text-left">
+            <th class="py-8 pr-12">{% trans "Currency" %}</th>
+            <th class="py-8 px-12">{% trans "Amount" %}</th>
+            <th class="py-8 pl-12 text-right">{% trans "Orders" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+            <tr class="border-b border-dark-200 last:border-b-0">
+                <td class="py-8 pr-12 font-semibold">{{ row.currency }}</td>
+                <td class="py-8 px-12 font-semibold">{{ row.amount }}</td>
+                <td class="py-8 pl-12 text-right font-semibold">{{ row.orders }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+```
+
+```python
+# configuration.py
+registered_views = [
+    SBAdminDashboardView(
+        widgets=[RevenueTableWidget()],
+        title=_("Dashboard"),
+    ),
+]
+```
+
+### 2. Widget With Subwidgets
+
+Use a parent `SBAdminDashboardWidget` with `sub_widgets` when the parent owns common layout/settings and children should render inside it. In the normal mode, each child widget keeps its own AJAX behavior.
+
+When the parent renders settings/filters through `widget_base.html`, nested chart widgets listen to the parent filter form automatically. A change in a parent setting such as `period` triggers each child chart's own AJAX call with the same filter data. This is the right mode when children can fetch independently and you do not need to coalesce their queries.
+
+```python
+# dashboard_widgets.py
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardChartWidget,
+    SBAdminDashboardWidget,
+)
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget
+
+
+class SalesDashboardWidget(SBAdminDashboardWidget):
+    widget_id = "sales_dashboard"
+    name = _("Sales dashboard")
+    template_name = "dashboard/sales_dashboard.html"
+
+    def __init__(self, *args, **kwargs):
+        settings = [
+            SBAdminField(
+                title=_("Period"),
+                name="period",
+                filter_widget=ChoiceFilterWidget(
+                    choices=[("week", _("Week")), ("month", _("Month"))],
+                    default_value="month",
+                    allow_clear=False,
+                ),
+            )
+        ]
+        super().__init__(*args, settings=settings, **kwargs)
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+
+class OrdersChartWidget(SBAdminDashboardChartWidget):
+    name = _("Orders")
+    chart_type = "bar"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        return {
+            "main": {
+                "labels": ["Jan", "Feb", "Mar"],
+                "datasets": [
+                    {
+                        "label": str(_("Orders")),
+                        "data": [12, 19, 7],
+                        "backgroundColor": "#2368A9",
+                    }
+                ],
+            }
+        }
+
+
+class RevenueChartWidget(SBAdminDashboardChartWidget):
+    name = _("Revenue")
+    chart_type = "line"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        return {
+            "main": {
+                "labels": ["Jan", "Feb", "Mar"],
+                "datasets": [
+                    {
+                        "label": str(_("Revenue")),
+                        "data": [1200, 1800, 900],
+                        "borderColor": "#24B47E",
+                    }
+                ],
+            }
+        }
+```
+
+```django
+{# templates/dashboard/sales_dashboard.html #}
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load sb_admin_tags %}
+
+{% block content_inner %}
+    <section id="{{ widget_id }}" class="col-span-12 grid grid-cols-12 gap-24">
+        {% for sub_widget in sub_widgets %}
+            {% render_widget sub_widget request %}
+        {% endfor %}
+    </section>
+{% endblock %}
+```
+
+```python
+# configuration.py
+registered_views = [
+    SBAdminDashboardView(
+        widgets=[
+            SalesDashboardWidget(
+                sub_widgets=[
+                    OrdersChartWidget(),
+                    RevenueChartWidget(),
+                ],
+            ),
+        ],
+        title=_("Dashboard"),
+    ),
+]
+```
+
+### 3. Widget With Subwidgets and Grouped AJAX
+
+Set `group_ajax_calls=True` on the parent when several subwidgets should refresh from one parent AJAX response. This is useful for dashboards with one global filter form and multiple related child widgets. The parent calls each child `get_data(request)` and returns:
+
+```python
+{
+    "sub_widget": {
+        "sales_dashboard_0": {...},
+        "sales_dashboard_1": {...},
+    }
+}
+```
+
+Child widgets still own how they consume their data:
+- `SBAdminDashboardChartWidget` registers itself with the parent group and updates the chart from its data slice.
+- `SBAdminDashboardHtmlWidget` registers itself with the parent group and replaces its own HTML from `{"html": "..."}`.
+- Custom widgets can call `window.SBAdminRegisterDashboardSubWidget(parentWidgetId, {widgetId, onData})` from their own template.
+
+```python
+# dashboard_widgets.py
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardChartWidget,
+    SBAdminDashboardHtmlWidget,
+    SBAdminDashboardWidget,
+)
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget, DateFilterWidget
+
+
+class GroupedSalesDashboardWidget(SBAdminDashboardWidget):
+    widget_id = "sales_dashboard"
+    name = _("Sales dashboard")
+    group_ajax_calls = True
+
+    def __init__(self, *args, **kwargs):
+        settings = [
+            SBAdminField(
+                title=_("Date"),
+                name="created_at",
+                filter_widget=DateFilterWidget(
+                    shortcuts=[
+                        {"value": [-30, 0], "label": _("Last 30 days")},
+                        {"value": [-90, 0], "label": _("Last 90 days")},
+                    ],
+                    default_value_shortcut_index=0,
+                    allow_clear=False,
+                ),
+            ),
+            SBAdminField(
+                title=_("Resolution"),
+                name="resolution",
+                filter_widget=ChoiceFilterWidget(
+                    choices=[("day", _("Day")), ("month", _("Month"))],
+                    default_value="month",
+                    allow_clear=False,
+                ),
+            ),
+        ]
+        super().__init__(*args, settings=settings, **kwargs)
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        request.sales_dashboard_data = self.build_sales_dashboard_data(request)
+        return super().get_data(request)
+
+    def build_sales_dashboard_data(self, request):
+        resolution = request.request_data.request_get.get("resolution", "month")
+        if resolution == "day":
+            return {
+                "labels": ["Mon", "Tue", "Wed"],
+                "orders": [4, 9, 6],
+                "revenue_rows": [
+                    {"currency": "EUR", "amount": "450,00 €", "orders": 4},
+                    {"currency": "CZK", "amount": "2 100 Kč", "orders": 2},
+                ],
+            }
+        return {
+            "labels": ["Jan", "Feb", "Mar"],
+            "orders": [12, 19, 7],
+            "revenue_rows": [
+                {"currency": "EUR", "amount": "1 234,50 €", "orders": 23},
+                {"currency": "CZK", "amount": "5 600 Kč", "orders": 8},
+                {"currency": "HUF", "amount": "125 000 Ft", "orders": 4},
+            ],
+        }
+
+
+class GroupedOrdersChartWidget(SBAdminDashboardChartWidget):
+    name = _("Orders")
+    chart_type = "bar"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        dashboard_data = request.sales_dashboard_data
+        return {
+            "main": {
+                "labels": dashboard_data["labels"],
+                "datasets": [
+                    {
+                        "label": str(_("Orders")),
+                        "data": dashboard_data["orders"],
+                        "backgroundColor": "#2368A9",
+                    }
+                ],
+            }
+        }
+
+
+class GroupedRevenueTableWidget(SBAdminDashboardHtmlWidget):
+    name = _("Revenue by currency")
+    content_template_name = "dashboard/revenue_table.html"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_html_context_data(self, request):
+        dashboard_data = getattr(request, "sales_dashboard_data", None)
+        rows = dashboard_data["revenue_rows"] if dashboard_data else []
+        return {"rows": rows}
+```
+
+The example above stores shared data on `request` inside the parent `get_data()` before calling `super().get_data(request)`. This keeps child signatures unchanged (`get_data(request)` / `get_html_context_data(request)`) and lets a project do one service/repository call in the parent. Prefer a project-specific attribute name such as `request.sales_dashboard_data`; avoid broad names like `request.dashboard_data` when multiple grouped widgets can appear on the same page.
+
+`SBAdminDashboardHtmlWidget` also renders once during the initial page load, before the grouped AJAX request has called the parent `get_data()`. If the HTML child reads request-shared data, guard with `getattr(request, "...", None)` and return empty/sample/initial rows for the first render. The grouped AJAX response will replace the HTML afterwards.
+
+```python
+# configuration.py
+registered_views = [
+    SBAdminDashboardView(
+        widgets=[
+            GroupedSalesDashboardWidget(
+                sub_widgets=[
+                    GroupedOrdersChartWidget(),
+                    GroupedRevenueTableWidget(),
+                ],
+            ),
+        ],
+        title=_("Dashboard"),
+    ),
+]
+```
+
+**Grouped AJAX rules:**
+- Put global settings/filters on the parent widget.
+- Pass widget instances in `sub_widgets`; do not use string import paths unless a project has a strong reason.
+- Keep the group parent generic. It should aggregate child data, not know about charts, tables, calendars, or app-specific widgets.
+- Each child widget owns its rendering/update contract. Charts return Chart.js-shaped data; HTML widgets return `{"html": rendered_html}`.
+- `SBAdminDashboardListWidget` can be rendered inside a grouped parent, but it keeps its own table AJAX endpoint. Use grouped AJAX for summary/chart/static HTML widgets, not for full Tabulator list data.
+
+**Source:** `django_smartbase_admin/engine/dashboard.py`; `django_smartbase_admin/templates/sb_admin/dashboard/group_widget.html`; `django_smartbase_admin/templates/sb_admin/dashboard/html_widget.html`; `django_smartbase_admin/static/sb_admin/src/js/dashboard_group.js`
 
 ---
 
