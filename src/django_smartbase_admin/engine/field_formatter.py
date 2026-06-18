@@ -26,7 +26,8 @@ class BadgeType(Enum):
 def datetime_formatter(object_id, value):
     if value is None:
         return None
-    value = timezone.localtime(value)
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
     return f"{date(value)} {time(value)}"
 
 
@@ -42,7 +43,8 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
     def inner_formatter(object_id, value):
         if value is None:
             return None
-        value = timezone.localtime(value)
+        if timezone.is_aware(value):
+            value = timezone.localtime(value)
         return_value = ""
         if date_format:
             return_value += date(value, date_format)
