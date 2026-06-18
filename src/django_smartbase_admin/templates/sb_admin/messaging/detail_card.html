@@ -3,7 +3,7 @@
     <div class="flex items-start gap-12">
         <div class="min-w-0">
             <h3 class="font-semibold text-18 text-dark-900">{{ message.title }}</h3>
-            <div class="text-12 mt-8">{{ message.created_at|date:"l, j. F Y" }} {{ message.created_at|time:"H:i" }}</div>
+            <div class="text-12 mt-8">{{ message.created_at|date:"DATETIME_FORMAT" }}</div>
         </div>
     </div>
 
