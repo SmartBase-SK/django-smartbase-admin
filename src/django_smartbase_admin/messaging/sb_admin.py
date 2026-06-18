@@ -32,9 +32,23 @@ from django_smartbase_admin.messaging.models import (
 )
 from django_smartbase_admin.messaging.services import (
     get_messaging_config,
+    render_message_type_badge,
     sync_recipients,
 )
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import SBAdminNoHistoryDetailMixin
+
+
+class _MessageTypeBadgeMixin:
+    """Provides a ``type_badge`` list-column method rendering the type badge."""
+
+    def type_badge(self, obj_id, value, **additional_data):
+        try:
+            request = SBAdminThreadLocalService.get_request()
+        except LookupError:
+            request = None
+        messaging_config = get_messaging_config(request) if request else None
+        return render_message_type_badge(value, messaging_config)
 
 
 def render_message_card(message):
@@ -70,7 +84,7 @@ class MessageRecipientStatusInline(SBAdminTableInline):
         return False
 
 
-class MessageAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
+class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin):
     """Management UI for authoring/editing messages (Django model perms)."""
 
     form = MessageForm
@@ -78,7 +92,12 @@ class MessageAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
 
     sbadmin_list_display = (
         SBAdminField(name="title", title=_("Title")),
-        SBAdminField(name="type", title=_("Type")),
+        SBAdminField(
+            name="type_badge",
+            title=_("Type"),
+            annotate=F("type"),
+            filter_disabled=True,
+        ),
         SBAdminField(name="created_at", title=_("Created")),
         SBAdminField(
             name="unread_count",
@@ -164,7 +183,7 @@ class MessageAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
             sync_recipients(obj, request, messaging_config)
 
 
-class MessageInboxAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
+class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin):
     """Per-user inbox over MessageRecipient + notification poll/acknowledge."""
 
     sbadmin_list_history_enabled = False
@@ -178,7 +197,7 @@ class MessageInboxAdmin(SBAdminNoHistoryDetailMixin, SBAdmin):
             filter_disabled=True,
         ),
         SBAdminField(
-            name="type",
+            name="type_badge",
             title=_("Type"),
             annotate=F("message__type"),
             filter_disabled=True,

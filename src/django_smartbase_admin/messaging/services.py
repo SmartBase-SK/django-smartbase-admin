@@ -1,6 +1,33 @@
 """Messaging services: config access + recipient resolution."""
 
+from django.utils.html import format_html
+
 from django_smartbase_admin.messaging.models import MessageRecipient
+
+
+def render_message_type_badge(type_key, messaging_config):
+    """Render an SBAdmin badge for a message type.
+
+    Uses the configured type's colour + label; for an unknown/custom type (one
+    with no configured badge) falls back to the "info" type's badge styling,
+    keeping the raw type key as the label.
+    """
+    message_type = (
+        messaging_config.get_message_type(type_key) if messaging_config else None
+    )
+    if message_type is not None:
+        return format_html(
+            '<span class="badge badge-simple badge-{}">{}</span>',
+            message_type.color,
+            message_type.label,
+        )
+    info_type = (
+        messaging_config.get_message_type("info") if messaging_config else None
+    )
+    color = info_type.color if info_type else "notice"
+    return format_html(
+        '<span class="badge badge-simple badge-{}">{}</span>', color, type_key
+    )
 
 
 def get_messaging_config(request):
