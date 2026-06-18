@@ -5046,12 +5046,26 @@ This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hoste
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
 
-### Two browser-only extras
+### The browser-only extra
 
-The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. Two bundled classes, however, only matter for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
+The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. One bundled class, however, only matters for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
 
-- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them.
-- **`SBAdminMCPOAuth2Authentication`** (`mcp/oauth/auth.py`) — adds `resource_metadata="…"` to the `WWW-Authenticate` header for header-driven discovery. Native clients fall back to probing `/.well-known/*` directly, so the stock DOT `OAuth2Authentication` also works for them. Keep the subclass for broad compatibility.
+- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them. Wire it into `MIDDLEWARE` **before** anything that 401/403s the MCP path (Django's `SecurityMiddleware`, then this, then session/auth) so the preflight short-circuits, and list the browser origins it may reflect in `SBADMIN_MCP_ALLOWED_ORIGINS` (defaults: `https://claude.ai`, `https://cursor.com`):
+
+  ```python
+  MIDDLEWARE = [
+      "django.middleware.security.SecurityMiddleware",
+      "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
+      # ... session / locale / common / auth ...
+  ]
+
+  # Override/extend the default allowlist; values are matched exactly.
+  SBADMIN_MCP_ALLOWED_ORIGINS = [
+      "https://claude.ai",
+      "https://cursor.com",
+  ]
+  ```
+Use the stock DOT `oauth2_provider.contrib.rest_framework.OAuth2Authentication` as your `DJANGO_MCP_AUTHENTICATION_CLASSES` (as shown above) for **all** clients. Its `401` `WWW-Authenticate` header carries no `resource_metadata` pointer, but every client — browser-hosted and native alike — falls back to probing `/.well-known/*` directly, so header-driven discovery isn't needed. (An earlier `SBAdminMCPOAuth2Authentication` subclass that added the pointer was removed once probing proved sufficient.)
 
 (Verified: a Claude Code CLI connection completed OAuth with the plain auth class and no CORS middleware.)
 
@@ -5060,7 +5074,7 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
 A ready-to-use single-page dashboard blueprint is exposed as the MCP **resource** `dashboard://blueprint` (read it; full setup is in its description). It logs in via OAuth PKCE and reads live data through an `api(tool, args)` helper over the MCP tools. To run one locally against a deployed (HTTPS) admin:
 
 1. **Serve over http on localhost** — fine as-is: loopback is a browser *secure context* (so `crypto.subtle` PKCE works) and the OAuth/MCP traffic to the admin is HTTPS regardless. Serve on a spare port (`python -m http.server 8010`).
-2. **Allow the origin** — add `http://localhost:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS`. `SBAdminMCPCorsMiddleware` reflects it **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session.
+2. **Allow the origin** — add both `http://localhost:8010` and `http://127.0.0.1:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS` (`8010` is the blueprint's canonical serve port; the two loopback hosts aren't interchangeable to a browser, so list both). `SBAdminMCPCorsMiddleware` reflects them **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session — which is why it's safe to keep these loopback origins allowed in **every** environment, including production, so one locally-served page can target any deployed backend without per-environment config.
 3. **Connect** — the page self-registers an OAuth client via DCR (`POST <issuer>/oauth/register`) on first connect and caches the `client_id` in `localStorage`; no manual registration. The DCR endpoint and `SBAdminMCPOAuth2Validator` accept the page's plain-http redirect because it's **loopback** (`localhost`, `127.0.0.1`, `::1`); any other http host is rejected.
 
 No HTTPS is needed locally; only if you serve the page on a non-loopback host (LAN IP / custom domain), which isn't a secure context over http — then use a TLS static server (e.g. mkcert) and register an `https://` redirect URI.
