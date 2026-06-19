@@ -565,18 +565,22 @@ class SBAdminTools(MCPToolset):
             ``fn`` is one of ``sum / avg / min / max / count``; ``field``
             must be a declared column from ``list_admins`` —
             ``sum/avg/min/max`` need a numeric one, ``count`` may omit
-            ``field`` for a row count. Without ``group_by`` the results
-            land under ``aggregates``, keyed ``f"{fn}_{field}"`` (or
-            ``"count"``).
+            ``field`` for a row count. Each result is keyed by a derived
+            alias — ``f"{fn}_{field}"`` (or ``"count"`` for a bare count);
+            aliases can't be overridden. Without ``group_by`` the results
+            land under ``aggregates`` as a flat ``{alias: value}`` dict.
           group_by: optional list of declared column names to break the
             ``aggregate`` totals down by (SQL ``GROUP BY``) — e.g.
             ``group_by=["queue"]`` with ``aggregate=[{"fn": "count"}]`` for
             tickets-per-queue in one call instead of one call per queue.
             Multi-valued (relation) columns are rejected. Requires
             ``aggregate``. Results land under ``groups`` as a list of
-            ``{**group_columns, **aggregate_aliases}`` rows ordered by the
-            group columns; a column grouped on a foreign key comes back as
-            the bare pk (resolve names with ``autocomplete``).
+            ``{"group": {column: value, ...}, "aggregates": {alias: value,
+            ...}}`` rows ordered by the group columns — group columns and
+            aggregate aliases are nested under separate keys so a column whose
+            name equals an aggregate alias can't collide. A column grouped on a
+            foreign key comes back as the bare pk (resolve names with
+            ``autocomplete``).
 
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
         plus any pagination metadata the list view emits, ``aggregates``
