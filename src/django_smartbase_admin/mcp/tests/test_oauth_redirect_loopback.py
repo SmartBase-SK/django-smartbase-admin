@@ -81,6 +81,23 @@ class LoopbackRedirectTests(TestCase):
             loopback_redirect_allowed("http://evil.example:52756/callback", registered)
         )
 
+    def test_loopback_fallback_is_http_only(self):
+        """Port relaxation must not smuggle a non-http scheme past the allowlist.
+
+        DOT rejects a scheme outside ``ALLOWED_REDIRECT_URI_SCHEMES``; the
+        loopback fallback must not re-admit it just because a registered URI
+        shares the (non-http) scheme, loopback host, path and query but a
+        different port.
+        """
+        registered = ["javascript://localhost:1/callback"]
+        self.assertFalse(
+            loopback_redirect_allowed("javascript://localhost:9/callback", registered)
+        )
+        # Even an exact non-http loopback match goes through DOT, never here.
+        self.assertFalse(
+            loopback_redirect_allowed("javascript://localhost:1/callback", registered)
+        )
+
         # End-to-end through the validator: DOT's exact match fails on the
         # port, the loopback fallback recovers it; no client -> no fallback.
         validator = SBAdminMCPOAuth2Validator()

@@ -134,6 +134,27 @@ class AggregateTests(TestCase):
             ],
         )
 
+    def test_group_by_keys_rows_by_requested_name_not_orm_target(self):
+        # ``id_alias`` is a method field whose ORM identifier is the annotation
+        # alias ``id_alias_annt``. Grouping by it must still surface rows under
+        # the agent-facing name ``id_alias`` (what the caller asked for), not
+        # the internal target — otherwise the group key the caller reads back
+        # doesn't match the field they grouped on.
+        ids = sorted(Folder.objects.create(name=n).pk for n in ("a", "b", "c"))
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            group_by=["id_alias"],
+            aggregate=[{"fn": "count"}],
+        )
+
+        self.assertNotIn("aggregates", result)
+        self.assertEqual(
+            result["groups"],
+            [{"id_alias": pk, "count": 1} for pk in ids],
+        )
+
     def test_aggregate_without_group_by_still_returns_scalar_dict(self):
         # Back-compat: the degenerate single-constant-group path keeps the
         # original scalar shape under "aggregates".

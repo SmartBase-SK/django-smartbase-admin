@@ -864,11 +864,20 @@ class SBAdminListAction(SBAdminAction):
 
         # Resolve group targets the same way; a computed (annotated) group
         # column needs its expression present before ``.values()``.
+        # Keep the caller-facing group key (the declared name they grouped by)
+        # separate from the ORM target. They diverge when a declared field's
+        # public name differs from its DB column — e.g. an ``id_alias`` method
+        # field backed by ``@admin.display(ordering="id")`` resolves to ``id``.
+        # ``group_targets`` drives ``.values()`` / ``order_by`` / dedup; the
+        # response rows are keyed by ``group_keys`` so ``group_by=["id_alias"]``
+        # comes back under ``id_alias``, not ``id``.
+        group_keys: list[str] = []
         group_targets: list[str] = []
         for field in group_fields:
             target = (
                 field.model_field.name if field.model_field is not None else field.field
             )
+            group_keys.append(field.name)
             group_targets.append(target)
             if (
                 field.model_field is None
@@ -909,7 +918,10 @@ class SBAdminListAction(SBAdminAction):
                     key = tuple(row[t] for t in group_targets)
                     slot = merged.get(key)
                     if slot is None:
-                        slot = {t: row[t] for t in group_targets}
+                        slot = {
+                            key_name: row[target]
+                            for key_name, target in zip(group_keys, group_targets)
+                        }
                         merged[key] = slot
                         order.append(key)
                     slot[alias] = row[alias]
