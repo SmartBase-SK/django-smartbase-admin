@@ -130,20 +130,20 @@ class SBAdminDashboardWidget(SBAdminView):
         return JsonResponse(data={"data": self.get_cached_data(request)})
 
     def get_widget_context_data(self, request):
+        parent_group_widget = self.get_parent_group_widget()
         context = {
             "widget_id": self.get_id(),
             "widget_name": self.name,
-            "ajax_url": self.get_ajax_url(request),
             "filters": self.get_filters(),
             "settings": self.get_settings(),
             "sub_widgets": self.get_sub_widgets(),
             "request": request,
             "filter_form_id": self.get_filter_form_id(),
         }
-        parent_group_widget = self.get_parent_group_widget()
         if parent_group_widget:
             context["parent_widget_id"] = parent_group_widget.get_id()
-            context["parent_ajax_url"] = parent_group_widget.get_ajax_url(request)
+        else:
+            context["ajax_url"] = self.get_ajax_url(request)
         return context
 
     def get_sub_widgets(self):

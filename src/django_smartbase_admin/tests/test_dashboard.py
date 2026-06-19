@@ -9,9 +9,11 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models import F
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import path
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.engine.const import FILTER_DATA_NAME, IGNORE_LIST_SELECTION
 from django_smartbase_admin.engine.dashboard import (
@@ -25,6 +27,8 @@ from django_smartbase_admin.engine.dashboard import (
 from django_smartbase_admin.engine.dynamic_forms import SBDynamicRegion
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+urlpatterns = [path("", sb_admin_site.urls)]
 
 
 class _DashboardWidget(SBAdminDashboardListWidget):
@@ -252,6 +256,7 @@ class _CustomParentScopedListWidget(_StandaloneDashboardWidget):
         return queryset.filter(id__in=parent_instance_ids)
 
 
+@override_settings(ROOT_URLCONF=__name__)
 class TestSBAdminDashboardListWidget(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
