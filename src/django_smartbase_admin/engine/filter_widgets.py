@@ -429,8 +429,11 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
 
     def get_base_filter_query_for_parsed_value(self, request, parsed_value):
         if not parsed_value:
-            # No usable pk → no constraint, like the other widgets on empty.
-            return Q()
+            # Truly-empty values are dropped before the widget runs, so an
+            # empty list here is non-empty input that coerced to nothing —
+            # invalid. Fail closed so an active filter can't silently widen to
+            # the whole table (which would also widen bulk actions / exports).
+            return Q(pk__in=[])
         return Q(**{f"{self.field.filter_field}__in": parsed_value})
 
     def validate_value(self, value) -> None:

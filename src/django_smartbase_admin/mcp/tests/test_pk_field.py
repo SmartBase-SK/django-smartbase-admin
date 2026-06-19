@@ -231,9 +231,10 @@ class PrimaryKeyFilterWidgetParseTests(TestCase):
         widget = self._widget()
         q = widget.get_base_filter_query_for_parsed_value(None, ["5", "9"])
         self.assertEqual(q.children, [("id__in", ["5", "9"])])
-        # No usable pk → no constraint.
+        # Invalid input that coerced to nothing → fail closed (match nothing).
         self.assertEqual(
-            widget.get_base_filter_query_for_parsed_value(None, []).children, []
+            widget.get_base_filter_query_for_parsed_value(None, []).children,
+            [("pk__in", [])],
         )
 
 
@@ -288,9 +289,15 @@ class PrimaryKeyAliasTests(TestCase):
     """The synthetic pk column is skipped only when a declared column already
     *is* the pk — not merely because a column's ``filter_field`` points at it."""
 
+    def setUp(self):
+        super().setUp()
+        self._original = sb_admin_site._registry.pop(Folder, None)
+
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
         sb_admin_site._registry.pop(Folder, None)
+        if self._original is not None:
+            sb_admin_site._registry[Folder] = self._original
         super().tearDown()
 
     def _fields(self, admin_class):
