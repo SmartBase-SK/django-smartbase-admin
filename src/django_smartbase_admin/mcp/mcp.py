@@ -161,7 +161,9 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
         field_map = admin.get_field_map(request)
     field_map = field_map or {}
     for entry in sort:
-        if not isinstance(entry, dict) or "field" not in entry:
+        # ``dir`` is required, not defaulted — the list pipeline reads
+        # ``sort['dir']`` directly, so a missing key must fail clearly here.
+        if not isinstance(entry, dict) or "field" not in entry or "dir" not in entry:
             raise ValueError(
                 "Each sort entry must be {'field': <name>, 'dir': "
                 f"'asc'|'desc'}}, got {entry!r}"
@@ -172,9 +174,8 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
                 f"Admin {admin.get_id()!r} cannot sort by {name!r}; "
                 f"sortable fields: {sorted(field_map)}."
             )
-        direction = entry.get("dir", "asc")
-        if direction not in ("asc", "desc"):
-            raise ValueError(f"sort dir must be 'asc' or 'desc', got {direction!r}")
+        if entry["dir"] not in ("asc", "desc"):
+            raise ValueError(f"sort dir must be 'asc' or 'desc', got {entry['dir']!r}")
 
 
 def _decode_preset_url_params(url_params) -> dict:
@@ -593,6 +594,25 @@ class SBAdminTools(MCPToolset):
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
         field_map = admin.get_field_map(request)
+        # Accept ``"id"`` as an alias for a differently-named pk on input, so
+        # the documented refetch works (output always mirrors the pk to
+        # ``"id"``). No-op for the usual ``id``-pk model.
+        pk_name = admin.model._meta.pk.name
+        if pk_name != "id" and "id" not in field_map:
+            fields = [pk_name if f == "id" else f for f in fields]
+            if filter_data:
+                filter_data = {
+                    (pk_name if k == "id" else k): v for k, v in filter_data.items()
+                }
+            if sort:
+                sort = [
+                    (
+                        {**s, "field": pk_name}
+                        if isinstance(s, dict) and s.get("field") == "id"
+                        else s
+                    )
+                    for s in sort
+                ]
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)

@@ -5,14 +5,18 @@ between the ``id`` every row carries and what ``list_rows`` accepts as input.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from django.contrib import admin
+from django.contrib.sessions.models import Session
 from django.db.models import F
 from django.test import TestCase, override_settings
 from django.urls import path
+from django.utils import timezone
 from filer.models import Folder
 
+from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.field import SBAdminField
@@ -281,15 +285,15 @@ class DeclaredPrimaryKeyTests(TestCase):
     SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
 )
 class PrimaryKeyAliasTests(TestCase):
-    """A column that already targets the pk filter_field (without being named
-    after it) suppresses the synthetic column — no duplicate filter."""
+    """The synthetic pk column is skipped only when a declared column already
+    *is* the pk — not merely because a column's ``filter_field`` points at it."""
 
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
         sb_admin_site._registry.pop(Folder, None)
         super().tearDown()
 
-    def _filter_field_names(self, admin_class):
+    def _fields(self, admin_class):
         sb_admin_site._registry.pop(Folder, None)
         sb_admin_site.register(Folder, admin_class)
         MCPToolTestConfig().init_view_map()
@@ -297,12 +301,107 @@ class PrimaryKeyAliasTests(TestCase):
         user = MagicMock(is_authenticated=True, is_superuser=True)
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
         entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
-        return [f["name"] for f in entry["fields"]]
+        return {f["name"]: f for f in entry["fields"]}
 
     def test_explicit_filter_field_alias_suppresses_synthetic(self):
-        names = self._filter_field_names(_PkAliasFilterFieldAdmin)
-        self.assertEqual(names, ["public_id", "name"])  # no extra "id"
+        # ``public_id`` already addresses the pk (filter_field="id"), so no
+        # redundant synthetic "id" is added.
+        fields = self._fields(_PkAliasFilterFieldAdmin)
+        self.assertEqual(list(fields), ["public_id", "name"])  # no synthetic "id"
 
     def test_display_method_ordering_suppresses_synthetic(self):
-        names = self._filter_field_names(_PkMethodOrderingAdmin)
-        self.assertEqual(names, ["id_label", "name"])  # no extra "id"
+        # ``id_label`` orders on the pk → addresses it; no synthetic "id".
+        fields = self._fields(_PkMethodOrderingAdmin)
+        self.assertEqual(list(fields), ["id_label", "name"])  # no synthetic "id"
+
+
+class TabulatorIdColumnNameTests(TestCase):
+    """``get_tabulator_columns`` reports the row-id column name from the pk
+    column (``model_field.primary_key``); when no column is the pk — e.g. the
+    synthetic was skipped for an annotation alias — it falls back to the pk
+    field name (only the name; no column is grafted on)."""
+
+    def _id_column_name(self, column_fields, pk_name="id"):
+        action = SimpleNamespace(
+            column_fields=column_fields,
+            get_pk_field=lambda: SimpleNamespace(name=pk_name),
+        )
+        _, id_column_name = SBAdminListAction.get_tabulator_columns(action)
+        return id_column_name
+
+    def test_uses_pk_column_field_when_present(self):
+        pk_col = SimpleNamespace(
+            model_field=SimpleNamespace(primary_key=True),
+            field="id",
+            serialize_tabulator=lambda: {"field": "id"},
+        )
+        self.assertEqual(self._id_column_name([pk_col], pk_name="UNUSED"), "id")
+
+    def test_falls_back_to_pk_name_when_no_pk_column(self):
+        # An annotation that addresses the pk has no ``model_field.primary_key``.
+        alias = SimpleNamespace(
+            model_field=None,
+            field="public_id__annotate",
+            serialize_tabulator=lambda: {"field": "public_id__annotate"},
+        )
+        self.assertEqual(self._id_column_name([alias]), "id")
+
+
+class _SessionAdmin(SBAdmin):
+    """A model whose pk is a non-``id`` CharField (``session_key``)."""
+
+    model = Session
+    sbadmin_list_display = ("expire_date",)
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class CustomPkIdAliasTests(TestCase):
+    """For a model whose pk isn't named ``id``, ``"id"`` is accepted as an
+    alias on input — so the documented exact-row refetch works even though the
+    column is registered under the real pk name."""
+
+    def setUp(self):
+        super().setUp()
+        self._original = sb_admin_site._registry.pop(Session, None)
+        sb_admin_site.register(Session, _SessionAdmin)
+        MCPToolTestConfig().init_view_map()
+        MCPToolTestConfig.view_permission_for = None
+
+    def tearDown(self):
+        MCPToolTestConfig.view_permission_for = None
+        sb_admin_site._registry.pop(Session, None)
+        if self._original is not None:
+            sb_admin_site._registry[Session] = self._original
+        super().tearDown()
+
+    def _tools(self):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        return SBAdminTools(request=build_mcp_request(user))
+
+    def _view_id(self, tools):
+        result = tools.list_admins()
+        return next(
+            e["view_id"] for e in result["admin_views"] if e["model"] == "Session"
+        )
+
+    def test_id_alias_selects_sorts_and_filters_the_real_pk(self):
+        Session.objects.create(
+            session_key="abc123", session_data="", expire_date=timezone.now()
+        )
+        tools = self._tools()
+        view_id = self._view_id(tools)
+
+        # ``fields=["id"]`` resolves (alias → ``session_key``); row mirrors it.
+        rows = tools.list_rows(
+            view_id, fields=["id"], sort=[{"field": "id", "dir": "asc"}]
+        )["data"]
+        self.assertEqual([r["id"] for r in rows], ["abc123"])
+
+        # ``filter_data={"id": ...}`` refetches the exact row.
+        filtered = tools.list_rows(
+            view_id, fields=["id"], filter_data={"id": "abc123"}
+        )["data"]
+        self.assertEqual([r["id"] for r in filtered], ["abc123"])

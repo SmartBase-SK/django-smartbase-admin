@@ -150,16 +150,18 @@ class SBAdminListAction(SBAdminAction):
         return [field for field in self.column_fields if field.filter_widget]
 
     def get_tabulator_columns(self):
-        """Serialized Tabulator columns + the pk column's field name (the
-        frontend's ``tableIdColumnName``, or ``None`` if the column set has
-        no single pk). The pk is exposed as a real column upstream by
-        ``get_effective_list_display``, so it isn't grafted on here."""
+        """Serialized Tabulator columns + the pk field name (the frontend's
+        ``tableIdColumnName``)."""
         columns_serialized = []
         id_column_name = None
         for field in self.column_fields:
             if getattr(field.model_field, "primary_key", False):
                 id_column_name = field.field
             columns_serialized.append(field.serialize_tabulator())
+        if id_column_name is None:
+            # No column is the pk (e.g. an annotation addresses it instead);
+            # the pk value is still in every row, so name it directly.
+            id_column_name = self.get_pk_field().name
         return columns_serialized, id_column_name
 
     def get_excel_columns(self):

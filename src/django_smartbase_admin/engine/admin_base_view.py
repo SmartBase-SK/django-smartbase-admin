@@ -848,8 +848,16 @@ class SBAdminBaseListView(SBAdminBaseView):
         return list_display
 
     def _build_synthetic_pk_field(self, list_display):
-        """Synthetic read-only pk column, or ``None`` when the pk is already
-        declared / can't be resolved (e.g. a composite pk)."""
+        """Synthetic read-only pk column for the list — the canonical ``id``
+        column the agent uses for select / sort / filter, and the frontend for
+        row identity.
+
+        Returns ``None`` when a declared column already addresses the pk — by
+        name, by an explicit ``filter_field`` pointing at it, or via a method
+        ``@admin.display(ordering="id")`` — since the author has already
+        exposed it and a second column would be redundant; or when the pk
+        can't be resolved (e.g. a composite pk).
+        """
         from django_smartbase_admin.engine.filter_widgets import (
             PrimaryKeyFilterWidget,
         )
@@ -861,11 +869,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         pk_name = getattr(pk_model_field, "name", None)
         if not pk_name:
             return None
-        # Skip if a declared column already targets the pk — by name, by an
-        # explicit ``filter_field="id"``, or via a method's
-        # ``@admin.display(ordering="id")``. A second column on the same
-        # filter_field would collide, and the W001 duplicate check can't see
-        # one synthesized at runtime.
+
         for entry in list_display:
             name = getattr(entry, "name", entry)
             method = getattr(self, name, None) if isinstance(name, str) else None
@@ -878,11 +882,10 @@ class SBAdminBaseListView(SBAdminBaseView):
                 )
             ):
                 return None
+
         field = self.auto_create_field_from_model_field(pk_model_field)
         field.title = "ID"
-        # Hidden by default — present for select/sort/filter, not forced
-        # into every projection (the pk is emitted regardless).
-        field.list_visible = False
+        field.list_visible = False  # off by default; still select/sort/filterable
         field.filter_widget = PrimaryKeyFilterWidget()
         return field
 

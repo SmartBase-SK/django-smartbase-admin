@@ -406,16 +406,10 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
     _SEPARATORS = re.compile(r"[\s,;]+")
 
     def parse_value_from_input(self, request, filter_value):
-        """Normalise input to a flat list of pks, dropping empties and any
-        value that can't be this pk.
-
-        Accepts a native scalar or list (MCP) or a string of pks separated
-        by commas, whitespace, or semicolons (the text-input UI: ``"5"``,
-        ``"5, 9"``, ``"5 9"``, ``"5;9"``). Each value is coerced through the
-        pk field, so an id that doesn't fit (e.g. ``"abc"`` for an integer
-        pk) is dropped rather than handed to the ORM — where it would raise
-        and 500 the list query for the browser.
-        """
+        """Flat list of pks. Accepts a native scalar/list (MCP) or a string of
+        pks separated by commas, whitespace, or semicolons (the UI text box).
+        Values are coerced through the pk field; ones that can't be this pk
+        (e.g. ``"abc"`` for an int pk) are dropped, not handed to the ORM."""
         value = filter_value
         if isinstance(value, str):
             value = [part for part in self._SEPARATORS.split(value.strip()) if part]
@@ -435,8 +429,7 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
 
     def get_base_filter_query_for_parsed_value(self, request, parsed_value):
         if not parsed_value:
-            # No usable pk → no constraint (matches how the other widgets
-            # treat an empty value: the filter simply doesn't narrow).
+            # No usable pk → no constraint, like the other widgets on empty.
             return Q()
         return Q(**{f"{self.field.filter_field}__in": parsed_value})
 
@@ -450,8 +443,8 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
                     "primary keys (int or str), got "
                     f"{type(item).__name__}: {item!r}"
                 )
-            # Reject an id that can't be this pk up front, so MCP gets a clear
-            # error instead of the ORM's coercion failure mid-query.
+            # Reject up front so MCP gets a clear error, not an ORM failure
+            # mid-query.
             if self.model_field is not None:
                 try:
                     self.model_field.get_prep_value(item)
