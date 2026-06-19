@@ -64,9 +64,7 @@ class PrimaryKeyFieldTests(TestCase):
 
     def test_schema_surfaces_synthetic_pk_with_widget_and_shape(self):
         result = self._tools().list_admins()
-        entry = next(
-            e for e in result["admin_views"] if e["view_id"] == "filer_folder"
-        )
+        entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
         fields_by_name = {f["name"]: f for f in entry["fields"]}
 
         self.assertIn("id", fields_by_name)
@@ -201,9 +199,7 @@ class DeclaredPrimaryKeyTests(TestCase):
 
     def test_declared_pk_is_not_duplicated(self):
         result = self._tools().list_admins()
-        entry = next(
-            e for e in result["admin_views"] if e["view_id"] == "filer_folder"
-        )
+        entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
         names = [f["name"] for f in entry["fields"]]
         self.assertEqual(names, ["id", "name"])  # exactly one "id", no dup
 
