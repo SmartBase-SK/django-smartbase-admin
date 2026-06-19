@@ -14,7 +14,6 @@ from django.db.models import (
     FilteredRelation,
 )
 from django.db.models.functions import Concat
-
 from django_smartbase_admin.engine.const import ANNOTATE_KEY, Formatter
 from django_smartbase_admin.engine.field_formatter import (
     boolean_formatter,
@@ -23,10 +22,11 @@ from django_smartbase_admin.engine.field_formatter import (
     datetime_formatter,
 )
 from django_smartbase_admin.engine.filter_widgets import (
-    StringFilterWidget,
+    AutocompleteFilterWidget,
     BooleanFilterWidget,
     DateFilterWidget,
-    AutocompleteFilterWidget,
+    MultipleChoiceFilterWidget,
+    StringFilterWidget,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.xlsx_export import SBAdminXLSXFormat
@@ -205,12 +205,13 @@ class SBAdminField(JSONSerializableMixin):
         filter_widget = getattr(self, "filter_widget", None)
         if self.filter_disabled:
             return
-        if not filter_widget and getattr(self, "model_field", False):
-            filter_widget = StringFilterWidget.apply_to_field(self)
-            filter_widget = filter_widget or BooleanFilterWidget.apply_to_field(self)
-            filter_widget = filter_widget or DateFilterWidget.apply_to_field(self)
-            filter_widget = filter_widget or AutocompleteFilterWidget.apply_to_field(
-                self
+        if not filter_widget and getattr(self, "model_field", None):
+            filter_widget = (
+                BooleanFilterWidget.apply_to_field(self)
+                or DateFilterWidget.apply_to_field(self)
+                or AutocompleteFilterWidget.apply_to_field(self)
+                or MultipleChoiceFilterWidget.apply_to_field(self)
+                or StringFilterWidget.apply_to_field(self)
             )
         if not filter_widget:
             filter_widget = StringFilterWidget()
