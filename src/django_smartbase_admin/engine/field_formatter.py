@@ -1,9 +1,13 @@
 import datetime
+from collections.abc import Callable
 from enum import Enum
+from typing import Any
 
+from django.db.models import Field
 from django.template.defaultfilters import date, time
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.hashable import make_hashable
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -59,6 +63,29 @@ def boolean_formatter(object_id, value):
     return format_html(
         '<span class="badge badge-simple badge-neutral">{}</span>', _("No")
     )
+
+
+def build_choice_formatter_for_field(
+    model_field: Field, empty_value_display: Any
+) -> Callable[[Any, Any], Any] | None:
+    """Build a formatter that resolves stored choice values to human-readable labels.
+
+    Mirrors ``django.contrib.admin.utils.display_for_field`` for fields with
+    ``flatchoices``.
+    """
+    flatchoices = getattr(model_field, "flatchoices", None)
+    if not flatchoices:
+        return None
+
+    def formatter(object_id, value):
+        try:
+            return dict(flatchoices).get(value, empty_value_display)
+        except TypeError:
+            return dict(make_hashable(flatchoices)).get(
+                make_hashable(value), empty_value_display
+            )
+
+    return formatter
 
 
 # Built-in formatters that produce locale-dependent strings. The MCP

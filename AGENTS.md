@@ -19,7 +19,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
-| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options, automatic choice formatting |
 | [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -2496,6 +2496,7 @@ from django_smartbase_admin.engine.field_formatter import (
     array_badge_formatter,                  # Display list as horizontal badges
     newline_separated_array_badge_formatter, # Display list as vertical badges (one per line)
     boolean_formatter,                      # Yes/No badges
+    build_choice_formatter_for_field,       # Choice value → label (auto-assigned on choice fields)
     datetime_formatter,                     # Localized datetime
     datetime_formatter_with_format,         # Custom date/time format
     link_formatter,                         # Clickable URL
@@ -2503,6 +2504,8 @@ from django_smartbase_admin.engine.field_formatter import (
     format_array,                           # Custom badge formatting with BadgeType
 )
 ```
+
+`SBAdminField.init_field_static()` also auto-assigns `python_formatter` for date, boolean, and choice (`flatchoices`) model fields. Choice fields use `build_choice_formatter_for_field`. Set `python_formatter` explicitly or use an admin method to override.
 
 ### Array Badge Formatters
 
