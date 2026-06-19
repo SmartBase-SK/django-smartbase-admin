@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Q
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import path
@@ -15,7 +15,11 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
-from django_smartbase_admin.engine.const import FILTER_DATA_NAME, IGNORE_LIST_SELECTION
+from django_smartbase_admin.engine.const import (
+    FILTER_DATA_NAME,
+    IGNORE_LIST_SELECTION,
+    PARENT_FILTER_DATA_NAME,
+)
 from django_smartbase_admin.engine.dashboard import (
     SbAdminCalendarWidget,
     SBAdminDashboardChartWidget,
@@ -183,6 +187,18 @@ class _DashboardParentWidget(SBAdminDashboardWidget):
 
 class _DashboardListGroupWidget(_DashboardGroupWidget):
     sub_widgets = [_StandaloneDashboardWidget()]
+
+
+class _DashboardParentFilterListWidget(_StandaloneDashboardWidget):
+    dashboard_filter_data = None
+
+    def get_filter_from_dashboard_filter(self, request, dashboard_filter_data):
+        self.dashboard_filter_data = dashboard_filter_data
+        return Q()
+
+
+class _DashboardParentFilterListGroupWidget(_DashboardGroupWidget):
+    sub_widgets = [_DashboardParentFilterListWidget()]
 
 
 class _DashboardHtmlGroupWidget(_DashboardGroupWidget):
@@ -795,6 +811,47 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
             "/dashboard_group_widget/action_list_json/template/parent-object/",
             html,
         )
+        tabulator_definition = widget.get_sub_widgets()[0].get_tabulator_definition(
+            request
+        )
+        self.assertEqual(
+            tabulator_definition["parentWidgetId"], "dashboard_group_widget"
+        )
+        self.assertIn("dashboardParentFilterModule", tabulator_definition["modules"])
+        self.assertEqual(
+            widget.get_data(request),
+            {"sub_widget": {"dashboard_group_widget_0": {}}},
+        )
+
+    def test_dashboard_list_widget_passes_parent_filter_data_to_filter_hook(self):
+        widget = _DashboardParentFilterListGroupWidget()
+        self.init_dashboard_widget_static(widget)
+        request = self.factory.get("/dashboard/")
+        request.LANGUAGE_CODE = "en"
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            object_id="parent-object",
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+            global_filter_instance=[],
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        widget.init_view_dynamic(request, request_data=request.request_data)
+        list_widget = widget.get_sub_widgets()[0]
+
+        action = SBAdminListAction(
+            list_widget,
+            request,
+            all_params={
+                "dashboard_group_widget_0": {PARENT_FILTER_DATA_NAME: {"shipper": "42"}}
+            },
+        )
+        action.get_filter_from_request()
+
+        self.assertEqual(list_widget.dashboard_filter_data, {"shipper": "42"})
 
     def test_dashboard_group_widget_updates_html_subwidget_from_parent_data(self):
         widget = _DashboardHtmlGroupWidget()

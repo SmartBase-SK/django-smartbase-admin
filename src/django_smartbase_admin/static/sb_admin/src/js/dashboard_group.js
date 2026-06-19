@@ -6,8 +6,9 @@ class SBAdminDashboardGroup {
         this.groupId = element.dataset.dashboardGroupId
         this.formId = element.dataset.filterFormId
         this.ajaxUrl = element.dataset.ajaxUrl
-        this.subWidgets = {}
+        this.subWidgets = new Map()
         this.lastData = null
+        this.refreshCount = 0
         this.initialized = false
     }
 
@@ -30,7 +31,10 @@ class SBAdminDashboardGroup {
         return values
     }
 
-    updateSubWidget(definition, responseData) {
+    updateSubWidget(definition, responseData, isInitialData = false) {
+        if (isInitialData && definition.skipInitialData) {
+            return
+        }
         const widgetData = responseData.sub_widget[definition.widgetId]
         if (!widgetData || !definition.onData) {
             return
@@ -39,21 +43,23 @@ class SBAdminDashboardGroup {
     }
 
     refresh() {
+        const isInitialData = this.refreshCount === 0
         fetch(`${this.ajaxUrl}?${new URLSearchParams(this.formValues())}`, {
             method: 'GET',
             headers: {"X-CSRFToken": window.csrf_token},
         }).then(response => response.json()).then(response => {
             this.lastData = response.data
-            Object.values(this.subWidgets).forEach((definition) => {
-                this.updateSubWidget(definition, this.lastData)
+            this.refreshCount += 1
+            this.subWidgets.forEach((definition) => {
+                this.updateSubWidget(definition, this.lastData, isInitialData)
             })
         })
     }
 
     registerSubWidget(definition) {
-        this.subWidgets[definition.widgetId] = definition
+        this.subWidgets.set(definition.widgetId, definition)
         if (this.lastData) {
-            this.updateSubWidget(definition, this.lastData)
+            this.updateSubWidget(definition, this.lastData, this.refreshCount === 1)
         }
     }
 
@@ -74,36 +80,38 @@ class SBAdminDashboardGroup {
     }
 }
 
+const registeredSubWidgets = new Map()
+
+function getRegisteredSubWidgets(groupId) {
+    if (!registeredSubWidgets.has(groupId)) {
+        registeredSubWidgets.set(groupId, new Map())
+    }
+    return registeredSubWidgets.get(groupId)
+}
+
 function initDashboardGroups() {
     window.SBAdminDashboardGroups = window.SBAdminDashboardGroups || {}
     document.querySelectorAll('[data-dashboard-group-id]').forEach((element) => {
         const groupId = element.dataset.dashboardGroupId
-        const group = window.SBAdminDashboardGroups[groupId] || new SBAdminDashboardGroup(element)
-        window.SBAdminDashboardGroups[groupId] = group
-        const pendingDefinitions = window.SBAdminDashboardGroupPendingSubWidgets[groupId] || []
-        pendingDefinitions.forEach((definition) => {
+        const group = new SBAdminDashboardGroup(element)
+        // Child widgets usually register while the group HTML is rendering.
+        // Init copies those callbacks into the live group before the first shared AJAX refresh.
+        getRegisteredSubWidgets(group.groupId).forEach((definition) => {
             group.registerSubWidget(definition)
         })
-        window.SBAdminDashboardGroupPendingSubWidgets[groupId] = []
+        window.SBAdminDashboardGroups[groupId] = group
         group.init()
     })
 }
 
-window.SBAdminDashboardGroups = window.SBAdminDashboardGroups || {}
-window.SBAdminDashboardGroupPendingSubWidgets = window.SBAdminDashboardGroupPendingSubWidgets || {}
 window.SBAdminRegisterDashboardSubWidget = function(groupId, definition) {
-    const group = window.SBAdminDashboardGroups[groupId]
+    // Keep every child callback in the registration map so init can wire it once the group exists.
+    getRegisteredSubWidgets(groupId).set(definition.widgetId, definition)
+    const group = window.SBAdminDashboardGroups && window.SBAdminDashboardGroups[groupId]
     if (group) {
+        // Some widgets, especially tables, initialize after the group. Attach them immediately too.
+        // registerSubWidget de-duplicates by widgetId through the group's Map.
         group.registerSubWidget(definition)
-        return
     }
-    window.SBAdminDashboardGroupPendingSubWidgets[groupId] = window.SBAdminDashboardGroupPendingSubWidgets[groupId] || []
-    window.SBAdminDashboardGroupPendingSubWidgets[groupId].push(definition)
 }
-
-if (window.SBAdminMainLoaded) {
-    initDashboardGroups()
-} else {
-    document.addEventListener('SBAdminMainLoaded', initDashboardGroups, {once: true})
-}
-document.dispatchEvent(new Event('SBAdminDashboardGroupLoaded'))
+window.SBAdminInitDashboardGroups = initDashboardGroups

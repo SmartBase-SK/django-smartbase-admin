@@ -13,10 +13,6 @@
         <script>
             (function() {
                 const registerHtmlWidget = function() {
-                    if (typeof window.SBAdminRegisterDashboardSubWidget !== 'function') {
-                        document.addEventListener('SBAdminDashboardGroupLoaded', registerHtmlWidget, {once: true});
-                        return;
-                    }
                     const element = document.getElementById("{{ widget_id }}");
                     const contentElement = element ? element.querySelector('[data-dashboard-html-widget-content]') : null;
                     if (!contentElement) {

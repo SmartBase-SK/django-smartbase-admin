@@ -152,4 +152,3 @@ class SBAdminChart {
 }
 
 window.SBAdminChartClass = SBAdminChart
-document.dispatchEvent(new Event('SBAdminChartClassLoaded'))

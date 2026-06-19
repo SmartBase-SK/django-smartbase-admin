@@ -5,7 +5,7 @@ from django import forms
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, TruncYear
 from django.http import JsonResponse
 from django.template.loader import render_to_string
@@ -15,7 +15,10 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
-from django_smartbase_admin.engine.const import OBJECT_ID_PLACEHOLDER
+from django_smartbase_admin.engine.const import (
+    OBJECT_ID_PLACEHOLDER,
+    PARENT_FILTER_DATA_NAME,
+)
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     DateFilterWidget,
@@ -791,6 +794,17 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         qs = super().get_queryset(request)
         return self._filter_queryset_by_parent_request(request, qs)
 
+    def get_extra_filter_from_request(self, request, list_action):
+        return self.get_filter_from_dashboard_filter(
+            request, list_action.params.get(PARENT_FILTER_DATA_NAME, {})
+        )
+
+    def get_filter_from_dashboard_filter(self, request, dashboard_filter_data):
+        return Q()
+
+    def get_data(self, request):
+        return {}
+
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         super().init_view_dynamic(request, request_data, **kwargs)
         self.init_fields_cache(
@@ -816,6 +830,9 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
 
     def get_tabulator_definition(self, request):
         tabulator_definition = super().get_tabulator_definition(request)
+        parent_group_widget = self.get_parent_group_widget()
+        if parent_group_widget:
+            tabulator_definition["parentWidgetId"] = parent_group_widget.get_id()
         tabulator_definition["stickyHeaderAndFooter"] = False
         tabulator_definition["modules"] = [
             "viewsModule",
@@ -824,6 +841,8 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
             "filterModule",
             "columnDisplayModule",
         ]
+        if parent_group_widget:
+            tabulator_definition["modules"].append("dashboardParentFilterModule")
         return tabulator_definition
 
 

@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponse, JsonResponse, HttpRequest, Http404
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -672,6 +672,9 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_list_view_media(self, request):
         return forms.Media(js=("sb_admin/dist/table.js",))
+
+    def get_extra_filter_from_request(self, request, list_action):
+        return Q()
 
     @classmethod
     def _postgres_unaccent_extension_available(cls) -> bool:

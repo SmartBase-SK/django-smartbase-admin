@@ -15,42 +15,35 @@
             {{ initial_data|get_json_script:'initial_data' }}
             <script>
                 (function() {
-                    const initChart = function() {
-                        if (typeof window.SBAdminChartClass !== 'function') {
-                            document.addEventListener('SBAdminChartClassLoaded', initChart, {once: true});
-                            return;
-                        }
-                        window.SBAdminChart = window.SBAdminChart || {};
-                        window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
-                            {% if parent_widget_id %}
-                            "parentWidgetId": "{{ parent_widget_id }}",
-                            {% else %}
-                            "formId": "{{ filter_form_id }}",
-                            "ajaxUrl": "{{ ajax_url }}",
-                            {% endif %}
-                            "widgetId": "{{ widget_id }}",
-                            "chartType": "{{ chart_type }}",
-                            "chartOptions": {
-                                scales: {
-                                    x: {
-                                        ticks: {
-                                            font: {
-                                                weight: 600,
-                                            }
+                    window.SBAdminChart = window.SBAdminChart || {};
+                    window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                        {% if parent_widget_id %}
+                        "parentWidgetId": "{{ parent_widget_id }}",
+                        {% else %}
+                        "formId": "{{ filter_form_id }}",
+                        "ajaxUrl": "{{ ajax_url }}",
+                        {% endif %}
+                        "widgetId": "{{ widget_id }}",
+                        "chartType": "{{ chart_type }}",
+                        "chartOptions": {
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        font: {
+                                            weight: 600,
                                         }
-                                    },
-                                    y: {
-                                        ticks: {
-                                            font: {
-                                                weight: 600,
-                                            }
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        font: {
+                                            weight: 600,
                                         }
                                     }
                                 }
                             }
-                        });
-                    };
-                    initChart();
+                        }
+                    });
                 })();
             </script>
         </div>

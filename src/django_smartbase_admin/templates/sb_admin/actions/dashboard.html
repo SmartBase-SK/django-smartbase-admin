@@ -7,14 +7,17 @@
 {% endblock %}
 
 {% block content %}
+    {{ dashboard_media.js }}
     <div class="w-full max-w-1180 mx-auto dashboard-wrapper">
         {% for widget in direct_sub_views %}
             {% render_widget widget request %}
         {% endfor %}
     </div>
+    <script>
+        window.SBAdminInitDashboardGroups()
+    </script>
 {% endblock %}
 
 {% block additional_js %}
     {{ block.super }}
-    {{ dashboard_media.js }}
 {% endblock %}
