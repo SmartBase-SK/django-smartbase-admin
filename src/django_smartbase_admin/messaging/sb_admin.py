@@ -14,6 +14,7 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
@@ -52,6 +53,22 @@ class _MessageTypeBadgeMixin:
         return SBAdminMessagingService.render_message_type_badge(
             value, messaging_config
         )
+
+
+def _bold_title_formatter(object_id, value):
+    """Render a list cell value in bold."""
+    return format_html('<span class="font-semibold">{}</span>', value or "")
+
+
+def _read_status_badge(object_id, value):
+    """Render a read/unread badge from a ``read_at`` value (success / negative)."""
+    if value:
+        return format_html(
+            '<span class="badge badge-simple badge-positive">{}</span>', _("Read")
+        )
+    return format_html(
+        '<span class="badge badge-simple badge-negative">{}</span>', _("Unread")
+    )
 
 
 def _sender_filter_query(request, value):
@@ -107,7 +124,9 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
     sbadmin_list_history_enabled = False
 
     sbadmin_list_display = (
-        SBAdminField(name="title", title=_("Title")),
+        SBAdminField(
+            name="title", title=_("Title"), python_formatter=_bold_title_formatter
+        ),
         SBAdminField(
             name="type_badge",
             title=_("Type"),
@@ -243,6 +262,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
             name="title",
             title=_("Title"),
             annotate=F("message__title"),
+            python_formatter=_bold_title_formatter,
         ),
         SBAdminField(
             name="type_badge",
@@ -255,7 +275,12 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
             annotate=F("message__created_at"),
             python_formatter=datetime_formatter,
         ),
-        SBAdminField(name="read_at", title=_("Read"), filter_disabled=True),
+        SBAdminField(
+            name="read_at",
+            title=_("Read"),
+            python_formatter=_read_status_badge,
+            filter_disabled=True,
+        ),
     )
     ordering = ["-message__created_at"]
 
