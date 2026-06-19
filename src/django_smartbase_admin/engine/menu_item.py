@@ -1,4 +1,6 @@
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 
 from django_smartbase_admin.services.configuration import SBAdminConfigurationService
 
@@ -12,6 +14,8 @@ class SBAdminMenuItem(object):
     sub_items = None
     is_active = None
     parent_menu_item = None
+    badge = None
+    badge_class = "badge badge-simple badge-primary ml-auto"
 
     def __init__(
         self,
@@ -20,6 +24,8 @@ class SBAdminMenuItem(object):
         label=None,
         url=None,
         sub_items=None,
+        badge=None,
+        badge_class=None,
     ) -> None:
         super().__init__()
         self.view_id = view_id or self.view_id
@@ -27,6 +33,8 @@ class SBAdminMenuItem(object):
         self.label = label or self.label
         self.url = url or self.url
         self.sub_items = sub_items or self.sub_items or []
+        self.badge = badge if badge is not None else self.badge
+        self.badge_class = badge_class or self.badge_class
 
     @classmethod
     def init_menu_item_static_cls(cls, menu_item, view_id, view_map):
@@ -68,6 +76,25 @@ class SBAdminMenuItem(object):
     def get_icon(self):
         return self.icon or getattr(self.view, "icon", None)
 
+    def get_badge(self, request):
+        badge = self.badge
+        if callable(badge):
+            badge = badge(request)
+        return badge or None
+
+    def get_badge_class(self, request):
+        return self.badge_class
+
+    def render_badge(self, request):
+        badge = self.get_badge(request)
+        if badge is None:
+            return None
+        if isinstance(badge, SafeString):
+            return badge
+        return format_html(
+            '<span class="{}">{}</span>', self.get_badge_class(request), badge
+        )
+
     def get_subitems_serialized(self, request, request_data):
         subitem_active = False
         subitems_serialized = []
@@ -87,6 +114,7 @@ class SBAdminMenuItem(object):
             "get_url": self.get_url(request),
             "get_id": self.get_id(),
             "get_view_id": self.get_view_id(),
+            "get_badge": self.render_badge(request),
             "is_active": active,
         }
         return json_dict, active

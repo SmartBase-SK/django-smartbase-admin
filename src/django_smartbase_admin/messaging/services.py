@@ -41,6 +41,32 @@ def get_messaging_config(request):
     return getattr(configuration, "messaging_config", None)
 
 
+def get_unread_count(request):
+    """Return the count of unread messages for the request's user.
+
+    Designed to be passed straight to an ``SBAdminMenuItem``'s ``badge``
+    argument so the inbox menu entry shows an unread-message badge::
+
+        SBAdminMenuItem(
+            view_id="sb_admin_messaging_messagerecipient",
+            label=_("My messages"),
+            icon="Mail",
+            badge=get_unread_count,
+        )
+
+    Returns ``0`` when messaging is disabled or the user is anonymous, which
+    renders no badge.
+    """
+    if not get_messaging_config(request):
+        return 0
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        return 0
+    return MessageRecipient.objects.filter(
+        user=user, read_at__isnull=True
+    ).count()
+
+
 def get_poller_context(request):
     """Build the global-context keys driving the notification poller.
 
