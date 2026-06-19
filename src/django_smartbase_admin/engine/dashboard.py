@@ -37,9 +37,6 @@ class SBAdminDashboardWidget(SBAdminView):
     sub_widgets = None
     global_filter_data_map = None
     cache_enabled = False
-    group_ajax_calls = False
-    group_ajax_media = forms.Media(js=("sb_admin/dist/dashboard_group.js",))
-    group_ajax_template_name = "sb_admin/dashboard/group_widget.html"
     SUB_WIDGET_NAME_SUFFIX = "_sub_widget"
     path_to_parent_instance_id = None
 
@@ -53,14 +50,9 @@ class SBAdminDashboardWidget(SBAdminView):
         settings=None,
         sub_widgets=None,
         global_filter_data_map=None,
-        group_ajax_calls=None,
     ) -> None:
         super().__init__()
-        if group_ajax_calls is not None:
-            self.group_ajax_calls = group_ajax_calls
         self.template_name = self.template_name or template_name
-        if self.group_ajax_calls and self.template_name is None:
-            self.template_name = self.group_ajax_template_name
         self.name = self.name or name
         self.model = self.model or model
         self.annotates = self.annotates or annotates
@@ -100,8 +92,6 @@ class SBAdminDashboardWidget(SBAdminView):
         return self.settings
 
     def get_ajax_url(self, request=None):
-        if self.has_parent_group_ajax_calls():
-            return self.parent_view.get_ajax_url(request)
         return self.get_action_url(
             "action_get_data", object_id=self.get_parent_instance_id(request)
         )
@@ -150,8 +140,10 @@ class SBAdminDashboardWidget(SBAdminView):
             "request": request,
             "filter_form_id": self.get_filter_form_id(),
         }
-        if self.has_parent_group_ajax_calls():
-            context["parent_widget_id"] = self.parent_view.get_id()
+        parent_group_widget = self.get_parent_group_widget()
+        if parent_group_widget:
+            context["parent_widget_id"] = parent_group_widget.get_id()
+            context["parent_ajax_url"] = parent_group_widget.get_ajax_url(request)
         return context
 
     def get_sub_widgets(self):
@@ -165,16 +157,12 @@ class SBAdminDashboardWidget(SBAdminView):
         widget_media = self.media
         if widget_media:
             media += widget_media
-        if self.group_ajax_calls:
-            media += self.group_ajax_media
         for widget in self.get_sub_widgets():
             if hasattr(widget, "get_media"):
                 media += widget.get_media()
         return media
 
     def get_template_name(self):
-        if self.group_ajax_calls and self.template_name is None:
-            return self.group_ajax_template_name
         return self.template_name
 
     def render(self, request):
@@ -196,13 +184,6 @@ class SBAdminDashboardWidget(SBAdminView):
         return settings
 
     def get_data(self, request):
-        if self.group_ajax_calls:
-            return {
-                "sub_widget": {
-                    sub_widget.get_id(): sub_widget.get_data(request)
-                    for sub_widget in self.get_sub_widgets()
-                }
-            }
         raise NotImplementedError
 
     def get_cached_data(self, request):
@@ -229,16 +210,32 @@ class SBAdminDashboardWidget(SBAdminView):
         self.view_id = sub_widget_id
         self.parent_view = parent_view
 
-    def has_parent_group_ajax_calls(self):
-        return self.parent_view is not None and getattr(
-            self.parent_view, "group_ajax_calls", False
-        )
+    def get_parent_group_widget(self):
+        parent_view = self.parent_view
+        if parent_view is not None and isinstance(
+            parent_view, SBAdminDashboardGroupWidget
+        ):
+            return parent_view
+        return None
 
     def init_view_dynamic(self, request, request_data=None, **kwargs):
         result = super().init_view_dynamic(request, request_data, **kwargs)
         for sub_widget in self.get_sub_widgets():
             sub_widget.init_view_dynamic(request, request_data, **kwargs)
         return result
+
+
+class SBAdminDashboardGroupWidget(SBAdminDashboardWidget):
+    template_name = "sb_admin/dashboard/group_widget.html"
+    media = forms.Media(js=("sb_admin/dist/dashboard_group.js",))
+
+    def get_data(self, request):
+        return {
+            "sub_widget": {
+                sub_widget.get_id(): sub_widget.get_data(request)
+                for sub_widget in self.get_sub_widgets()
+            }
+        }
 
 
 class SBAdminChartAggregateSubWidget(object):

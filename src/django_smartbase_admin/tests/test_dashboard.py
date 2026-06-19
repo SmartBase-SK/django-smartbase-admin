@@ -17,6 +17,7 @@ from django_smartbase_admin.engine.const import FILTER_DATA_NAME, IGNORE_LIST_SE
 from django_smartbase_admin.engine.dashboard import (
     SbAdminCalendarWidget,
     SBAdminDashboardChartWidget,
+    SBAdminDashboardGroupWidget,
     SBAdminDashboardHtmlWidget,
     SBAdminDashboardListWidget,
     SBAdminDashboardWidget,
@@ -109,10 +110,9 @@ class _DashboardHtmlSubWidget(SBAdminDashboardHtmlWidget):
         return "<p>Rendered HTML</p>"
 
 
-class _DashboardGroupWidget(SBAdminDashboardWidget):
+class _DashboardGroupWidget(SBAdminDashboardGroupWidget):
     widget_id = "dashboard_group_widget"
     name = "Group widget"
-    group_ajax_calls = True
     sub_widgets = [
         _DashboardGroupSubWidget(),
         _DashboardGroupSubWidget(),
@@ -164,6 +164,17 @@ class _DashboardGroupChartSubWidget(SBAdminDashboardChartWidget):
 
 class _DashboardChartGroupWidget(_DashboardGroupWidget):
     sub_widgets = [_DashboardGroupChartSubWidget()]
+
+
+class _DashboardParentWidget(SBAdminDashboardWidget):
+    widget_id = "dashboard_parent_widget"
+    sub_widgets = [_DashboardGroupChartSubWidget()]
+
+    def get_action_url(self, action, modifier="template", object_id=None):
+        return f"/{self.get_id()}/{action}/{modifier}/"
+
+    def has_view_or_change_permission(self, request, obj=None):
+        return True
 
 
 class _DashboardListGroupWidget(_DashboardGroupWidget):
@@ -244,6 +255,11 @@ class _CustomParentScopedListWidget(_StandaloneDashboardWidget):
 class TestSBAdminDashboardListWidget(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
+
+    def init_dashboard_widget_static(self, widget):
+        configuration = SimpleNamespace(view_map={})
+        widget.init_widget_static(configuration)
+        return configuration
 
     def test_init_view_dynamic_preserves_sbadmin_field_metadata(self):
         widget = _DashboardWidget()
@@ -641,6 +657,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
     def test_dashboard_group_widget_initializes_existing_sub_widgets(self):
         widget = _DashboardGroupWidget()
+        self.init_dashboard_widget_static(widget)
         request = self.factory.get("/dashboard/")
         request.request_data = SimpleNamespace(
             configuration=SBAdminRoleConfiguration(),
@@ -667,6 +684,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
     def test_dashboard_group_widget_template_owns_single_parent_ajax_call(self):
         widget = _DashboardGroupWidget()
+        self.init_dashboard_widget_static(widget)
         request = self.factory.get("/dashboard/")
         request.request_data = SimpleNamespace(
             configuration=SBAdminRoleConfiguration(),
@@ -694,6 +712,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self,
     ):
         widget = _DashboardChartGroupWidget()
+        self.init_dashboard_widget_static(widget)
         request = self.factory.get("/dashboard/")
         request.request_data = SimpleNamespace(
             configuration=SBAdminRoleConfiguration(),
@@ -716,8 +735,32 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         )
         self.assertIn("SBAdminChartClassLoaded", html)
 
+    def test_dashboard_parent_widget_keeps_chart_subwidget_own_ajax(self):
+        widget = _DashboardParentWidget()
+        self.init_dashboard_widget_static(widget)
+        request = self.factory.get("/dashboard/")
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            object_id=None,
+        )
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        sub_widget = widget.get_sub_widgets()[0]
+        html = render_to_string(
+            sub_widget.template_name,
+            sub_widget.get_widget_context_data(request),
+            request=request,
+        )
+
+        self.assertNotIn('"parentWidgetId": "dashboard_parent_widget"', html)
+        self.assertIn('"formId": "dashboard_parent_widget-filter-form"', html)
+        self.assertIn("dashboard_parent_widget_0/action_get_data/template/", html)
+
     def test_dashboard_group_widget_keeps_list_subwidget_table_ajax(self):
         widget = _DashboardListGroupWidget()
+        self.init_dashboard_widget_static(widget)
         request = self.factory.get("/dashboard/")
         request.LANGUAGE_CODE = "en"
         request.request_data = SimpleNamespace(
@@ -750,6 +793,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
 
     def test_dashboard_group_widget_updates_html_subwidget_from_parent_data(self):
         widget = _DashboardHtmlGroupWidget()
+        self.init_dashboard_widget_static(widget)
         request = self.factory.get("/dashboard/")
         request.request_data = SimpleNamespace(
             configuration=SBAdminRoleConfiguration(),

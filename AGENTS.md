@@ -4663,7 +4663,7 @@ registered_views = [
 
 ### 3. Widget With Subwidgets and Grouped AJAX
 
-Set `group_ajax_calls=True` on the parent when several subwidgets should refresh from one parent AJAX response. This is useful for dashboards with one global filter form and multiple related child widgets. The parent calls each child `get_data(request)` and returns:
+Use `SBAdminDashboardGroupWidget` as the parent when several subwidgets should refresh from one parent AJAX response. This is useful for dashboards with one global filter form and multiple related child widgets. The parent calls each child `get_data(request)` and returns:
 
 ```python
 {
@@ -4685,17 +4685,16 @@ from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.engine.dashboard import (
     SBAdminDashboardChartWidget,
+    SBAdminDashboardGroupWidget,
     SBAdminDashboardHtmlWidget,
-    SBAdminDashboardWidget,
 )
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget, DateFilterWidget
 
 
-class GroupedSalesDashboardWidget(SBAdminDashboardWidget):
+class GroupedSalesDashboardWidget(SBAdminDashboardGroupWidget):
     widget_id = "sales_dashboard"
     name = _("Sales dashboard")
-    group_ajax_calls = True
 
     def __init__(self, *args, **kwargs):
         settings = [
