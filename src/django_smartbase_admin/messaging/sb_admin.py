@@ -8,7 +8,9 @@
   marks it read, and it hosts the notification poll + acknowledge endpoints.
 """
 
-from django.db.models import Count, F, Q
+from django.contrib.auth import get_user_model
+from django.db.models import Count, F, Q, TextField, Value
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -19,6 +21,7 @@ from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_a
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.field_formatter import datetime_formatter
+from django_smartbase_admin.engine.filter_widgets import StringFilterWidget
 from django_smartbase_admin.messaging.config import NotificationStyle
 from django_smartbase_admin.messaging.forms import (
     MessageForm,
@@ -43,8 +46,25 @@ class _MessageTypeBadgeMixin:
             request = SBAdminThreadLocalService.get_request()
         except LookupError:
             request = None
-        messaging_config = SBAdminMessagingService.get_messaging_config(request) if request else None
-        return SBAdminMessagingService.render_message_type_badge(value, messaging_config)
+        messaging_config = (
+            SBAdminMessagingService.get_messaging_config(request) if request else None
+        )
+        return SBAdminMessagingService.render_message_type_badge(
+            value, messaging_config
+        )
+
+
+def _sender_filter_query(request, value):
+    """Match the sender (message author) by full name, email, or username."""
+    if not value:
+        return Q()
+    username_field = get_user_model().USERNAME_FIELD
+    return (
+        Q(message__created_by__first_name__icontains=value)
+        | Q(message__created_by__last_name__icontains=value)
+        | Q(message__created_by__email__icontains=value)
+        | Q(**{f"message__created_by__{username_field}__icontains": value})
+    )
 
 
 def render_message_card(message):
@@ -106,6 +126,14 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
     search_fields = ["title", "content"]
 
     inlines = [MessageAttachmentInline, MessageRecipientStatusInline]
+
+    def get_queryset(self, request=None):
+        # "Sent" view: scope to messages authored by the current user.
+        qs = super().get_queryset(request)
+        user = getattr(request, "user", None) if request else None
+        if user and user.is_authenticated:
+            return qs.filter(created_by=user)
+        return qs
 
     def get_sbadmin_fieldsets(self, request, object_id=None):
         # Created message → single read-only detail card. Otherwise the editable
@@ -187,23 +215,45 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
 
     sbadmin_list_display = (
         SBAdminField(
+            name="sender",
+            title=_("From"),
+            annotate=Coalesce(
+                F("message__created_by__email"), Value(""), output_field=TextField()
+            ),
+            supporting_annotates={
+                "sender_first_name": Coalesce(
+                    F("message__created_by__first_name"),
+                    Value(""),
+                    output_field=TextField(),
+                ),
+                "sender_last_name": Coalesce(
+                    F("message__created_by__last_name"),
+                    Value(""),
+                    output_field=TextField(),
+                ),
+                "sender_username": Coalesce(
+                    F(f"message__created_by__{get_user_model().USERNAME_FIELD}"),
+                    Value(""),
+                    output_field=TextField(),
+                ),
+            },
+            filter_widget=StringFilterWidget(filter_query_lambda=_sender_filter_query),
+        ),
+        SBAdminField(
             name="title",
             title=_("Title"),
             annotate=F("message__title"),
-            filter_disabled=True,
         ),
         SBAdminField(
             name="type_badge",
             title=_("Type"),
             annotate=F("message__type"),
-            filter_disabled=True,
         ),
         SBAdminField(
             name="received_at",
             title=_("Received"),
             annotate=F("message__created_at"),
             python_formatter=datetime_formatter,
-            filter_disabled=True,
         ),
         SBAdminField(name="read_at", title=_("Read"), filter_disabled=True),
     )
@@ -270,6 +320,13 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
                 label = sender.get_full_name() or sender.email or str(sender)
                 return f"{_('From')} {label}"
         return super().get_change_label(request, object_id)
+
+    def sender(self, obj_id, value, **additional_data):
+        # List "From" column: full name → email (annotated value) → username.
+        first = additional_data.get("sender_first_name") or ""
+        last = additional_data.get("sender_last_name") or ""
+        full_name = f"{first} {last}".strip()
+        return full_name or value or additional_data.get("sender_username") or "-"
 
     def message_card(self, obj):
         return render_message_card(obj.message if obj else None)
