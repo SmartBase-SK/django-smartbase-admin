@@ -30,11 +30,7 @@ from django_smartbase_admin.messaging.models import (
     MessageAttachment,
     MessageRecipient,
 )
-from django_smartbase_admin.messaging.services import (
-    get_messaging_config,
-    render_message_type_badge,
-    sync_recipients,
-)
+from django_smartbase_admin.messaging.services import SBAdminMessagingService
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.utils import SBAdminNoHistoryDetailMixin
 
@@ -47,8 +43,8 @@ class _MessageTypeBadgeMixin:
             request = SBAdminThreadLocalService.get_request()
         except LookupError:
             request = None
-        messaging_config = get_messaging_config(request) if request else None
-        return render_message_type_badge(value, messaging_config)
+        messaging_config = SBAdminMessagingService.get_messaging_config(request) if request else None
+        return SBAdminMessagingService.render_message_type_badge(value, messaging_config)
 
 
 def render_message_card(message):
@@ -117,7 +113,7 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
         if object_id is not None:
             return [(None, {"fields": ["message_card"]})]
         fieldsets = [(None, {"fields": ["title", "type", "content"]})]
-        messaging_config = get_messaging_config(request)
+        messaging_config = SBAdminMessagingService.get_messaging_config(request)
         audience_fields = []
         if messaging_config:
             for audience in messaging_config.audiences:
@@ -156,13 +152,13 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
     def get_form(self, request, obj=None, **kwargs):
         # The config-driven authoring form (type choices + recipient selectors)
         # is only needed while creating. An existing message is read-only.
-        messaging_config = get_messaging_config(request)
+        messaging_config = SBAdminMessagingService.get_messaging_config(request)
         if messaging_config and obj is None:
             kwargs["form"] = build_message_form_class(messaging_config, request)
         return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, obj, form, change):
-        messaging_config = get_messaging_config(request)
+        messaging_config = SBAdminMessagingService.get_messaging_config(request)
         # Recipients are resolved once, at creation; an existing message is
         # read-only so editing never recomputes targeting or recipients.
         if not change:
@@ -180,7 +176,7 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
                 obj.targeting = targeting
         super().save_model(request, obj, form, change)
         if not change and messaging_config:
-            sync_recipients(obj, request, messaging_config)
+            SBAdminMessagingService.sync_recipients(obj, request, messaging_config)
 
 
 class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin):
@@ -282,22 +278,14 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         # Opening the detail marks the message as read.
-        self._mark_read(request, object_id)
+        SBAdminMessagingService.mark_read(request, object_id)
         return super().change_view(request, object_id, form_url, extra_context)
-
-    def _mark_read(self, request, recipient_pk):
-        user = getattr(request, "user", None)
-        if not (user and user.is_authenticated):
-            return
-        MessageRecipient.objects.filter(
-            pk=recipient_pk, user=user, read_at__isnull=True
-        ).update(read_at=timezone.now())
 
     # --- notification poll + acknowledge -----------------------------------
 
     @sbadmin_action(permission="view")
     def action_poll_notifications(self, request, modifier, object_id=None):
-        messaging_config = get_messaging_config(request)
+        messaging_config = SBAdminMessagingService.get_messaging_config(request)
         user = getattr(request, "user", None)
         if not messaging_config or not (user and user.is_authenticated):
             return HttpResponse("")
@@ -355,5 +343,5 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
 
     @sbadmin_action(permission="view")
     def action_acknowledge(self, request, modifier, object_id=None):
-        self._mark_read(request, object_id)
+        SBAdminMessagingService.mark_read(request, object_id)
         return HttpResponse("")

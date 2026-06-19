@@ -612,9 +612,11 @@ class SBAdminBaseView(object):
         global context never breaks pages on projects without messaging.
         """
         try:
-            from django_smartbase_admin.messaging.services import get_poller_context
+            from django_smartbase_admin.messaging.services import (
+                SBAdminMessagingService,
+            )
 
-            return get_poller_context(request)
+            return SBAdminMessagingService.get_poller_context(request)
         except Exception:
             return {}
 

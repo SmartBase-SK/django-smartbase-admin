@@ -1,11 +1,10 @@
 {% load i18n sb_admin_messaging_tags %}
 <div class="break-normal">
-    <div class="flex items-start gap-12">
-        <div class="min-w-0">
-            <h3 class="font-semibold text-18 text-dark-900">{{ message.title }} {{ message.type|message_type_badge }}</h3>
-            <div class="text-12 mt-8">{{ message.created_at|date:"DATETIME_FORMAT" }}</div>
-        </div>
+    <div class="flex items-center gap-8">
+        <h3 class="font-semibold text-18 text-dark-900">{{ message.title }}</h3>
+        {{ message.type|message_type_badge }}
     </div>
+    <div class="text-12 mt-4">{{ message.created_at|date:"DATETIME_FORMAT" }}</div>
 
     {% if message.content %}
         <div class="message-content text-dark-900 mt-16">

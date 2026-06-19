@@ -31,7 +31,7 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="font-semibold text-18">
+                        <h3 class="font-semibold text-18 text-dark-900">
                             {% if modal.message.created_by %}{% trans 'From' %} {{ modal.message.created_by.get_full_name|default:modal.message.created_by.email|default:modal.message.created_by }}{% endif %}
                         </h3>
                     </div>
