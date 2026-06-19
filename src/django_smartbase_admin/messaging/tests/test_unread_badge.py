@@ -18,7 +18,7 @@ from django_smartbase_admin.engine.menu_item import (
 )
 from django_smartbase_admin.messaging.config import SBAdminMessagingConfig
 from django_smartbase_admin.messaging.models import Message, MessageRecipient
-from django_smartbase_admin.messaging.services import get_unread_count
+from django_smartbase_admin.messaging.services import SBAdminMessagingService
 
 
 class MenuItemBadgeTestCase(SimpleTestCase):
@@ -116,12 +116,12 @@ class GetUnreadCountTestCase(TestCase):
 
     def test_counts_only_unread_for_user(self):
         request = _request(self.user, SBAdminMessagingConfig())
-        self.assertEqual(get_unread_count(request), 2)
+        self.assertEqual(SBAdminMessagingService.get_unread_count(request), 2)
 
     def test_zero_when_messaging_disabled(self):
         request = _request(self.user, None)
-        self.assertEqual(get_unread_count(request), 0)
+        self.assertEqual(SBAdminMessagingService.get_unread_count(request), 0)
 
     def test_zero_for_anonymous_user(self):
         request = _request(AnonymousUser(), SBAdminMessagingConfig())
-        self.assertEqual(get_unread_count(request), 0)
+        self.assertEqual(SBAdminMessagingService.get_unread_count(request), 0)
