@@ -565,9 +565,10 @@ class SBAdminTools(MCPToolset):
             ``fn`` is one of ``sum / avg / min / max / count``; ``field``
             must be a declared column from ``list_admins`` —
             ``sum/avg/min/max`` need a numeric one, ``count`` may omit
-            ``field`` for a row count. Without ``group_by`` the results
-            land under ``aggregates``, keyed ``f"{fn}_{field}"`` (or
-            ``"count"``).
+            ``field`` for a row count. Each result is keyed by a derived
+            alias — ``f"{fn}_{field}"`` (or ``"count"`` for a bare count);
+            aliases can't be overridden. Without ``group_by`` the results
+            land under ``aggregates`` as a flat ``{alias: value}`` dict.
           group_by: optional list of declared column names to break the
             ``aggregate`` totals down by (SQL ``GROUP BY``) — e.g.
             ``group_by=["queue"]`` with ``aggregate=[{"fn": "count"}]`` for
