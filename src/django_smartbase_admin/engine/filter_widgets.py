@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Self, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
@@ -32,6 +32,7 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 from django_smartbase_admin.utils import JSONSerializableMixin
+from typing_extensions import Self
 
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
