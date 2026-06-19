@@ -137,6 +137,7 @@ class SBAdminChart {
     registerParentGroup() {
         window.SBAdminRegisterDashboardSubWidget(this.options.parentWidgetId, {
             widgetId: this.options.widgetId,
+            formId: this.options.formId,
             onData: (data) => {
                 this.updateData(data)
             },

@@ -1,4 +1,4 @@
-import {filterInputValueChangeListener, filterInputValueChangedUtil} from "./utils"
+import {ensureFilterForm, filterInputValueChangeListener, filterInputValueChangedUtil} from "./utils"
 
 class SBAdminDashboardGroup {
     constructor(element) {
@@ -12,22 +12,28 @@ class SBAdminDashboardGroup {
         this.initialized = false
     }
 
+    filterFormIds() {
+        const formIds = new Set([this.formId])
+        this.subWidgets.forEach((definition) => {
+            if (definition.formId) {
+                formIds.add(definition.formId)
+            }
+        })
+        return formIds
+    }
+
     formValues() {
         const values = {}
-        const form = document.getElementById(this.formId)
-        const entries = form ? new FormData(form).entries() : new FormData()
-        for (const [key, value] of entries) {
-            if (value) {
-                values[key] = value
-            }
-        }
-        if (!form) {
-            document.querySelectorAll(`[form="${this.formId}"]`).forEach((input) => {
-                if (input.name && input.value) {
-                    values[input.name] = input.value
+        this.filterFormIds().forEach((formId) => {
+            ensureFilterForm(formId)
+            const form = document.getElementById(formId)
+            const entries = form ? new FormData(form).entries() : new FormData().entries()
+            for (const [key, value] of entries) {
+                if (value) {
+                    values[key] = value
                 }
-            })
-        }
+            }
+        })
         return values
     }
 
@@ -73,7 +79,8 @@ class SBAdminDashboardGroup {
         document.addEventListener(window.sb_admin_const.TABLE_RELOAD_DATA_EVENT_NAME, () => {
             this.refresh()
         })
-        filterInputValueChangeListener(`[form="${this.formId}"]`, (event) => {
+        const filterInputSelector = [...this.filterFormIds()].map((formId) => `[form="${formId}"]`).join(',')
+        filterInputValueChangeListener(filterInputSelector, (event) => {
             this.refresh()
             filterInputValueChangedUtil(event.target)
         })
