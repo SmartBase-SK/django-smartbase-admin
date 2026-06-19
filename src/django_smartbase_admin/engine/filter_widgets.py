@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q, fields, FilteredRelation, Count
+from django.db.models import Field, Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
@@ -29,6 +32,10 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 from django_smartbase_admin.utils import JSONSerializableMixin
+from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from django_smartbase_admin.engine.field import SBAdminField
 
 
 class AutocompleteParseMixin:
@@ -164,15 +171,15 @@ class SBAdminFilterWidget(JSONSerializableMixin):
         return self.default_label or self.get_default_value()
 
     @classmethod
-    def is_used_for_model_field_type(cls, model_field):
+    def is_used_for_model_field_type(cls, model_field: Field) -> bool:
         return False
 
     @classmethod
-    def apply_to_field(cls, field):
+    def apply_to_field(cls, field: SBAdminField) -> Self | None:
         return cls.apply_to_model_field(field.model_field)
 
     @classmethod
-    def apply_to_model_field(cls, model_field):
+    def apply_to_model_field(cls, model_field: Field) -> Self | None:
         if cls.is_used_for_model_field_type(model_field):
             return cls()
         return None
@@ -384,6 +391,16 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
             AllOperators.IS_NULL,
             AllOperators.IS_NOT_NULL,
         ]
+
+    @classmethod
+    def is_used_for_model_field_type(cls, model_field: Field) -> bool:
+        return bool(getattr(model_field, "flatchoices", None))
+
+    @classmethod
+    def apply_to_model_field(cls, model_field: Field) -> Self | None:
+        if cls.is_used_for_model_field_type(model_field):
+            return cls(choices=model_field.choices)
+        return None
 
 
 class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):

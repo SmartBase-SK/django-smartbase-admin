@@ -84,6 +84,20 @@
         @apply flex items-center px-12 border border-dark-300 bg-dark-100 text-dark-700 shadow-xs;
     }
 
+    .input-affix--readonly {
+        .input-affix__addon {
+            @apply shadow-none;
+        }
+    }
+
+    .input-affix__button {
+        @apply transition-colors;
+
+        &:not(:disabled):hover {
+            @apply bg-dark-200 text-dark-900;
+        }
+    }
+
     .input-affix__prefix {
         @apply border-r-0 rounded-l;
     }

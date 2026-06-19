@@ -44,6 +44,7 @@ from django_smartbase_admin.engine.const import (
     SUPPORTED_FILE_TYPE_ICONS,
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
 )
+from django_smartbase_admin.audit.views import should_link_history_to_audit
 from django_smartbase_admin.engine.inline_pagination import SBADMIN_INLINE_PREFIX_HEADER
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
@@ -108,9 +109,6 @@ class SBAdminBaseView(object):
         return self.has_permission(request, obj, "delete")
 
     def has_permission_for_action(self, request, action: SBAdminCustomAction) -> bool:
-        if getattr(action, "action_id", None) == Action.BULK_DELETE.value:
-            if not self.has_delete_permission(request):
-                return False
         return self.has_permission(
             request=request,
             obj=None,
@@ -367,8 +365,7 @@ class SBAdminBaseView(object):
                 self.register_action_autocomplete_views(request, action.sub_actions)
 
             target_view = getattr(action, "target_view", None)
-            form_class = getattr(target_view, "form_class", None)
-            if not form_class:
+            if target_view is None:
                 continue
             action_id = self.get_form_view_action_id(
                 target_view, getattr(action, "action_id", None)
@@ -383,8 +380,13 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            if hasattr(action_view, "get_form_class"):
-                form_class = action_view.get_form_class()
+            form_class = (
+                action_view.get_form_class()
+                if hasattr(action_view, "get_form_class")
+                else getattr(target_view, "form_class", None)
+            )
+            if not form_class:
+                continue
             form_kwargs = (
                 action_view.get_unbound_form_kwargs()
                 if hasattr(action_view, "get_unbound_form_kwargs")
@@ -550,14 +552,19 @@ class SBAdminBaseView(object):
     def get_change_view_context(
         self, request: HttpRequest, object_id: str | int | None
     ) -> dict[str, Any]:
-        """Default change-form context: Back → model changelist. ModelAdmin subclasses only."""
+        """Default change-form context: Back → ``back_url`` or model changelist.
+        ModelAdmin only."""
+        default_back = reverse(
+            "sb_admin:{}_{}_changelist".format(
+                self.opts.app_label, self.opts.model_name
+            )
+        )
+        back_url = SBAdminViewService.resolve_back_url(
+            request, default_back, current_path=request.path
+        )
         return {
             "show_back_button": True,
-            "back_url": reverse(
-                "sb_admin:{}_{}_changelist".format(
-                    self.opts.app_label, self.opts.model_name
-                )
-            ),
+            "back_url": back_url,
         }
 
     def get_global_context(
@@ -970,10 +977,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     no_params=True,
                 ),
             ]
-        if (
-            self.sbadmin_list_history_enabled
-            and "django_smartbase_admin.audit" in settings.INSTALLED_APPS
-        ):
+        if self.sbadmin_list_history_enabled and should_link_history_to_audit(request):
             try:
                 from django_smartbase_admin.audit.views import (
                     get_audit_model_history_url,
@@ -986,6 +990,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                         title=_("History"),
                         url=url,
                         no_params=True,
+                        permission="view",
                     ),
                 ]
             except Exception:
@@ -1023,6 +1028,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     view=self,
                     action_id=Action.BULK_DELETE.value,
                     css_class="btn-destructive",
+                    permission="delete",
                 ),
             ]
         return self.sbadmin_list_selection_actions
@@ -1075,7 +1081,7 @@ class SBAdminBaseListView(SBAdminBaseView):
         data = action.get_xlsx_data(request)
         return SBAdminXLSXExportService.create_workbook_http_respone(*data)
 
-    @sbadmin_action
+    @sbadmin_action(permission="delete")
     def action_bulk_delete(self, request, modifier, object_id=None):
         action = self.sbadmin_list_action_class(self, request)
         if (

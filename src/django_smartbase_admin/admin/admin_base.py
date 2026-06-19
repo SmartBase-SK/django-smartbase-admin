@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
-from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
@@ -31,7 +30,12 @@ from django.forms.models import (
     ModelFormMetaclass,
     modelform_factory,
 )
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch, resolve
@@ -52,6 +56,7 @@ from nested_admin.nested import (
 
 from django_smartbase_admin.audit.views import (
     redirect_to_audit_history,
+    should_link_history_to_audit,
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
@@ -263,7 +268,7 @@ class SBAdminFormFieldWidgetsMixin:
             "class", None
         )  # remove origin classes to prevent override our custom widget class
         kwargs = {}
-        if choices:
+        if choices and widget != SBAdminHiddenWidget:
             kwargs["choices"] = choices
         if isinstance(form_field, RichTextFormField):
             kwargs["config_name"] = getattr(
@@ -824,6 +829,11 @@ class SBAdminTranslationStatusMixin:
                 translations_view_id, obj.id
             )
         )
+        request = SBAdminThreadLocalService.get_request()
+        if request is not None:
+            translations_edit_url = SBAdminViewService.url_with_current_back_url(
+                request, translations_edit_url
+            )
         result = f"<a href='{translations_edit_url}' class='btn btn-small absolute top-24 right-24'>{_('Edit')}</a>"
         languages = SBAdminTranslationsService.get_all_languages()
         translations = (
@@ -1182,7 +1192,7 @@ class SBAdmin(
             if not self.has_view_or_change_permission(request, obj):
                 raise PermissionDenied
 
-            if "django_smartbase_admin.audit" in settings.INSTALLED_APPS:
+            if should_link_history_to_audit(request):
                 return redirect_to_audit_history(request, obj)
 
             # Then get the history for this object.
@@ -1258,15 +1268,32 @@ class SBAdmin(
             trigger_client_event(response, TABLE_RELOAD_DATA_EVENT_NAME, {})
         return response
 
+    def _apply_back_url(self, request, response):
+        """On a terminal Save, redirect to ``back_url`` instead of the default
+        changelist. Only applies to a redirect response with ``_save`` in POST."""
+        if not isinstance(response, HttpResponseRedirect):
+            return response
+        if "_save" not in request.POST:
+            return response
+        default_url = response.url
+        target = SBAdminViewService.resolve_back_url(
+            request, default_url, current_path=request.path
+        )
+        if target != default_url:
+            return HttpResponseRedirect(target)
+        return response
+
     def response_add(self, request, obj, post_url_continue=None):
         if is_modal(request):
             return self.get_modal_save_response(request, obj)
-        return super().response_add(request, obj, post_url_continue)
+        return self._apply_back_url(
+            request, super().response_add(request, obj, post_url_continue)
+        )
 
     def response_change(self, request, obj):
         if is_modal(request):
             return self.get_modal_save_response(request, obj)
-        return super().response_change(request, obj)
+        return self._apply_back_url(request, super().response_change(request, obj))
 
     @classmethod
     def set_generic_relation_from_parent(cls, request, obj):

@@ -4,7 +4,7 @@ import math
 from typing import Any, TYPE_CHECKING
 
 from django.contrib.admin.utils import lookup_spawns_duplicates
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldDoesNotExist, FieldError
 from django.db.models import Avg, Count, Field, Max, Min, Q, Sum, Value
 from django.utils import timezone
 from django.utils.html import escape
@@ -52,6 +52,16 @@ if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
 
 logger = logging.getLogger(__name__)
+
+
+def _lookup_targets_bare_relation(model, lookup: str) -> bool:
+    """Whether ``lookup`` is a bare relation field (e.g. an FK), which can't be
+    text-searched. Traversal paths and unknown names raise and count as False."""
+    try:
+        return model._meta.get_field(lookup).is_relation
+    except FieldDoesNotExist:
+        return False
+
 
 # Whitelisted list aggregations: public name -> Django aggregate class.
 LIST_AGGREGATE_FUNCTIONS = {
@@ -374,9 +384,13 @@ class SBAdminListAction(SBAdminAction):
         search_fields = self.get_search_fields(request)
         search_fields_definition = list(self.view.get_search_fields(request) or [])
         if search_fields_definition and search_term:
-            search_field_map = {
-                field.name: str(field.filter_field) for field in search_fields
-            }
+            search_field_map = {}
+            for field in search_fields:
+                filter_field = str(field.filter_field)
+                if _lookup_targets_bare_relation(self.view.model, filter_field):
+                    search_field_map[field.name] = str(field.name)
+                else:
+                    search_field_map[field.name] = filter_field
             orm_lookups = []
             for configured_search_field in search_fields_definition:
                 configured_search_field = str(configured_search_field)

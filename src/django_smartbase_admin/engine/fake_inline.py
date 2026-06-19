@@ -74,27 +74,32 @@ class SBAdminFakeInlineMixin:
             f"{self.__class__.__name__}"
             f"{self.parent_model._meta.object_name}"
         )
+        proxy_app_label = self.parent_model._meta.app_label
         try:
-            fake_model_class = apps.get_model(self.model._meta.app_label, model_name)
+            fake_model_class = apps.get_model(proxy_app_label, model_name)
         except LookupError:
-            fake_model_class = type(
-                model_name,
-                (self.model,),
-                {
-                    "__module__": self.__module__,
-                    "Meta": type(
-                        "Meta",
-                        (),
-                        {
-                            "proxy": True,
-                            "verbose_name": self.model._meta.verbose_name,
-                            "verbose_name_plural": self.model._meta.verbose_name_plural,
-                        },
-                    ),
-                },
-            )
-            fake_model_class.original_model = self.model
-            fake_model_class._meta.pk.name = self.model._meta.pk.name
+            existing = apps.all_models.get(proxy_app_label, {}).get(model_name.lower())
+            if existing is not None:
+                fake_model_class = existing
+            else:
+                fake_model_class = type(
+                    model_name,
+                    (self.model,),
+                    {
+                        "__module__": self.__module__,
+                        "Meta": type(
+                            "Meta",
+                            (),
+                            {
+                                "proxy": True,
+                                "verbose_name": self.model._meta.verbose_name,
+                                "verbose_name_plural": self.model._meta.verbose_name_plural,
+                            },
+                        ),
+                    },
+                )
+                fake_model_class.original_model = self.model
+                fake_model_class._meta.pk.name = self.model._meta.pk.name
         self.original_model = self.model
         self.model = fake_model_class
 

@@ -162,6 +162,9 @@
               id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="flex flex-col{% if sbadmin_is_modal %} min-h-0{% else %} detail-view-form flex-grow w-full max-w-1180 mx-auto{% endif %}" novalidate>
         <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
             {% csrf_token %}
+            {% if show_back_button %}
+                <input type="hidden" name="back_url" value="{% add_preserved_filters back_url %}">
+            {% endif %}
             {% if errors %}
                 {% include "sb_admin/includes/form_error_alert.html" with errors_count=errors|length non_field_errors=adminform.form.non_field_errors %}
             {% endif %}

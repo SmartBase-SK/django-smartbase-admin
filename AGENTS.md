@@ -12,13 +12,14 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | `SBAdminTextTagsWidget`, input prefix/suffix on text and number widgets, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Form Widgets](#form-widgets) | input prefix/suffix text and icon buttons, `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview) | Full SBAdmin pages backed by a regular Django form instead of a model change view |
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
-| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options, automatic choice formatting |
 | [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -44,6 +45,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
 | [SBAdminWizardView](#sbadminwizardview) | Multi-step wizard with ``SBAdminWizardStep`` — attributes, lifecycle, formsets, navigation, template |
+| [Return Navigation (`back_url`)](#return-navigation-back_url) | Back/Save returns to the originating page via `SBAdminViewService`, `back_url` query param + hidden field |
 | [Contributing to This Document](#contributing-to-this-document) | Guidelines for adding new sections and examples |
 
 **Quick lookup:**
@@ -53,7 +55,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **XLSX custom formatting per column?** → [XLSX Export Field Formatting](#xlsx-export-field-formatting)
 - **Filtering by related model?** → [Filter Widgets](#filter-widgets) (filter_query_lambda)
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
+- **Copy-to-clipboard text input?** → [Input prefix and suffix](#input-prefix-and-suffix-text-and-number-widgets)
 - **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
+- **Full admin page with a non-model form?** → [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview)
 - **Show/hide fields based on another form field?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
 - **Refresh choices or layout without reloading the whole form?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
 - **Dynamic form sections in stacked inlines?** → [Dynamic regions in stacked inlines](#dynamic-regions-in-stacked-inlines)
@@ -848,6 +852,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `restrict_queryset()` | Apply global queryset filters (e.g., hide soft-deleted records) | [Global Queryset Filtering](#global-queryset-filtering) |
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 | `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
+| `mcp_readonly` | Make MCP requests read-only for non-superusers. Default `False`; set `True` to block MCP add/change/delete and mutating actions while leaving browser admin writes unchanged. | [MCP Read-Only Toggle](#mcp-read-only-toggle) |
 
 ### URL Params Compression Toggle
 
@@ -866,6 +871,30 @@ _role_config = SBAdminRoleConfiguration(
 - `True` (default): shorter URL payloads using LZ-String.
 - `False`: plain JSON payloads in URLs (useful for debugging or compatibility checks).
 - Decoding remains backward compatible in both modes (plain JSON and compressed payloads are both accepted).
+
+### MCP Read-Only Toggle
+
+`SBAdminRoleConfiguration.mcp_readonly` controls whether MCP requests can mutate data. It is off by default. When enabled, requests marked with `request.is_mcp` deny `add`, `change`, and `delete` model permissions plus any custom action whose resolved permission is not `"view"`. Superusers bypass the read-only gate.
+
+```python
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[...],
+    registered_views=[...],
+    mcp_readonly=True,  # default is False
+)
+```
+
+```python
+class AppRoleConfiguration(SBAdminRoleConfiguration):
+    mcp_readonly = True
+```
+
+**Key points:**
+- Browser/admin UI requests are unchanged; only MCP requests (`request.is_mcp`) are gated.
+- Read-only custom actions must declare `permission="view"` on `@sbadmin_action(...)` or `SBAdminCustomAction(...)`.
+- Mutating custom actions default to `"change"` if no permission is declared.
+- The gate runs in `SBAdminViewService.has_permission()` before project-specific `has_permission()` overrides, so a custom permission system cannot accidentally bypass it.
 
 **Typical subclass combining all three:**
 
@@ -1221,7 +1250,11 @@ class ArticleTagNamesForm(SBAdminBaseFormInit, forms.Form):
 
 ### Input prefix and suffix (text and number widgets)
 
-Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or `SBAdminNumberWidget` (e.g. currency, units, URL stem). Omit both for a normal input.
+Pass optional `prefix` and/or `suffix` strings to `SBAdminTextInputWidget` or
+`SBAdminNumberWidget` for passive text affixes (e.g. currency, units, URL stem).
+Use `prefix_icon` / `suffix_icon` with `prefix_button_attrs` /
+`suffix_button_attrs` when the affix should be a clickable icon button. Omit all
+affix options for a normal input.
 
 ```python
 from django import forms
@@ -1243,12 +1276,36 @@ class ArticleForm(SBAdminBaseForm):
             "slug": SBAdminTextInputWidget(prefix="https://blog.example.com/"),
             "price": SBAdminNumberWidget(suffix="€"),
             "discount": SBAdminNumberWidget(prefix="-", suffix="%"),
+            "public_url": SBAdminTextInputWidget(
+                attrs={"readonly": "readonly"},
+                suffix_icon="Minus-the-top",
+                suffix_button_attrs={
+                    "title": "Copy URL",
+                    "aria-label": "Copy URL",
+                    "data-sbadmin-copy-button": True,
+                    "data-sbadmin-copy-label": "Copy URL",
+                    "data-sbadmin-copied-label": "Copied",
+                },
+            ),
         }
 ```
 
 **Key points:**
-- Addons are display-only; they do not change the stored field value.
-- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in and forward `prefix` / `suffix` in `__init__`).
+- `prefix` / `suffix` are passive text affixes; `prefix_icon` / `suffix_icon`
+  render clickable icon buttons.
+- Each side accepts only one affix shape: use either `prefix` or `prefix_icon`,
+  and either `suffix` or `suffix_icon`.
+- `prefix_button_attrs` and `suffix_button_attrs` are normal HTML attributes.
+  Always include `title` and `aria-label` for icon-only buttons.
+- Copy-to-clipboard behavior is globally delegated from `main.js` via
+  `data-sbadmin-copy-button`. Copy buttons can omit `data-sbadmin-copy-target`;
+  `main.js` falls back to the nearest input inside the affix wrapper.
+- Read-only inputs add `input-affix--readonly` to the wrapper so affix addons
+  match the read-only input styling.
+- Other widgets can support the same pattern via `SBAdminInputAffixMixin` (mix in
+  and forward `prefix` / `suffix` plus the icon-button args in `__init__`).
+- `SBAdminCopyableTextInputWidget` remains available as a compatibility wrapper,
+  but new code should prefer the generic icon-button affix API.
 
 ### `Meta.widgets` are initialized automatically in `SBAdminBaseForm`
 
@@ -1332,6 +1389,103 @@ tags_config = SBAdminJsonEditorField(
 - Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
 - `add_to_top=True` reorders the **root** array only; nested arrays still append.
 - Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
+
+---
+
+## Standalone Form Views (`SBAdminStandaloneFormView`)
+
+Use `SBAdminStandaloneFormView` for a full SBAdmin page backed by a regular
+Django form instead of a model add/change view. Typical uses include calculators,
+import screens, report builders, and other workflows that should live in the
+SBAdmin navigation but do not edit one model instance.
+
+```python
+from django import forms
+from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.engine.admin_view import SBAdminView
+from django_smartbase_admin.engine.modal_view import SBAdminStandaloneFormView
+
+
+class ArticleReportForm(forms.Form):
+    status = forms.ChoiceField(
+        label="Status",
+        choices=(("draft", "Draft"), ("published", "Published")),
+    )
+
+
+class ArticleReportFormView(SBAdminStandaloneFormView):
+    template_name = "blog/article_report.html"
+    form_class = ArticleReportForm
+
+    def get_context_data(self, **kwargs):
+        context = self.view.get_global_context(self.request)
+        context.update(super().get_context_data(**kwargs))
+        context["page_title"] = self.view.title
+        return context
+
+    def form_valid(self, form):
+        rows = build_article_report(status=form.cleaned_data["status"])
+        return self.render_to_response(self.get_context_data(form=form, rows=rows))
+
+
+class ArticleReportView(SBAdminView):
+    label = "Article report"
+    title = "Article report"
+    view_id = "article_report"
+    menu_action = "report"
+
+    @sbadmin_action(permission="view")
+    def report(self, request, modifier, object_id=None):
+        return ArticleReportFormView.as_view(view=self)(request)
+```
+
+Register the `SBAdminView` in the role configuration and point a menu item at
+its `view_id`:
+
+```python
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="article_report"),
+    menu_items=[
+        SBAdminMenuItem(label="Article report", icon="Table-report", view_id="article_report"),
+    ],
+    registered_views=[
+        ArticleReportView(),
+    ],
+)
+```
+
+Template example:
+
+```django
+{% extends "sb_admin/sb_admin_base.html" %}
+
+{% block content %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Run report</button>
+    </form>
+
+    {% if rows %}
+        {# Render report output here. #}
+    {% endif %}
+{% endblock %}
+```
+
+**Key points:**
+- Pass `view=self` through `ArticleReportFormView.as_view(view=self)` so the
+  form view can use SBAdmin context, permissions, dynamic forms, and fieldsets.
+- Merge `self.view.get_global_context(self.request)` into `get_context_data()`
+  so the template gets the navigation shell, notifications, view id, and SBAdmin
+  request metadata.
+- Use `get_form_kwargs()` for request-aware forms or runtime configuration.
+- If the form uses `SBDynamicRegion`, `SBAdminStandaloneFormView` already handles
+  dynamic-region POST fragments; do not hand-roll region response code.
+- Keep permission decisions on the owning `SBAdminView` / role configuration.
 
 ---
 
@@ -2023,6 +2177,43 @@ class ArticleAdmin(SBAdmin):
         ]
 ```
 
+### `requires_confirmation` on Action Modals
+
+Use `requires_confirmation = True` when an action should show a final confirmation step before running `process_form_valid(...)`. The first valid submit renders `confirmation_template_name`; the action is processed only after the confirmation submit posts `_confirmed=1`.
+
+For actions without visible form fields, the confirmation step is rendered immediately on `GET`. For actions with visible fields, the modal shows the form first, validates the submitted values, then renders the confirmation step. Override `get_confirmation_data(...)` to build the preview data; return `None` to skip confirmation for that request, or raise `SBAdminActionError` to show a non-field error.
+
+```python
+from django_smartbase_admin.engine.exceptions import SBAdminActionError
+
+
+class ConfirmArchiveForm(SBAdminBaseFormInit, forms.Form):
+    pass
+
+
+class ArchiveArticlesView(ListActionModalView):
+    form_class = ConfirmArchiveForm
+    modal_title = _("Archive Selected Articles")
+    requires_confirmation = True
+    confirmation_message = _("Archive {count} selected article(s)?")
+
+    def get_confirmation_data(self, request, form):
+        selection_queryset = self.get_selection_queryset(request, form)
+        count = selection_queryset.count()
+        if not count:
+            raise SBAdminActionError(_("Select at least one article."))
+        return {"count": count}
+
+    def process_form_valid_list_selection_queryset(self, request, form, selection_queryset):
+        count = selection_queryset.update(status="archived")
+        messages.success(request, _("%d article(s) archived.") % count)
+```
+
+**Key points:**
+- `confirmation_message` is formatted with `confirmation_message.format(**data)`, where `data` is returned by `get_confirmation_data(...)`.
+- The confirmation template replays the form's hidden fields and selected rows, so `process_form_valid(...)` receives the same valid form on the second submit.
+- Use `requires_confirmation` for action flows backed by `ActionModalView`, `ListActionModalView`, or `RowActionModalView`; direct `SBAdminCustomAction` methods are not modal form flows and should implement their own confirmation UI if needed.
+
 ### SBAdminCustomAction Parameters
 
 `SBAdminFormViewAction` extends `SBAdminCustomAction`. Available parameters:
@@ -2305,6 +2496,7 @@ from django_smartbase_admin.engine.field_formatter import (
     array_badge_formatter,                  # Display list as horizontal badges
     newline_separated_array_badge_formatter, # Display list as vertical badges (one per line)
     boolean_formatter,                      # Yes/No badges
+    build_choice_formatter_for_field,       # Choice value → label (auto-assigned on choice fields)
     datetime_formatter,                     # Localized datetime
     datetime_formatter_with_format,         # Custom date/time format
     link_formatter,                         # Clickable URL
@@ -2312,6 +2504,8 @@ from django_smartbase_admin.engine.field_formatter import (
     format_array,                           # Custom badge formatting with BadgeType
 )
 ```
+
+`SBAdminField.init_field_static()` also auto-assigns `python_formatter` for date, boolean, and choice (`flatchoices`) model fields. Choice fields use `build_choice_formatter_for_field`. Set `python_formatter` explicitly or use an admin method to override.
 
 ### Array Badge Formatters
 
@@ -2519,6 +2713,12 @@ class ArticleAdmin(SBAdmin):
     model = Article
     inlines = [ArticleTagInline]
 ```
+
+When an admin overrides `get_inlines()` to show different inlines per request/object,
+keep every possible real inline class in the static `inlines` attribute as a
+superset. SBAdmin registers inline views and their autocomplete action URLs from
+that static list during configuration initialization; `get_inlines()` should only
+decide which already-registered inline classes render for the current object.
 
 **Available inline classes:**
 - `SBAdminTableInline` - Tabular layout (like `TabularInline`)
@@ -4364,16 +4564,16 @@ Action URLs always use `/<view>/<action>/<modifier>/` with an optional `/<object
 
 ### Permission defaults
 
-The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"` to the decorator. `BULK_DELETE` is special-cased through `has_delete_permission`.
+The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`change`** model permission for every `@sbadmin_action` or `SBAdminCustomAction` that does not declare otherwise. Read-only endpoints opt out by passing `permission="view"`. Actions that need stronger permissions declare them directly, for example the built-in bulk delete action carries `permission="delete"`.
 
-| Action kind | Decorator | Default check |
+| Action kind | Declaration | Default check |
 |-------------|-----------|---------------|
 | Read-only (list/json/autocomplete/xlsx/config/dashboard data) | `@sbadmin_action(permission="view")` | `has_permission(..., "view")` |
 | State-changing custom action | `@sbadmin_action` (bare) | `has_permission(..., "change")` |
 | Mutation needing a stronger permission | `@sbadmin_action(permission="delete")` (or `"add"`) | `has_permission(..., <kwarg>)` |
-| `Action.BULK_DELETE.value` | bare | `view.has_delete_permission(request, obj)` |
+| Custom action object needing stronger permission | `SBAdminCustomAction(..., permission="delete")` | `has_permission(..., "delete")` |
 
-The kwarg is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
+The permission value is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Actions declared directly with `SBAdminCustomAction(..., permission=...)` use the same path. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
 
 Built-in read-only endpoints already carry `permission="view"`: `action_list`, `action_list_json`, `action_autocomplete` (on admins, filter widgets, and the tree widget), `action_xlsx_export`, `action_config`, dashboard widget `action_get_data`, audit log `action_list_json`, translations `list`. The reorder family (`action_table_reorder`, `action_table_data_edit`, `action_list_json_reorder`, `action_enter_reorder`) is intentionally left at the default — entering reorder mode is treated as a mutation.
 
@@ -4849,12 +5049,26 @@ This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hoste
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
 
-### Two browser-only extras
+### The browser-only extra
 
-The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. Two bundled classes, however, only matter for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
+The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. One bundled class, however, only matters for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
 
-- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them.
-- **`SBAdminMCPOAuth2Authentication`** (`mcp/oauth/auth.py`) — adds `resource_metadata="…"` to the `WWW-Authenticate` header for header-driven discovery. Native clients fall back to probing `/.well-known/*` directly, so the stock DOT `OAuth2Authentication` also works for them. Keep the subclass for broad compatibility.
+- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them. Wire it into `MIDDLEWARE` **before** anything that 401/403s the MCP path (Django's `SecurityMiddleware`, then this, then session/auth) so the preflight short-circuits, and list the browser origins it may reflect in `SBADMIN_MCP_ALLOWED_ORIGINS` (defaults: `https://claude.ai`, `https://cursor.com`):
+
+  ```python
+  MIDDLEWARE = [
+      "django.middleware.security.SecurityMiddleware",
+      "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
+      # ... session / locale / common / auth ...
+  ]
+
+  # Override/extend the default allowlist; values are matched exactly.
+  SBADMIN_MCP_ALLOWED_ORIGINS = [
+      "https://claude.ai",
+      "https://cursor.com",
+  ]
+  ```
+Use the stock DOT `oauth2_provider.contrib.rest_framework.OAuth2Authentication` as your `DJANGO_MCP_AUTHENTICATION_CLASSES` (as shown above) for **all** clients. Its `401` `WWW-Authenticate` header carries no `resource_metadata` pointer, but every client — browser-hosted and native alike — falls back to probing `/.well-known/*` directly, so header-driven discovery isn't needed. (An earlier `SBAdminMCPOAuth2Authentication` subclass that added the pointer was removed once probing proved sufficient.)
 
 (Verified: a Claude Code CLI connection completed OAuth with the plain auth class and no CORS middleware.)
 
@@ -4863,7 +5077,7 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
 A ready-to-use single-page dashboard blueprint is exposed as the MCP **resource** `dashboard://blueprint` (read it; full setup is in its description). It logs in via OAuth PKCE and reads live data through an `api(tool, args)` helper over the MCP tools. To run one locally against a deployed (HTTPS) admin:
 
 1. **Serve over http on localhost** — fine as-is: loopback is a browser *secure context* (so `crypto.subtle` PKCE works) and the OAuth/MCP traffic to the admin is HTTPS regardless. Serve on a spare port (`python -m http.server 8010`).
-2. **Allow the origin** — add `http://localhost:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS`. `SBAdminMCPCorsMiddleware` reflects it **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session.
+2. **Allow the origin** — add both `http://localhost:8010` and `http://127.0.0.1:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS` (`8010` is the blueprint's canonical serve port; the two loopback hosts aren't interchangeable to a browser, so list both). `SBAdminMCPCorsMiddleware` reflects them **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session — which is why it's safe to keep these loopback origins allowed in **every** environment, including production, so one locally-served page can target any deployed backend without per-environment config.
 3. **Connect** — the page self-registers an OAuth client via DCR (`POST <issuer>/oauth/register`) on first connect and caches the `client_id` in `localStorage`; no manual registration. The DCR endpoint and `SBAdminMCPOAuth2Validator` accept the page's plain-http redirect because it's **loopback** (`localhost`, `127.0.0.1`, `::1`); any other http host is rejected.
 
 No HTTPS is needed locally; only if you serve the page on a non-loopback host (LAN IP / custom domain), which isn't a secure context over http — then use a TLS static server (e.g. mkcert) and register an `https://` redirect URI.
@@ -5166,6 +5380,55 @@ Default template: `sb_admin/wizard/wizard_step.html`
 
 **Formset rendering in the template**: each formset in `wizard_formsets` is rendered inside a `.sbadmin-formset-dynamic` wrapper with `data-prefix` and `data-max-forms`. Rows live in `.sbadmin-formset-forms`. If the formset allows adding rows, a `<template>` with the empty form and a `.sbadmin-formset-add` button are rendered. The script `sb_admin/dist/sbadmin_formset.js` clones the template row, replaces `__prefix__` in attributes, increments `TOTAL_FORMS`, and fires `formset:added` on the new row element (matching Django's native event, used by autocomplete and other SBAdmin widgets to re-initialize).
 
+
+---
+
+## Return Navigation (`back_url`)
+
+Back / Save on a change form or custom view (translations, …) returns to the
+page the user **came from** instead of always the model changelist. The
+originating URL is carried **explicitly** through a `back_url` query param
+(outgoing cross-model links) and a hidden field (POST forms), resolved by
+`SBAdminViewService` (`services/views.py`).
+
+`HTTP_REFERER` is **not** used at all. It is unreliable on POST (points at the
+form itself) and on a navigation target it points wherever the user last came
+from (detail → translations → back-to-detail would leave the referer on
+translations and loop back there). So the originating URL must be put on the
+link that navigates *to* the other model.
+
+```python
+from django_smartbase_admin.services.views import SBAdminViewService
+
+# On a link that navigates to another model, carry a back_url back to here:
+url = SBAdminViewService.url_with_current_back_url(request, target_url)
+
+# Resolve where Back/Save should go (priority: POST hidden field > GET param > default):
+back_url = SBAdminViewService.resolve_back_url(
+    request, default_url, current_path=request.path
+)
+```
+
+`validate_back_url` rejects external hosts (open-redirect guard), non-`sb_admin`
+paths, and self-loops. The change form / translations templates render the
+hidden field straight from the `back_url` context value (the same value the Back
+button uses), so a custom form participates just by having `back_url` in context:
+
+```html
+<input type="hidden" name="back_url" value="{{ back_url }}">
+```
+
+**Adding a new cross-model link:** append the param on the outgoing link — in
+Python via `url_with_current_back_url(request, target_url)`, or in a template
+with `?back_url={{ request.get_full_path|urlencode }}`.
+
+Wired globally in `change_form.html`, `translations-detail.html`,
+`response_change`/`response_add` (terminal Save only — `_continue`/`_addanother`
+keep Django defaults), `get_change_view_context`, `SBAdminView.get_back_url`
+(+ `_continue` keeps `back_url`), the `sbadmin_translation_status` Edit link,
+and the inline "Change" links (`stacked_inline.html`, `table_inline.html`).
+Out of scope: modal/popup links (autocomplete add/edit, filer — `_popup=1`,
+they don't navigate away) and the wizard.
 
 ---
 

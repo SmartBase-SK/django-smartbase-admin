@@ -39,6 +39,8 @@ const CKEDITOR_READY_MAX_FRAMES = 120
 const PAGE_SCROLL_MARGIN_PX = 24
 const MODAL_SCROLL_MARGIN_PX = 24
 const SBADMIN_MAIN_LOADED_EVENT = 'SBAdminMainLoaded'
+const COPY_BUTTON_SELECTOR = '[data-sbadmin-copy-button]'
+const COPIED_TIMEOUT_MS = 1500
 
 class Main {
     constructor() {
@@ -96,6 +98,7 @@ class Main {
 
             window.htmx.on("htmx:afterSettle", (event) => {
                 this.switchCKEditorTheme(event.detail.elt)
+                this.syncEmptyFieldsets(document)
             })
         }
 
@@ -111,6 +114,7 @@ class Main {
             this.selectAll(e)
             this.saveState(e)
             this.fileDownload(e)
+            this.copyToClipboard(e)
             this.passwordToggleFnc(e)
             this.collapseStackedInlineButtons(e)
         })
@@ -236,13 +240,17 @@ class Main {
     initTooltips(target) {
         target = target || document
         const tooltipTriggerList = [].slice.call(target.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map((tooltipTriggerEl) => {
+        tooltipTriggerList.forEach((tooltipTriggerEl) => {
             const tooltipEl = tooltipTriggerEl.closest('.js-tooltip')
-            if (tooltipEl) {
-                return new Tooltip(tooltipTriggerEl, { container: tooltipEl })
+            const tooltipContainer = tooltipTriggerEl.dataset.bsContainer || tooltipEl
+            if (tooltipContainer) {
+                new Tooltip(tooltipTriggerEl, { container: tooltipContainer })
             }
-            return null
         })
+        const firstInlineErrorTooltip = target.querySelector('.djn-inline-field-error-tooltip[data-bs-toggle="tooltip"]')
+        if (firstInlineErrorTooltip) {
+            Tooltip.getInstance(firstInlineErrorTooltip)?.show()
+        }
     }
 
     handleLocationHashFromTabs() {
@@ -782,6 +790,60 @@ class Main {
                 }
             })
         }
+    }
+
+    getCopyTarget(button) {
+        const selector = button.dataset.sbadminCopySelector
+        if (selector) {
+            return document.querySelector(selector)
+        }
+        const targetId = button.dataset.sbadminCopyTarget
+        if (targetId) {
+            return document.getElementById(targetId)
+        }
+        return button.closest('.input-affix')?.querySelector('input, textarea, select')
+    }
+
+    async writeClipboardText(value) {
+        if (window.navigator?.clipboard?.writeText) {
+            await window.navigator.clipboard.writeText(value)
+            return
+        }
+        const textarea = document.createElement('textarea')
+        textarea.value = value
+        textarea.setAttribute('readonly', 'readonly')
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+    }
+
+    setCopyButtonLabel(button, label) {
+        button.title = label
+        button.setAttribute('aria-label', label)
+    }
+
+    copyToClipboard(event) {
+        const button = event.target.closest(COPY_BUTTON_SELECTOR)
+        if (!button) {
+            return
+        }
+        event.preventDefault()
+
+        const target = this.getCopyTarget(button)
+        const value = String(target?.value || target?.textContent || '').trim()
+        if (!value) {
+            return
+        }
+
+        this.writeClipboardText(value).then(() => {
+            const copyLabel = button.dataset.sbadminCopyLabel || button.title || 'Copy'
+            const copiedLabel = button.dataset.sbadminCopiedLabel || 'Copied'
+            this.setCopyButtonLabel(button, copiedLabel)
+            window.setTimeout(() => this.setCopyButtonLabel(button, copyLabel), COPIED_TIMEOUT_MS)
+        })
     }
 }
 

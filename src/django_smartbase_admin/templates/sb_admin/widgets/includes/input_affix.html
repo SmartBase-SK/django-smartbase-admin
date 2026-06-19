@@ -1,14 +1,26 @@
-{% if widget.prefix or widget.suffix %}
-    <div class="input-affix">
+{% if widget.prefix or widget.suffix or widget.prefix_icon or widget.suffix_icon %}
+    <div class="input-affix{% if widget.attrs.readonly %} input-affix--readonly{% endif %}">
         {% if widget.prefix %}
             <div class="input-affix__addon input-affix__prefix">
                 {{ widget.prefix }}
             </div>
+        {% elif widget.prefix_icon %}
+            <button{% include "sb_admin/includes/attrs.html" with attrs=widget.prefix_button_attrs %}>
+                <svg class="w-20 h-20" aria-hidden="true">
+                    <use href="#{{ widget.prefix_icon }}" xlink:href="#{{ widget.prefix_icon }}"></use>
+                </svg>
+            </button>
         {% endif %}
         <div class="input-affix__field">
             {% include "sb_admin/widgets/input.html" %}
         </div>
-        {% if widget.suffix %}
+        {% if widget.suffix_icon %}
+            <button{% include "sb_admin/includes/attrs.html" with attrs=widget.suffix_button_attrs %}>
+                <svg class="w-20 h-20" aria-hidden="true">
+                    <use href="#{{ widget.suffix_icon }}" xlink:href="#{{ widget.suffix_icon }}"></use>
+                </svg>
+            </button>
+        {% elif widget.suffix %}
             <div class="input-affix__addon input-affix__suffix">
                 {{ widget.suffix }}
             </div>

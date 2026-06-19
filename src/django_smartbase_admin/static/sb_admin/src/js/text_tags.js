@@ -57,6 +57,35 @@ export default class TextTags {
         return options
     }
 
+    getPendingTags(instance, delimiter) {
+        return instance.input.element.value
+            .split(delimiter)
+            .map((value) => value.trim())
+            .filter(Boolean)
+    }
+
+    addPendingTags(instance, delimiter) {
+        const pendingTags = this.getPendingTags(instance, delimiter)
+        if (!pendingTags.length) {
+            return
+        }
+        instance.setValue(pendingTags)
+        instance.clearInput()
+    }
+
+    addPendingTagsOnBlurOrSubmit(inputEl, instance) {
+        if (this.isReadonly(inputEl)) {
+            return
+        }
+        const delimiter = inputEl.dataset.choicesDelimiter || ","
+        instance.input.element.addEventListener("blur", () => {
+            this.addPendingTags(instance, delimiter)
+        })
+        inputEl.form?.addEventListener("submit", () => {
+            this.addPendingTags(instance, delimiter)
+        })
+    }
+
     initTextTags(inputEl) {
         if (inputEl.closest(".choices")) {
             return
@@ -69,5 +98,6 @@ export default class TextTags {
         if (this.isReadonly(inputEl)) {
             instance.containerOuter.element.classList.add(TEXT_TAGS_READONLY_CLASS)
         }
+        this.addPendingTagsOnBlurOrSubmit(inputEl, instance)
     }
 }

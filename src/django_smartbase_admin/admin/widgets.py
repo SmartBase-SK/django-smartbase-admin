@@ -33,8 +33,9 @@ from filer.models import File
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import (
-    SBADMIN_PARENT_INSTANCE_PK_VAR,
+    SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_PARENT_INSTANCE_PK_VAR,
 )
 from django_smartbase_admin.engine.const import (
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
@@ -43,6 +44,10 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     SBAdminTreeWidgetMixin,
+)
+from django_smartbase_admin.services.request_cache import (
+    RequestCacheKey,
+    cache_on_request,
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.templatetags.sb_admin_tags import (
@@ -104,7 +109,7 @@ class SBAdminBaseWidget(ContextMixin):
                     if is_modal(SBAdminThreadLocalService.get_request())
                     else ""
                 )
-            except:
+            except Exception:
                 pass
             widget_id = f"{modal_prefix}{opts.app_label}_{opts.model_name}_{context['widget']['attrs']['id']}"
             context["widget"]["attrs"]["id"] = widget_id
@@ -114,26 +119,116 @@ class SBAdminBaseWidget(ContextMixin):
 
 
 class SBAdminInputAffixMixin:
-    def __init__(self, *args, prefix=None, suffix=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+        prefix_button_attrs=None,
+        suffix_button_attrs=None,
+        media_js=(),
+        **kwargs,
+    ):
+        self.validate_affix_config(
+            prefix=prefix,
+            suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
+        )
         self.prefix = prefix
         self.suffix = suffix
+        self.prefix_icon = prefix_icon
+        self.suffix_icon = suffix_icon
+        self.prefix_button_attrs = self.get_affix_button_attrs(
+            (prefix_button_attrs or {}) if prefix_icon else None
+        )
+        self.suffix_button_attrs = self.get_affix_button_attrs(
+            (suffix_button_attrs or {}) if suffix_icon else None
+        )
+        self.media_js = media_js
         super().__init__(*args, **kwargs)
+
+    def validate_affix_config(
+        self,
+        *,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+    ):
+        if prefix and prefix_icon:
+            raise ImproperlyConfigured("Use either prefix or prefix_icon, not both.")
+        if suffix and suffix_icon:
+            raise ImproperlyConfigured("Use either suffix or suffix_icon, not both.")
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["prefix"] = self.prefix
         context["widget"]["suffix"] = self.suffix
+        context["widget"]["prefix_icon"] = self.prefix_icon
+        context["widget"]["suffix_icon"] = self.suffix_icon
+        context["widget"]["prefix_button_attrs"] = (
+            self.get_positioned_affix_button_attrs(
+                self.prefix_button_attrs, "input-affix__prefix"
+            )
+        )
+        context["widget"]["suffix_button_attrs"] = (
+            self.get_positioned_affix_button_attrs(
+                self.suffix_button_attrs, "input-affix__suffix"
+            )
+        )
         return context
 
-    def get_attrs_with_affix_classes(self, attrs, prefix=None, suffix=None):
+    def get_affix_button_attrs(self, attrs):
+        if attrs is None:
+            return None
+        attrs = dict(attrs)
+        attrs.setdefault("type", "button")
+        attrs["class"] = " ".join(
+            filter(
+                None,
+                (
+                    "input-affix__addon input-affix__button text-dark-900",
+                    attrs.get("class", ""),
+                ),
+            )
+        )
+        return attrs
+
+    def get_positioned_affix_button_attrs(self, attrs, position_class):
+        if attrs is None:
+            return None
+        attrs = dict(attrs)
+        attrs["class"] = " ".join(
+            filter(None, (attrs.get("class", ""), position_class))
+        )
+        return attrs
+
+    def get_attrs_with_affix_classes(
+        self,
+        attrs,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+    ):
         attrs = dict(attrs or {})
         classes = attrs.get("class", "")
-        if prefix:
+        if prefix or prefix_icon:
             classes = f"{classes} rounded-l-none".strip()
-        if suffix:
+        if suffix or suffix_icon:
             classes = f"{classes} rounded-r-none".strip()
         attrs["class"] = classes
         return attrs
+
+    @property
+    def media(self):
+        media = super().media
+        if self.media_js:
+            media += forms.Media(js=self.media_js)
+        return media
 
 
 class SBAdminTextInputWidget(
@@ -141,13 +236,64 @@ class SBAdminTextInputWidget(
 ):
     template_name = "sb_admin/widgets/text.html"
 
-    def __init__(self, form_field=None, attrs=None, prefix=None, suffix=None):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+        prefix_button_attrs=None,
+        suffix_button_attrs=None,
+        media_js=(),
+    ):
         attrs = self.get_attrs_with_affix_classes(
             {"class": "input", **(attrs or {})},
             prefix=prefix,
             suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
         )
-        super().__init__(form_field, attrs=attrs, prefix=prefix, suffix=suffix)
+        super().__init__(
+            form_field,
+            attrs=attrs,
+            prefix=prefix,
+            suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
+            prefix_button_attrs=prefix_button_attrs,
+            suffix_button_attrs=suffix_button_attrs,
+            media_js=media_js,
+        )
+
+
+class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        prefix=None,
+        suffix=None,
+        *,
+        copy_label="Copy",
+        copied_label="Copied",
+        copy_icon="Minus-the-top",
+    ):
+        super().__init__(
+            form_field=form_field,
+            attrs=attrs,
+            prefix=prefix,
+            suffix=suffix,
+            suffix_icon=copy_icon,
+            suffix_button_attrs={
+                "title": copy_label,
+                "aria-label": copy_label,
+                "data-sbadmin-copy-button": True,
+                "data-sbadmin-copy-label": copy_label,
+                "data-sbadmin-copied-label": copied_label,
+            },
+        )
 
 
 class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
@@ -161,6 +307,7 @@ class SBAdminTextTagsWidget(SBAdminBaseWidget, forms.TextInput):
                 "class": "input js-sbadmin-text-tags",
                 "data-choices-delimiter": delimiter,
                 "autocomplete": "off",
+                "dir": "ltr",
                 **(attrs or {}),
             },
         )
@@ -180,11 +327,41 @@ class SBAdminTextareaWidget(SBAdminBaseWidget, forms.Textarea):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
 
 
-class SBAdminEmailInputWidget(SBAdminBaseWidget, forms.EmailInput):
+class SBAdminEmailInputWidget(
+    SBAdminInputAffixMixin, SBAdminBaseWidget, forms.EmailInput
+):
     template_name = "sb_admin/widgets/email.html"
 
-    def __init__(self, form_field=None, attrs=None):
-        super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+        prefix_button_attrs=None,
+        suffix_button_attrs=None,
+        media_js=(),
+    ):
+        attrs = self.get_attrs_with_affix_classes(
+            {"class": "input", **(attrs or {})},
+            prefix=prefix,
+            suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
+        )
+        super().__init__(
+            form_field,
+            attrs=attrs,
+            prefix=prefix,
+            suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
+            prefix_button_attrs=prefix_button_attrs,
+            suffix_button_attrs=suffix_button_attrs,
+            media_js=media_js,
+        )
 
 
 class SBAdminURLFieldWidget(SBAdminBaseWidget, AdminURLFieldWidget):
@@ -198,13 +375,36 @@ class SBAdminNumberWidget(SBAdminInputAffixMixin, SBAdminBaseWidget, forms.Numbe
     class_name = "input"
     template_name = "sb_admin/widgets/number.html"
 
-    def __init__(self, form_field=None, attrs=None, prefix=None, suffix=None):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        prefix=None,
+        suffix=None,
+        prefix_icon=None,
+        suffix_icon=None,
+        prefix_button_attrs=None,
+        suffix_button_attrs=None,
+        media_js=(),
+    ):
         attrs = self.get_attrs_with_affix_classes(
             {"class": self.class_name, **(attrs or {})},
             prefix=prefix,
             suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
         )
-        super().__init__(form_field, attrs=attrs, prefix=prefix, suffix=suffix)
+        super().__init__(
+            form_field,
+            attrs=attrs,
+            prefix=prefix,
+            suffix=suffix,
+            prefix_icon=prefix_icon,
+            suffix_icon=suffix_icon,
+            prefix_button_attrs=prefix_button_attrs,
+            suffix_button_attrs=suffix_button_attrs,
+            media_js=media_js,
+        )
 
 
 class SBAdminCheckboxWidget(SBAdminBaseWidget, forms.CheckboxInput):
@@ -726,7 +926,6 @@ class SBAdminAutocompleteWidget(
     reload_on_save = None
     full_width = False
     REQUEST_CREATED_DATA_KEY = "autocomplete_created_data"
-    SELECTED_OPTION_CACHE_KEY = "_sbadmin_autocomplete_selected_options"
 
     def __init__(self, form_field=None, *args, **kwargs):
         attrs = kwargs.pop("attrs", None)
@@ -785,28 +984,20 @@ class SBAdminAutocompleteWidget(
 
     def get_selected_option_cache_key(self, request):
         formset = getattr(getattr(self, "bound_form", None), "_sbadmin_formset", None)
-        return (
+        formset_prefix = getattr(formset, "prefix", "") or ""
+        return RequestCacheKey.autocomplete_selected_options(
             self.get_id(),
-            getattr(formset, "prefix", None),
+            formset_prefix,
             # Defensive: value_field changes how submitted values map back to rows.
             self.get_value_field(),
         )
-
-    def get_selected_option_cache(self, request):
-        cache = getattr(request, self.SELECTED_OPTION_CACHE_KEY, None)
-        if cache is None:
-            cache = {}
-            setattr(request, self.SELECTED_OPTION_CACHE_KEY, cache)
-        return cache
 
     def get_selected_option_items_from_cache(self, request, parsed_value):
         formset = getattr(getattr(self, "bound_form", None), "_sbadmin_formset", None)
         if formset is None:
             return None
 
-        cache = self.get_selected_option_cache(request)
-        cache_key = self.get_selected_option_cache_key(request)
-        if cache_key not in cache:
+        def load_items_by_value():
             values = []
             value_set = set()
             for form in formset.forms:
@@ -831,9 +1022,13 @@ class SBAdminAutocompleteWidget(
                     **{f"{self.get_value_field()}__in": values}
                 ):
                     items_by_value[str(self.get_value(request, item))] = item
-            cache[cache_key] = items_by_value
+            return items_by_value
 
-        items_by_value = cache[cache_key]
+        items_by_value = cache_on_request(
+            self.get_selected_option_cache_key(request),
+            load_items_by_value,
+            request=request,
+        )
         parsed_values = (
             parsed_value if isinstance(parsed_value, list) else [parsed_value]
         )
@@ -860,23 +1055,15 @@ class SBAdminAutocompleteWidget(
         if not self.is_multiselect():
             query_suffix = ""
             self.multiselect = False
-        context["widget"]["attrs"]["preselect_field"] = threadsafe_request.GET.get(
-            "sbadmin_parent_instance_field"
-        )
-        context["widget"]["attrs"]["preselect_field_label"] = (
-            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_LABEL_VAR)
-        )
-        context["widget"]["attrs"]["preselect_field_value"] = (
-            threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
-        )
         parsed_value = None
+        selected_options = []
+        has_bound_value = bool(value)
         if value:
             parsed_value = self.parse_value_from_input(threadsafe_request, value)
             is_create = self.parse_is_create_from_input(
                 threadsafe_request,
                 threadsafe_request.request_data.request_post.get(name),
             )
-            selected_options = []
             if is_create:
                 errors = getattr(self.form, "errors", {})
                 if errors.get(self.field_name):
@@ -884,6 +1071,8 @@ class SBAdminAutocompleteWidget(
             if parsed_value:
                 if self.is_multiselect() and not isinstance(parsed_value, list):
                     parsed_value = [parsed_value]
+                elif not self.is_multiselect() and isinstance(parsed_value, list):
+                    parsed_value = next(iter(parsed_value), None)
 
                 try:
                     items = self.get_selected_option_items_from_cache(
@@ -900,7 +1089,7 @@ class SBAdminAutocompleteWidget(
                                 "label": self.get_label(threadsafe_request, item),
                             }
                         )
-                except ValueError as e:
+                except ValueError:
                     new_object_id = threadsafe_request.request_data.additional_data.get(
                         self.REQUEST_CREATED_DATA_KEY, {}
                     ).get(self.field_name)
@@ -919,6 +1108,18 @@ class SBAdminAutocompleteWidget(
                             ),
                         )
 
+        elif self._should_preselect_parent_instance(threadsafe_request):
+            parsed_value = threadsafe_request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+            selected_options = [
+                {
+                    "value": parsed_value,
+                    "label": threadsafe_request.GET.get(
+                        SBADMIN_PARENT_INSTANCE_LABEL_VAR, ""
+                    ),
+                }
+            ]
+
+        if has_bound_value or selected_options:
             context["widget"]["value"] = json.dumps(selected_options)
             context["widget"]["value_list"] = selected_options
 
@@ -936,6 +1137,11 @@ class SBAdminAutocompleteWidget(
 
         return context
 
+    def _should_preselect_parent_instance(self, request):
+        parent_field = request.GET.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
+        parent_pk = request.GET.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+        return parent_field == self.input_id and bool(parent_pk)
+
     def add_related_buttons_urls(self, parsed_value, request, context):
         try:
             if hasattr(sb_admin_site, "get_model_admin"):
@@ -948,19 +1154,26 @@ class SBAdminAutocompleteWidget(
             if parsed_value and related_model_admin.has_view_or_change_permission(
                 request
             ):
-                try:
-                    related_row = (
-                        related_model_admin.get_queryset(request)
-                        .filter(**{self.get_value_field(): parsed_value})
-                        .values("pk")
-                        .first()
-                    )
-                except (ValueError, TypeError):
-                    related_row = None
-                if related_row is not None:
+                value_field = self.get_value_field()
+                pk_field = self.model._meta.pk.name
+                if value_field == pk_field:
                     context["widget"]["attrs"]["related_edit_url"] = (
-                        related_model_admin.get_detail_url(related_row["pk"])
+                        related_model_admin.get_detail_url(parsed_value)
                     )
+                else:
+                    try:
+                        related_row = (
+                            related_model_admin.get_queryset(request)
+                            .filter(**{value_field: parsed_value})
+                            .values("pk")
+                            .first()
+                        )
+                    except (ValueError, TypeError):
+                        related_row = None
+                    if related_row is not None:
+                        context["widget"]["attrs"]["related_edit_url"] = (
+                            related_model_admin.get_detail_url(related_row["pk"])
+                        )
             if related_model_admin.has_add_permission(request):
                 context["widget"]["attrs"]["related_add_url"] = (
                     related_model_admin.get_new_url(request)

@@ -24,7 +24,7 @@
             <div class="dropdown-menu max-h-none{% if filter_widget.full_width %} w-auto{% else %} w-248{% endif %}">
                 <div class="px-12 pt-8">
                     {% include 'sb_admin/widgets/input.html' %}
-                    <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete"
+                    <select {% if filter_widget.multiselect %}multiple{% endif %} class="js-autocomplete" dir="ltr"
                             data-autocomplete-data-id="{{ autocomplete_data_id }}">
                     </select>
                 </div>
@@ -58,14 +58,4 @@
         {{ filter_widget|get_json_script:autocomplete_data_id }}
     </div>
     {% include 'sb_admin/widgets/includes/help_text.html' %}
-    <script>
-        setTimeout(function () {
-            const field = "{{ widget.attrs.preselect_field|escapejs }}"
-            const id = "{{ widget.attrs.preselect_field_value|default:-1|escapejs }}"
-            const label = "{{ widget.attrs.preselect_field_label|default:''|escapejs }}"
-            if (field && field !== "None" && window.SBAdmin.autocomplete) {
-                window.SBAdmin.autocomplete.selectAutocompleteItem(field, id, label);
-            }
-        }, 100)
-    </script>
 {% endwith %}

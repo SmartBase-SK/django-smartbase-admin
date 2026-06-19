@@ -7,7 +7,6 @@ from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.const import (
     GLOBAL_FILTER_DATA_KEY,
     FilterVersions,
-    Action,
 )
 from django_smartbase_admin.models import (
     ColorScheme,
@@ -194,6 +193,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     plugins: list = []
     default_list_sticky_header_and_footer = True
     enable_url_compression = True
+    mcp_readonly = False
+    link_history_to_audit = True
 
     def __init__(
         self,
@@ -208,6 +209,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         plugins=None,
         default_list_sticky_header_and_footer=None,
         enable_url_compression=None,
+        mcp_readonly=None,
+        link_history_to_audit=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -231,6 +234,14 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             enable_url_compression
             if enable_url_compression is not None
             else self.enable_url_compression
+        )
+        self.mcp_readonly = (
+            mcp_readonly if mcp_readonly is not None else self.mcp_readonly
+        )
+        self.link_history_to_audit = (
+            link_history_to_audit
+            if link_history_to_audit is not None
+            else self.link_history_to_audit
         )
 
     def init_registered_views(self):
@@ -340,19 +351,38 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     ):
         return qs
 
+    def get_action_permission(self, action):
+        return getattr(action, "permission", None) or "change"
+
     def has_action_permission(self, request, request_data, view, model, obj, action):
         if model:
-            if action.action_id == Action.BULK_DELETE.value:
-                return view.has_delete_permission(request, obj)
-            permission = getattr(action, "permission", None) or "change"
+            permission = self.get_action_permission(action)
+            if self.is_mcp_readonly_request(request) and permission != "view":
+                return False
             return self.has_permission(
                 request, request_data, view, model, obj, permission
             )
         return request.user.is_staff
 
+    def is_mcp_readonly_request(self, request):
+        return (
+            self.mcp_readonly
+            and getattr(request, "is_mcp", False)
+            and not request.user.is_superuser
+        )
+
+    def is_mcp_readonly_permission(self, request, permission):
+        if not self.is_mcp_readonly_request(request):
+            return False
+        if isinstance(permission, SBAdminCustomAction):
+            return self.get_action_permission(permission) != "view"
+        return permission in ("add", "change", "delete")
+
     def has_permission(
         self, request, request_data, view, model=None, obj=None, permission=None
     ):
+        if self.is_mcp_readonly_permission(request, permission):
+            return False
         if isinstance(permission, SBAdminCustomAction):
             return self.has_action_permission(
                 request, request_data, view, model, obj, permission

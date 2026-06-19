@@ -38,11 +38,15 @@ from django_smartbase_admin.engine.dynamic_forms import (
     SBADMIN_DYNAMIC_REGION_PARAM,
     SBADMIN_DYNAMIC_REGION_PREFIX_PARAM,
     SBAdminDynamicFormMixin,
-    SBDynamicRegionSource,
     SBDynamicRegion,
+    SBDynamicRegionSource,
     SBInactiveFieldPolicy,
 )
-from django_smartbase_admin.engine.modal_view import ActionModalView, RowActionModalView
+from django_smartbase_admin.engine.modal_view import (
+    ActionModalView,
+    RowActionModalView,
+    SBAdminStandaloneFormView,
+)
 from django_smartbase_admin.services.thread_local import (
     SBAdminThreadLocalService,
     sb_admin_request,
@@ -515,8 +519,34 @@ class DynamicRegionActionModal(ActionModalView):
     form_class = DynamicRegionForm
 
 
+class EmptyConfirmationActionModal(ActionModalView):
+    form_class = forms.Form
+    requires_confirmation = True
+    confirmation_message = "Delete {name}?"
+
+    def get_confirmation_data(self, request, form):
+        return {"name": "row"}
+
+
+class VisibleFieldConfirmationForm(forms.Form):
+    name = forms.CharField()
+
+
+class VisibleFieldConfirmationActionModal(ActionModalView):
+    form_class = VisibleFieldConfirmationForm
+    requires_confirmation = True
+    confirmation_message = "Submit {name}?"
+
+    def get_confirmation_data(self, request, form):
+        return {"name": form.cleaned_data["name"]}
+
+
 class CrossFieldsetDynamicRegionModal(ActionModalView):
     form_class = CrossFieldsetRegionForm
+
+
+class DynamicRegionStandaloneView(SBAdminStandaloneFormView):
+    form_class = DynamicRegionForm
 
 
 class RowObjectDynamicRegionForm(SBAdminBaseForm):
@@ -1001,6 +1031,17 @@ class DynamicFormTests(SimpleTestCase):
     def tearDown(self):
         sb_admin_request.reset(self.request_token)
 
+    def test_hidden_model_choice_field_keeps_hidden_widget(self):
+        class HiddenModelChoiceForm(SBAdminBaseFormInit, forms.Form):
+            parent_node = forms.ModelChoiceField(
+                queryset=DynamicRegionDemoModel.objects.none(),
+                widget=forms.HiddenInput,
+            )
+
+        form = HiddenModelChoiceForm(request=self.request)
+
+        self.assertIsInstance(form.fields["parent_node"].widget, SBAdminHiddenWidget)
+
     def render_fieldset(self, form, index=0):
         fieldsets = []
         for fieldset in form.fieldsets():
@@ -1452,6 +1493,45 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertIsNone(FormWithExternalViewRegions.view)
 
+    def test_action_autocomplete_registration_supports_dynamic_form_class(self):
+        dynamic_form_class = complete_action_form_class("dynamic")
+
+        class DynamicActionModal(CompleteActionModal):
+            source_name = "dynamic"
+
+            def get_form_class(self):
+                return dynamic_form_class
+
+        view = CompleteParentActionView()
+        self.request.user = SimpleNamespace(is_anonymous=True)
+        self.request.request_data = CompleteActionRequestData(
+            view=view.get_id(),
+            action=Action.AUTOCOMPLETE.value,
+            modifier=(
+                f"{DynamicActionModal.__name__}"
+                f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}unused"
+            ),
+            object_id="42",
+            user=self.request.user,
+            request_meta=self.request.META,
+            request_get=self.request.GET,
+            request_post=self.request.POST,
+            configuration=CompleteActionConfiguration(),
+            autocomplete_map={},
+        )
+
+        view.register_action_autocomplete_views(
+            self.request,
+            [SimpleNamespace(target_view=DynamicActionModal)],
+        )
+
+        widget_id = (
+            f"{DynamicActionModal.__name__}"
+            f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}"
+            f"{view.get_id()}_lookup_CompleteActionAutocompleteWidget_CompleteDynamicActionForm"
+        )
+        self.assertIn(widget_id, self.request.request_data.autocomplete_map)
+
     def test_actions_and_autocomplete_initialize_all_action_sources(self):
         parent_view = CompleteParentActionView()
         inline_view = CompleteInlineActionView()
@@ -1564,6 +1644,33 @@ class DynamicFormTests(SimpleTestCase):
 
         self.assertEqual(form.fields["mode"].widget.attrs["hx-post"], "/modal/action/")
 
+    def test_empty_action_modal_can_render_confirmation_on_get(self):
+        request = RequestFactory().get("/modal/action/")
+        SBAdminThreadLocalService.set_request(request)
+        modal = EmptyConfirmationActionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.content.decode()
+
+        self.assertIn("Delete row?", html)
+        self.assertIn('name="_confirmed" value="1"', html)
+
+    def test_action_modal_with_visible_fields_keeps_form_on_get_before_confirmation(
+        self,
+    ):
+        request = RequestFactory().get("/modal/action/")
+        SBAdminThreadLocalService.set_request(request)
+        modal = VisibleFieldConfirmationActionModal(view=FakeView())
+        modal.setup(request)
+
+        response = modal.get(request)
+        html = response.rendered_content
+
+        self.assertIn('id="sb-admin-modal-form"', html)
+        self.assertNotIn("Submit", html)
+        self.assertNotIn('name="_confirmed" value="1"', html)
+
     def test_action_modal_dynamic_region_initial_is_built_from_request_data(self):
         request = RequestFactory().post(
             "/modal/action/",
@@ -1582,6 +1689,29 @@ class DynamicFormTests(SimpleTestCase):
         self.assertIn('name="download_url"', html)
         self.assertIn('name="billing_period"', html)
         self.assertNotIn('name="weight"', html)
+
+    def test_standalone_form_view_dynamic_region_initial_is_built_from_request_data(
+        self,
+    ):
+        request = RequestFactory().post(
+            "/standalone/action/",
+            {
+                SBADMIN_DYNAMIC_REGION_PARAM: "details",
+                "mode": "digital",
+            },
+        )
+        SBAdminThreadLocalService.set_request(request)
+        view = DynamicRegionStandaloneView(view=FakeView())
+        view.setup(request)
+
+        response = view.post(request)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="download_url"', html)
+        self.assertIn('name="billing_period"', html)
+        self.assertNotIn('name="weight"', html)
+        self.assertNotIn("This field is required", html)
 
     def test_action_modal_dynamic_region_response_includes_related_regions(self):
         request = RequestFactory().post(

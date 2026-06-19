@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from django_smartbase_admin.engine.const import ROW_CLASS_FIELD
 from django_smartbase_admin.engine.fake_inline import is_fake_inline_batch_safe
@@ -320,6 +321,10 @@ def _detail_field_entries(admin, request) -> list[str]:
         names = list(
             SBAdminMCPDetailService.get_detail_fields(admin, request, None) or []
         )
+    except ImproperlyConfigured:
+        # List-only admin with no detail page — no fieldsets by design.
+        # Mirrors how get_form autocomplete registration treats this case.
+        return []
     except Exception:
         logger.warning(
             "MCP schema: get_detail_fields failed for %s",
