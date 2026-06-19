@@ -574,9 +574,12 @@ class SBAdminTools(MCPToolset):
             tickets-per-queue in one call instead of one call per queue.
             Multi-valued (relation) columns are rejected. Requires
             ``aggregate``. Results land under ``groups`` as a list of
-            ``{**group_columns, **aggregate_aliases}`` rows ordered by the
-            group columns; a column grouped on a foreign key comes back as
-            the bare pk (resolve names with ``autocomplete``).
+            ``{"group": {column: value, ...}, "aggregates": {alias: value,
+            ...}}`` rows ordered by the group columns — group columns and
+            aggregate aliases are nested under separate keys so a column whose
+            name equals an aggregate alias can't collide. A column grouped on a
+            foreign key comes back as the bare pk (resolve names with
+            ``autocomplete``).
 
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
         plus any pagination metadata the list view emits, ``aggregates``

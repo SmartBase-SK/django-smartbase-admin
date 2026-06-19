@@ -25,13 +25,19 @@ class _Admin(SBAdmin):
     search_fields = ("name",)
     # ``children`` is the reverse of the self-FK ``parent`` → a one-to-many
     # (multi-valued) field, used to exercise the join fan-out path.
-    sbadmin_list_display = ("id", "name", "id_alias", "parent", "children")
+    sbadmin_list_display = ("id", "name", "id_alias", "count", "parent", "children")
 
     # A method field with ``admin_order_field`` → backed by the ``id``
     # column via an annotation, so its ORM identifier is suffixed
     # (``id_alias_annt``), distinct from the agent-facing name ``id_alias``.
     @admin.display(ordering="id")
     def id_alias(self, obj):
+        return obj.id
+
+    # A method field whose public name collides with the derived ``count``
+    # aggregate alias — used to exercise the group-key/alias collision guard.
+    @admin.display(ordering="id")
+    def count(self, obj):
         return obj.id
 
 
@@ -124,13 +130,23 @@ class AggregateTests(TestCase):
 
         # No top-level scalar aggregates; a "groups" list instead, one row
         # per parent, ordered by the group column (NULLs first in sqlite).
+        # Group columns and aggregates are nested under separate keys.
         self.assertNotIn("aggregates", result)
         self.assertEqual(
             result["groups"],
             [
-                {"parent": None, "count": 2, "sum_id": a.pk + b.pk},
-                {"parent": a.pk, "count": 2, "sum_id": sum(a_ids)},
-                {"parent": b.pk, "count": 1, "sum_id": sum(b_ids)},
+                {
+                    "group": {"parent": None},
+                    "aggregates": {"count": 2, "sum_id": a.pk + b.pk},
+                },
+                {
+                    "group": {"parent": a.pk},
+                    "aggregates": {"count": 2, "sum_id": sum(a_ids)},
+                },
+                {
+                    "group": {"parent": b.pk},
+                    "aggregates": {"count": 1, "sum_id": sum(b_ids)},
+                },
             ],
         )
 
@@ -152,7 +168,27 @@ class AggregateTests(TestCase):
         self.assertNotIn("aggregates", result)
         self.assertEqual(
             result["groups"],
-            [{"id_alias": pk, "count": 1} for pk in ids],
+            [{"group": {"id_alias": pk}, "aggregates": {"count": 1}} for pk in ids],
+        )
+
+    def test_group_key_equal_to_aggregate_alias_does_not_collide(self):
+        # ``count`` is a method field whose public name equals the derived
+        # ``count`` aggregate alias. Nesting the group column and the aggregate
+        # under separate keys means they no longer share a dict, so both
+        # survive — the group value under ``group.count`` and the metric under
+        # ``aggregates.count``.
+        ids = sorted(Folder.objects.create(name=n).pk for n in ("a", "b", "c"))
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            group_by=["count"],
+            aggregate=[{"fn": "count"}],
+        )
+
+        self.assertEqual(
+            result["groups"],
+            [{"group": {"count": pk}, "aggregates": {"count": 1}} for pk in ids],
         )
 
     def test_aggregate_without_group_by_still_returns_scalar_dict(self):
