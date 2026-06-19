@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from ckeditor.fields import RichTextFormField
 from ckeditor_uploader.fields import RichTextUploadingFormField
 from django import forms
-from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.admin.utils import unquote
@@ -57,6 +56,7 @@ from nested_admin.nested import (
 
 from django_smartbase_admin.audit.views import (
     redirect_to_audit_history,
+    should_link_history_to_audit,
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
@@ -1192,7 +1192,7 @@ class SBAdmin(
             if not self.has_view_or_change_permission(request, obj):
                 raise PermissionDenied
 
-            if "django_smartbase_admin.audit" in settings.INSTALLED_APPS:
+            if should_link_history_to_audit(request):
                 return redirect_to_audit_history(request, obj)
 
             # Then get the history for this object.
