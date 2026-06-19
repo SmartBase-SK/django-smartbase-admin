@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timedelta
 
 from django import forms
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
@@ -406,20 +406,32 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
     _SEPARATORS = re.compile(r"[\s,;]+")
 
     def parse_value_from_input(self, request, filter_value):
-        """Normalise input to a flat list of pks, dropping empties.
+        """Normalise input to a flat list of pks, dropping empties and any
+        value that can't be this pk.
 
         Accepts a native scalar or list (MCP) or a string of pks separated
         by commas, whitespace, or semicolons (the text-input UI: ``"5"``,
-        ``"5, 9"``, ``"5 9"``, ``"5;9"``). Values stay strings — the ORM
-        coerces them per the pk field's type, so this works for integer and
-        non-integer (uuid/char) pks alike.
+        ``"5, 9"``, ``"5 9"``, ``"5;9"``). Each value is coerced through the
+        pk field, so an id that doesn't fit (e.g. ``"abc"`` for an integer
+        pk) is dropped rather than handed to the ORM — where it would raise
+        and 500 the list query for the browser.
         """
         value = filter_value
         if isinstance(value, str):
             value = [part for part in self._SEPARATORS.split(value.strip()) if part]
         if not isinstance(value, list):
             value = [value]
-        return [item for item in value if item not in forms.Field.empty_values]
+        parsed = []
+        for item in value:
+            if item in forms.Field.empty_values:
+                continue
+            if self.model_field is not None:
+                try:
+                    item = self.model_field.get_prep_value(item)
+                except (ValueError, TypeError, ValidationError):
+                    continue
+            parsed.append(item)
+        return parsed
 
     def get_base_filter_query_for_parsed_value(self, request, parsed_value):
         if not parsed_value:
@@ -438,6 +450,16 @@ class PrimaryKeyFilterWidget(SBAdminFilterWidget):
                     "primary keys (int or str), got "
                     f"{type(item).__name__}: {item!r}"
                 )
+            # Reject an id that can't be this pk up front, so MCP gets a clear
+            # error instead of the ORM's coercion failure mid-query.
+            if self.model_field is not None:
+                try:
+                    self.model_field.get_prep_value(item)
+                except (ValueError, TypeError, ValidationError):
+                    raise ValueError(
+                        f"PrimaryKeyFilterWidget got {item!r}, not a valid "
+                        f"{self.model_field.get_internal_type()} id"
+                    )
 
     def get_advanced_filter_operators(self):
         return [

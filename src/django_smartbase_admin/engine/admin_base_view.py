@@ -861,9 +861,23 @@ class SBAdminBaseListView(SBAdminBaseView):
         pk_name = getattr(pk_model_field, "name", None)
         if not pk_name:
             return None
-        declared = {getattr(field, "name", field) for field in list_display}
-        if pk_name in declared:
-            return None
+        # Skip if a declared column already targets the pk — by name, by an
+        # explicit ``filter_field="id"``, or via a method's
+        # ``@admin.display(ordering="id")``. A second column on the same
+        # filter_field would collide, and the W001 duplicate check can't see
+        # one synthesized at runtime.
+        for entry in list_display:
+            name = getattr(entry, "name", entry)
+            method = getattr(self, name, None) if isinstance(name, str) else None
+            if (
+                name == pk_name
+                or getattr(entry, "filter_field", None) == pk_name
+                or (
+                    callable(method)
+                    and getattr(method, "admin_order_field", None) == pk_name
+                )
+            ):
+                return None
         field = self.auto_create_field_from_model_field(pk_model_field)
         field.title = "ID"
         # Hidden by default — present for select/sort/filter, not forced
