@@ -34,8 +34,9 @@ class _Admin(SBAdmin):
     def id_alias(self, obj):
         return obj.id
 
-    # A method field whose public name collides with the derived ``count``
-    # aggregate alias — used to exercise the group-key/alias collision guard.
+    # A method field whose public name equals the derived ``count`` aggregate
+    # alias — used to exercise that nesting keeps a group column and an
+    # equally-named aggregate from colliding.
     @admin.display(ordering="id")
     def count(self, obj):
         return obj.id
