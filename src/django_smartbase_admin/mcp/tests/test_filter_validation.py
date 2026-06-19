@@ -246,3 +246,28 @@ class FilterValidationTests(TestCase):
                 ("uploaded_at__lte", d2 + timedelta(days=1)),
             ],
         )
+
+
+class ValidateSortTests(TestCase):
+    """``dir`` is required (not defaulted): the list pipeline reads
+    ``sort['dir']`` directly, so a bad/missing one must be caught in
+    validation, not surface as a ``KeyError`` mid-query."""
+
+    def _validate(self, sort):
+        from django_smartbase_admin.mcp.mcp import _validate_sort
+
+        # ``field_map`` provided, so ``admin``/``request`` go unused.
+        _validate_sort(None, None, sort, field_map={"name": object()})
+
+    def test_missing_dir_raises_clear_error(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._validate([{"field": "name"}])
+        self.assertIn("dir", str(ctx.exception))
+
+    def test_invalid_dir_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._validate([{"field": "name", "dir": "up"}])
+        self.assertIn("asc", str(ctx.exception))
+
+    def test_valid_sort_passes(self):
+        self._validate([{"field": "name", "dir": "desc"}])  # no raise

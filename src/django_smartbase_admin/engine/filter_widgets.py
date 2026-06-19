@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from django import forms
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Field, Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
@@ -401,6 +402,85 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
         if cls.is_used_for_model_field_type(model_field):
             return cls(choices=model_field.choices)
         return None
+
+
+class PrimaryKeyFilterWidget(SBAdminFilterWidget):
+    """Exact-match / ``IN`` filter on a primary key.
+
+    Accepts a single pk or a list of pks and filters
+    ``<filter_field>__in=[...]``. Attached to the synthetic primary-key
+    column the list view exposes when the admin hasn't declared one, so a
+    row can be re-fetched by the ``id`` it already shows — in the browser
+    (a text box: one id, or several comma-separated) and over MCP (a pk or
+    a list of pks). Not auto-detected for any model field type; only used
+    when set explicitly.
+    """
+
+    # A pk is typed, not picked — reuse the plain text-input template.
+    template_name = "sb_admin/filter_widgets/string_field.html"
+    close_dropdown_on_change = True
+
+    _SEPARATORS = re.compile(r"[\s,;]+")
+
+    def parse_value_from_input(self, request, filter_value):
+        """Flat list of pks. Accepts a native scalar/list (MCP) or a string of
+        pks separated by commas, whitespace, or semicolons (the UI text box).
+        Values are coerced through the pk field; ones that can't be this pk
+        (e.g. ``"abc"`` for an int pk) are dropped, not handed to the ORM."""
+        value = filter_value
+        if isinstance(value, str):
+            value = [part for part in self._SEPARATORS.split(value.strip()) if part]
+        if not isinstance(value, list):
+            value = [value]
+        parsed = []
+        for item in value:
+            if item in forms.Field.empty_values:
+                continue
+            if self.model_field is not None:
+                try:
+                    item = self.model_field.get_prep_value(item)
+                except (ValueError, TypeError, ValidationError):
+                    continue
+            parsed.append(item)
+        return parsed
+
+    def get_base_filter_query_for_parsed_value(self, request, parsed_value):
+        if not parsed_value:
+            # Truly-empty values are dropped before the widget runs, so an
+            # empty list here is non-empty input that coerced to nothing —
+            # invalid. Fail closed so an active filter can't silently widen to
+            # the whole table (which would also widen bulk actions / exports).
+            return Q(pk__in=[])
+        return Q(**{f"{self.field.filter_field}__in": parsed_value})
+
+    def validate_value(self, value) -> None:
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            # ``bool`` is an ``int`` subclass but never a valid pk here.
+            if isinstance(item, bool) or not isinstance(item, (int, str)):
+                raise ValueError(
+                    "PrimaryKeyFilterWidget expects a primary key or a list of "
+                    "primary keys (int or str), got "
+                    f"{type(item).__name__}: {item!r}"
+                )
+            # Reject up front so MCP gets a clear error, not an ORM failure
+            # mid-query.
+            if self.model_field is not None:
+                try:
+                    self.model_field.get_prep_value(item)
+                except (ValueError, TypeError, ValidationError):
+                    raise ValueError(
+                        f"PrimaryKeyFilterWidget got {item!r}, not a valid "
+                        f"{self.model_field.get_internal_type()} id"
+                    )
+
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.IN,
+            AllOperators.NOT_IN,
+            AllOperators.IS_NULL,
+            AllOperators.IS_NOT_NULL,
+        ]
 
 
 class NumberRangeFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
