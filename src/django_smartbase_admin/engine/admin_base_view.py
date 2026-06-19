@@ -290,7 +290,7 @@ class SBAdminBaseView(object):
 
     def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.init_fields_cache(
-            self.get_sbadmin_list_display(request),
+            self.get_effective_list_display(request),
             request.request_data.configuration,
             request=request,
         )
@@ -826,6 +826,52 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_display(self, request) -> list[str] | list:
         return self.sbadmin_list_display or self.list_display or []
 
+    def get_effective_list_display(self, request) -> list:
+        """``get_sbadmin_list_display`` augmented with a synthetic,
+        read-only primary-key column when the admin hasn't declared one.
+
+        The list pipeline already emits every row's pk under a normalized
+        ``"id"`` key, but without a matching field nothing can *select*,
+        *sort*, or *filter* by it — the field map rejects the name (this is
+        what made MCP ``list_rows(fields=["id"])`` fail, and why the browser
+        only ever got a display-only id column). Promoting the pk to a real,
+        hidden column closes that round-trip through the normal column /
+        sort / filter machinery, for the UI and MCP alike. Hidden by default
+        (``list_visible=False``) so it doesn't clutter the grid. With the pk
+        now a real column, :meth:`get_tabulator_columns` reports its id-column
+        name directly instead of grafting on a display-only one.
+        """
+        list_display = list(self.get_sbadmin_list_display(request) or [])
+        pk_field = self._build_synthetic_pk_field(list_display)
+        if pk_field is not None:
+            list_display.append(pk_field)
+        return list_display
+
+    def _build_synthetic_pk_field(self, list_display):
+        """Synthetic read-only pk column, or ``None`` when the pk is already
+        declared / can't be resolved (e.g. a composite pk)."""
+        from django_smartbase_admin.engine.filter_widgets import (
+            PrimaryKeyFilterWidget,
+        )
+
+        model = getattr(self, "model", None)
+        if model is None:
+            return None
+        pk_model_field = getattr(model._meta, "pk", None)
+        pk_name = getattr(pk_model_field, "name", None)
+        if not pk_name:
+            return None
+        declared = {getattr(field, "name", field) for field in list_display}
+        if pk_name in declared:
+            return None
+        field = self.auto_create_field_from_model_field(pk_model_field)
+        field.title = "ID"
+        # Hidden by default — present for select/sort/filter, not forced
+        # into every projection (the pk is emitted regardless).
+        field.list_visible = False
+        field.filter_widget = PrimaryKeyFilterWidget()
+        return field
+
     def _register_list_filter_autocomplete(self, request) -> None:
         field_map = self.init_fields_cache(
             self.get_sbadmin_list_display(request),
@@ -840,7 +886,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_list_display(self, request) -> list[str]:
         return [
             getattr(field, "name", field)
-            for field in self.get_sbadmin_list_display(request)
+            for field in self.get_effective_list_display(request)
         ]
 
     def get_search_fields(self, request):

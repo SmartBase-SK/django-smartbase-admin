@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timedelta
 
 from django import forms
@@ -376,6 +377,67 @@ class MultipleChoiceFilterWidget(AutocompleteParseMixin, ChoiceFilterWidget):
             raise ValueError(
                 f"MultipleChoiceFilterWidget expects a list of choice values, got {type(value).__name__}: {value!r}"
             )
+
+    def get_advanced_filter_operators(self):
+        return [
+            AllOperators.IN,
+            AllOperators.NOT_IN,
+            AllOperators.IS_NULL,
+            AllOperators.IS_NOT_NULL,
+        ]
+
+
+class PrimaryKeyFilterWidget(SBAdminFilterWidget):
+    """Exact-match / ``IN`` filter on a primary key.
+
+    Accepts a single pk or a list of pks and filters
+    ``<filter_field>__in=[...]``. Attached to the synthetic primary-key
+    column the list view exposes when the admin hasn't declared one, so a
+    row can be re-fetched by the ``id`` it already shows — in the browser
+    (a text box: one id, or several comma-separated) and over MCP (a pk or
+    a list of pks). Not auto-detected for any model field type; only used
+    when set explicitly.
+    """
+
+    # A pk is typed, not picked — reuse the plain text-input template.
+    template_name = "sb_admin/filter_widgets/string_field.html"
+    close_dropdown_on_change = True
+
+    _SEPARATORS = re.compile(r"[\s,;]+")
+
+    def parse_value_from_input(self, request, filter_value):
+        """Normalise input to a flat list of pks, dropping empties.
+
+        Accepts a native scalar or list (MCP) or a string of pks separated
+        by commas, whitespace, or semicolons (the text-input UI: ``"5"``,
+        ``"5, 9"``, ``"5 9"``, ``"5;9"``). Values stay strings — the ORM
+        coerces them per the pk field's type, so this works for integer and
+        non-integer (uuid/char) pks alike.
+        """
+        value = filter_value
+        if isinstance(value, str):
+            value = [part for part in self._SEPARATORS.split(value.strip()) if part]
+        if not isinstance(value, list):
+            value = [value]
+        return [item for item in value if item not in forms.Field.empty_values]
+
+    def get_base_filter_query_for_parsed_value(self, request, parsed_value):
+        if not parsed_value:
+            # No usable pk → no constraint (matches how the other widgets
+            # treat an empty value: the filter simply doesn't narrow).
+            return Q()
+        return Q(**{f"{self.field.filter_field}__in": parsed_value})
+
+    def validate_value(self, value) -> None:
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            # ``bool`` is an ``int`` subclass but never a valid pk here.
+            if isinstance(item, bool) or not isinstance(item, (int, str)):
+                raise ValueError(
+                    "PrimaryKeyFilterWidget expects a primary key or a list of "
+                    "primary keys (int or str), got "
+                    f"{type(item).__name__}: {item!r}"
+                )
 
     def get_advanced_filter_operators(self):
         return [

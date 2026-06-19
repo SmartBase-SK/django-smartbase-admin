@@ -149,24 +149,17 @@ class SBAdminListAction(SBAdminAction):
     def get_filters(self):
         return [field for field in self.column_fields if field.filter_widget]
 
-    def get_tabulator_columns_add_id_column_if_missing(self, add_id_column=True):
+    def get_tabulator_columns(self):
+        """Serialized Tabulator columns + the pk column's field name (the
+        frontend's ``tableIdColumnName``, or ``None`` if the column set has
+        no single pk). The pk is exposed as a real column upstream by
+        ``get_effective_list_display``, so it isn't grafted on here."""
         columns_serialized = []
         id_column_name = None
         for field in self.column_fields:
             if getattr(field.model_field, "primary_key", False):
                 id_column_name = field.field
             columns_serialized.append(field.serialize_tabulator())
-        # Add ID column in case there is none
-        if add_id_column and not id_column_name:
-            model_id_field = self.get_pk_field()
-            id_column_name = model_id_field.name
-            id_field = self.view.auto_create_field_from_model_field(model_id_field)
-            id_field.title = "ID"
-            id_field.list_visible = False
-            id_field.init_field_static(
-                self.view, self.threadsafe_request.request_data.configuration
-            )
-            columns_serialized = [id_field.serialize_tabulator()] + columns_serialized
         return columns_serialized, id_column_name
 
     def get_excel_columns(self):
@@ -208,7 +201,7 @@ class SBAdminListAction(SBAdminAction):
             "AJAX_NOTIFICATIONS_KEY": SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
         }
 
-        columns, id_column_name = self.get_tabulator_columns_add_id_column_if_missing()
+        columns, id_column_name = self.get_tabulator_columns()
         row_actions = self.view.get_sbadmin_row_actions_processed(
             self.threadsafe_request
         )

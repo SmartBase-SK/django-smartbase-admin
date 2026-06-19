@@ -517,6 +517,9 @@ class SBAdminTools(MCPToolset):
             ``list_admins["admin_views"][].fields[].name``. Every row also
             carries a normalized ``"id"`` key for row identity, regardless
             of the model's pk field name (so ``row["id"]`` is always safe).
+            ``"id"`` is itself a selectable, sortable, and filterable column
+            — filter it with one id or a list of ids to re-fetch the exact
+            rows behind ids you already saw.
           filter_data: ``{field: value}`` mapping. Each **key** is a column
             ``name`` from ``list_admins["admin_views"][].fields[].name`` —
             the same identifier ``fields`` and ``sort`` use. (Keys returned
