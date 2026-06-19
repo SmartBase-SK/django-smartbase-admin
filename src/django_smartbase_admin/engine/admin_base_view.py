@@ -44,6 +44,7 @@ from django_smartbase_admin.engine.const import (
     SUPPORTED_FILE_TYPE_ICONS,
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
 )
+from django_smartbase_admin.audit.views import should_link_history_to_audit
 from django_smartbase_admin.engine.inline_pagination import SBADMIN_INLINE_PREFIX_HEADER
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
@@ -976,10 +977,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     no_params=True,
                 ),
             ]
-        if (
-            self.sbadmin_list_history_enabled
-            and "django_smartbase_admin.audit" in settings.INSTALLED_APPS
-        ):
+        if self.sbadmin_list_history_enabled and should_link_history_to_audit(request):
             try:
                 from django_smartbase_admin.audit.views import (
                     get_audit_model_history_url,

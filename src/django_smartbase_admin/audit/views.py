@@ -2,11 +2,32 @@
 View helpers for audit history.
 """
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import redirect
 from django.urls import reverse
 
 from django_smartbase_admin.services.views import SBAdminViewService
+
+
+def should_link_history_to_audit(request) -> bool:
+    """
+    Whether admin history (change form and list view) should link to the
+    audit log instead of the standard Django history.
+
+    The audit app keeps recording regardless; this only controls where the
+    history links point. Requires the audit app to be installed (it provides
+    the history views) and the active SBAdminRoleConfiguration to opt in via
+    the ``link_history_to_audit`` flag (defaults to True). Reading it off the
+    role configuration lets a project enable it only for selected user roles.
+    """
+    if "django_smartbase_admin.audit" not in settings.INSTALLED_APPS:
+        return False
+    request_data = getattr(request, "request_data", None)
+    configuration = getattr(request_data, "configuration", None)
+    if configuration is None:
+        return True
+    return getattr(configuration, "link_history_to_audit", True)
 
 
 def _get_audit_view_id():
