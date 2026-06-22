@@ -17,7 +17,11 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
+from django_smartbase_admin.admin.admin_base import (
+    SBAdmin,
+    SBAdminTableInline,
+    SBAdminTableInlinePaginated,
+)
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
@@ -112,7 +116,7 @@ class MessageAttachmentInline(SBAdminTableInline):
     extra = 1
 
 
-class MessageRecipientStatusInline(SBAdminTableInline):
+class MessageRecipientStatusInline(SBAdminTableInlinePaginated):
     """Read-only listing of recipients + their read status ("who hasn't read")."""
 
     model = MessageRecipient
@@ -120,6 +124,7 @@ class MessageRecipientStatusInline(SBAdminTableInline):
     readonly_fields = ["user", "notified_at", "read_at"]
     extra = 0
     can_delete = False
+    per_page = 10
 
     def has_add_permission(self, request, obj=None):
         return False
