@@ -36,6 +36,7 @@ from django_smartbase_admin.messaging.models import (
 )
 from django_smartbase_admin.messaging.services import SBAdminMessagingService
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import SBAdminNoHistoryDetailMixin
 
 
@@ -81,6 +82,16 @@ def _sender_filter_query(request, value):
         | Q(message__created_by__last_name__icontains=value)
         | Q(message__created_by__email__icontains=value)
         | Q(**{f"message__created_by__{username_field}__icontains": value})
+    )
+
+
+def new_message_action(send_view, request):
+    """The shared "New message" toolbar action linking to the Message add view."""
+    return SBAdminCustomAction(
+        title=_("New message"),
+        url=send_view.get_new_url(request),
+        icon="Add-one",
+        css_class="btn btn-secondary",
     )
 
 
@@ -153,6 +164,24 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
         if user and user.is_authenticated:
             return qs.filter(created_by=user)
         return qs
+
+    def get_sbadmin_list_actions(self, request):
+        # Use the same "New message" toolbar action as the inbox instead of the
+        # framework's default "Add" button (suppressed in action_list below).
+        actions = list(super().get_sbadmin_list_actions(request) or [])
+        if self.has_add_permission(request):
+            actions.append(new_message_action(self, request))
+        return actions
+
+    @sbadmin_action(permission="view")
+    def action_list(self, request, *args, **kwargs):
+        response = super().action_list(request, *args, **kwargs)
+        # Hide the default "Add" button — the custom "New message" action above
+        # replaces it so it matches the inbox button.
+        content_context = getattr(response, "context_data", {}).get("content_context")
+        if isinstance(content_context, dict):
+            content_context["new_url"] = None
+        return response
 
     def get_sbadmin_fieldsets(self, request, object_id=None):
         # Created message → single read-only detail card. Otherwise the editable
@@ -335,6 +364,24 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
 
     # --- detail (read-only message reader) ---------------------------------
 
+    def get_sbadmin_list_actions(self, request):
+        # Offer a "New message" action to users allowed to author messages
+        # (i.e. who have add permission on the management Message view).
+        actions = list(super().get_sbadmin_list_actions(request) or [])
+        send_view = self._get_message_send_view(request)
+        if send_view is not None and send_view.has_add_permission(request):
+            actions.append(new_message_action(send_view, request))
+        return actions
+
+    @staticmethod
+    def _get_message_send_view(request):
+        configuration = getattr(
+            getattr(request, "request_data", None), "configuration", None
+        )
+        if configuration is None:
+            return None
+        return configuration.view_map.get(SBAdminViewService.get_model_path(Message))
+
     def get_change_label(self, request, object_id=None):
         # Title the detail page with the sender (message author), not the
         # MessageRecipient's "<message_id> → <user_id>" repr.
@@ -426,4 +473,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
     @sbadmin_action(permission="view")
     def action_acknowledge(self, request, modifier, object_id=None):
         SBAdminMessagingService.mark_read(request, object_id)
-        return HttpResponse("")
+        # Refresh the page so the inbox / unread badge reflect the read state.
+        response = HttpResponse("")
+        response["HX-Refresh"] = "true"
+        return response
