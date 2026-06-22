@@ -7,6 +7,8 @@ from django_smartbase_admin.messaging.models import MessageRecipient
 
 
 class SBAdminMessagingService:
+    RECIPIENT_SYNC_BATCH_SIZE = 2000
+
     @classmethod
     def get_messaging_config(cls, request):
         """Return the active ``SBAdminMessagingConfig`` for the request, or ``None``.
@@ -139,7 +141,11 @@ class SBAdminMessagingService:
             if user_id not in existing
         ]
         if to_create:
-            MessageRecipient.objects.bulk_create(to_create, ignore_conflicts=True)
+            MessageRecipient.objects.bulk_create(
+                to_create,
+                batch_size=cls.RECIPIENT_SYNC_BATCH_SIZE,
+                ignore_conflicts=True,
+            )
 
         stale_ids = [
             user_id
