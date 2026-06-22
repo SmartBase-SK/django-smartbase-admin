@@ -25,9 +25,11 @@ class SBAdminDashboardView(SBAdminView):
     def get_widget_id(self, widget, index):
         return f"{self.get_id()}_{index}"
 
-    def get_dashboard_media(self, request):
+    def get_dashboard_media(self, request, widget_views=None):
         media = forms.Media()
-        for widget in self.get_widget_views(request):
+        if widget_views is None:
+            widget_views = self.get_widget_views(request)
+        for widget in widget_views:
             if hasattr(widget, "get_media"):
                 media += widget.get_media()
         return media
@@ -35,8 +37,9 @@ class SBAdminDashboardView(SBAdminView):
     @sbadmin_action
     def dashboard(self, request, modifier, object_id=None):
         context = self.get_global_context(request)
-        context["direct_sub_views"] = self.get_widget_views(request, object_id)
-        context["dashboard_media"] = self.get_dashboard_media(request)
+        widget_views = self.get_widget_views(request, object_id)
+        context["direct_sub_views"] = widget_views
+        context["dashboard_media"] = self.get_dashboard_media(request, widget_views)
         context["title"] = self.get_title()
         return TemplateResponse(
             request,

@@ -114,6 +114,9 @@ function initDashboardGroups() {
     window.SBAdminDashboardGroups = window.SBAdminDashboardGroups || {}
     document.querySelectorAll('[data-dashboard-group-id]').forEach((element) => {
         const groupId = element.dataset.dashboardGroupId
+        if (window.SBAdminDashboardGroups[groupId]) {
+            return
+        }
         const group = new SBAdminDashboardGroup(element)
         // Child widgets usually register while the group HTML is rendering.
         // Init copies those callbacks into the live group before the first shared AJAX refresh.
@@ -123,6 +126,14 @@ function initDashboardGroups() {
         window.SBAdminDashboardGroups[groupId] = group
         group.init()
     })
+}
+
+function initDashboardGroupsOnReady() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDashboardGroups, {once: true})
+        return
+    }
+    initDashboardGroups()
 }
 
 window.SBAdminRegisterDashboardSubWidget = function(groupId, definition) {
@@ -136,3 +147,4 @@ window.SBAdminRegisterDashboardSubWidget = function(groupId, definition) {
     }
 }
 window.SBAdminInitDashboardGroups = initDashboardGroups
+initDashboardGroupsOnReady()

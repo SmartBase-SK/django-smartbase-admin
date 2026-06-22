@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-from django import forms
 from django.contrib import admin
 from django.contrib.admin.helpers import Fieldset
 from django.contrib.admin.sites import AdminSite
@@ -420,6 +419,29 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertEqual(media_html.count("sb_admin/dist/calendar.js"), 1)
         self.assertEqual(media_html.count("sb_admin/dist/calendar_style.css"), 1)
 
+    def test_dashboard_media_uses_object_specific_widget_views(self):
+        class _ObjectSpecificDashboardView(SBAdminDashboardView):
+            def get_widget_views(self, request, object_id=None):
+                if object_id == "price-list-1":
+                    return [SBAdminDashboardChartWidget()]
+                return [_StandaloneDashboardWidget()]
+
+            def get_global_context(self, request):
+                return {}
+
+        view = _ObjectSpecificDashboardView(title="Dashboard")
+        request = self.factory.get("/dashboard/")
+
+        response = view.dashboard(request, None, object_id="price-list-1")
+        media_html = str(response.context_data["dashboard_media"])
+
+        self.assertIsInstance(
+            response.context_data["direct_sub_views"][0],
+            SBAdminDashboardChartWidget,
+        )
+        self.assertIn("sb_admin/dist/chart.js", media_html)
+        self.assertNotIn("sb_admin/dist/table.js", media_html)
+
     def test_dashboard_widgets_use_index_based_ids(self):
         configuration = SimpleNamespace(view_map={})
         view = SBAdminDashboardView(
@@ -727,6 +749,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertIn(
             'data-ajax-url="/dashboard_group_widget/action_get_data/template/"', html
         )
+        self.assertIn("window.SBAdminInitDashboardGroups()", html)
         self.assertNotIn("registerChart", html)
         self.assertNotIn("setTimeout", html)
 
@@ -780,18 +803,6 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertNotIn('"parentWidgetId": "dashboard_parent_widget"', html)
         self.assertIn('"formId": "dashboard_parent_widget-filter-form"', html)
         self.assertIn("dashboard_parent_widget_0/action_get_data/template/", html)
-
-    def test_dashboard_template_guards_group_initializer(self):
-        html = render_to_string(
-            "sb_admin/actions/dashboard.html",
-            {
-                "dashboard_media": forms.Media(),
-                "direct_sub_views": [],
-            },
-            request=self.factory.get("/dashboard/"),
-        )
-
-        self.assertIn("if (window.SBAdminInitDashboardGroups)", html)
 
     def test_dashboard_group_widget_keeps_list_subwidget_table_ajax(self):
         widget = _DashboardListGroupWidget()
