@@ -31,20 +31,27 @@ def is_non_loopback_http(redirect_uri: str) -> bool:
 
 
 def loopback_redirect_allowed(redirect_uri: str, allowed_uris) -> bool:
-    """RFC 8252 §7.3 — match a loopback redirect URI ignoring its port.
+    """RFC 8252 §7.3 — match a loopback ``http`` redirect URI ignoring its port.
 
     Loopback hosts are treated as interchangeable (a client registered with
-    ``127.0.0.1`` may come back as ``localhost``); scheme, path and query must
-    still match a registered loopback URI exactly.
+    ``127.0.0.1`` may come back as ``localhost``); path and query must still
+    match a registered loopback URI exactly.
+
+    Port relaxation is confined to ``http`` — the only RFC 8252 §7.3 case and
+    the only scheme this validator deliberately permits for loopback hosts.
+    Custom/native schemes (``cursor://``, ``claude://``) stay on DOT's exact
+    match, which enforces ``ALLOWED_REDIRECT_URI_SCHEMES``; without this gate a
+    dynamically registered URI like ``javascript://localhost:1/callback`` could
+    slip past the scheme allowlist on a mere port mismatch.
     """
     requested = urlsplit(redirect_uri)
-    if requested.hostname not in LOOPBACK_HOSTS:
+    if requested.scheme != "http" or requested.hostname not in LOOPBACK_HOSTS:
         return False
     for allowed in allowed_uris:
         candidate = urlsplit(allowed)
         if (
-            candidate.hostname in LOOPBACK_HOSTS
-            and candidate.scheme == requested.scheme
+            candidate.scheme == "http"
+            and candidate.hostname in LOOPBACK_HOSTS
             and candidate.path == requested.path
             and candidate.query == requested.query
         ):

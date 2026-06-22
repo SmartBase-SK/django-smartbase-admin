@@ -194,6 +194,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     default_list_sticky_header_and_footer = True
     enable_url_compression = True
     mcp_readonly = False
+    link_history_to_audit = True
 
     def __init__(
         self,
@@ -209,6 +210,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         default_list_sticky_header_and_footer=None,
         enable_url_compression=None,
         mcp_readonly=None,
+        link_history_to_audit=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -235,6 +237,11 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         )
         self.mcp_readonly = (
             mcp_readonly if mcp_readonly is not None else self.mcp_readonly
+        )
+        self.link_history_to_audit = (
+            link_history_to_audit
+            if link_history_to_audit is not None
+            else self.link_history_to_audit
         )
 
     def init_registered_views(self):

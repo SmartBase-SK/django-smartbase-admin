@@ -142,15 +142,17 @@ def _extract_fk_affected(model, changes: dict) -> list[dict]:
             old_repr = None
             new_repr = None
 
-        # Add old value if present
+        # Add old value if present. ``old_val`` / ``new_val`` arrive already
+        # JSON-safe from serialization (int PKs stay int, UUID/char PKs are
+        # str) — use them as-is. Casting to int() crashed on non-int PKs.
         if old_val:
             obj_repr = old_repr or _get_object_repr(related_model, old_val)
-            affected.append({"ct": ct_label, "id": int(old_val), "repr": obj_repr})
+            affected.append({"ct": ct_label, "id": old_val, "repr": obj_repr})
 
         # Add new value if present and different
         if new_val and new_val != old_val:
             obj_repr = new_repr or _get_object_repr(related_model, new_val)
-            affected.append({"ct": ct_label, "id": int(new_val), "repr": obj_repr})
+            affected.append({"ct": ct_label, "id": new_val, "repr": obj_repr})
 
     return affected
 

@@ -24,6 +24,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     DateFilterWidget,
     MultipleChoiceFilterWidget,
     NumberRangeFilterWidget,
+    PrimaryKeyFilterWidget,
 )
 from django_smartbase_admin.mcp.actions import collect_action_entries
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 # Order matters: ``MultipleChoiceFilterWidget`` subclasses
 # ``ChoiceFilterWidget``, so it must be checked first.
 _WIDGET_CATEGORIES: tuple[tuple[type, str], ...] = (
+    (PrimaryKeyFilterWidget, "PrimaryKeyFilterWidget"),
     (DateFilterWidget, "DateFilterWidget"),
     (NumberRangeFilterWidget, "NumberRangeFilterWidget"),
     (BooleanFilterWidget, "BooleanFilterWidget"),
@@ -55,6 +57,13 @@ _WIDGET_CATEGORIES: tuple[tuple[type, str], ...] = (
 )
 
 WIDGET_SHAPES: dict[str, dict] = {
+    "PrimaryKeyFilterWidget": {
+        "value_shape": (
+            "an id, or a list of ids, matched exactly (SQL IN); pass the "
+            "ids you already saw in the data to re-fetch those exact rows"
+        ),
+        "example": [42, 7, 13],
+    },
     "DateFilterWidget": {
         "value_shape": (
             "[start, end] — list of two ISO-8601 dates ('YYYY-MM-DD'); "

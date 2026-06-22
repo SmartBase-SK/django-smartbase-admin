@@ -150,24 +150,19 @@ class SBAdminListAction(SBAdminAction):
     def get_filters(self):
         return [field for field in self.column_fields if field.filter_widget]
 
-    def get_tabulator_columns_add_id_column_if_missing(self, add_id_column=True):
+    def get_tabulator_columns(self):
+        """Serialized Tabulator columns + the pk field name (the frontend's
+        ``tableIdColumnName``)."""
         columns_serialized = []
         id_column_name = None
         for field in self.column_fields:
             if getattr(field.model_field, "primary_key", False):
                 id_column_name = field.field
             columns_serialized.append(field.serialize_tabulator())
-        # Add ID column in case there is none
-        if add_id_column and not id_column_name:
-            model_id_field = self.get_pk_field()
-            id_column_name = model_id_field.name
-            id_field = self.view.auto_create_field_from_model_field(model_id_field)
-            id_field.title = "ID"
-            id_field.list_visible = False
-            id_field.init_field_static(
-                self.view, self.threadsafe_request.request_data.configuration
-            )
-            columns_serialized = [id_field.serialize_tabulator()] + columns_serialized
+        if id_column_name is None:
+            # No column is the pk (e.g. an annotation addresses it instead);
+            # the pk value is still in every row, so name it directly.
+            id_column_name = self.get_pk_field().name
         return columns_serialized, id_column_name
 
     def get_excel_columns(self):
@@ -210,7 +205,7 @@ class SBAdminListAction(SBAdminAction):
             "AJAX_NOTIFICATIONS_KEY": SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
         }
 
-        columns, id_column_name = self.get_tabulator_columns_add_id_column_if_missing()
+        columns, id_column_name = self.get_tabulator_columns()
         row_actions = self.view.get_sbadmin_row_actions_processed(
             self.threadsafe_request
         )
@@ -837,11 +832,16 @@ class SBAdminListAction(SBAdminAction):
         degenerate case of the same query.
 
         Without ``group_by`` returns a scalar ``{alias: value}`` dict; with
-        ``group_by`` returns a list of ``{**group_fields, **aliases}`` rows,
-        ordered by the group columns. Each metric runs in its own query and
-        is merged by group key, so a metric that traverses a to-many
-        relation (a multi-valued ``count``, or an annotated field that
-        aggregates a related set) can never fan-out-inflate a sibling.
+        ``group_by`` returns a list of
+        ``{"group": {name: value, ...}, "aggregates": {alias: value, ...}}``
+        rows, ordered by the group columns. The two namespaces are nested
+        rather than merged into one flat dict so a group column whose public
+        name equals a derived aggregate alias (e.g. a ``count`` field grouped
+        on while also aggregating ``count``) can't clobber the other — they
+        live under separate keys. Each metric runs in its own query and is
+        merged by group key, so a metric that traverses a to-many relation (a
+        multi-valued ``count``, or an annotated field that aggregates a related
+        set) can never fan-out-inflate a sibling.
         """
         specs = self.validate_aggregate(aggregate, field_map=field_map)
         group_fields = self.validate_group_by(group_by, field_map=field_map)
@@ -869,11 +869,20 @@ class SBAdminListAction(SBAdminAction):
 
         # Resolve group targets the same way; a computed (annotated) group
         # column needs its expression present before ``.values()``.
+        # Keep the caller-facing group key (the declared name they grouped by)
+        # separate from the ORM target. They diverge when a declared field's
+        # public name differs from its DB column — e.g. an ``id_alias`` method
+        # field backed by ``@admin.display(ordering="id")`` resolves to ``id``.
+        # ``group_targets`` drives ``.values()`` / ``order_by`` / dedup; the
+        # response ``group`` dict is keyed by ``group_keys`` so
+        # ``group_by=["id_alias"]`` comes back under ``id_alias``, not ``id``.
+        group_keys: list[str] = []
         group_targets: list[str] = []
         for field in group_fields:
             target = (
                 field.model_field.name if field.model_field is not None else field.field
             )
+            group_keys.append(field.name)
             group_targets.append(target)
             if (
                 field.model_field is None
@@ -883,6 +892,7 @@ class SBAdminListAction(SBAdminAction):
                 if field.supporting_annotates:
                     extra.update(field.supporting_annotates)
                 extra[target] = field.annotate
+
         if extra:
             queryset = queryset.annotate(**extra)
 
@@ -914,13 +924,20 @@ class SBAdminListAction(SBAdminAction):
                     key = tuple(row[t] for t in group_targets)
                     slot = merged.get(key)
                     if slot is None:
-                        slot = {t: row[t] for t in group_targets}
+                        slot = {
+                            "group": {
+                                key_name: row[target]
+                                for key_name, target in zip(group_keys, group_targets)
+                            },
+                            "aggregates": {},
+                        }
                         merged[key] = slot
                         order.append(key)
-                    slot[alias] = row[alias]
+                    slot["aggregates"][alias] = row[alias]
         except FieldError as exc:
             raise ValueError(f"Cannot aggregate the requested field(s): {exc}") from exc
 
+        # No group dimension → unwrap to the bare scalar aggregate dict.
         if not group_targets:
-            return merged[order[0]] if order else {}
+            return merged[order[0]]["aggregates"] if order else {}
         return [merged[key] for key in order]

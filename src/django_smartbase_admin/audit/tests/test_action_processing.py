@@ -115,7 +115,7 @@ class TestListAction(SBAdminListAction):
     def get_filters(self):
         return []
 
-    def get_tabulator_columns_add_id_column_if_missing(self, add_id_column=True):
+    def get_tabulator_columns(self):
         return [], "id"
 
 
