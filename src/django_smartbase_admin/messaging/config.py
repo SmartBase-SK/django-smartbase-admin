@@ -108,7 +108,7 @@ class UsersAudience(SBAdminMessageAudience):
         )
 
     def serialize(self, cleaned_value):
-        return [user.pk for user in cleaned_value] if cleaned_value else []
+        return [str(user.pk) for user in cleaned_value] if cleaned_value else []
 
     def resolve_users(self, stored_value, request):
         from django.contrib.auth import get_user_model
