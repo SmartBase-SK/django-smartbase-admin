@@ -199,12 +199,16 @@ class SBAdminMessagingConfig:
         message_types=None,
         audiences=None,
         poll_interval_seconds=60,
+        scope_by_author=False,
     ):
         self.message_types = list(
             message_types if message_types is not None else DEFAULT_MESSAGE_TYPES
         )
         self.audiences = list(audiences if audiences is not None else DEFAULT_AUDIENCES)
         self.poll_interval_seconds = poll_interval_seconds
+        # When enabled, the "Sent" view only lists messages authored by the
+        # current user. Disabled by default — every user sees all sent messages.
+        self.scope_by_author = scope_by_author
 
     # --- lookup helpers -------------------------------------------------
 

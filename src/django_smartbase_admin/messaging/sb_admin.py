@@ -170,8 +170,15 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
     inlines = [MessageAttachmentInline, MessageRecipientStatusInline]
 
     def get_queryset(self, request=None):
-        # "Sent" view: scope to messages authored by the current user.
-        qs = super().get_queryset(request)
+        return self.scope_queryset_by_author(super().get_queryset(request), request)
+
+    def scope_queryset_by_author(self, qs, request):
+        # "Sent" view: optionally scope to messages authored by the current
+        # user. Controlled by ``SBAdminMessagingConfig.scope_by_author``
+        # (disabled by default — all sent messages are listed).
+        messaging_config = SBAdminMessagingService.get_messaging_config(request)
+        if not (messaging_config and messaging_config.scope_by_author):
+            return qs
         user = getattr(request, "user", None) if request else None
         if user and user.is_authenticated:
             return qs.filter(created_by=user)
