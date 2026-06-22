@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-22 03:03-0500\n"
+"POT-Creation-Date: 2026-06-22 03:43-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -1088,11 +1088,6 @@ msgstr "Uložit a přidat další"
 msgid "Save and continue editing"
 msgstr "Uložit a pokračovat v úpravách"
 
-#, fuzzy
-#| msgid "Select all"
-msgid "Select"
-msgstr "Vybrat vše"
-
 msgid "Add file"
 msgstr "Přidat soubor"
 
@@ -1227,6 +1222,11 @@ msgstr " z "
 msgid "Language"
 msgstr "Jazyk"
 
+#, fuzzy
+#~| msgid "Select all"
+#~ msgid "Select"
+#~ msgstr "Vybrat vše"
+
 #, python-format
 #~ msgid ""
 #~ "Deleting the %(object_name)s '%(escaped_object)s' would result in "
@@ -1279,3 +1279,6 @@ msgstr "Jazyk"
 #~ msgstr ""
 #~ "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující "
 #~ "objekty a jejich související položky budou smazány:"
+
+msgid "Notified"
+msgstr "Notifikováno"

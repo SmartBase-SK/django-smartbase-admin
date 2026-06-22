@@ -8,6 +8,7 @@
   marks it read, and it hosts the notification poll + acknowledge endpoints.
 """
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db.models import Count, F, Q, TextField, Value
 from django.db.models.functions import Coalesce
@@ -120,11 +121,29 @@ class MessageRecipientStatusInline(SBAdminTableInlinePaginated):
     """Read-only listing of recipients + their read status ("who hasn't read")."""
 
     model = MessageRecipient
-    fields = ["user", "notified_at", "read_at"]
-    readonly_fields = ["user", "notified_at", "read_at"]
+    fields = ["user", "notified", "read"]
+    readonly_fields = ["user", "notified", "read"]
     extra = 0
     can_delete = False
     per_page = 10
+
+    @admin.display(description=_("Notified"))
+    def notified(self, obj):
+        if not obj.notified_at:
+            return ""
+        return format_html(
+            '<span class="badge badge-simple">{}</span>',
+            datetime_formatter(obj.pk, obj.notified_at),
+        )
+
+    @admin.display(description=_("Read"))
+    def read(self, obj):
+        if not obj.read_at:
+            return ""
+        return format_html(
+            '<span class="badge badge-simple badge-positive">{}</span>',
+            datetime_formatter(obj.pk, obj.read_at),
+        )
 
     def has_add_permission(self, request, obj=None):
         return False

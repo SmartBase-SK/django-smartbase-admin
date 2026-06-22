@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-22 03:03-0500\n"
+"POT-Creation-Date: 2026-06-22 03:43-0500\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -324,7 +324,7 @@ msgid "Message recipients"
 msgstr "Príjemcovia správ"
 
 msgid "Read"
-msgstr "Prečítané"
+msgstr "Prečítaná"
 
 msgid "Unread"
 msgstr "Neprečítané"
@@ -333,7 +333,7 @@ msgid "New message"
 msgstr "Nová správa"
 
 msgid "Created"
-msgstr "Vytvorené"
+msgstr "Vytvorená"
 
 msgid "Recipients"
 msgstr "Príjemcovia"
@@ -345,7 +345,7 @@ msgid "From"
 msgstr "Od"
 
 msgid "Received"
-msgstr "Prijaté"
+msgstr "Prijatá"
 
 msgid "System"
 msgstr "Systém"
@@ -1078,11 +1078,6 @@ msgstr "Uložiť a pridať ďalšie"
 msgid "Save and continue editing"
 msgstr "Uložiť a pokračovať v úpravách"
 
-#, fuzzy
-#| msgid "Select all"
-msgid "Select"
-msgstr "Vybrať všetky"
-
 msgid "Add file"
 msgstr "Pridať súbor"
 
@@ -1211,6 +1206,11 @@ msgstr " z "
 msgid "Language"
 msgstr "Jazyk"
 
+#, fuzzy
+#~| msgid "Select all"
+#~ msgid "Select"
+#~ msgstr "Vybrať všetky"
+
 #, python-format
 #~ msgid ""
 #~ "Deleting the %(object_name)s '%(escaped_object)s' would result in "
@@ -1261,3 +1261,6 @@ msgstr "Jazyk"
 #~ msgstr ""
 #~ "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky "
 #~ "nasledujúce položky a ich súvisiace objekty budú odstránené:"
+
+msgid "Notified"
+msgstr "Notifikovaný"
