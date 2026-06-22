@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-22 01:31-0500\n"
+"POT-Creation-Date: 2026-06-22 03:03-0500\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -276,8 +276,8 @@ msgstr "Toast"
 msgid "Modal"
 msgstr "Modálne okno"
 
-msgid "Specific users"
-msgstr ""
+msgid "Users"
+msgstr "Používatelia"
 
 msgid "User groups"
 msgstr "Skupiny používateľov"
@@ -297,10 +297,8 @@ msgstr "Názov"
 msgid "Type"
 msgstr "Typ"
 
-#, fuzzy
-#| msgid "Contains"
 msgid "Content"
-msgstr "Obsahuje"
+msgstr "Obsah"
 
 msgid "Message"
 msgstr "Správa"
@@ -330,6 +328,9 @@ msgstr "Prečítané"
 
 msgid "Unread"
 msgstr "Neprečítané"
+
+msgid "New message"
+msgstr "Nová správa"
 
 msgid "Created"
 msgstr "Vytvorené"
@@ -1059,6 +1060,9 @@ msgstr "Neuložené zmeny"
 msgid "This list has unsaved changes. Changing page will discard them."
 msgstr "V tomto zozname máte neuložené zmeny. Pri zmene stránky sa zahodia."
 
+msgid "Send"
+msgstr "Odoslať"
+
 msgid "Basic Settings"
 msgstr "Základné nastavenia"
 
@@ -1257,9 +1261,3 @@ msgstr "Jazyk"
 #~ msgstr ""
 #~ "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky "
 #~ "nasledujúce položky a ich súvisiace objekty budú odstránené:"
-
-msgid "New message"
-msgstr "Nová správa"
-
-msgid "Send"
-msgstr "Odoslať"

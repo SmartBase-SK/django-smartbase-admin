@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-22 01:31-0500\n"
+"POT-Creation-Date: 2026-06-22 03:03-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -277,8 +277,8 @@ msgstr "Toast"
 msgid "Modal"
 msgstr "Modální okno"
 
-msgid "Specific users"
-msgstr ""
+msgid "Users"
+msgstr "Uživatelé"
 
 msgid "User groups"
 msgstr "Skupiny uživatelů"
@@ -298,10 +298,8 @@ msgstr "Název"
 msgid "Type"
 msgstr "Typ"
 
-#, fuzzy
-#| msgid "Contains"
 msgid "Content"
-msgstr "Obsahuje"
+msgstr "Obsah"
 
 msgid "Message"
 msgstr "Zpráva"
@@ -331,6 +329,9 @@ msgstr "Přečteno"
 
 msgid "Unread"
 msgstr "Nepřečteno"
+
+msgid "New message"
+msgstr "Nová zpráva"
 
 msgid "Created"
 msgstr "Vytvořeno"
@@ -1069,6 +1070,9 @@ msgstr "Neuložené změny"
 msgid "This list has unsaved changes. Changing page will discard them."
 msgstr "V tomto seznamu máte neuložené změny. Při změně stránky se zahodí."
 
+msgid "Send"
+msgstr "Odeslat"
+
 msgid "Basic Settings"
 msgstr "Základní nastavení"
 
@@ -1275,9 +1279,3 @@ msgstr "Jazyk"
 #~ msgstr ""
 #~ "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující "
 #~ "objekty a jejich související položky budou smazány:"
-
-msgid "New message"
-msgstr "Nová zpráva"
-
-msgid "Send"
-msgstr "Odeslat"
