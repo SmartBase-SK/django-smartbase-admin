@@ -856,6 +856,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 | `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
 | `mcp_readonly` | Make MCP requests read-only for non-superusers. Default `False`; set `True` to block MCP add/change/delete and mutating actions while leaving browser admin writes unchanged. | [MCP Read-Only Toggle](#mcp-read-only-toggle) |
+| `myprofile_sbadmin` | Tell MCP which change view is the current user's own profile. | [Current User / My Profile](#current-user--my-profile) |
 
 ### URL Params Compression Toggle
 
@@ -5575,6 +5576,110 @@ OAUTH2_PROVIDER = {
 This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
+
+### Current User / My Profile
+
+MCP requests know the authenticated Django user internally, but agents should not guess the matching admin row by scanning user lists. Configure `SBAdminRoleConfiguration.myprofile_sbadmin` to expose the current user's profile detail target through `list_admins()["my_profile"]` and the `fetch_my_profile` MCP tool.
+
+For a user-profile admin, keep the profile admin project-side. A common setup is a `User` proxy model whose changelist URL renders the logged-in user's change form:
+
+```python
+# accounts/models.py
+from django.contrib.auth import get_user_model
+
+BaseUser = get_user_model()
+
+
+class MyProfile(BaseUser):
+    class Meta:
+        proxy = True
+        verbose_name = "my profile"
+        verbose_name_plural = "my profile"
+```
+
+```python
+# accounts/sb_admin.py
+from django.contrib import admin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseRedirect
+
+from accounts.models import MyProfile
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.configuration import (
+    SBAdminMyProfileConfig,
+    SBAdminRoleConfiguration,
+)
+
+@admin.register(MyProfile, site=sb_admin_site)
+class MyProfileAdmin(SBAdmin):
+    model = MyProfile
+    fieldsets = (
+        (None, {"fields": ("username", "first_name", "last_name", "email")}),
+    )
+    readonly_fields = ("username",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        if obj is None:
+            return request.user.is_authenticated
+        return obj.pk == request.user.pk
+
+    def has_change_permission(self, request, obj=None):
+        if obj is None:
+            return request.user.is_authenticated
+        return obj.pk == request.user.pk
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field=from_field)
+        if obj and obj.pk != request.user.pk:
+            raise PermissionDenied
+        return obj
+
+    def changelist_view(self, request, extra_context=None):
+        profile_url = self.get_menu_view_url(request)
+        return self.change_view(
+            request,
+            str(request.user.pk),
+            form_url=profile_url,
+            extra_context=extra_context,
+        )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        profile_url = self.get_menu_view_url(request)
+        if str(object_id) != str(request.user.pk):
+            return HttpResponseRedirect(profile_url)
+        return super().change_view(request, object_id, form_url, extra_context)
+
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(view_id="accounts_myprofile", label="My profile", icon="User-business"),
+        ...
+    ],
+    registered_views=[...],
+    myprofile_sbadmin=SBAdminMyProfileConfig(
+        view_id="accounts_myprofile",
+    ),
+)
+```
+
+`SBAdminMyProfileConfig` defaults to `request.user.pk` as the detail `object_id`, which matches proxy-user profile admins. Use `object_id_getter` only when the profile object has a different key:
+
+```python
+myprofile_sbadmin=SBAdminMyProfileConfig(
+    view_id="accounts_customerprofile",
+    object_id_getter=lambda request: request.user.customer_profile_id,
+)
+```
+
+Agents can either call `fetch_my_profile(fields=[...])` directly, or read `list_admins()["my_profile"]` and pass its `view_id` / `object_id` to `fetch_detail` or `update_detail`. The target is still checked through normal SBAdmin view and object permissions.
 
 ### The browser-only extra
 
