@@ -457,12 +457,13 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         toasts = []
         modal = None
         notified_ids = []
+        toast_candidates = []
         for recipient in pending:
             message_type = messaging_config.get_message_type(recipient.message.type)
-            notified_ids.append(recipient.pk)
             if message_type is None:
                 # Unknown/removed type: drain it (mark notified, no toast/modal)
                 # so it doesn't re-surface in every poll forever.
+                notified_ids.append(recipient.pk)
                 continue
             if message_type.notification_style == NotificationStyle.MODAL:
                 # Show at most one modal per poll; the rest re-surface next poll.
@@ -475,9 +476,15 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
                             "action_acknowledge", "json", object_id=recipient.pk
                         ),
                     }
-                else:
-                    notified_ids.remove(recipient.pk)
+                    notified_ids.append(recipient.pk)
             else:
+                toast_candidates.append((recipient, message_type))
+
+        # Toasts wait behind modals: while any modal is being shown, leave the
+        # toasts pending (unnotified) so they only surface in a later poll once
+        # all the modal messages are finished.
+        if modal is None:
+            for recipient, message_type in toast_candidates:
                 toasts.append(
                     {
                         "recipient": recipient,
@@ -486,6 +493,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
                         "detail_url": self.get_detail_url(recipient.pk),
                     }
                 )
+                notified_ids.append(recipient.pk)
 
         if notified_ids:
             MessageRecipient.objects.filter(pk__in=notified_ids).update(
