@@ -582,10 +582,11 @@ class SBAdminTools(MCPToolset):
             group columns; a column grouped on a foreign key comes back as
             the bare pk (resolve names with ``autocomplete``).
 
-        Returns ``{"data": [...], "last_page": int, "last_row": int}``
-        plus any pagination metadata the list view emits, ``aggregates``
-        when ``aggregate`` is supplied without ``group_by``, and ``groups``
-        when ``group_by`` is supplied.
+        Returns ``{"next_page": int | None, "total_rows": int, "last_page": int,
+        "last_row": int, "data": [...]}`` with ``data`` last (``total_rows`` ==
+        ``last_row``). ``next_page`` is the page to fetch next, or ``None`` on the
+        last page. ``aggregates`` is added when ``aggregate`` is supplied without
+        ``group_by``, ``groups`` when ``group_by`` is supplied.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -669,7 +670,7 @@ class SBAdminTools(MCPToolset):
         )
         result = json.loads(response.content.decode())
         result.pop(SB_ADMIN_AJAX_NOTIFICATIONS_KEY, None)
-        rows = result.get("data") or []
+        rows = result.pop("data", None) or []  # popped here, re-appended last
         # Mirror the pk to a stable ``"id"`` key (the list action keys it
         # under the model's pk name, e.g. ``"emergency_uuid"``).
         pk_attname = admin.model._meta.pk.attname
@@ -682,7 +683,17 @@ class SBAdminTools(MCPToolset):
             attach_inlines(admin, request, rows, include_inlines)
         if aggregates is not None:
             result["groups" if group_by else "aggregates"] = aggregates
-        return result
+        # ``next_page`` first and the big ``data`` array last, so the nav meta
+        # survives truncation/preview of a large response. ``next_page``
+        # non-null means more rows remain — re-call with that page.
+        last_page = result.get("last_page")
+        more = bool(last_page is not None and page < last_page)
+        return {
+            "next_page": page + 1 if more else None,
+            "total_rows": result.get("last_row"),
+            **result,
+            "data": rows,
+        }
 
     @_guarded_tool_call
     def fetch_detail(

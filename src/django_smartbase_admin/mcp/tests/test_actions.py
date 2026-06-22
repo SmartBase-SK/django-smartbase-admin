@@ -143,6 +143,35 @@ class ListRowsTests(_ToolTestBase):
         )
         self.assertEqual({row["name"] for row in searched["data"]}, {"alpha"})
 
+    def test_next_page_total_rows_and_data_last(self):
+        """Pagination nav: ``next_page`` / ``total_rows`` come first, the big
+        ``data`` array stays last (so the meta survives truncation), and
+        ``next_page`` is ``None`` only on the final page."""
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+
+        # Page 1 of three single-row pages: more remain.
+        page1 = SBAdminTools(request=build_mcp_request(user)).list_rows(
+            "filer_folder", fields=["name"], page=1, page_size=1
+        )
+        self.assertEqual(page1["next_page"], 2)
+        self.assertEqual(page1["total_rows"], 3)
+        self.assertEqual(page1["total_rows"], page1["last_row"])
+        # Nav meta first, ``data`` last.
+        self.assertEqual(list(page1)[0], "next_page")
+        self.assertEqual(list(page1)[-1], "data")
+
+        # Last page: nothing more to fetch.
+        page3 = SBAdminTools(request=build_mcp_request(user)).list_rows(
+            "filer_folder", fields=["name"], page=3, page_size=1
+        )
+        self.assertIsNone(page3["next_page"])
+
+        # Single unpaginated page is also complete.
+        full = SBAdminTools(request=build_mcp_request(user)).list_rows(
+            "filer_folder", fields=["name"]
+        )
+        self.assertIsNone(full["next_page"])
+
     def test_error_paths_surface_clear_exceptions(self):
         """Bad ``view_id`` and missing view permission must each raise a
         distinct, actionable exception — agents need to tell "no rows"
