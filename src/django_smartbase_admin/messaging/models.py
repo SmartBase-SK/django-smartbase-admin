@@ -95,4 +95,4 @@ class MessageRecipient(models.Model):
         verbose_name_plural = _("Message recipients")
 
     def __str__(self):
-        return f"{self.message_id} → {self.user_id}"
+        return self.message.title if self.message_id else _("Message")
