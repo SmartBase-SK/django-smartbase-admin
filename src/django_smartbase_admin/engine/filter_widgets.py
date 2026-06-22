@@ -653,7 +653,8 @@ class DateFilterWidget(SBAdminFilterWidget):
     @classmethod
     def _days_to_date(cls, days):
         try:
-            return timezone.now() + timedelta(days=int(days))
+            value = timezone.now() + timedelta(days=int(days))
+            return value.replace(hour=0, minute=0, second=0, microsecond=0)
         except (TypeError, ValueError, OverflowError):
             return None
 
