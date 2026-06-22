@@ -1,8 +1,8 @@
 """Messaging service: config access, badges, recipient resolution + read state."""
 
 from django.utils import timezone
-from django.utils.html import format_html
 
+from django_smartbase_admin.engine.field_formatter import format_badge
 from django_smartbase_admin.messaging.models import MessageRecipient
 
 
@@ -40,18 +40,12 @@ class SBAdminMessagingService:
             messaging_config.get_message_type(type_key) if messaging_config else None
         )
         if message_type is not None:
-            return format_html(
-                '<span class="badge badge-simple badge-{}">{}</span>',
-                message_type.color,
-                message_type.label,
-            )
+            return format_badge(message_type.label, message_type.color)
         info_type = (
             messaging_config.get_message_type("info") if messaging_config else None
         )
         color = info_type.color if info_type else "notice"
-        return format_html(
-            '<span class="badge badge-simple badge-{}">{}</span>', color, type_key
-        )
+        return format_badge(type_key, color)
 
     @classmethod
     def get_unread_count(cls, request):

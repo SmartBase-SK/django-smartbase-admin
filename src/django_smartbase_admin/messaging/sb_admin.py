@@ -26,7 +26,12 @@ from django_smartbase_admin.admin.admin_base import (
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
-from django_smartbase_admin.engine.field_formatter import datetime_formatter
+from django_smartbase_admin.engine.field_formatter import (
+    BadgeType,
+    boolean_formatter,
+    datetime_formatter,
+    format_badge,
+)
 from django_smartbase_admin.engine.filter_widgets import StringFilterWidget
 from django_smartbase_admin.messaging.config import NotificationStyle
 from django_smartbase_admin.messaging.forms import (
@@ -64,17 +69,6 @@ class _MessageTypeBadgeMixin:
 def _bold_title_formatter(object_id, value):
     """Render a list cell value in bold."""
     return format_html('<span class="font-semibold">{}</span>', value or "")
-
-
-def _read_status_badge(object_id, value):
-    """Render a read/unread badge from a ``read_at`` value (success / negative)."""
-    if value:
-        return format_html(
-            '<span class="badge badge-simple badge-positive">{}</span>', _("Read")
-        )
-    return format_html(
-        '<span class="badge badge-simple badge-negative">{}</span>', _("Unread")
-    )
 
 
 def _sender_filter_query(request, value):
@@ -129,20 +123,14 @@ class MessageRecipientStatusInline(SBAdminTableInlinePaginated):
 
     @admin.display(description=_("Notified"))
     def notified(self, obj):
-        if not obj.notified_at:
-            return ""
-        return format_html(
-            '<span class="badge badge-simple">{}</span>',
-            datetime_formatter(obj.pk, obj.notified_at),
+        return format_badge(
+            datetime_formatter(obj.pk, obj.notified_at), BadgeType.NOTICE
         )
 
     @admin.display(description=_("Read"))
     def read(self, obj):
-        if not obj.read_at:
-            return ""
-        return format_html(
-            '<span class="badge badge-simple badge-positive">{}</span>',
-            datetime_formatter(obj.pk, obj.read_at),
+        return format_badge(
+            datetime_formatter(obj.pk, obj.read_at), BadgeType.POSITIVE
         )
 
     def has_add_permission(self, request, obj=None):
@@ -341,7 +329,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         SBAdminField(
             name="read_at",
             title=_("Read"),
-            python_formatter=_read_status_badge,
+            python_formatter=boolean_formatter,
             filter_disabled=True,
         ),
     )

@@ -23,6 +23,25 @@ class BadgeType(Enum):
     PRIMARY = "primary"
 
 
+def format_badge(value, badge_type: "BadgeType | str" = BadgeType.NOTICE, simple=True):
+    if value is None or value == "":
+        return ""
+    css = badge_type.value if isinstance(badge_type, BadgeType) else badge_type
+    simple_class = "badge-simple " if simple else ""
+    return format_html(
+        '<span class="badge {}badge-{}">{}</span>', simple_class, css, value
+    )
+
+
+def badge_formatter(badge_type: "BadgeType | str" = BadgeType.NOTICE, simple=True):
+    """``python_formatter`` factory rendering a column's value as a badge."""
+
+    def inner_formatter(object_id, value):
+        return format_badge(value, badge_type, simple=simple)
+
+    return inner_formatter
+
+
 def datetime_formatter(object_id, value):
     if value is None:
         return None
@@ -59,12 +78,8 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
 
 def boolean_formatter(object_id, value):
     if value:
-        return format_html(
-            '<span class="badge badge-simple badge-positive">{}</span>', _("Yes")
-        )
-    return format_html(
-        '<span class="badge badge-simple badge-neutral">{}</span>', _("No")
-    )
+        return format_badge(_("Yes"), BadgeType.POSITIVE)
+    return format_badge(_("No"), BadgeType.NEUTRAL)
 
 
 def build_choice_formatter_for_field(
