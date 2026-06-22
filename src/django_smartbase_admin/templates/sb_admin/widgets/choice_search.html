@@ -12,7 +12,7 @@
                 data-bs-config='{"popperConfig":{"strategy":"fixed"}}'
                 class="autocomplete-button btn px-10 font-normal flex-1 min-w-0"
         >
-            <span id="{{ widget.attrs.id }}-value">{% trans 'Select' %}</span>
+            <span id="{{ widget.attrs.id }}-value">{{ widget.form_field.empty_label|default:"---------" }}</span>
             <svg class="ml-8">
                 <use xlink:href="#Down"></use>
             </svg>
