@@ -15,38 +15,35 @@
             {{ initial_data|get_json_script:'initial_data' }}
             <script>
                 (function() {
-                    const initChart = function() {
-                        window.SBAdminChart = window.SBAdminChart || {};
-                        window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
-                            "formId": "{{ widget_id }}-filter-form",
-                            "widgetId": "{{ widget_id }}",
-                            "ajaxUrl": "{{ ajax_url }}",
-                            "chartType": "{{ chart_type }}",
-                            "chartOptions": {
-                                scales: {
-                                    x: {
-                                        ticks: {
-                                            font: {
-                                                weight: 600,
-                                            }
+                    window.SBAdminChart = window.SBAdminChart || {};
+                    window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                        "formId": "{{ filter_form_id }}",
+                        {% if parent_widget_id %}
+                        "parentWidgetId": "{{ parent_widget_id }}",
+                        {% else %}
+                        "ajaxUrl": "{{ ajax_url }}",
+                        {% endif %}
+                        "widgetId": "{{ widget_id }}",
+                        "chartType": "{{ chart_type }}",
+                        "chartOptions": {
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        font: {
+                                            weight: 600,
                                         }
-                                    },
-                                    y: {
-                                        ticks: {
-                                            font: {
-                                                weight: 600,
-                                            }
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        font: {
+                                            weight: 600,
                                         }
                                     }
                                 }
                             }
-                        });
-                    };
-                    if (window.SBAdminMainLoaded) {
-                        initChart();
-                        return;
-                    }
-                    document.addEventListener('SBAdminMainLoaded', initChart, {once: true});
+                        }
+                    });
                 })();
             </script>
         </div>

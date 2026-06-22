@@ -7,6 +7,7 @@ const entries = {
     main: './src/django_smartbase_admin/static/sb_admin/src/js/main.js',
     table: './src/django_smartbase_admin/static/sb_admin/src/js/table.js',
     chart: './src/django_smartbase_admin/static/sb_admin/src/js/chart.js',
+    dashboard_group: './src/django_smartbase_admin/static/sb_admin/src/js/dashboard_group.js',
     calendar: './src/django_smartbase_admin/static/sb_admin/src/js/calendar.js',
     main_style: './src/django_smartbase_admin/static/sb_admin/src/css/style.css',
     translations: './src/django_smartbase_admin/static/sb_admin/src/js/translations.js',

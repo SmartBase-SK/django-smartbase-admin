@@ -12,6 +12,7 @@ import {FullTextSearchModule} from "./table_modules/full_text_search_module"
 import { HeaderTabsModule } from "./table_modules/header_tabs_module"
 import { DataTreeModule } from "./table_modules/data_tree_module"
 import { StickyHeaderAndFooterModule } from "./table_modules/sticky_header_and_footer_module"
+import { DashboardParentFilterModule } from "./table_modules/dashboard_parent_filter_module"
 import { SBAjaxParamsTabulatorModifier } from "./sb_ajax_params_tabulator_modifier"
 import { createIcon } from "./utils"
 import { registerFitDataFillAvailableSpaceLayout } from "./tabulator_layouts/fit_data_fill_available_space"
@@ -47,6 +48,7 @@ class SBAdminTable {
         this.tableDataEditUrl = options.tableDataEditUrl
         this.tableActionMoveUrl = options.tableActionMoveUrl
         this.tableDetailUrl = options.tableDetailUrl
+        this.parentWidgetId = options.parentWidgetId
         this.defaultColumnData = options.defaultColumnData
         this.tableColumns = this.initDefaultColumns(options.tableColumns)
         this.tableIdColumnName = options.tableIdColumnName
@@ -575,4 +577,5 @@ window.SBAdminTableModulesClass = {
     'headerTabsModule': HeaderTabsModule,
     'dataTreeModule': DataTreeModule,
     'stickyHeaderAndFooterModule': StickyHeaderAndFooterModule,
+    'dashboardParentFilterModule': DashboardParentFilterModule,
 }

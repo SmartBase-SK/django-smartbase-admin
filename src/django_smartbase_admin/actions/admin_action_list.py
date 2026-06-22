@@ -37,6 +37,7 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_FULL_TEXT_SEARCH,
     TABLE_PARAMS_SELECTED_FILTER_TYPE,
     ADVANCED_FILTER_DATA_NAME,
+    PARENT_FILTER_DATA_NAME,
     IGNORE_LIST_SELECTION,
     MODIFIER_OBJECT_ID,
     SB_ADMIN_AJAX_NOTIFICATIONS_KEY,
@@ -193,6 +194,7 @@ class SBAdminListAction(SBAdminAction):
             "TABLE_PARAMS_SELECTED_FILTER_TYPE": TABLE_PARAMS_SELECTED_FILTER_TYPE,
             "FILTER_DATA_NAME": FILTER_DATA_NAME,
             "ADVANCED_FILTER_DATA_NAME": ADVANCED_FILTER_DATA_NAME,
+            "PARENT_FILTER_DATA_NAME": PARENT_FILTER_DATA_NAME,
             "BASE_PARAMS_NAME": BASE_PARAMS_NAME,
             "TABLE_PARAMS_PAGE_NAME": TABLE_PARAMS_PAGE_NAME,
             "TABLE_PARAMS_SORT_NAME": TABLE_PARAMS_SORT_NAME,
@@ -298,7 +300,10 @@ class SBAdminListAction(SBAdminAction):
             self.threadsafe_request, self.column_fields, self.filter_data
         )
         advanced_filters = QueryBuilderService.get_filters_for_list_action(self)
-        return base_filters & advanced_filters
+        extra_filters = self.view.get_extra_filter_from_request(
+            self.threadsafe_request, self
+        )
+        return base_filters & advanced_filters & extra_filters
 
     def get_search_fields(self, request):
         search_fields_definition = self.view.get_search_fields(request)
