@@ -449,7 +449,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         pending = list(
             MessageRecipient.objects.filter(
                 user=user, notified_at__isnull=True
-            ).select_related("message")[:50]
+            ).select_related("message", "message__created_by")[:50]
         )
         if not pending:
             return HttpResponse("")
@@ -459,9 +459,11 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         notified_ids = []
         for recipient in pending:
             message_type = messaging_config.get_message_type(recipient.message.type)
-            if message_type is None:
-                continue
             notified_ids.append(recipient.pk)
+            if message_type is None:
+                # Unknown/removed type: drain it (mark notified, no toast/modal)
+                # so it doesn't re-surface in every poll forever.
+                continue
             if message_type.notification_style == NotificationStyle.MODAL:
                 # Show at most one modal per poll; the rest re-surface next poll.
                 if modal is None:

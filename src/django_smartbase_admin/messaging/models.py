@@ -1,3 +1,5 @@
+import os
+
 from ckeditor.fields import RichTextField
 from django.conf import settings
 from django.db import models
@@ -59,8 +61,6 @@ class MessageAttachment(models.Model):
     @property
     def filename(self):
         """Base file name without the upload directory path."""
-        import os
-
         return os.path.basename(self.file.name) if self.file else ""
 
     def __str__(self):
