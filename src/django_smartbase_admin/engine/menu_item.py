@@ -4,6 +4,8 @@ from django.utils.safestring import SafeString
 
 from django_smartbase_admin.services.configuration import SBAdminConfigurationService
 
+DEFAULT_MENU_ITEM_BADGE_CLASS = "badge badge-simple badge-primary ml-auto"
+
 
 class SBAdminMenuItem(object):
     view_id = None
@@ -15,7 +17,7 @@ class SBAdminMenuItem(object):
     is_active = None
     parent_menu_item = None
     badge = None
-    badge_class = "badge badge-simple badge-primary ml-auto"
+    badge_class = DEFAULT_MENU_ITEM_BADGE_CLASS
 
     def __init__(
         self,
