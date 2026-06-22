@@ -50,7 +50,8 @@ class MenuItemBadgeTestCase(SimpleTestCase):
         html = SBAdminMenuItem(label="Inbox", badge=7).render_badge(None)
         self.assertIsInstance(html, SafeString)
         self.assertEqual(
-            html, format_html('<span class="{}">{}</span>', DEFAULT_MENU_ITEM_BADGE_CLASS, 7)
+            html,
+            format_html('<span class="{}">{}</span>', DEFAULT_MENU_ITEM_BADGE_CLASS, 7),
         )
 
     def test_render_badge_uses_custom_class(self):

@@ -16,6 +16,4 @@ def message_type_badge(type_key):
     messaging_config = (
         SBAdminMessagingService.get_messaging_config(request) if request else None
     )
-    return SBAdminMessagingService.render_message_type_badge(
-        type_key, messaging_config
-    )
+    return SBAdminMessagingService.render_message_type_badge(type_key, messaging_config)

@@ -129,9 +129,7 @@ class MessageRecipientStatusInline(SBAdminTableInlinePaginated):
 
     @admin.display(description=_("Read"))
     def read(self, obj):
-        return format_badge(
-            datetime_formatter(obj.pk, obj.read_at), BadgeType.POSITIVE
-        )
+        return format_badge(datetime_formatter(obj.pk, obj.read_at), BadgeType.POSITIVE)
 
     def has_add_permission(self, request, obj=None):
         return False

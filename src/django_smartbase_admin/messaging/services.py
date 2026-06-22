@@ -69,9 +69,7 @@ class SBAdminMessagingService:
         user = getattr(request, "user", None)
         if not (user and user.is_authenticated):
             return 0
-        return MessageRecipient.objects.filter(
-            user=user, read_at__isnull=True
-        ).count()
+        return MessageRecipient.objects.filter(user=user, read_at__isnull=True).count()
 
     @classmethod
     def get_poller_context(cls, request):
