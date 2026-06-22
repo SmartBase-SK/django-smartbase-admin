@@ -100,7 +100,7 @@ class SBAdminDashboardWidget(SBAdminView):
         )
 
     def get_filter_form_id(self):
-        if self.parent_view is not None:
+        if self.parent_view is not None and self.get_parent_group_widget() is None:
             return f"{self.parent_view.get_id()}-filter-form"
         return f"{self.get_id()}-filter-form"
 

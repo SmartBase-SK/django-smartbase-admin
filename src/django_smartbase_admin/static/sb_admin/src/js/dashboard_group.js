@@ -10,6 +10,7 @@ class SBAdminDashboardGroup {
         this.lastData = null
         this.refreshCount = 0
         this.initialized = false
+        this.listeningFormIds = new Set()
     }
 
     filterFormIds() {
@@ -64,9 +65,24 @@ class SBAdminDashboardGroup {
 
     registerSubWidget(definition) {
         this.subWidgets.set(definition.widgetId, definition)
+        if (this.initialized && definition.formId) {
+            this.listenToFilterForm(definition.formId)
+        }
         if (this.lastData) {
             this.updateSubWidget(definition, this.lastData, this.refreshCount === 1)
         }
+    }
+
+    listenToFilterForm(formId) {
+        if (!formId || this.listeningFormIds.has(formId)) {
+            return
+        }
+        this.listeningFormIds.add(formId)
+        ensureFilterForm(formId)
+        filterInputValueChangeListener(`[form="${formId}"]`, (event) => {
+            this.refresh()
+            filterInputValueChangedUtil(event.target)
+        })
     }
 
     init() {
@@ -79,10 +95,8 @@ class SBAdminDashboardGroup {
         document.addEventListener(window.sb_admin_const.TABLE_RELOAD_DATA_EVENT_NAME, () => {
             this.refresh()
         })
-        const filterInputSelector = [...this.filterFormIds()].map((formId) => `[form="${formId}"]`).join(',')
-        filterInputValueChangeListener(filterInputSelector, (event) => {
-            this.refresh()
-            filterInputValueChangedUtil(event.target)
+        this.filterFormIds().forEach((formId) => {
+            this.listenToFilterForm(formId)
         })
     }
 }

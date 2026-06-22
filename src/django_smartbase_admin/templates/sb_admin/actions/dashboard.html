@@ -13,11 +13,13 @@
             {% render_widget widget request %}
         {% endfor %}
     </div>
-    <script>
-        window.SBAdminInitDashboardGroups()
-    </script>
 {% endblock %}
 
 {% block additional_js %}
     {{ block.super }}
+    <script>
+        if (window.SBAdminInitDashboardGroups) {
+            window.SBAdminInitDashboardGroups()
+        }
+    </script>
 {% endblock %}

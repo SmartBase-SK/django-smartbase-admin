@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from django import forms
 from django.contrib import admin
 from django.contrib.admin.helpers import Fieldset
 from django.contrib.admin.sites import AdminSite
@@ -750,11 +751,12 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         )
 
         self.assertIn('"parentWidgetId": "dashboard_group_widget"', html)
+        self.assertIn('"formId": "dashboard_group_widget_0-filter-form"', html)
         self.assertIn('"widgetId": "dashboard_group_widget_0"', html)
         self.assertNotIn(
             '"ajaxUrl": "/dashboard_group_widget_0/action_get_data/template/"', html
         )
-        self.assertIn("SBAdminChartClassLoaded", html)
+        self.assertIn("new window.SBAdminChartClass", html)
 
     def test_dashboard_parent_widget_keeps_chart_subwidget_own_ajax(self):
         widget = _DashboardParentWidget()
@@ -778,6 +780,18 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertNotIn('"parentWidgetId": "dashboard_parent_widget"', html)
         self.assertIn('"formId": "dashboard_parent_widget-filter-form"', html)
         self.assertIn("dashboard_parent_widget_0/action_get_data/template/", html)
+
+    def test_dashboard_template_guards_group_initializer(self):
+        html = render_to_string(
+            "sb_admin/actions/dashboard.html",
+            {
+                "dashboard_media": forms.Media(),
+                "direct_sub_views": [],
+            },
+            request=self.factory.get("/dashboard/"),
+        )
+
+        self.assertIn("if (window.SBAdminInitDashboardGroups)", html)
 
     def test_dashboard_group_widget_keeps_list_subwidget_table_ajax(self):
         widget = _DashboardListGroupWidget()
@@ -873,7 +887,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         data = widget.get_data(request)
 
         self.assertIn("SBAdminRegisterDashboardSubWidget", html)
-        self.assertIn("SBAdminDashboardGroupLoaded", html)
+        self.assertIn("onData: function(data)", html)
         self.assertIn('widgetId: "dashboard_group_widget_0"', html)
         self.assertIn(
             "Rendered HTML", data["sub_widget"]["dashboard_group_widget_0"]["html"]

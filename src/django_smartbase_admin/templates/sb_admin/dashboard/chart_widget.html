@@ -17,10 +17,10 @@
                 (function() {
                     window.SBAdminChart = window.SBAdminChart || {};
                     window.SBAdminChart["{{ widget_id }}"] = new window.SBAdminChartClass({
+                        "formId": "{{ filter_form_id }}",
                         {% if parent_widget_id %}
                         "parentWidgetId": "{{ parent_widget_id }}",
                         {% else %}
-                        "formId": "{{ filter_form_id }}",
                         "ajaxUrl": "{{ ajax_url }}",
                         {% endif %}
                         "widgetId": "{{ widget_id }}",
