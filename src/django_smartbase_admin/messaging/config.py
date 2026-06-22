@@ -92,7 +92,7 @@ class UsersAudience(SBAdminMessageAudience):
     """Target explicitly selected users."""
 
     key = "users"
-    label = _("Specific users")
+    label = _("Users")
 
     def get_form_field(self, request):
         from django import forms

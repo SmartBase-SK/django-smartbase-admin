@@ -278,7 +278,7 @@ msgid "Modal"
 msgstr "Modální okno"
 
 msgid "Specific users"
-msgstr "Konkrétní uživatelé"
+msgstr ""
 
 msgid "User groups"
 msgstr "Skupiny uživatelů"
@@ -1278,3 +1278,6 @@ msgstr "Jazyk"
 
 msgid "New message"
 msgstr "Nová zpráva"
+
+msgid "Send"
+msgstr "Odeslat"

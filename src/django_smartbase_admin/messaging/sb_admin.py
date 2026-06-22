@@ -90,7 +90,7 @@ def new_message_action(send_view, request):
     return SBAdminCustomAction(
         title=_("New message"),
         url=send_view.get_new_url(request),
-        icon="Add-one",
+        icon="Plus",
         css_class="btn btn-secondary",
     )
 
@@ -182,6 +182,16 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
         if isinstance(content_context, dict):
             content_context["new_url"] = None
         return response
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        # Title the add form "New message" instead of "Add ...".
+        if add:
+            context["add_title"] = _("New message")
+        return super().render_change_form(
+            request, context, add=add, change=change, form_url=form_url, obj=obj
+        )
 
     def get_sbadmin_fieldsets(self, request, object_id=None):
         # Created message → single read-only detail card. Otherwise the editable
