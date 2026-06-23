@@ -82,11 +82,11 @@ class ListAdminsTests(TestCase):
         sb_admin_site.register(Folder, FolderListAdminsTestAdmin)
         # Reset per-test permission scope on the shared singleton config.
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().whoami_sbadmin = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
 
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().whoami_sbadmin = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
         sb_admin_site._registry.pop(Folder, None)
         if self._original_admin is not None:
             sb_admin_site._registry[Folder] = self._original_admin
@@ -141,7 +141,9 @@ class ListAdminsTests(TestCase):
             is_anonymous=False,
             is_superuser=True,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
@@ -159,7 +161,9 @@ class ListAdminsTests(TestCase):
             is_anonymous=False,
             is_superuser=False,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
         MCPToolTestConfig.view_permission_for = set()
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
@@ -180,7 +184,9 @@ class ListAdminsTests(TestCase):
             is_anonymous=True,
             is_superuser=True,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 

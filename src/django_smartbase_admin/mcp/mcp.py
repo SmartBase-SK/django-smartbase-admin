@@ -779,7 +779,7 @@ class SBAdminTools(MCPToolset):
         """Fetch the current authenticated user's configured profile detail.
 
         Host projects opt in with
-        ``SBAdminRoleConfiguration(whoami_sbadmin=SBAdminWhoamiConfig(...))``.
+        ``SBAdminRoleConfiguration(mcp_whoami_sbadmin=SBAdminWhoamiConfig(...))``.
         The result is the same shape as ``fetch_detail`` with ``view_id`` and
         ``object_id`` included so callers can reuse the regular detail tools.
 
@@ -798,7 +798,7 @@ class SBAdminTools(MCPToolset):
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
         if target is None:
-            raise LookupError("No whoami_sbadmin is configured for this user.")
+            raise LookupError("No mcp_whoami_sbadmin is configured for this user.")
         detail = self._fetch_detail_payload(
             target["view_id"], target["object_id"], fields=fields
         )

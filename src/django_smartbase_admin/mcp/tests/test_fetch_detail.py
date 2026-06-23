@@ -59,11 +59,11 @@ class _FetchDetailTestBase(TestCase):
         sb_admin_site.register(Folder, self.admin_class)
         MCPToolTestConfig().init_view_map()
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().whoami_sbadmin = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
 
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().whoami_sbadmin = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
         sb_admin_site._registry.pop(Folder, None)
         if self._original_admin is not None:
             sb_admin_site._registry[Folder] = self._original_admin
@@ -134,7 +134,9 @@ class FetchDetailTests(_FetchDetailTestBase):
             is_anonymous=False,
             is_superuser=True,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
         tools = SBAdminTools(request=build_mcp_request(user))
 
         profile = tools.fetch_whoami(fields=["name"])
@@ -167,7 +169,7 @@ class FetchDetailTests(_FetchDetailTestBase):
             is_anonymous=False,
             is_superuser=True,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
             view_id="missing_profile"
         )
 
@@ -182,7 +184,9 @@ class FetchDetailTests(_FetchDetailTestBase):
             is_anonymous=False,
             is_superuser=False,
         )
-        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
         MCPToolTestConfig.view_permission_for = set()
 
         with self.assertRaises(PermissionError):
