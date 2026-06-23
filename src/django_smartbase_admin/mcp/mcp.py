@@ -361,6 +361,11 @@ class SBAdminTools(MCPToolset):
           - ``list_actions``: global buttons above the list, no row
             context (e.g. "Create…" modals, exports).
           - ``selection_actions``: bulk buttons over selected rows.
+
+        When configured by the host project, the top-level
+        ``whoami`` entry points at the current user's own profile
+        detail target: ``{"view_id", "object_id"}``. Pass those to
+        ``fetch_detail`` / ``update_detail`` or call ``fetch_whoami``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -385,11 +390,19 @@ class SBAdminTools(MCPToolset):
         # ``action_invokers`` is a sibling legend to ``widget_shapes`` —
         # keyed by action-list name, value is the MCP tool to call.
         # Saves repeating ``invoke_with`` on every individual action.
-        return {
+        result = {
             "admin_views": admins,
             "widget_shapes": get_widget_shapes(),
             "action_invokers": ACTION_INVOKERS,
         }
+        try:
+            whoami = request.request_data.configuration.get_whoami_target(request)
+        except LookupError:
+            pass
+        else:
+            if whoami is not None:
+                result["whoami"] = whoami
+        return result
 
     @_guarded_tool_call
     def fetch_filter_preset(
@@ -688,6 +701,23 @@ class SBAdminTools(MCPToolset):
             result["groups" if group_by else "aggregates"] = aggregates
         return result
 
+    def _fetch_detail_payload(
+        self,
+        view_id: str,
+        object_id: str,
+        fields: list[str] | None = None,
+    ) -> dict:
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        try:
+            admin.init_view_dynamic(request, request.request_data)
+            return SBAdminMCPDetailService.get_detail_data(
+                admin, request, object_id, fields=fields
+            )
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
+
     @_guarded_tool_call
     def fetch_detail(
         self,
@@ -739,16 +769,44 @@ class SBAdminTools(MCPToolset):
         Raises ``LookupError`` if the object isn't visible,
         ``PermissionError`` if permission is denied.
         """
+        return self._fetch_detail_payload(view_id, object_id, fields=fields)
+
+    @_guarded_tool_call
+    def fetch_whoami(
+        self,
+        fields: list[str] | None = None,
+    ) -> dict:
+        """Fetch the current authenticated user's configured profile detail.
+
+        Host projects opt in with
+        ``SBAdminRoleConfiguration(mcp_whoami_sbadmin=SBAdminWhoamiConfig(...))``.
+        The result is the same shape as ``fetch_detail`` with ``view_id`` and
+        ``object_id`` included so callers can reuse the regular detail tools.
+
+        Args:
+          fields: optional subset of the configured profile admin's
+            ``detail_fields``.
+
+        Raises ``LookupError`` when no profile admin is configured or the
+        target object is not visible, ``PermissionError`` if permission is
+        denied.
+        """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id, request=request)
-        admin.init_view_dynamic(request, request.request_data)
         try:
-            return SBAdminMCPDetailService.get_detail_data(
-                admin, request, object_id, fields=fields
-            )
+            target = request.request_data.configuration.get_whoami_target(request)
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
+        if target is None:
+            raise LookupError("No mcp_whoami_sbadmin is configured for this user.")
+        detail = self._fetch_detail_payload(
+            target["view_id"], target["object_id"], fields=fields
+        )
+        return {
+            "view_id": target["view_id"],
+            "object_id": target["object_id"],
+            **detail,
+        }
 
     @_guarded_tool_call
     def fetch_add_form(

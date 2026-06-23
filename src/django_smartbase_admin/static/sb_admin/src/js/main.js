@@ -78,7 +78,6 @@ class Main {
                 this.syncEmptyFieldsets(target)
                 this.scheduleScrollToFirstErrorField(target)
             }
-
             window.htmx.on("htmx:afterSwap", (event) => {
                 if (!shouldProcessAfterSwap(event)) {
                     return
@@ -89,11 +88,12 @@ class Main {
             window.htmx.on("htmx:oobAfterSwap", (event) => {
                 // fix duplicit oobAfterSwap events triggered for multiple oob swaps
                 // https://github.com/bigskysoftware/htmx/issues/1803
-                if (event.detail.__seen) {
+                const target = event.detail.elt
+                const swapTarget = event.detail.target
+                if (!target || !swapTarget || (target !== swapTarget && target.id !== swapTarget.id)) {
                     return
                 }
-                event.detail.__seen = true
-                processAfterSwap(event.detail.elt)
+                processAfterSwap(target)
             })
 
             window.htmx.on("htmx:afterSettle", (event) => {
