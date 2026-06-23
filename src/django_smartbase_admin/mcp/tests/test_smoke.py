@@ -158,11 +158,15 @@ class MCPOAuthSmokeTests(TestCase):
         self.assertIn("result", payload, payload)
         result = payload["result"]
         self.assertFalse(result.get("isError"), payload)
-        # No SBAdmin admins are registered for tests, so the structured
-        # tool result has an empty ``admins`` list (and the static
-        # ``widget_shapes`` legend).
+        # No project-specific admins are registered for tests, but the
+        # framework's messaging app registers a per-user inbox admin that is
+        # visible to any authenticated user — so it shows up here. Assert the
+        # structured shape (a list of admin views + the static
+        # ``widget_shapes`` legend) rather than emptiness.
         structured = result["structuredContent"]
-        self.assertEqual(structured["admin_views"], [])
+        self.assertIsInstance(structured["admin_views"], list)
+        view_ids = [view["view_id"] for view in structured["admin_views"]]
+        self.assertIn("sb_admin_messaging_messagerecipient", view_ids)
         self.assertIn("widget_shapes", structured)
 
     # --- helpers ---------------------------------------------------------

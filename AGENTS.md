@@ -42,6 +42,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
+| [Messaging](#messaging) | Built-in in-app messaging — install, `messaging_config` (types/audiences/poller), inbox vs management views, menu wiring, custom recipient audiences, contributing |
 | [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -90,6 +91,9 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **List or chart inside detail page?** → [Detail View Widgets](#detail-view-widgets)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **Send in-app messages / notifications to users?** → [Messaging](#messaging)
+- **Custom message recipient group?** → [Recipient audiences](#recipient-audiences)
+- **Render a single value as a badge?** → [Single-Value Badge](#single-value-badge-format_badge--badge_formatter)
 - **Regenerate translations?** → [Internationalization](#internationalization)
 - **Wire MCP / Cursor?** → [MCP (AI agents)](#mcp-ai-agents)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
@@ -2505,6 +2509,8 @@ from django_smartbase_admin.engine.field_formatter import (
     link_formatter,                         # Clickable URL
     rich_text_formatter,                    # HTML content with max-width
     format_array,                           # Custom badge formatting with BadgeType
+    format_badge,                           # Single value → one badge (BadgeType or colour token)
+    badge_formatter,                        # python_formatter factory wrapping format_badge
 )
 ```
 
@@ -2549,6 +2555,38 @@ from django_smartbase_admin.engine.field_formatter import format_array, BadgeTyp
 # ERROR (red), NEUTRAL (gray), PRIMARY (brand color)
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
+
+### Single-Value Badge (`format_badge` / `badge_formatter`)
+
+For a single value (not a list), `format_badge(value, badge_type=BadgeType.NOTICE, simple=True)` renders one badge. `badge_type` accepts a `BadgeType` **or** a raw colour token (e.g. `"warning"`); an empty/`None` value renders nothing; `simple=False` keeps the leading dot indicator.
+
+```python
+from django_smartbase_admin.engine.field_formatter import (
+    format_badge, badge_formatter, BadgeType,
+)
+
+class ArticleAdmin(SBAdmin):
+    # Inline use in an admin method:
+    def status_display(self, obj_id, value, **additional_data):
+        color = BadgeType.SUCCESS if value == "published" else BadgeType.NEUTRAL
+        return format_badge(value, color)
+
+    sbadmin_list_display = (
+        SBAdminField(name="status_display", title="Status", annotate=F("status"), filter_disabled=True),
+        # Or `badge_formatter(...)` straight as a column's python_formatter:
+        SBAdminField(
+            name="category_badge",
+            title="Category",
+            annotate=F("category__name"),
+            python_formatter=badge_formatter(BadgeType.PRIMARY),
+            filter_disabled=True,
+        ),
+    )
+```
+
+**Key points:**
+- Prefer `format_badge` over hand-written `<span class="badge …">` markup so colour/markup stays consistent (it's what `boolean_formatter` and the messaging badges use).
+- `badge_formatter(badge_type, simple=True)` returns a `(object_id, value)` callable — drop it straight into `python_formatter`.
 
 ---
 
@@ -5459,6 +5497,114 @@ Projects can further restrict access by:
 - Not adding the audit log `SBAdminMenuItem` for non-admin roles
 - Overriding `has_permission` in the role configuration to deny access to the `AdminAuditLog` model
 - Overriding `restrict_queryset` to apply additional filters on `AdminAuditLog` itself
+
+---
+
+## Messaging
+
+Built-in optional app (`django_smartbase_admin.messaging`) for sending in-app messages to users. It ships a `Message` model (title, type, rich-HTML content, file attachments, JSON `targeting`), a per-recipient `MessageRecipient` join (with `notified_at` / `read_at`), two auto-registered admin views, and a notification poller that surfaces new messages as a toast or an acknowledge-modal on every page load. Disabled until a project attaches an `SBAdminMessagingConfig` to its role configuration.
+
+The two auto-registered views (no `@admin.register` needed):
+- **`MessageAdmin`** (`messaging_message`) — authoring/management list + add form, gated by Django model permissions on `Message`. The detail of a created message is read-only.
+- **`MessageInboxAdmin`** (`messaging_messagerecipient`) — per-user inbox over `MessageRecipient`, visible to any authenticated user and scoped to their own rows; opening a message marks it read.
+
+### Installation
+
+1. Add to `INSTALLED_APPS` (after `django_smartbase_admin`):
+
+```python
+INSTALLED_APPS = [
+    "django_smartbase_admin",
+    "django_smartbase_admin.messaging",
+]
+```
+
+2. Run migrations: `python manage.py migrate`
+
+3. Attachments use a plain Django `FileField`, so ensure `MEDIA_ROOT` / `MEDIA_URL` are configured (no `filer` dependency).
+
+### Enabling — `messaging_config`
+
+Set `messaging_config` on the role configuration. With no arguments it uses sensible defaults (info→toast, warning→ack-modal; users/groups/all-users audiences); pass `message_types` / `audiences` to override.
+
+```python
+from django_smartbase_admin.messaging.config import (
+    SBAdminMessagingConfig, SBAdminMessageType, NotificationStyle,
+    UsersAudience, GroupsAudience, AllUsersAudience,
+)
+
+class _RoleConfig(SBAdminRoleConfiguration):
+    messaging_config = SBAdminMessagingConfig(
+        message_types=[
+            SBAdminMessageType(
+                key="info", label=_("Info"),
+                notification_style=NotificationStyle.TOAST,
+                icon="Info", color="notice",
+            ),
+            SBAdminMessageType(
+                key="warning", label=_("Warning"),
+                notification_style=NotificationStyle.MODAL,
+                icon="Attention", color="warning", require_acknowledge=True,
+            ),
+        ],
+        audiences=[UsersAudience(), GroupsAudience(), AllUsersAudience()],
+        poll_interval_seconds=60,   # how often the page polls for new messages
+        scope_by_author=False,      # True → MessageAdmin lists only the current user's sent messages
+    )
+```
+
+**`SBAdminMessageType`** — `key` (stored on `Message.type`), `label`, `notification_style` (`TOAST` or `MODAL`), `icon` (sb_admin sprite id), `color` (badge/alert colour token, e.g. `"notice"`/`"warning"`/`"primary"`), `require_acknowledge` (modal-only; forces an explicit Acknowledge click).
+
+### Menu wiring
+
+The framework only registers the views — the project adds the menu entries. Typical split: senders get a submenu (received + sent), receive-only users get just the inbox. Show the inbox unread count with `SBAdminMessagingService.get_unread_count` as the menu item's `badge`.
+
+```python
+from django_smartbase_admin.messaging.services import SBAdminMessagingService
+
+SBAdminMenuItem(
+    view_id="messaging_messagerecipient",   # the inbox
+    label=_("My messages"), icon="Mail",
+    badge=SBAdminMessagingService.get_unread_count,
+)
+SBAdminMenuItem(view_id="messaging_message", label=_("Sent"))   # management view
+```
+
+### Recipient audiences
+
+An **audience** is a pluggable recipient source. On the add form each audience contributes one field under "Recipients"; on save the selections are stored in `Message.targeting` (`{audience_key: value}`) and resolved to `MessageRecipient` rows. Built-ins: `UsersAudience` (autocomplete), `GroupsAudience` (Django groups), `AllUsersAudience` (no selection).
+
+Add a custom audience by subclassing `SBAdminMessageAudience` — implement `get_form_field` (return `None` for no per-message selection), `serialize` (cleaned value → JSON-safe), `get_initial` (stored → form initial), and `resolve_users` (stored value → **auth user** queryset). Do model imports lazily (the module loads during settings).
+
+```python
+from django_smartbase_admin.messaging.config import SBAdminMessageAudience
+
+class StaffAudience(SBAdminMessageAudience):
+    """No selection — targets all staff users whenever chosen."""
+    key = "staff"
+    label = _("Staff users")
+
+    def get_form_field(self, request):
+        from django import forms
+        return forms.BooleanField(required=False, label=self.label)
+
+    def serialize(self, cleaned_value):
+        return bool(cleaned_value)
+
+    def resolve_users(self, stored_value, request):
+        from django.contrib.auth import get_user_model
+        model = get_user_model()
+        return model.objects.filter(is_staff=True) if stored_value else model.objects.none()
+```
+
+For a selection-based custom audience, return a `forms.MultipleChoiceField`/`ModelMultipleChoiceField` from `get_form_field` and resolve the stored ids in `resolve_users` (see `UsersAudience` / `GroupsAudience` for the pattern).
+
+### Contributing to the messaging app
+
+- **Where logic lives:** query/badge/read-state helpers go on `SBAdminMessagingService` (classmethods) in `messaging/services.py` — don't inline `.objects.filter(...)` or `<span class="badge">` markup in `sb_admin.py`. Reuse `format_badge` for badges and `datetime_formatter` for dates.
+- **Templates:** the message card (`templates/sb_admin/messaging/detail_card.html`), toast/modal poller (`poller.html`, `poll_response.html`) are shared by the inbox detail, admin detail, and modal — change them in one place. The per-model submit row override lives at `templates/sb_admin/sb_admin_messaging/message/submit_line.html`.
+- **Type-badge filter:** the type badge in lists comes from `SBAdminMessagingService.render_message_type_badge` and the `sb_admin_messaging_tags` template filter (resolves the active `messaging_config` from the thread-local request).
+- **Strings:** wrap user-facing text in `_()` and recompile catalogs (see [Internationalization](#internationalization)). After `makemessages`, clear any `#, fuzzy` flags on new strings or they render untranslated.
 
 ---
 

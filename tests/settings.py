@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "nested_admin",
     "django_smartbase_admin",
     "django_smartbase_admin.audit",
+    "django_smartbase_admin.messaging",
     "oauth2_provider",
     "rest_framework",
     "mcp_server",

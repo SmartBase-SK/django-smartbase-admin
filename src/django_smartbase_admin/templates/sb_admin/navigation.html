@@ -47,6 +47,7 @@
                                             </svg>
                                         {% endif %}
                                         <span>{{ menu_item.get_label }}</span>
+                                        {% if menu_item.get_badge %}{{ menu_item.get_badge }}{% endif %}
                                     </a>
                                     <ul id="{{ menu_item.get_id }}" class="collapse -mb-2 mt-2{% if menu_item.is_active %} show{% endif %}">
                                         {% for sub_menu_item in menu_item.sub_items %}
@@ -68,6 +69,7 @@
                                             </svg>
                                         {% endif %}
                                         <span>{{ menu_item.get_label }}</span>
+                                        {% if menu_item.get_badge %}{{ menu_item.get_badge }}{% endif %}
                                     </a>
                                 </div>
                             {% endif %}

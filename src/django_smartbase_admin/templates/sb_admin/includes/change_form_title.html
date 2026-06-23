@@ -1,7 +1,7 @@
 {% load i18n %}
 
 {% if add %}
-    {% trans 'Add' %}{% if add_label %} {{ add_label }}{% endif %}
+    {% if add_title %}{{ add_title }}{% else %}{% trans 'Add' %}{% if add_label %} {{ add_label }}{% endif %}{% endif %}
 {% elif change_label %}
     {{ change_label }}
 {% else %}
