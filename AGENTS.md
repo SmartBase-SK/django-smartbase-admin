@@ -5530,7 +5530,8 @@ INSTALLED_APPS = [
 ```python
 # settings.py — all optional, all migration-free
 
-# upload directory: a string prefix, or an (instance, filename) -> path callable
+# upload directory: a string prefix, "" for the storage/container root,
+# or an (instance, filename) -> path callable
 SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO = "tenant/attachments/"
 
 # storage backend: a STORAGES alias, a Storage instance, or a callable returning one

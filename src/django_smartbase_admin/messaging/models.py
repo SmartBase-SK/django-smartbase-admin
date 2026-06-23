@@ -52,15 +52,18 @@ def message_attachment_upload_to(instance, filename):
     This is a stable, module-level callable on purpose: Django serializes a
     callable ``upload_to`` into migrations as its dotted import path and never
     inspects what it returns. So projects can repoint attachment storage via the
-    ``SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO`` setting — either a string prefix
-    or their own ``(instance, filename) -> path`` callable — *without* generating
-    a migration, since only this function's runtime result changes, not the
-    field definition. Defaults to ``messaging/attachments/`` when unset.
+    ``SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO`` setting — a string prefix, an
+    empty string to store at the storage/container root, or their own
+    ``(instance, filename) -> path`` callable — *without* generating a migration,
+    since only this function's runtime result changes, not the field definition.
+    Defaults to ``messaging/attachments/`` when unset.
     """
     override = getattr(settings, "SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO", None)
     if callable(override):
         return override(instance, filename)
-    base = override or DEFAULT_MESSAGE_ATTACHMENT_UPLOAD_TO
+    # ``None`` (unset) → default prefix; an explicit ``""`` → container root,
+    # since ``os.path.join("", filename) == filename``.
+    base = DEFAULT_MESSAGE_ATTACHMENT_UPLOAD_TO if override is None else override
     return os.path.join(base, filename)
 
 
