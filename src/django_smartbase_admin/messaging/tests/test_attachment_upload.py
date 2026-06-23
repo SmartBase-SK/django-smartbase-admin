@@ -44,7 +44,9 @@ class MessageAttachmentUploadToTestCase(SimpleTestCase):
             "tenant/attachments/file.pdf",
         )
 
-    @override_settings(SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO=lambda instance, filename: f"x/{filename}")
+    @override_settings(
+        SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO=lambda instance, filename: f"x/{filename}"
+    )
     def test_callable_override(self):
         self.assertEqual(message_attachment_upload_to(None, "file.pdf"), "x/file.pdf")
 
@@ -57,7 +59,9 @@ class MessageAttachmentStorageTestCase(SimpleTestCase):
     def test_explicit_none_uses_default_storage(self):
         self.assertIs(message_attachment_storage(), default_storage)
 
-    @override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}})
+    @override_settings(
+        STORAGES={"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}}
+    )
     @override_settings(SB_ADMIN_MESSAGING_ATTACHMENT_STORAGE="default")
     def test_string_alias_resolves_from_storages(self):
         from django.core.files.storage import storages
