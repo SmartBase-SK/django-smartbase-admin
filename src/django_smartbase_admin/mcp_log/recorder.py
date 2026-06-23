@@ -47,7 +47,7 @@ def _build_payload(args: tuple, kwargs: dict) -> tuple[dict, int]:
     return payload, size
 
 
-def _summarize_result(result) -> dict:
+def _summarize_result(result, kwargs) -> dict:
     """Light response metadata (counts/shape) as model field values."""
     meta = {
         "result_status": "",
@@ -59,30 +59,36 @@ def _summarize_result(result) -> dict:
     }
     if isinstance(result, list):
         meta["result_count"] = len(result)
-        return meta
-    if not isinstance(result, dict):
-        return meta
+    elif isinstance(result, dict):
+        if isinstance(result.get("status"), str):
+            meta["result_status"] = result["status"][:32]
+        for key in _ITEM_KEYS:
+            if isinstance(result.get(key), list):
+                meta["result_count"] = len(result[key])
+                break
+        for key in _TOTAL_KEYS:
+            if isinstance(result.get(key), int):
+                meta["result_total"] = result[key]
+                break
+        if isinstance(result.get("data"), dict) and isinstance(
+            result["data"].get("count"), int
+        ):
+            meta["result_total"] = result["data"]["count"]
+        if isinstance(result.get("fields"), dict):
+            meta["result_fields"] = len(result["fields"])
+        if isinstance(result.get("inlines"), dict):
+            inlines = result["inlines"]
+            meta["result_inlines"] = len(inlines)
+            meta["result_inline_rows"] = sum(
+                len(v["rows"])
+                for v in inlines.values()
+                if isinstance(v, dict) and isinstance(v.get("rows"), list)
+            )
 
-    if isinstance(result.get("status"), str):
-        meta["result_status"] = result["status"][:32]
-    for key in _ITEM_KEYS:
-        if isinstance(result.get(key), list):
-            meta["result_count"] = len(result[key])
-            break
-    for key in _TOTAL_KEYS:
-        if isinstance(result.get(key), int):
-            meta["result_total"] = result[key]
-            break
-    if isinstance(result.get("fields"), dict):
-        meta["result_fields"] = len(result["fields"])
-    if isinstance(result.get("inlines"), dict):
-        inlines = result["inlines"]
-        meta["result_inlines"] = len(inlines)
-        meta["result_inline_rows"] = sum(
-            len(v["rows"])
-            for v in inlines.values()
-            if isinstance(v, dict) and isinstance(v.get("rows"), list)
-        )
+    # Bulk tools (invoke_selection_action / delete_objects) carry the affected
+    # set explicitly as ``object_ids`` — record how many objects were touched.
+    if meta["result_count"] is None and isinstance(kwargs.get("object_ids"), list):
+        meta["result_count"] = len(kwargs["object_ids"])
     return meta
 
 
@@ -106,13 +112,14 @@ def on_mcp_tool_called(
         if user is not None and not getattr(user, "is_authenticated", False):
             user = None
 
-        payload, request_size = _build_payload(tool_args or (), tool_kwargs or {})
+        kwargs = tool_kwargs or {}
+        payload, request_size = _build_payload(tool_args or (), kwargs)
 
         response_size = 0
-        response_meta = _summarize_result(None)
+        response_meta = _summarize_result(None, kwargs)
         if result is not None:
             response_size = len(_dumps(result).encode("utf-8"))
-            response_meta = _summarize_result(result)
+            response_meta = _summarize_result(result, kwargs)
 
         error_type = ""
         error_message = ""
