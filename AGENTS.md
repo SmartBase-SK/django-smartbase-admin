@@ -42,7 +42,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
-| [Messaging](#messaging) | Built-in in-app messaging — install, `messaging_config` (types/audiences/poller), inbox vs management views, menu wiring, custom recipient audiences, contributing |
+| [Messaging](#messaging) | Built-in in-app messaging — install, attachment upload path/storage settings, `messaging_config` (types/audiences/poller), inbox vs management views, menu wiring, custom recipient audiences, contributing |
 | [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -5522,6 +5522,23 @@ INSTALLED_APPS = [
 2. Run migrations: `python manage.py migrate`
 
 3. Attachments use a plain Django `FileField`, so ensure `MEDIA_ROOT` / `MEDIA_URL` are configured (no `filer` dependency).
+
+### Attachment upload path & storage
+
+`MessageAttachment.file` resolves both its upload directory and its storage backend through stable module-level callables (`message_attachment_upload_to` / `message_attachment_storage`). Django serializes a *callable* `upload_to`/`storage` into migrations as its import path and never inspects what it returns, so a project can override either via settings **without generating a migration** — only the callables' runtime results change, not the field definition. Both default to `messaging/attachments/` and the project's default storage when unset.
+
+```python
+# settings.py — all optional, all migration-free
+
+# upload directory: a string prefix, "" for the storage/container root,
+# or an (instance, filename) -> path callable
+SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO = "tenant/attachments/"
+
+# storage backend: a STORAGES alias, a Storage instance, or a callable returning one
+SB_ADMIN_MESSAGING_ATTACHMENT_STORAGE = "messaging"   # -> storages["messaging"]
+```
+
+Caveat: the override must flow through these fixed callables via the settings. Pointing the field at a *different* callable changes the serialized import path and *would* require a migration.
 
 ### Enabling — `messaging_config`
 
