@@ -363,9 +363,9 @@ class SBAdminTools(MCPToolset):
           - ``selection_actions``: bulk buttons over selected rows.
 
         When configured by the host project, the top-level
-        ``my_profile`` entry points at the current user's own profile
+        ``whoami`` entry points at the current user's own profile
         detail target: ``{"view_id", "object_id"}``. Pass those to
-        ``fetch_detail`` / ``update_detail`` or call ``fetch_my_profile``.
+        ``fetch_detail`` / ``update_detail`` or call ``fetch_whoami``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -396,14 +396,12 @@ class SBAdminTools(MCPToolset):
             "action_invokers": ACTION_INVOKERS,
         }
         try:
-            my_profile = request.request_data.configuration.get_myprofile_target(
-                request
-            )
+            whoami = request.request_data.configuration.get_whoami_target(request)
         except LookupError:
             pass
         else:
-            if my_profile is not None:
-                result["my_profile"] = my_profile
+            if whoami is not None:
+                result["whoami"] = whoami
         return result
 
     @_guarded_tool_call
@@ -774,14 +772,14 @@ class SBAdminTools(MCPToolset):
         return self._fetch_detail_payload(view_id, object_id, fields=fields)
 
     @_guarded_tool_call
-    def fetch_my_profile(
+    def fetch_whoami(
         self,
         fields: list[str] | None = None,
     ) -> dict:
         """Fetch the current authenticated user's configured profile detail.
 
         Host projects opt in with
-        ``SBAdminRoleConfiguration(myprofile_sbadmin=SBAdminMyProfileConfig(...))``.
+        ``SBAdminRoleConfiguration(whoami_sbadmin=SBAdminWhoamiConfig(...))``.
         The result is the same shape as ``fetch_detail`` with ``view_id`` and
         ``object_id`` included so callers can reuse the regular detail tools.
 
@@ -796,11 +794,11 @@ class SBAdminTools(MCPToolset):
         request = self.request
         ensure_sbadmin_request_data(request)
         try:
-            target = request.request_data.configuration.get_myprofile_target(request)
+            target = request.request_data.configuration.get_whoami_target(request)
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
         if target is None:
-            raise LookupError("No myprofile_sbadmin is configured for this user.")
+            raise LookupError("No whoami_sbadmin is configured for this user.")
         detail = self._fetch_detail_payload(
             target["view_id"], target["object_id"], fields=fields
         )

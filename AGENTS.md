@@ -856,7 +856,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 | `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
 | `mcp_readonly` | Make MCP requests read-only for non-superusers. Default `False`; set `True` to block MCP add/change/delete and mutating actions while leaving browser admin writes unchanged. | [MCP Read-Only Toggle](#mcp-read-only-toggle) |
-| `myprofile_sbadmin` | Tell MCP which change view is the current user's own profile. | [Current User / My Profile](#current-user--my-profile) |
+| `whoami_sbadmin` | Tell MCP which change view is the current user's own profile. | [Current User / Whoami](#current-user--whoami) |
 
 ### URL Params Compression Toggle
 
@@ -5577,9 +5577,9 @@ This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hoste
 
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
 
-### Current User / My Profile
+### Current User / Whoami
 
-MCP requests know the authenticated Django user internally, but agents should not guess the matching admin row by scanning user lists. Configure `SBAdminRoleConfiguration.myprofile_sbadmin` to expose the current user's profile detail target through `list_admins()["my_profile"]` and the `fetch_my_profile` MCP tool.
+MCP requests know the authenticated Django user internally, but agents should not guess the matching admin row by scanning user lists. Configure `SBAdminRoleConfiguration.whoami_sbadmin` to expose the current user's profile detail target through `list_admins()["whoami"]` and the `fetch_whoami` MCP tool.
 
 For a user-profile admin, keep the profile admin project-side. A common setup is a `User` proxy model whose changelist URL renders the logged-in user's change form:
 
@@ -5607,7 +5607,7 @@ from accounts.models import MyProfile
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import (
-    SBAdminMyProfileConfig,
+    SBAdminWhoamiConfig,
     SBAdminRoleConfiguration,
 )
 
@@ -5664,22 +5664,22 @@ _role_config = SBAdminRoleConfiguration(
         ...
     ],
     registered_views=[...],
-    myprofile_sbadmin=SBAdminMyProfileConfig(
+    whoami_sbadmin=SBAdminWhoamiConfig(
         view_id="accounts_myprofile",
     ),
 )
 ```
 
-`SBAdminMyProfileConfig` defaults to `request.user.pk` as the detail `object_id`, which matches proxy-user profile admins. Use `object_id_getter` only when the profile object has a different key:
+`SBAdminWhoamiConfig` defaults to `request.user.pk` as the detail `object_id`, which matches proxy-user profile admins. Use `object_id_getter` only when the profile object has a different key:
 
 ```python
-myprofile_sbadmin=SBAdminMyProfileConfig(
+whoami_sbadmin=SBAdminWhoamiConfig(
     view_id="accounts_customerprofile",
     object_id_getter=lambda request: request.user.customer_profile_id,
 )
 ```
 
-Agents can either call `fetch_my_profile(fields=[...])` directly, or read `list_admins()["my_profile"]` and pass its `view_id` / `object_id` to `fetch_detail` or `update_detail`. The target is still checked through normal SBAdmin view and object permissions.
+Agents can either call `fetch_whoami(fields=[...])` directly, or read `list_admins()["whoami"]` and pass its `view_id` / `object_id` to `fetch_detail` or `update_detail`. The target is still checked through normal SBAdmin view and object permissions.
 
 ### The browser-only extra
 

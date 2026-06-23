@@ -175,7 +175,7 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-class SBAdminMyProfileConfig:
+class SBAdminWhoamiConfig:
     """MCP pointer to the current user's profile change view."""
 
     def __init__(self, view_id, object_id_getter=None):
@@ -207,7 +207,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     enable_url_compression = True
     mcp_readonly = False
     link_history_to_audit = True
-    myprofile_sbadmin = None
+    whoami_sbadmin = None
 
     def __init__(
         self,
@@ -224,7 +224,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         enable_url_compression=None,
         mcp_readonly=None,
         link_history_to_audit=None,
-        myprofile_sbadmin=None,
+        whoami_sbadmin=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -257,10 +257,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             if link_history_to_audit is not None
             else self.link_history_to_audit
         )
-        self.myprofile_sbadmin = (
-            myprofile_sbadmin
-            if myprofile_sbadmin is not None
-            else self.myprofile_sbadmin
+        self.whoami_sbadmin = (
+            whoami_sbadmin if whoami_sbadmin is not None else self.whoami_sbadmin
         )
 
     def init_registered_views(self):
@@ -359,9 +357,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         if request_data is not None:
             request_data.register_autocomplete_view(view)
 
-    def get_myprofile_target(self, request):
+    def get_whoami_target(self, request):
         """Return the current user's configured profile target for MCP."""
-        config = self.myprofile_sbadmin
+        config = self.whoami_sbadmin
         user = getattr(request, "user", None)
         if not config or not getattr(user, "is_authenticated", False):
             return None

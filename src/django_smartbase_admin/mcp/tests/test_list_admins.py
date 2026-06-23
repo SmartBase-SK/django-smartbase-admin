@@ -20,7 +20,7 @@ from django.db.models import F
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminRowAction, sbadmin_action
-from django_smartbase_admin.engine.configuration import SBAdminMyProfileConfig
+from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -82,11 +82,11 @@ class ListAdminsTests(TestCase):
         sb_admin_site.register(Folder, FolderListAdminsTestAdmin)
         # Reset per-test permission scope on the shared singleton config.
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().myprofile_sbadmin = None
+        MCPToolTestConfig().whoami_sbadmin = None
 
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
-        MCPToolTestConfig().myprofile_sbadmin = None
+        MCPToolTestConfig().whoami_sbadmin = None
         sb_admin_site._registry.pop(Folder, None)
         if self._original_admin is not None:
             sb_admin_site._registry[Folder] = self._original_admin
@@ -123,16 +123,16 @@ class ListAdminsTests(TestCase):
         # that ``full_text_search`` is a no-op for this admin.
         self.assertEqual(entry["search_fields"], [])
 
-    def test_my_profile_is_omitted_when_unconfigured(self):
+    def test_whoami_is_omitted_when_unconfigured(self):
         user = MagicMock(
             id=1, is_authenticated=True, is_anonymous=False, is_superuser=True
         )
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
-        self.assertNotIn("my_profile", result)
+        self.assertNotIn("whoami", result)
 
-    def test_my_profile_surfaces_configured_current_user_detail_target(self):
+    def test_whoami_surfaces_configured_current_user_detail_target(self):
         folder = Folder.objects.create(name="profile")
         user = MagicMock(
             pk=folder.pk,
@@ -141,18 +141,16 @@ class ListAdminsTests(TestCase):
             is_anonymous=False,
             is_superuser=True,
         )
-        MCPToolTestConfig().myprofile_sbadmin = SBAdminMyProfileConfig(
-            view_id="filer_folder"
-        )
+        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
         self.assertEqual(
-            result["my_profile"],
+            result["whoami"],
             {"view_id": "filer_folder", "object_id": str(folder.pk)},
         )
 
-    def test_my_profile_surfaces_configured_target_without_eager_object_check(self):
+    def test_whoami_surfaces_configured_target_without_eager_object_check(self):
         folder = Folder.objects.create(name="profile")
         user = MagicMock(
             pk=folder.pk,
@@ -161,19 +159,17 @@ class ListAdminsTests(TestCase):
             is_anonymous=False,
             is_superuser=False,
         )
-        MCPToolTestConfig().myprofile_sbadmin = SBAdminMyProfileConfig(
-            view_id="filer_folder"
-        )
+        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
         MCPToolTestConfig.view_permission_for = set()
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
         self.assertEqual(
-            result["my_profile"],
+            result["whoami"],
             {"view_id": "filer_folder", "object_id": str(folder.pk)},
         )
 
-    def test_my_profile_is_omitted_for_anonymous_user(self):
+    def test_whoami_is_omitted_for_anonymous_user(self):
         folder = Folder.objects.create(name="profile")
         user = MagicMock(
             pk=folder.pk,
@@ -184,13 +180,11 @@ class ListAdminsTests(TestCase):
             is_anonymous=True,
             is_superuser=True,
         )
-        MCPToolTestConfig().myprofile_sbadmin = SBAdminMyProfileConfig(
-            view_id="filer_folder"
-        )
+        MCPToolTestConfig().whoami_sbadmin = SBAdminWhoamiConfig(view_id="filer_folder")
 
         result = SBAdminTools(request=build_mcp_request(user)).list_admins()
 
-        self.assertNotIn("my_profile", result)
+        self.assertNotIn("whoami", result)
 
     def test_permission_filtering_includes_or_excludes_admin(self):
         """Two halves of the same contract — empty scope hides the admin,
