@@ -1,0 +1,18 @@
+{% load i18n %}
+{% if attachments %}
+    <ul class="mt-12 -my-2">
+        {% for attachment in attachments %}
+            {% if attachment.file %}
+                <li class="py-2">
+                    <a href="{{ attachment.file.url }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center">
+                        <svg class="w-16 h-16 mr-8 shrink-0">
+                            <use xlink:href="#Doc"></use>
+                        </svg>
+                        {{ attachment.file.name }}
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endif %}

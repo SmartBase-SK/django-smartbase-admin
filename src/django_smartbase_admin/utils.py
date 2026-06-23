@@ -18,6 +18,15 @@ class JSONSerializableMixin(object):
         return {k: v for k, v in self.__dict__.items() if v is not None}
 
 
+class SBAdminNoHistoryDetailMixin:
+    """Hide the detail view's history button on an SBAdmin ModelAdmin."""
+
+    def get_change_view_context(self, request, object_id):
+        context = super().get_change_view_context(request, object_id)
+        context["show_history_button"] = False
+        return context
+
+
 def is_htmx_request(request_meta):
     return request_meta.get("HTTP_HX_REQUEST", False) != False
 

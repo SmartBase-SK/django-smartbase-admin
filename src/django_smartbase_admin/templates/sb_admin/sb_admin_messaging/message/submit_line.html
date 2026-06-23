@@ -1,0 +1,14 @@
+{% load i18n admin_urls %}
+
+{% if show_delete_link %}
+    <a href="{% url opts|admin_urlname:'delete' object_id %}" class="btn btn-destructive">
+        <svg class="w-20 h-20 mr-8">
+            <use xlink:href="#Delete"></use>
+        </svg>
+        {% trans "Delete" %}
+    </a>
+{% endif %}
+
+{% if show_save and add %}
+    <input type="submit" value="{% trans 'Send' %}" class="btn btn-secondary" name="_save" />
+{% endif %}

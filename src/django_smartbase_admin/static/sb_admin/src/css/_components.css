@@ -144,6 +144,9 @@
             @apply text-dark;
         }
 
+        .badge {
+            @apply py-0 self-start;
+        }
 
         .collapse-btn {
              > a {
@@ -283,6 +286,22 @@
         >.errorlist:first-child {
             @apply mt-0;
         }
+    }
+    .alert-success {
+        @apply bg-success-50 border-success-100 text-success-900;
+        .alert-icon { @apply text-success; }
+    }
+    .alert-warning {
+        @apply bg-warning-50 border-warning-100 text-warning-900;
+        .alert-icon { @apply text-warning; }
+    }
+    .alert-negative {
+        @apply bg-negative-50 border-negative-100 text-negative-900;
+        .alert-icon { @apply text-negative; }
+    }
+    .alert-notice {
+        @apply bg-notice-50 border-notice-100 text-notice-900;
+        .alert-icon { @apply text-notice; }
     }
 
     #save-view-modal-button {
@@ -549,6 +568,24 @@
         @apply gap-24;
         > form {
             @apply absolute;
+        }
+    }
+
+    .message-content {
+        a[href] {
+            @apply text-primary;
+        }
+        p, ul, ol {
+            margin-bottom: 0.5em;
+        }
+
+        ul {
+            list-style: disc;
+            @apply pl-20;
+        }
+        ol {
+            list-style: decimal;
+            @apply pl-20;
         }
     }
 }

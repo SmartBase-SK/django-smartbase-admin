@@ -207,6 +207,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     enable_url_compression = True
     mcp_readonly = False
     link_history_to_audit = True
+    messaging_config = None
     mcp_whoami_sbadmin = None
 
     def __init__(
@@ -224,6 +225,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         enable_url_compression=None,
         mcp_readonly=None,
         link_history_to_audit=None,
+        messaging_config=None,
         mcp_whoami_sbadmin=None,
     ) -> None:
         super().__init__()
@@ -256,6 +258,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             link_history_to_audit
             if link_history_to_audit is not None
             else self.link_history_to_audit
+        )
+        self.messaging_config = (
+            messaging_config if messaging_config is not None else self.messaging_config
         )
         self.mcp_whoami_sbadmin = (
             mcp_whoami_sbadmin
