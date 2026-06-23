@@ -2,6 +2,7 @@ import os
 
 from ckeditor.fields import RichTextField
 from django.conf import settings
+from django.core.files.storage import default_storage, storages
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -42,6 +43,47 @@ class Message(models.Model):
         return self.title
 
 
+DEFAULT_MESSAGE_ATTACHMENT_UPLOAD_TO = "messaging/attachments/"
+
+
+def message_attachment_upload_to(instance, filename):
+    """Resolve the upload directory for a message attachment.
+
+    This is a stable, module-level callable on purpose: Django serializes a
+    callable ``upload_to`` into migrations as its dotted import path and never
+    inspects what it returns. So projects can repoint attachment storage via the
+    ``SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO`` setting — either a string prefix
+    or their own ``(instance, filename) -> path`` callable — *without* generating
+    a migration, since only this function's runtime result changes, not the
+    field definition. Defaults to ``messaging/attachments/`` when unset.
+    """
+    override = getattr(settings, "SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO", None)
+    if callable(override):
+        return override(instance, filename)
+    base = override or DEFAULT_MESSAGE_ATTACHMENT_UPLOAD_TO
+    return os.path.join(base, filename)
+
+
+def message_attachment_storage():
+    """Resolve the storage backend for message attachments.
+
+    A callable ``storage`` is deconstructed by Django as its import path (the
+    backend it returns is never inspected), so — exactly like
+    :func:`message_attachment_upload_to` — projects can swap the backend via the
+    ``SB_ADMIN_MESSAGING_ATTACHMENT_STORAGE`` setting *without* a migration. The
+    setting accepts a key into ``STORAGES``, a ``Storage`` instance, or a
+    callable returning one. Defaults to the project's default storage when unset.
+    """
+    override = getattr(settings, "SB_ADMIN_MESSAGING_ATTACHMENT_STORAGE", None)
+    if override is None:
+        return default_storage
+    if isinstance(override, str):
+        return storages[override]
+    if callable(override):
+        return override()
+    return override
+
+
 class MessageAttachment(models.Model):
     message = models.ForeignKey(
         Message,
@@ -49,7 +91,8 @@ class MessageAttachment(models.Model):
         on_delete=models.CASCADE,
     )
     file = models.FileField(
-        upload_to="messaging/attachments/",
+        upload_to=message_attachment_upload_to,
+        storage=message_attachment_storage,
         verbose_name=_("File"),
     )
 
