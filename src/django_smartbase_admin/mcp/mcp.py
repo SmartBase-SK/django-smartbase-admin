@@ -259,15 +259,36 @@ def _guarded_tool_call(method):
     leaks across calls and tests, causing audit rows to be written under
     stale users.
     """
+    import time
     from functools import wraps
+
+    from django_smartbase_admin.mcp.signals import mcp_tool_called
 
     @wraps(method)
     def wrapper(self, *args, **kwargs):
-        if not sb_admin_site.has_permission(self.request):
-            raise PermissionDenied
+        start = time.perf_counter()
+        result = None
+        error = None
         try:
-            return method(self, *args, **kwargs)
+            if not sb_admin_site.has_permission(self.request):
+                raise PermissionDenied
+            result = method(self, *args, **kwargs)
+            return result
+        except Exception as exc:
+            error = exc
+            raise
         finally:
+            # send_robust: a failing receiver must not break the tool call.
+            mcp_tool_called.send_robust(
+                sender=type(self),
+                request=getattr(self, "request", None),
+                tool_name=method.__name__,
+                tool_args=args,
+                tool_kwargs=kwargs,
+                result=result,
+                error=error,
+                duration_ms=int((time.perf_counter() - start) * 1000),
+            )
             SBAdminThreadLocalService.clear_request()
 
     return wrapper
