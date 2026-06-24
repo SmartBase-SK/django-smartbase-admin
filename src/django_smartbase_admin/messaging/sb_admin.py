@@ -446,9 +446,12 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         if not messaging_config or not (user and user.is_authenticated):
             return HttpResponse("")
 
+        # Only surface messages that are still unread *and* not yet shown.
+        # Filtering on ``read_at`` too means a message read by other means
+        # (e.g. opening it in the inbox) never pops a stale toast/modal.
         pending = list(
             MessageRecipient.objects.filter(
-                user=user, notified_at__isnull=True
+                user=user, read_at__isnull=True, notified_at__isnull=True
             ).select_related("message", "message__created_by")[:50]
         )
         if not pending:
@@ -476,7 +479,14 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
                             "action_acknowledge", "json", object_id=recipient.pk
                         ),
                     }
-                    notified_ids.append(recipient.pk)
+                    # A modal that must be acknowledged keeps prompting until the
+                    # user explicitly acknowledges it (which sets ``read_at`` and
+                    # drops it from the pending query). Marking it notified on
+                    # display would let a mere page refresh dismiss it while it
+                    # is still unread — so only non-acknowledge modals are
+                    # "shown once".
+                    if not message_type.require_acknowledge:
+                        notified_ids.append(recipient.pk)
             else:
                 toast_candidates.append((recipient, message_type))
 
