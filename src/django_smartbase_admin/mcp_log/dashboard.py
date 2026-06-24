@@ -1,25 +1,24 @@
 """Dashboard over ``MCPRequestLog`` — branded "AI Assistant Module".
 
-Server-rendered stat cards for the retention window plus a filterable
-recent-calls list. Registered via the project's
+A calls-over-time line chart whose aggregate cards (Calls / Errors / duration /
+volume) double as series selectors and share the chart's date-range filter,
+plus a filterable recent-calls list. Registered via the project's
 ``SBAdminConfiguration.registered_views``; reachable at
 ``/sb-admin/aiassistantmodule/aiassistantmodule/template/``.
 """
 
-from datetime import timedelta
-
-from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.db.models import Avg, Count, F, Q, Sum, TextField, Value
 from django.db.models.functions import Coalesce
 from django.template.response import TemplateResponse
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.dashboard import (
+    SBAdminChartAggregateSubWidget,
+    SBAdminDashboardLineChartWidgetByDate,
     SBAdminDashboardListWidget,
-    SBAdminDashboardWidget,
 )
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.field_formatter import BadgeType, format_badge
@@ -28,75 +27,18 @@ from django_smartbase_admin.engine.filter_widgets import (
     BooleanFilterWidget,
     DateFilterWidget,
     FromValuesAutocompleteWidget,
+    RadioChoiceFilterWidget,
 )
 from django_smartbase_admin.mcp_log.models import MCPRequestLog
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
 
-DEFAULT_PERIOD_DAYS = 60
+
+def _round_value(sub_widget, request, value):
+    return round(value or 0)
 
 
-class MCPLogStatsWidget(SBAdminDashboardWidget):
-    """Stat cards aggregated over the retention window (no AJAX, always renders)."""
-
-    template_name = "sb_admin/mcp_log/stats_widget.html"
-
-    def has_view_permission(self, request, obj=None) -> bool:
-        return True
-
-    @staticmethod
-    def _kb(value):
-        return round((value or 0) / 1024)
-
-    def get_period_days(self):
-        return getattr(
-            settings, "SB_ADMIN_MCP_REQUEST_LOG_RETENTION_DAYS", DEFAULT_PERIOD_DAYS
-        )
-
-    def get_widget_context_data(self, request):
-        context = super().get_widget_context_data(request)
-        days = self.get_period_days()
-        since = timezone.now() - timedelta(days=days)
-        qs = MCPRequestLog.objects.filter(timestamp__gte=since)
-
-        totals = qs.aggregate(
-            calls=Count("id"),
-            errors=Count("id", filter=Q(is_error=True)),
-            avg_duration=Avg("duration_ms"),
-            items=Sum("result_total"),
-            req_bytes=Sum("request_size"),
-            resp_bytes=Sum("response_size"),
-        )
-        calls = totals["calls"] or 0
-        errors = totals["errors"] or 0
-
-        context.update(
-            {
-                "period_days": days,
-                "stat_cards": [
-                    {"label": _("Calls"), "value": calls},
-                    {
-                        "label": _("Errors"),
-                        "value": errors,
-                        "sub": f"{round(100 * errors / calls)}%" if calls else "0%",
-                        "negative": errors > 0,
-                    },
-                    {
-                        "label": _("Avg duration (ms)"),
-                        "value": round(totals["avg_duration"] or 0),
-                    },
-                    {"label": _("Items returned"), "value": totals["items"] or 0},
-                    {
-                        "label": _("Request (KB)"),
-                        "value": self._kb(totals["req_bytes"]),
-                    },
-                    {
-                        "label": _("Response (KB)"),
-                        "value": self._kb(totals["resp_bytes"]),
-                    },
-                ],
-            }
-        )
-        return context
+def _kb_value(sub_widget, request, value):
+    return round((value or 0) / 1024)
 
 
 class MCPRecentCallsListWidget(SBAdminDashboardListWidget):
@@ -181,13 +123,140 @@ class MCPRecentCallsListWidget(SBAdminDashboardListWidget):
         return True
 
 
+class MCPCallsChartWidget(SBAdminDashboardLineChartWidgetByDate):
+    """Calls over time, with native date-range filter and a Total / By user
+    grouping (one line vs one line per calling user)."""
+
+    name = _("MCP calls")
+    model = MCPRequestLog
+    date_annotate_field = "timestamp"
+    GROUP_KEY = "__mcp_group__"
+
+    # Cards over the chart: each is an aggregate AND the active series for the
+    # line. They share the chart's date-range filter, so the numbers track the
+    # selected period (no separate retention-window widget).
+    sub_widgets = [
+        SBAdminChartAggregateSubWidget(title=_("Calls"), aggregate=Count("id")),
+        SBAdminChartAggregateSubWidget(
+            title=_("Errors"), aggregate=Count("id", filter=Q(is_error=True))
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Avg duration (ms)"),
+            aggregate=Avg("duration_ms"),
+            python_formatter=_round_value,
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Items returned"), aggregate=Sum("result_total")
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Request (KB)"),
+            aggregate=Sum("request_size"),
+            python_formatter=_kb_value,
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Response (KB)"),
+            aggregate=Sum("response_size"),
+            python_formatter=_kb_value,
+        ),
+    ]
+
+    class GroupOptions(models.TextChoices):
+        TOTAL = "total", _("Total")
+        USER = "user", _("By user")
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("y_axis_annotate", Count("id"))
+        kwargs["settings"] = [
+            SBAdminField(
+                name=self.GROUP_KEY,
+                title=_("Grouping"),
+                filter_widget=RadioChoiceFilterWidget(
+                    choices=self.GroupOptions.choices,
+                    default_value=self.GroupOptions.TOTAL,
+                    allow_clear=False,
+                ),
+            ),
+            *(kwargs.get("settings") or []),
+        ]
+        super().__init__(**kwargs)
+        self._prune_settings()
+
+    def _prune_settings(self):
+        """Drop the whole period-compare picker (pointless here) and the "Year"
+        resolution option. The enum members stay so the chart's annotate/compare
+        logic keeps working; with no compare field, ``get_data`` reads it as
+        ``None`` and skips comparison entirely."""
+        year = self.DateResolutionsOptions.DATE_RESOLUTION_YEAR.value
+        self.settings = [
+            field for field in self.get_settings() if field.name != self.COMPARE_KEY
+        ]
+        for field in self.get_settings():
+            if field.name == self.RESOLUTION_KEY:
+                widget = field.filter_widget
+                widget.choices = [c for c in widget.choices if c[0] != year]
+
+    def get_date_widget_shortcuts(self):
+        # Drop "Last Year"; keep Last 30 days and Last Quarter (default).
+        return [
+            shortcut
+            for shortcut in super().get_date_widget_shortcuts()
+            if shortcut["value"] != [-365, 0]
+        ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def _group_by_user(self, request):
+        value = self.get_settings_from_request(request).get(self.GROUP_KEY)
+        return value == self.GroupOptions.USER
+
+    def get_data(self, request):
+        # Total mode: the stock single-line behaviour (incl. compare).
+        if not self._group_by_user(request):
+            return super().get_data(request)
+
+        # By-user mode: one dataset (line) per calling user, using whichever
+        # metric (card) is currently active for the y-axis.
+        user_field = f"user__{MCPRecentCallsListWidget._user_attr()}"
+        rows = list(
+            self.get_data_queryset(request)
+            .annotate(x_axis=self.get_x_axis_annotate(request))
+            .values("x_axis", user_field)
+            .annotate(y_axis=self.get_y_axis_annotate(request))
+            .order_by("x_axis")
+        )
+        buckets, seen = [], set()
+        for row in rows:
+            if row["x_axis"] not in seen:
+                seen.add(row["x_axis"])
+                buckets.append(row["x_axis"])
+        index = {bucket: i for i, bucket in enumerate(buckets)}
+        series: dict = {}
+        for row in rows:
+            label = row.get(user_field) or "—"
+            series.setdefault(label, [0] * len(buckets))[index[row["x_axis"]]] += row[
+                "y_axis"
+            ]
+        labels = [
+            self.process_label(request, bucket, None, [], []) for bucket in buckets
+        ]
+        datasets = [
+            {"label": label, "data": data, "fill": False}
+            for label, data in series.items()
+        ]
+        return {"main": {"labels": labels, "datasets": datasets}, "sub_widget": {}}
+
+
 class MCPLogDashboardView(SBAdminDashboardView):
     view_id = "aiassistantmodule"
     label = _("AI Assistant Module")
     menu_action = "aiassistantmodule"
 
     def __init__(self, title=None, widgets=None):
-        widgets = widgets or [MCPLogStatsWidget(), MCPRecentCallsListWidget()]
+        widgets = widgets or [
+            MCPCallsChartWidget(),
+            MCPRecentCallsListWidget(),
+        ]
         super().__init__(title=title or str(self.label), widgets=widgets)
 
     def has_view_permission(self, request, obj=None) -> bool:

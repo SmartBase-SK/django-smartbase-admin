@@ -1374,3 +1374,12 @@ msgstr "Počet vrátených inlinov"
 
 msgid "Returned inline rows"
 msgstr "Počet vrátených riadkov inlinov"
+
+msgid "MCP calls"
+msgstr "MCP volania"
+
+msgid "Grouping"
+msgstr "Zoskupenie"
+
+msgid "By user"
+msgstr "Podľa používateľa"
