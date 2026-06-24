@@ -1264,3 +1264,77 @@ msgstr "Jazyk"
 
 msgid "Notified"
 msgstr "Notifikovaný"
+
+# MCP request log / AI Assistant Module dashboard
+
+msgid "AI Assistant Module"
+msgstr "AI asistent"
+
+msgid "Calls"
+msgstr "Volania"
+
+msgid "Errors"
+msgstr "Chyby"
+
+msgid "Avg duration (ms)"
+msgstr "Priem. trvanie (ms)"
+
+msgid "Items returned"
+msgstr "Vrátené položky"
+
+msgid "Request (KB)"
+msgstr "Požiadavka (KB)"
+
+msgid "Response (KB)"
+msgstr "Odpoveď (KB)"
+
+msgid "No data"
+msgstr "Žiadne dáta"
+
+msgid "Recent calls"
+msgstr "Posledné volania"
+
+msgid "Time"
+msgstr "Čas"
+
+msgid "Tool"
+msgstr "Nástroj"
+
+msgid "Duration (ms)"
+msgstr "Trvanie (ms)"
+
+msgid "Error"
+msgstr "Chyba"
+
+msgid "Request"
+msgstr "Požiadavka"
+
+msgid "Response"
+msgstr "Odpoveď"
+
+msgid "Request size (B)"
+msgstr "Veľkosť požiadavky (B)"
+
+msgid "Response size (B)"
+msgstr "Veľkosť odpovede (B)"
+
+msgid "Result status"
+msgstr "Stav výsledku"
+
+msgid "Total"
+msgstr "Spolu"
+
+msgid "Fields"
+msgstr "Polia"
+
+msgid "Inlines"
+msgstr "Vnorené"
+
+msgid "Inline rows"
+msgstr "Riadky vnorených"
+
+msgid "Error type"
+msgstr "Typ chyby"
+
+msgid "Error message"
+msgstr "Chybová správa"
