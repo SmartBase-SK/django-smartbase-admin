@@ -6,27 +6,8 @@
 {% block content_inner %}
     <div id="{{ widget_id }}" class="col-span-12 flex flex-col gap-12">
 
-        <div class="flex justify-end">
-            {% for f in filters %}
-                <div class="filter-wrapper relative">
-                    <button type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                            class="btn flex items-center gap-4">
-                        <span>{% trans "Date" %}: {{ current_date_label }}</span>
-                        <svg class="w-16 h-16 ml-4"><use xlink:href="#Down"></use></svg>
-                    </button>
-                    {% include f.filter_widget.template_name with filter_widget=f.filter_widget all_filters_visible=True %}
-                </div>
-                <form id="{{ f.filter_widget.view_id }}-filter-form" method="get" class="hidden"></form>
-                <script>
-                    (function () {
-                        var input = document.getElementById("{{ f.filter_widget.input_id }}");
-                        var form = document.getElementById("{{ f.filter_widget.view_id }}-filter-form");
-                        if (input && form) {
-                            input.addEventListener("change", function () { form.submit(); });
-                        }
-                    })();
-                </script>
-            {% endfor %}
+        <div class="text-18 text-dark-900 font-semibold">
+            {% blocktrans with days=period_days %}Last {{ days }} days{% endblocktrans %}
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-16">

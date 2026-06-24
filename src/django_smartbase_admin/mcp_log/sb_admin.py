@@ -26,56 +26,64 @@ from django_smartbase_admin.services.views import SBAdminViewService
 # The AI Assistant Module dashboard (see dashboard.MCPLogDashboardView).
 DASHBOARD_VIEW_ID = "aiassistantmodule"
 
-_JSON_TOKEN_RE = re.compile(
-    r'("(?:\\u[0-9a-fA-F]{4}|\\.|[^"\\])*"\s*:)'  # key
-    r'|("(?:\\u[0-9a-fA-F]{4}|\\.|[^"\\])*")'  # string value
-    r"|\b(true|false|null)\b"  # literal
-    r"|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"  # number
-)
-
-_JSON_COLORS = {
-    "key": "#7c3aed",
-    "str": "#0f766e",
-    "lit": "#c2410c",
-    "num": "#2563eb",
-}
-
-
-def _highlight_json(value):
-    """Pretty-print + lightly syntax-highlight a JSON-able value as safe HTML.
-
-    Only string/key tokens can carry HTML-special chars and those are escaped;
-    structural characters between tokens are HTML-safe and pass through.
-    """
-    text = json.dumps(value, indent=2, ensure_ascii=False, default=str)
-
-    def repl(match):
-        key, string, literal, number = match.groups()
-        if key is not None:
-            name, _, _rest = key.rpartition(":")
-            return (
-                f'<span style="color:{_JSON_COLORS["key"]}">{escape(name.rstrip())}</span>'
-                f'<span style="color:#94a3b8">:</span>'
-            )
-        if string is not None:
-            return f'<span style="color:{_JSON_COLORS["str"]}">{escape(string)}</span>'
-        if literal is not None:
-            return f'<span style="color:{_JSON_COLORS["lit"]}">{literal}</span>'
-        return f'<span style="color:{_JSON_COLORS["num"]}">{number}</span>'
-
-    highlighted = _JSON_TOKEN_RE.sub(repl, text)
-    return mark_safe(
-        '<pre style="margin:0;padding:14px 16px;background:#f8fafc;'
-        "border:1px solid #e2e8f0;border-radius:8px;max-height:480px;overflow:auto;"
-        'font-size:12.5px;line-height:1.6;white-space:pre;color:#0f172a;">'
-        f"{highlighted}</pre>"
-    )
-
 
 class MCPRequestLogAdmin(SBAdmin):
     """Read-only view of individual MCP tool calls."""
 
     sbadmin_list_history_enabled = False
+
+    # ``email`` if the user model has it, else its ``USERNAME_FIELD`` — so this
+    # works for any AUTH_USER_MODEL without raising a FieldError.
+    _user_field = (
+        "email"
+        if "email" in {f.name for f in get_user_model()._meta.get_fields()}
+        else get_user_model().USERNAME_FIELD
+    )
+
+    _json_token_re = re.compile(
+        r'("(?:\\u[0-9a-fA-F]{4}|\\.|[^"\\])*"\s*:)'  # key
+        r'|("(?:\\u[0-9a-fA-F]{4}|\\.|[^"\\])*")'  # string value
+        r"|\b(true|false|null)\b"  # literal
+        r"|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"  # number
+    )
+    _json_colors = {
+        "key": "#7c3aed",
+        "str": "#0f766e",
+        "lit": "#c2410c",
+        "num": "#2563eb",
+    }
+
+    @classmethod
+    def _highlight_json(cls, value):
+        """Pretty-print + lightly syntax-highlight a JSON-able value as safe HTML.
+
+        Only string/key tokens can carry HTML-special chars and those are escaped;
+        structural characters between tokens are HTML-safe and pass through.
+        """
+        text = json.dumps(value, indent=2, ensure_ascii=False, default=str)
+        colors = cls._json_colors
+
+        def repl(match):
+            key, string, literal, number = match.groups()
+            if key is not None:
+                name = key.rpartition(":")[0]
+                return (
+                    f'<span style="color:{colors["key"]}">{escape(name.rstrip())}</span>'
+                    f'<span style="color:#94a3b8">:</span>'
+                )
+            if string is not None:
+                return f'<span style="color:{colors["str"]}">{escape(string)}</span>'
+            if literal is not None:
+                return f'<span style="color:{colors["lit"]}">{literal}</span>'
+            return f'<span style="color:{colors["num"]}">{number}</span>'
+
+        highlighted = cls._json_token_re.sub(repl, text)
+        return mark_safe(
+            '<pre style="margin:0;padding:14px 16px;background:#f8fafc;'
+            "border:1px solid #e2e8f0;border-radius:8px;max-height:480px;overflow:auto;"
+            'font-size:12.5px;line-height:1.6;white-space:pre;color:#0f172a;">'
+            f"{highlighted}</pre>"
+        )
 
     sbadmin_list_display = (
         SBAdminField(name="timestamp", title=_("Time"), filter_disabled=True),
@@ -88,13 +96,17 @@ class MCPRequestLogAdmin(SBAdmin):
         SBAdminField(
             name="user_display",
             title=_("User"),
-            annotate=Coalesce(F("user__email"), Value(""), output_field=TextField()),
+            annotate=Coalesce(
+                F(f"user__{_user_field}"), Value(""), output_field=TextField()
+            ),
             filter_field="user",
             filter_widget=AutocompleteFilterWidget(
                 model=get_user_model(),
                 multiselect=True,
                 value_field="id",
-                label_lambda=lambda request, item: item.email or str(item),
+                label_lambda=lambda request, item: getattr(item, "email", None)
+                or getattr(item, item.USERNAME_FIELD, None)
+                or str(item),
             ),
         ),
         SBAdminField(
@@ -106,8 +118,12 @@ class MCPRequestLogAdmin(SBAdmin):
             filter_field="is_error",
             filter_widget=BooleanFilterWidget(),
         ),
-        SBAdminField(name="result_count", title=_("Items"), filter_disabled=True),
-        SBAdminField(name="duration_ms", title=_("Duration (ms)"), filter_disabled=True),
+        SBAdminField(
+            name="result_total", title=_("Record count"), filter_disabled=True
+        ),
+        SBAdminField(
+            name="duration_ms", title=_("Duration (ms)"), filter_disabled=True
+        ),
         SBAdminField(name="request_size", title=_("Request (B)"), filter_disabled=True),
         SBAdminField(
             name="response_size", title=_("Response (B)"), filter_disabled=True
@@ -136,7 +152,6 @@ class MCPRequestLogAdmin(SBAdmin):
         "arguments_html",
         "error_message",
         "result_status",
-        "result_count",
         "result_total",
         "result_fields",
         "result_inlines",
@@ -144,7 +159,6 @@ class MCPRequestLogAdmin(SBAdmin):
     ]
 
     sbadmin_fieldsets = [
-        (None, {"fields": ["arguments_html", "error_message"]}),
         (
             _("Details"),
             {
@@ -161,18 +175,21 @@ class MCPRequestLogAdmin(SBAdmin):
                 "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
             },
         ),
+        (_("Request"), {"fields": ["arguments_html", "error_message"]}),
         (
             _("Response"),
             {
                 "fields": [
-                    "result_status",
-                    "result_count",
-                    "result_total",
-                    "result_fields",
-                    "result_inlines",
+                    (
+                        "result_status",
+                        "result_total",
+                    ),
+                    (
+                        "result_fields",
+                        "result_inlines",
+                    ),
                     "result_inline_rows",
                 ],
-                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
             },
         ),
     ]
@@ -213,6 +230,6 @@ class MCPRequestLogAdmin(SBAdmin):
     def arguments_html(self, obj):
         if not obj or not obj.arguments:
             return "-"
-        return _highlight_json(obj.arguments)
+        return self._highlight_json(obj.arguments)
 
-    arguments_html.short_description = _("Request")
+    arguments_html.short_description = None

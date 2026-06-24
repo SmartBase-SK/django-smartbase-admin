@@ -1,19 +1,14 @@
 """Dashboard over ``MCPRequestLog`` — branded "AI Assistant Module".
 
-Two widgets on a standard ``SBAdminDashboardView``:
-
-* :class:`MCPLogStatsWidget` — server-rendered stat cards + per-tool bars
-  (no AJAX, always renders).
-* :class:`MCPRecentCallsListWidget` — a filterable/sortable Tabulator list of
-  recent calls (incl. the calling user).
-
-Registered via the project's ``SBAdminConfiguration.registered_views``;
-reachable at ``/sb-admin/aiassistantmodule/aiassistantmodule/template/``.
+Server-rendered stat cards for the retention window plus a filterable
+recent-calls list. Registered via the project's
+``SBAdminConfiguration.registered_views``; reachable at
+``/sb-admin/aiassistantmodule/aiassistantmodule/template/``.
 """
 
-import json
-from datetime import date, timedelta
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, F, Q, Sum, TextField, Value
 from django.db.models.functions import Coalesce
@@ -27,6 +22,7 @@ from django_smartbase_admin.engine.dashboard import (
     SBAdminDashboardWidget,
 )
 from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import BadgeType, format_badge
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     BooleanFilterWidget,
@@ -36,127 +32,37 @@ from django_smartbase_admin.engine.filter_widgets import (
 from django_smartbase_admin.mcp_log.models import MCPRequestLog
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
 
-DEFAULT_DAYS = 30
-SESSION_RANGE_KEY = "mcp_log_range"
-FILTER_FIELD = "timestamp"
-
-# Shortcuts shown inside the native DateFilterWidget calendar dropdown.
-DATE_SHORTCUTS = [
-    (30, _("Last 30 days")),
-    (90, _("Last Quarter")),
-    (365, _("Last Year")),
-]
-DAYS_LABEL = dict(DATE_SHORTCUTS)
-WIDGET_SHORTCUTS = [{"value": [-days, 0], "label": label} for days, label in DATE_SHORTCUTS]
-DEFAULT_SHORTCUT_INDEX = 0  # "Last 30 days"
-
-
-def _kb(value):
-    return round((value or 0) / 1024)
-
-
-def _parse_date(value):
-    try:
-        return date.fromisoformat(value) if value else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _days_from_value(value):
-    """Return N if ``value`` is a shortcut ``[-N, 0]`` blob, else None."""
-    try:
-        parsed = json.loads(value) if isinstance(value, str) else value
-    except (ValueError, TypeError):
-        return None
-    if (
-        isinstance(parsed, list)
-        and len(parsed) == 2
-        and parsed[1] == 0
-        and isinstance(parsed[0], (int, float))
-    ):
-        return abs(int(parsed[0]))
-    return None
-
-
-def _store_range_from_request(request):
-    """Persist the DateFilterWidget value (submitted as ``timestamp``) to the
-    session, so every widget — including the list's Tabulator AJAX — reads the same
-    window on subsequent requests (full page reload model)."""
-    value = request.GET.get(FILTER_FIELD)
-    if value is None:
-        return
-    date_from, date_to = DateFilterWidget.get_range_from_value(value)
-    if not date_from and not date_to:
-        request.session.pop(SESSION_RANGE_KEY, None)  # cleared → default
-        return
-    days = _days_from_value(value)
-    if days in DAYS_LABEL:
-        label = str(DAYS_LABEL[days])
-    else:
-        label = " – ".join(d.strftime("%d.%m.%Y") for d in (date_from, date_to) if d)
-    request.session[SESSION_RANGE_KEY] = {
-        # date-only strings so date.fromisoformat round-trips (get_range_from_value
-        # returns datetimes with time/tz, which date.fromisoformat rejects).
-        "from": date_from.strftime("%Y-%m-%d") if date_from else None,
-        "to": date_to.strftime("%Y-%m-%d") if date_to else None,
-        "label": label,
-    }
-
-
-def _current_range(request):
-    raw = (getattr(request, "session", None) or {}).get(SESSION_RANGE_KEY)
-    if not isinstance(raw, dict):
-        raw = {}
-    date_from = _parse_date(raw.get("from"))
-    date_to = _parse_date(raw.get("to"))
-    label = raw.get("label")
-    if not date_from and not date_to:
-        date_from = timezone.localdate() - timedelta(days=DEFAULT_DAYS)
-        label = str(DAYS_LABEL.get(DEFAULT_DAYS))
-    return date_from, date_to, label
-
-
-def _filter_range(qs, request):
-    date_from, date_to, _label = _current_range(request)
-    if date_from:
-        qs = qs.filter(timestamp__date__gte=date_from)
-    if date_to:
-        qs = qs.filter(timestamp__date__lte=date_to)
-    return qs
-
-
-def _date_filter_field():
-    return SBAdminField(
-        name=FILTER_FIELD,
-        title=_("Date"),
-        filter_field=FILTER_FIELD,
-        filter_widget=DateFilterWidget(
-            shortcuts=WIDGET_SHORTCUTS,
-            default_value_shortcut_index=DEFAULT_SHORTCUT_INDEX,
-        ),
-    )
+DEFAULT_PERIOD_DAYS = 60
 
 
 class MCPLogStatsWidget(SBAdminDashboardWidget):
-    template_name = "sb_admin/mcp_log/stats_widget.html"
-    model = MCPRequestLog
+    """Stat cards aggregated over the retention window (no AJAX, always renders)."""
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault("filters", [_date_filter_field()])
-        super().__init__(**kwargs)
+    template_name = "sb_admin/mcp_log/stats_widget.html"
 
     def has_view_permission(self, request, obj=None) -> bool:
         return True
 
+    @staticmethod
+    def _kb(value):
+        return round((value or 0) / 1024)
+
+    def get_period_days(self):
+        return getattr(
+            settings, "SB_ADMIN_MCP_REQUEST_LOG_RETENTION_DAYS", DEFAULT_PERIOD_DAYS
+        )
+
     def get_widget_context_data(self, request):
         context = super().get_widget_context_data(request)
-        qs = _filter_range(MCPRequestLog.objects.all(), request)
+        days = self.get_period_days()
+        since = timezone.now() - timedelta(days=days)
+        qs = MCPRequestLog.objects.filter(timestamp__gte=since)
 
         totals = qs.aggregate(
             calls=Count("id"),
             errors=Count("id", filter=Q(is_error=True)),
             avg_duration=Avg("duration_ms"),
-            items=Sum("result_count"),
+            items=Sum("result_total"),
             req_bytes=Sum("request_size"),
             resp_bytes=Sum("response_size"),
         )
@@ -165,7 +71,7 @@ class MCPLogStatsWidget(SBAdminDashboardWidget):
 
         context.update(
             {
-                "current_date_label": _current_range(request)[2],
+                "period_days": days,
                 "stat_cards": [
                     {"label": _("Calls"), "value": calls},
                     {
@@ -179,8 +85,14 @@ class MCPLogStatsWidget(SBAdminDashboardWidget):
                         "value": round(totals["avg_duration"] or 0),
                     },
                     {"label": _("Items returned"), "value": totals["items"] or 0},
-                    {"label": _("Request (KB)"), "value": _kb(totals["req_bytes"])},
-                    {"label": _("Response (KB)"), "value": _kb(totals["resp_bytes"])},
+                    {
+                        "label": _("Request (KB)"),
+                        "value": self._kb(totals["req_bytes"]),
+                    },
+                    {
+                        "label": _("Response (KB)"),
+                        "value": self._kb(totals["resp_bytes"]),
+                    },
                 ],
             }
         )
@@ -188,50 +100,85 @@ class MCPLogStatsWidget(SBAdminDashboardWidget):
 
 
 class MCPRecentCallsListWidget(SBAdminDashboardListWidget):
-    template_name = "sb_admin/mcp_log/recent_calls_widget.html"
-    name = _("Recent calls")
+    name = _("Calls")
     model = MCPRequestLog
     list_per_page = 20
     ordering = ["-timestamp"]
     sbadmin_list_history_enabled = False
 
-    sbadmin_list_display = [
-        SBAdminField(
-            name="timestamp", title=_("Time"), filter_widget=DateFilterWidget()
-        ),
-        SBAdminField(
-            name="user_email",
-            title=_("User"),
-            annotate=Coalesce(F("user__email"), Value(""), output_field=TextField()),
-            filter_field="user",
-            filter_widget=AutocompleteFilterWidget(
-                model=get_user_model(),
-                multiselect=True,
-                value_field="id",
-                label_lambda=lambda request, item: item.email or str(item),
+    @staticmethod
+    def _user_attr():
+        """``email`` if the user model has it, else ``USERNAME_FIELD``."""
+        user_model = get_user_model()
+        names = {f.name for f in user_model._meta.get_fields()}
+        return "email" if "email" in names else user_model.USERNAME_FIELD
+
+    @classmethod
+    def _user_label(cls, request, item):
+        return getattr(item, cls._user_attr(), None) or str(item)
+
+    @staticmethod
+    def _duration_label(object_id, value):
+        if value is None:
+            return ""
+        return format_badge(f"{value} ms", BadgeType.NEUTRAL)
+
+    @staticmethod
+    def _error_label(object_id, value):
+        if value:
+            return format_badge(_("Yes"), BadgeType.ERROR)
+        return format_badge(_("No"), BadgeType.SUCCESS)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("sbadmin_list_display", self._build_list_display())
+        super().__init__(**kwargs)
+
+    def _build_list_display(self):
+        return [
+            SBAdminField(
+                name="timestamp", title=_("Time"), filter_widget=DateFilterWidget()
             ),
-        ),
-        SBAdminField(
-            name="tool_name",
-            title=_("Tool"),
-            filter_field="tool_name",
-            filter_widget=FromValuesAutocompleteWidget(multiselect=True),
-        ),
-        SBAdminField(name="result_count", title=_("Items")),
-        SBAdminField(name="duration_ms", title=_("Duration (ms)")),
-        SBAdminField(
-            name="is_error",
-            title=_("Error"),
-            filter_field="is_error",
-            filter_widget=BooleanFilterWidget(),
-        ),
-    ]
+            SBAdminField(
+                name="user_label",
+                title=_("User"),
+                annotate=Coalesce(
+                    F(f"user__{self._user_attr()}"),
+                    Value(""),
+                    output_field=TextField(),
+                ),
+                filter_field="user",
+                filter_widget=AutocompleteFilterWidget(
+                    model=get_user_model(),
+                    multiselect=True,
+                    value_field="id",
+                    label_lambda=self._user_label,
+                ),
+            ),
+            SBAdminField(
+                name="tool_name",
+                title=_("Tool"),
+                filter_field="tool_name",
+                filter_widget=FromValuesAutocompleteWidget(multiselect=True),
+            ),
+            SBAdminField(name="result_total", title=_("Record count")),
+            SBAdminField(
+                name="duration_ms",
+                title=_("Duration"),
+                formatter="html",
+                python_formatter=self._duration_label,
+            ),
+            SBAdminField(
+                name="is_error",
+                title=_("Error"),
+                formatter="html",
+                python_formatter=self._error_label,
+                filter_field="is_error",
+                filter_widget=BooleanFilterWidget(),
+            ),
+        ]
 
     def has_view_permission(self, request, obj=None) -> bool:
         return True
-
-    def get_queryset(self, request=None):
-        return _filter_range(super().get_queryset(request), request)
 
 
 class MCPLogDashboardView(SBAdminDashboardView):
@@ -248,7 +195,6 @@ class MCPLogDashboardView(SBAdminDashboardView):
 
     @sbadmin_action
     def aiassistantmodule(self, request, modifier, object_id=None):
-        _store_range_from_request(request)
         context = self.get_global_context(request)
         widget_views = self.get_widget_views(request, object_id)
         context["direct_sub_views"] = widget_views
