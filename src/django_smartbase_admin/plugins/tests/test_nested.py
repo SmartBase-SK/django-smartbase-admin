@@ -23,6 +23,7 @@ from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import SBAdminRowAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.plugins.nested import (
     LAST_CHILD_FIELD,
@@ -395,3 +396,47 @@ class TabulatorNestedPluginTests(TestCase):
         self.assertEqual(payload["last_row"], Folder.objects.count())
         for row in payload["data"]:
             self.assertNotIn("_children", row)
+
+    def test_row_actions_use_raw_rows_before_formatting(self):
+        """Row action enablement must see raw values, not escaped display data."""
+        folder = Folder.objects.create(name="<raw-action>")
+        view, request = self._make_view_and_request(sbadmin_nested=None)
+        view.sbadmin_row_actions = [
+            SBAdminRowAction(
+                title="Open",
+                url="/open/__OBJECT_ID__/",
+                enabled_if=lambda row: row["name"] == "<raw-action>",
+            )
+        ]
+        action = view.sbadmin_list_action_class(view, request)
+
+        payload = action.get_data(additional_filter=Q(pk=folder.pk))
+
+        self.assertEqual(len(payload["data"][0]["_row_actions"]), 1)
+
+    def test_nested_row_actions_are_not_reinjected_with_formatted_parent_row(self):
+        """Nested hydration injects actions from raw parent/child rows.
+
+        The base list pipeline must not overwrite parent actions after
+        plugin formatting has already produced the tree.
+        """
+        parent = Folder.objects.create(name="<nested-parent>")
+        child = Folder.objects.create(name="<nested-child>", parent=parent)
+        view, request = self._make_view_and_request(
+            restrict=lambda qs, **kwargs: qs.filter(pk__in={parent.pk, child.pk})
+        )
+        view.sbadmin_row_actions = [
+            SBAdminRowAction(
+                title="Open",
+                url="/open/__OBJECT_ID__/",
+                enabled_if=lambda row: row["name"].startswith("<nested-"),
+            )
+        ]
+        action = view.sbadmin_list_action_class(view, request)
+
+        payload = action.get_data()
+
+        parent_row = payload["data"][0]
+        child_row = parent_row["_children"][0]
+        self.assertEqual(len(parent_row["_row_actions"]), 1)
+        self.assertEqual(len(child_row["_row_actions"]), 1)

@@ -577,6 +577,8 @@ class SBAdminListAction(SBAdminAction):
             return
         pk_field = self.get_pk_field().name
         for row in final_data:
+            if "_row_actions" in row:
+                continue
             obj_id = row.get(pk_field)
             raw_row = (raw_rows_by_pk or {}).get(obj_id)
             row["_row_actions"] = [
