@@ -141,9 +141,25 @@ class SBAdminTable {
         })
     }
 
+    // Single delegated tooltip for all row actions. Attached once to the stable
+    // Tabulator wrapper (which survives row re-renders), so freshly rendered rows
+    // are covered without re-init and the underlying tooltip is created lazily on
+    // hover/focus. Content comes from data-bs-title set in buildAction*.
+    initRowActionTooltips() {
+        const el = this.tabulator?.element
+        if (!el || el._sbRowActionTooltip || !window.bootstrap5?.Tooltip) return
+        el._sbRowActionTooltip = new window.bootstrap5.Tooltip(el, {
+            selector: '.row-action-link[data-bs-title], .row-action-dropdown[data-bs-title]',
+            trigger: 'hover focus',
+            container: 'body',
+            boundary: 'viewport',
+        })
+    }
+
     loadFromUrlAfterInit() {
         window.htmx.process(this.tabulator.rowManager.tableElement)
         this.initTooltipsInTable()
+        this.initRowActionTooltips()
         this.tabulator.on("dataProcessed", (data) => {
             window.htmx.process(this.tabulator.rowManager.tableElement)
             this.initTooltipsInTable()
@@ -307,6 +323,12 @@ class SBAdminTable {
                     return (action.css_class || '').split(' ').includes(cssClass)
                 }
 
+                // Icon-only actions show no visible label, so they get a delegated
+                // tooltip (see initRowActionTooltips). Labelled actions don't need one.
+                const wantsTooltip = function (action) {
+                    return Boolean(action.title) && actionHasCssClass(action, 'btn-only-icon')
+                }
+
                 const appendActionTitle = function (element, action) {
                     if (!action.title || actionHasCssClass(action, 'btn-only-icon')) {
                         return
@@ -318,8 +340,10 @@ class SBAdminTable {
                 }
 
                 const configureActionElement = function (element, action) {
-                    element.title = action.title || ''
                     element.setAttribute('aria-label', action.title || '')
+                    if (wantsTooltip(action)) {
+                        element.setAttribute('data-bs-title', action.title)
+                    }
                     if (action.open_in_modal) {
                         element.setAttribute('data-bs-toggle', 'modal')
                         element.setAttribute('data-bs-target', '#sb-admin-modal')
@@ -374,8 +398,12 @@ class SBAdminTable {
                     if (action.css_class) {
                         button.classList.add(...action.css_class.split(' ').filter(Boolean))
                     }
-                    button.title = action.title || ''
                     button.setAttribute('aria-label', action.title || '')
+                    // The button is a Bootstrap Dropdown; a Tooltip can't share the same
+                    // element, so the tooltip lives on the .row-action-dropdown wrapper.
+                    if (wantsTooltip(action)) {
+                        dropdown.setAttribute('data-bs-title', action.title)
+                    }
                     button.setAttribute('data-bs-toggle', 'dropdown')
                     button.setAttribute('data-sbadmin-managed-dropdown', 'row-actions')
                     button.setAttribute('aria-expanded', 'false')
