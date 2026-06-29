@@ -17,7 +17,7 @@ class SBAdminDashboardView(SBAdminView):
     def __init__(self, title=None, widgets=None) -> None:
         super().__init__()
         self.widgets = widgets or self.widgets or []
-        self.title = title
+        self.title = title or self.title
 
     def get_title(self):
         return self.title or settings.PROJECT_NAME
