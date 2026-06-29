@@ -521,19 +521,25 @@ class SBAdminListAction(SBAdminAction):
 
         data_qs = self.build_final_data_queryset(page_num, page_size, additional_filter)
         data = list(data_qs)
-
-        self.process_final_data(data)
         request = self.threadsafe_request
         plugins = list(request.request_data.configuration.plugins)
         for plugin in plugins:
-            data = plugin.modify_final_data(
+            data = plugin.modify_raw_data(
                 self,
                 request=request,
                 data=data,
             )
 
         raw_rows_by_pk = {row[self.get_pk_field().name]: dict(row) for row in data}
+        self.process_final_data(data)
         self.inject_row_actions(data, raw_rows_by_pk=raw_rows_by_pk)
+
+        for plugin in plugins:
+            data = plugin.modify_final_data(
+                self,
+                request=request,
+                data=data,
+            )
 
         return {
             "last_page": math.ceil(total_count / page_size),

@@ -414,12 +414,8 @@ class TabulatorNestedPluginTests(TestCase):
 
         self.assertEqual(len(payload["data"][0]["_row_actions"]), 1)
 
-    def test_nested_row_actions_are_not_reinjected_with_formatted_parent_row(self):
-        """Nested hydration injects actions from raw parent/child rows.
-
-        The base list pipeline must not overwrite parent actions after
-        plugin formatting has already produced the tree.
-        """
+    def test_nested_row_actions_use_raw_rows_before_formatting(self):
+        """Nested rows use raw parent/child values for action enablement."""
         parent = Folder.objects.create(name="<nested-parent>")
         child = Folder.objects.create(name="<nested-child>", parent=parent)
         view, request = self._make_view_and_request(

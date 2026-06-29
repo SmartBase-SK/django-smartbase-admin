@@ -371,7 +371,7 @@ class RowActionIntegrationTests(TestCase):
         )
         self.assertEqual(rows[1]["_row_actions"], [])
 
-    def test_nested_plugin_materializes_row_actions_for_child_rows(self):
+    def test_nested_plugin_assembles_finalized_child_rows(self):
         request = RequestFactory().get("/")
         request.request_data = SimpleNamespace(additional_data={})
         view = FakeAdminView()
@@ -399,10 +399,16 @@ class RowActionIntegrationTests(TestCase):
                 "only_show_filtered_children": False,
             },
         ):
-            result = TabulatorNestedPlugin.modify_final_data(
+            rows = TabulatorNestedPlugin.modify_raw_data(
                 action,
                 request=request,
                 data=[{PARENT_REAL_ID: 1, CHILDREN_IDS: [1, 2]}],
+            )
+            action.finalize_rows(rows)
+            result = TabulatorNestedPlugin.modify_final_data(
+                action,
+                request=request,
+                data=rows,
             )
 
         self.assertEqual(

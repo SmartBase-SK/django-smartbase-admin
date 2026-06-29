@@ -15,9 +15,11 @@ Hook pipeline (in call order):
    **store-only**. Reshaping here leaks into the visible page.
 4. ``modify_data_queryset`` — unsliced, filtered, ordered qs; returned
    qs is sliced ``[from:to]`` by the caller.
-5. ``modify_final_data`` — reshape the already-formatted row dicts
+5. ``modify_raw_data`` — reshape raw row dicts before formatters and
+   row actions run.
+6. ``modify_final_data`` — reshape finalized row dicts
    (e.g. assemble ``_children`` trees from group metadata).
-6. ``modify_xlsx_data`` — final pass before XLSX serialization, after
+7. ``modify_xlsx_data`` — final pass before XLSX serialization, after
    all paged ``get_data`` chunks are concatenated (e.g. flatten a
    ``_children`` tree back into sibling rows the spreadsheet can render).
 
@@ -118,6 +120,17 @@ class SBAdminPlugin:
         return qs
 
     @classmethod
+    def modify_raw_data(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        data: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """Reshape rows before formatters and row actions run."""
+        return data
+
+    @classmethod
     def modify_final_data(
         cls,
         action: "SBAdminListAction",
@@ -125,7 +138,7 @@ class SBAdminPlugin:
         data: list[dict[str, Any]],
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
-        """Reshape rows **after** column formatters have run (e.g.
+        """Reshape rows **after** column formatters and row actions have run (e.g.
         assemble a ``_children`` tree from group metadata)."""
         return data
 
