@@ -404,7 +404,11 @@ class RowActionIntegrationTests(TestCase):
                 request=request,
                 data=[{PARENT_REAL_ID: 1, CHILDREN_IDS: [1, 2]}],
             )
-            action.finalize_rows(rows)
+            raw_rows_by_pk = {
+                row[action.get_pk_field().name]: dict(row) for row in rows
+            }
+            action.process_final_data(rows)
+            action.inject_row_actions(rows, raw_rows_by_pk=raw_rows_by_pk)
             result = TabulatorNestedPlugin.modify_final_data(
                 action,
                 request=request,
