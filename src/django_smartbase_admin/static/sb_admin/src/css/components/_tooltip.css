@@ -63,7 +63,7 @@
         .tooltip-arrow {
             left: 0;
             width: .5rem;
-            height: .1rem;
+            height: 1rem;
 
             &:before {
                 right: -1px;
@@ -82,7 +82,7 @@
         .tooltip-arrow {
             right: 0;
             width: .5rem;
-            height: .1rem;
+            height: 1rem;
 
             &:before {
                 left: -1px;
