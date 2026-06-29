@@ -594,3 +594,48 @@ class ModalActionIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.content, b"Not found.")
+
+
+class ListRowClassTests(TestCase):
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+
+    def test_inject_row_class_uses_raw_row_values(self):
+        class CancelView(FakeAdminView, SBAdminBaseListView):
+            def get_sbadmin_list_row_class(self, request, row):
+                if row.get("status") == "cancelled":
+                    return "sbadmin-row-cancelled"
+                return ""
+
+        action = TestListAction(CancelView(), self.request)
+        rows = [
+            {"id": 1, "status": "cancelled"},
+            {"id": 2, "status": "new"},
+        ]
+
+        action.inject_row_class(rows)
+
+        self.assertEqual(rows[0]["_row_class"], "sbadmin-row-cancelled")
+        self.assertEqual(rows[1]["_row_class"], "")
+
+    def test_inject_row_class_is_noop_when_hook_absent(self):
+        # FakeAdminView (no get_sbadmin_list_row_class) stands in for views that
+        # use the list action without inheriting SBAdminBaseListView.
+        action = TestListAction(FakeAdminView(), self.request)
+        rows = [{"id": 1, "status": "cancelled"}]
+
+        action.inject_row_class(rows)
+
+        self.assertNotIn("_row_class", rows[0])
+
+    def test_inject_row_class_does_not_overwrite_existing(self):
+        class CancelView(FakeAdminView, SBAdminBaseListView):
+            def get_sbadmin_list_row_class(self, request, row):
+                return "computed"
+
+        action = TestListAction(CancelView(), self.request)
+        rows = [{"id": 1, "_row_class": "preset"}]
+
+        action.inject_row_class(rows)
+
+        self.assertEqual(rows[0]["_row_class"], "preset")

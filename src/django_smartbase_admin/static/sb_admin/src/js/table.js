@@ -484,6 +484,12 @@ class SBAdminTable {
                 "page": this.constants.TABLE_PARAMS_PAGE_NAME,
                 "sort": this.constants.TABLE_PARAMS_SORT_NAME,
             },
+            rowFormatter: (row) => {
+                const cls = (row.getData() || {})._row_class
+                if (cls) {
+                    row.getElement().classList.add(...cls.split(/\s+/).filter(Boolean))
+                }
+            },
             ...this.tabulatorOptions
         }
         if (tabulatorOptions['ajaxConfig']['method'] === 'POST'){
