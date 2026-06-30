@@ -21,6 +21,12 @@ class MCPConfig(AppConfig):
       to ``INSTALLED_APPS``. That submodule wires DOT plus the discovery
       (RFC 8414/9728) and Dynamic Client Registration (RFC 7591)
       endpoints DOT does not ship.
+
+    * **REST list_rows transport (opt-in)** — mounted by
+      ``include("django_smartbase_admin.mcp.urls")`` at
+      ``rest/tools/list_rows/``. Set ``SBADMIN_MCP_REST_AUTHENTICATOR`` to
+      an import path, class, or instance implementing
+      ``SBAdminMCPRestAuthenticator`` / DRF ``BaseAuthentication``.
     """
 
     # Explicit label so it doesn't collide with the unrelated top-level

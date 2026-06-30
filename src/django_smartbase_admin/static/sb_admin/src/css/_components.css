@@ -386,6 +386,12 @@
         }
     }
 
+    .tabulator-change-view-filters {
+        .filters-list {
+            @apply pt-4;
+        }
+    }
+
     .table-selected-rows-bar {
         @apply flex items-center h-48 pr-16 py-8;
         @apply bg-light custom-scrollbar;
@@ -496,6 +502,7 @@
         transition-duration: 120ms;
         transition-timing-function: ease-in;
         transition-delay: 0ms;
+        z-index: 12;
 
        &.htmx-request,
        .htmx-request & {

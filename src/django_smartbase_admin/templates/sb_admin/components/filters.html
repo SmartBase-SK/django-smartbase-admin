@@ -1,9 +1,9 @@
 {% load i18n %}
 
-<div class="py-12 px-16 flex items-start gap-8 max-sm:overflow-x-auto">
-    <ul class="flex flex-wrap gap-8 flex-1 min-w-0">
+<div class="py-12 px-16 flex items-start gap-8">
+    <ul class="flex lg:flex-wrap gap-8 pt-4 flex-1 min-w-0 max-md:overflow-x-auto custom-scrollbar filters-list">
         {% for filter_field in filters %}
-            <li class="filter-wrapper relative max-sm:flex-shrink-0{% if not all_filters_visible %} hidden{% endif %}"
+            <li class="filter-wrapper relative max-md:flex-shrink-0{% if not all_filters_visible %} hidden{% endif %}"
                  data-filter-input-name="{{ filter_field.filter_widget.input_name }}" {% if all_filters_visible %}data-all-filters-visible{% endif %}
                  id="{{ filter_field.filter_widget.input_id }}-wrapper">
                 <button
@@ -26,7 +26,7 @@
             </li>
         {% endfor %}
         {% if not all_filters_visible %}
-            <li class="relative max-sm:-order-1">
+            <li class="relative max-md:-order-1">
                 <button
                         data-bs-toggle="dropdown"
                         aria-expanded="false"
@@ -53,24 +53,8 @@
         {% endif %}
     </ul>
     {% if show_full_text_search %}
-        <div class="relative flex-shrink-0 ml-auto max-sm:ml-0">
-            <input type="text"
-                   name="{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                   class="input pl-38 pr-38 w-320 max-sm:w-280"
-                   form="{{ view_id }}-filter-form"
-                   id="{{ view_id }}-{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}"
-                   placeholder="{{ content_context.search_field_placeholder }}">
-            <div class="absolute pl-10 left-0 top-0 bottom-0 flex items-center gap-8 rounded-r pointer-events-none">
-                <svg class="w-20 h-20">
-                    <use xlink:href="#Search"></use>
-                </svg>
-            </div>
-            <div class="cursor-pointer absolute pr-10 right-0 top-0 bottom-0 flex items-center gap-8 rounded-r">
-                <svg onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.filterModule.clearFilter('{{ content_context.const.TABLE_PARAMS_FULL_TEXT_SEARCH }}')"
-                     class="w-20 h-20">
-                    <use xlink:href="#Close-small"></use>
-                </svg>
-            </div>
+        <div class="relative flex-shrink-0 ml-auto">
+            {% include 'sb_admin/actions/partials/full_text_search.html' with input_classes='w-192 md:w-280 xl:w-320' %}
         </div>
     {% endif %}
     {% block filters_toolbar_after_search %}{% endblock %}

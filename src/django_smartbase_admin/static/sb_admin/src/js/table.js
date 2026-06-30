@@ -141,9 +141,25 @@ class SBAdminTable {
         })
     }
 
+    // Single delegated tooltip for all row actions. Attached once to the stable
+    // Tabulator wrapper (which survives row re-renders), so freshly rendered rows
+    // are covered without re-init and the underlying tooltip is created lazily on
+    // hover/focus. Content comes from data-bs-title set in buildAction*.
+    initRowActionTooltips() {
+        const el = this.tabulator?.element
+        if (!el || el._sbRowActionTooltip || !window.bootstrap5?.Tooltip) return
+        el._sbRowActionTooltip = new window.bootstrap5.Tooltip(el, {
+            selector: '.row-action-link[data-bs-title], .row-action-dropdown[data-bs-title]',
+            trigger: 'hover focus',
+            container: 'body',
+            boundary: 'viewport',
+        })
+    }
+
     loadFromUrlAfterInit() {
         window.htmx.process(this.tabulator.rowManager.tableElement)
         this.initTooltipsInTable()
+        this.initRowActionTooltips()
         this.tabulator.on("dataProcessed", (data) => {
             window.htmx.process(this.tabulator.rowManager.tableElement)
             this.initTooltipsInTable()
@@ -307,6 +323,12 @@ class SBAdminTable {
                     return (action.css_class || '').split(' ').includes(cssClass)
                 }
 
+                // Icon-only actions show no visible label, so they get a delegated
+                // tooltip (see initRowActionTooltips). Labelled actions don't need one.
+                const wantsTooltip = function (action) {
+                    return Boolean(action.title) && actionHasCssClass(action, 'btn-only-icon')
+                }
+
                 const appendActionTitle = function (element, action) {
                     if (!action.title || actionHasCssClass(action, 'btn-only-icon')) {
                         return
@@ -318,8 +340,10 @@ class SBAdminTable {
                 }
 
                 const configureActionElement = function (element, action) {
-                    element.title = action.title || ''
                     element.setAttribute('aria-label', action.title || '')
+                    if (wantsTooltip(action)) {
+                        element.setAttribute('data-bs-title', action.title)
+                    }
                     if (action.open_in_modal) {
                         element.setAttribute('data-bs-toggle', 'modal')
                         element.setAttribute('data-bs-target', '#sb-admin-modal')
@@ -328,9 +352,22 @@ class SBAdminTable {
                     } else if (action.is_method_action) {
                         element.setAttribute('hx-post', action.url)
                         element.setAttribute('hx-swap', 'none')
+                        element.setAttribute('hx-indicator', '#page-loading')
                     } else {
                         element.href = action.url
-                        if (action.open_in_new_tab) {
+                        if (action.is_download) {
+                            // The endpoint may take a moment to generate the file.
+                            // Fetch it as a blob so the global page-loading overlay
+                            // can cover the whole request and hide once it's ready.
+                            // href stays set so modified clicks still work as a link.
+                            element.addEventListener('click', (event) => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) {
+                                    return
+                                }
+                                event.preventDefault()
+                                self.downloadWithLoading(action.url)
+                            })
+                        } else if (action.open_in_new_tab) {
                             element.target = '_blank'
                             element.rel = 'noopener'
                         }
@@ -374,8 +411,12 @@ class SBAdminTable {
                     if (action.css_class) {
                         button.classList.add(...action.css_class.split(' ').filter(Boolean))
                     }
-                    button.title = action.title || ''
                     button.setAttribute('aria-label', action.title || '')
+                    // The button is a Bootstrap Dropdown; a Tooltip can't share the same
+                    // element, so the tooltip lives on the .row-action-dropdown wrapper.
+                    if (wantsTooltip(action)) {
+                        dropdown.setAttribute('data-bs-title', action.title)
+                    }
                     button.setAttribute('data-bs-toggle', 'dropdown')
                     button.setAttribute('data-sbadmin-managed-dropdown', 'row-actions')
                     button.setAttribute('aria-expanded', 'false')
@@ -484,6 +525,22 @@ class SBAdminTable {
                 "page": this.constants.TABLE_PARAMS_PAGE_NAME,
                 "sort": this.constants.TABLE_PARAMS_SORT_NAME,
             },
+            rowFormatter: (row) => {
+                const el = row.getElement()
+                const prev = el.dataset.sbRowClass
+                if (prev) {
+                    el.classList.remove(...prev.split(/\s+/).filter(Boolean))
+                    delete el.dataset.sbRowClass
+                }
+                const cls = (row.getData() || {})._row_class
+                if (cls) {
+                    const tokens = cls.split(/\s+/).filter(Boolean)
+                    if (tokens.length) {
+                        el.classList.add(...tokens)
+                        el.dataset.sbRowClass = tokens.join(' ')
+                    }
+                }
+            },
             ...this.tabulatorOptions
         }
         if (tabulatorOptions['ajaxConfig']['method'] === 'POST'){
@@ -506,6 +563,44 @@ class SBAdminTable {
         })
     }
 
+    downloadWithLoading(url) {
+        document.documentElement.classList.add('htmx-request')
+        let filename = ''
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok " + response.statusText)
+                }
+                const header = response.headers.get('Content-Disposition')
+                if (header) {
+                    const match = header.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i)
+                    if (match) {
+                        filename = decodeURIComponent(match[1])
+                    }
+                }
+                return response.blob()
+            })
+            .then(function(blob) {
+                const objectUrl = window.URL.createObjectURL(blob)
+                const a = document.createElement("a")
+                a.style.display = "none"
+                a.href = objectUrl
+                a.download = filename
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
+                window.URL.revokeObjectURL(objectUrl)
+            })
+            .catch(function(error) {
+                console.error("There was a problem with the download:", error)
+                // Fall back to a plain navigation so the user still gets the file.
+                window.location.href = url
+            })
+            .finally(function() {
+                document.documentElement.classList.remove('htmx-request')
+            })
+    }
+
     executeListAction(action_url, no_params, open_in_new_tab = false) {
         const params = this.getUrlParamsString()
         if (this.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
@@ -519,6 +614,7 @@ class SBAdminTable {
                 ...JSON.parse(document.body.getAttribute('hx-headers')),
             }
             let filename = ''
+            document.documentElement.classList.add('htmx-request')
             fetch(action_url, {
                 method: "POST",
                 headers: headers,
@@ -548,6 +644,9 @@ class SBAdminTable {
                 })
                 .catch(function(error) {
                     console.error("There was a problem with the fetch operation:", error)
+                })
+                .finally(function() {
+                    document.documentElement.classList.remove('htmx-request')
                 })
         } else {
             if (!no_params) {
