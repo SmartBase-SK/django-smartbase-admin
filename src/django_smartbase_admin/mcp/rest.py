@@ -113,16 +113,23 @@ class SBAdminMCPToolAPIView(APIView):
     def post(self, request: Request, tool_name: str, **kwargs) -> Response:
         try:
             request.user = self.authenticate_rest_request(request, **kwargs)
+        except AuthenticationFailed:
+            return Response(
+                {"detail": "Invalid MCP REST credentials."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except ImproperlyConfigured:
+            return Response(
+                {"detail": "REST authentication is not configured."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
             result = call_sbadmin_mcp_tool(
                 request=request,
                 tool_name=tool_name,
                 arguments=request.data,
                 toolset_cls=self.toolset_cls,
-            )
-        except AuthenticationFailed:
-            return Response(
-                {"detail": "Invalid MCP REST credentials."},
-                status=status.HTTP_401_UNAUTHORIZED,
             )
         except (PermissionDenied, PermissionError):
             return Response(

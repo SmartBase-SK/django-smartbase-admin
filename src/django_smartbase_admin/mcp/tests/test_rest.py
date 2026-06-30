@@ -182,6 +182,22 @@ class RestViewTests(SimpleTestCase):
         with self.assertRaises(ImproperlyConfigured):
             resolve_sbadmin_mcp_rest_authenticator()
 
+    @override_settings(SBADMIN_MCP_REST_AUTHENTICATOR=None)
+    def test_view_reports_unconfigured_rest_auth_as_401(self):
+        view = SBAdminMCPToolAPIView.as_view(toolset_cls=RestDispatchTools)
+        request = APIRequestFactory().post(
+            "/mcp-rest/tools/ping/",
+            {"value": "ok"},
+            format="json",
+        )
+
+        response = view(request, tool_name="ping")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.data, {"detail": "REST authentication is not configured."}
+        )
+
 
 @override_settings(ROOT_URLCONF="django_smartbase_admin.mcp.urls")
 class RestURLTests(SimpleTestCase):
