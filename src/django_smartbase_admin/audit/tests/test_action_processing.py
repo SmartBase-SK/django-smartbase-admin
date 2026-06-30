@@ -258,6 +258,7 @@ class RowActionIntegrationTests(TestCase):
                     "css_class": "btn btn-small btn-only-icon",
                     "open_in_modal": True,
                     "is_method_action": False,
+                    "is_download": False,
                     "open_in_new_tab": False,
                 },
                 {
@@ -267,6 +268,7 @@ class RowActionIntegrationTests(TestCase):
                     "css_class": "btn-icon draft",
                     "open_in_modal": False,
                     "is_method_action": True,
+                    "is_download": False,
                     "open_in_new_tab": False,
                 },
                 {
@@ -276,6 +278,7 @@ class RowActionIntegrationTests(TestCase):
                     "css_class": "btn btn-small btn-only-icon",
                     "open_in_modal": False,
                     "is_method_action": False,
+                    "is_download": False,
                     "open_in_new_tab": True,
                 },
             ],
@@ -354,6 +357,7 @@ class RowActionIntegrationTests(TestCase):
                             "css_class": "btn btn-small btn-only-icon",
                             "open_in_modal": False,
                             "is_method_action": True,
+                            "is_download": False,
                             "open_in_new_tab": False,
                         },
                         {
@@ -363,6 +367,7 @@ class RowActionIntegrationTests(TestCase):
                             "css_class": "btn btn-small btn-only-icon",
                             "open_in_modal": False,
                             "is_method_action": False,
+                            "is_download": False,
                             "open_in_new_tab": False,
                         },
                     ],

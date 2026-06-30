@@ -382,8 +382,7 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertNotIn("save-view-modal-button", html)
         self.assertNotIn("filters-collapse-button", html)
         self.assertIn(
-            'id="filters-collapse" class="collapse max-sm:overflow-x-auto '
-            'custom-scrollbar show"',
+            'id="filters-collapse" class="collapse show tabulator-change-view-filters"',
             html,
         )
         search_index = html.index(
