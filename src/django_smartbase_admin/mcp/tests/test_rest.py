@@ -2,20 +2,20 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
+from django.urls import reverse
 from django_smartbase_admin.mcp.mcp import SBAdminTools, _guarded_tool_call
 from django_smartbase_admin.mcp.rest import (
     SBAdminMCPRestAuthenticator,
-    SBAdminMCPRestCapabilitiesAPIView,
     SBAdminMCPToolAPIView,
-    SBAdminMCPToolsManifestAPIView,
     call_sbadmin_mcp_tool,
-    get_sbadmin_mcp_rest_capabilities,
-    list_sbadmin_mcp_tools,
     resolve_guarded_mcp_tool,
+    resolve_sbadmin_mcp_rest_authenticator,
 )
 from django_smartbase_admin.mcp.tests._common import build_mcp_request
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.test import APIRequestFactory
 
 
@@ -62,25 +62,6 @@ class RestDispatchTests(SimpleTestCase):
                 toolset_cls=RestDispatchTools,
             )
 
-    def test_list_tools_describes_guarded_tools_only(self):
-        request = build_mcp_request(_staff_user())
-
-        result = list_sbadmin_mcp_tools(request=request, toolset_cls=RestDispatchTools)
-
-        tool_names = [tool["name"] for tool in result["tools"]]
-        self.assertIn("ping", tool_names)
-        self.assertNotIn("accidental_public_helper", tool_names)
-        ping = next(tool for tool in result["tools"] if tool["name"] == "ping")
-        self.assertEqual(ping["input_schema"]["required"], ["value"])
-        self.assertEqual(ping["input_schema"]["properties"]["value"]["type"], "string")
-
-    def test_capabilities_advertise_rest_tool_support(self):
-        result = get_sbadmin_mcp_rest_capabilities(toolset_cls=RestDispatchTools)
-
-        self.assertEqual(result["protocol"], "sbadmin-mcp-rest")
-        self.assertTrue(result["capabilities"]["tools"]["list"])
-        self.assertTrue(result["capabilities"]["tools"]["call"])
-
 
 class StaticAuthenticator(SBAdminMCPRestAuthenticator):
     def __init__(self, user):
@@ -90,11 +71,44 @@ class StaticAuthenticator(SBAdminMCPRestAuthenticator):
         return self.user
 
 
+class TupleAuthenticator(SBAdminMCPRestAuthenticator):
+    def __init__(self, user):
+        self.user = user
+
+    def authenticate(self, request, **kwargs):
+        return self.user, None
+
+
+class SettingsAuthenticator(SBAdminMCPRestAuthenticator):
+    def authenticate(self, request, **kwargs):
+        return _staff_user()
+
+
 class RestViewTests(SimpleTestCase):
+    def test_rest_authenticator_extends_drf_base_authentication(self):
+        self.assertTrue(issubclass(SBAdminMCPRestAuthenticator, BaseAuthentication))
+
     def test_view_uses_authenticator_user_and_dispatches_tool(self):
         user = _staff_user()
         view = SBAdminMCPToolAPIView.as_view(
             authenticator=StaticAuthenticator(user),
+            toolset_cls=RestDispatchTools,
+        )
+        request = APIRequestFactory().post(
+            "/mcp-rest/tools/ping/",
+            {"value": "ok"},
+            format="json",
+        )
+
+        response = view(request, tool_name="ping")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"value": "ok"})
+
+    def test_view_accepts_drf_authenticate_tuple(self):
+        user = _staff_user()
+        view = SBAdminMCPToolAPIView.as_view(
+            authenticator=TupleAuthenticator(user),
             toolset_cls=RestDispatchTools,
         )
         request = APIRequestFactory().post(
@@ -124,30 +138,34 @@ class RestViewTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_manifest_view_uses_authenticator_and_lists_tools(self):
-        user = _staff_user()
-        view = SBAdminMCPToolsManifestAPIView.as_view(
-            authenticator=StaticAuthenticator(user),
-            toolset_cls=RestDispatchTools,
+    @override_settings(
+        SBADMIN_MCP_REST_AUTHENTICATOR=(
+            "django_smartbase_admin.mcp.tests.test_rest.SettingsAuthenticator"
         )
-        request = APIRequestFactory().get("/mcp-rest/tools/")
+    )
+    def test_view_uses_settings_authenticator(self):
+        view = SBAdminMCPToolAPIView.as_view(toolset_cls=RestDispatchTools)
+        request = APIRequestFactory().post(
+            "/mcp-rest/tools/ping/",
+            {"value": "ok"},
+            format="json",
+        )
 
-        response = view(request)
+        response = view(request, tool_name="ping")
 
         self.assertEqual(response.status_code, 200)
-        tool_names = [tool["name"] for tool in response.data["tools"]]
-        self.assertIn("ping", tool_names)
-        self.assertNotIn("accidental_public_helper", tool_names)
+        self.assertEqual(response.data, {"value": "ok"})
 
-    def test_capabilities_view_uses_authenticator(self):
-        user = _staff_user()
-        view = SBAdminMCPRestCapabilitiesAPIView.as_view(
-            authenticator=StaticAuthenticator(user),
-            toolset_cls=RestDispatchTools,
+    @override_settings(SBADMIN_MCP_REST_AUTHENTICATOR=None)
+    def test_missing_settings_authenticator_is_configuration_error(self):
+        with self.assertRaises(ImproperlyConfigured):
+            resolve_sbadmin_mcp_rest_authenticator()
+
+
+@override_settings(ROOT_URLCONF="django_smartbase_admin.mcp.urls")
+class RestURLTests(SimpleTestCase):
+    def test_main_urls_include_fixed_list_rows_rest_route(self):
+        self.assertEqual(
+            reverse("sbadmin_mcp_rest_tool"),
+            "/rest/tools/list_rows/",
         )
-        request = APIRequestFactory().get("/mcp-rest/")
-
-        response = view(request)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["protocol"], "sbadmin-mcp-rest")
