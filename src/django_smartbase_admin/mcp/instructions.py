@@ -37,6 +37,9 @@ Rules: copy ``widget_id`` only from prior tool output (never invent it).
 ``list_rows`` requires non-empty ``fields``. Write results:
 ``{"status": "ok", ...}`` or ``{"status": "invalid", "errors": ...}`` (no DB change).
 Inline dict keys use ``inline_name`` from ``list_admins`` (inline class name).
+Send nested arguments (``inlines``, ``field_values``, ``object_ids``, ``filter_data``,
+``sort``) as real JSON objects/arrays, never stringified JSON; pass ids as JSON
+numbers exactly as returned (e.g. ``174``, not ``"174"``) so rows match.
 Create flow: ``fetch_add_form`` then ``create_object``; inline FK ids on add often
 need ``autocomplete`` on another admin with the same ``filter.target_model``.
 
