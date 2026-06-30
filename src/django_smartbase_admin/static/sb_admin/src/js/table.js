@@ -352,9 +352,22 @@ class SBAdminTable {
                     } else if (action.is_method_action) {
                         element.setAttribute('hx-post', action.url)
                         element.setAttribute('hx-swap', 'none')
+                        element.setAttribute('hx-indicator', '#page-loading')
                     } else {
                         element.href = action.url
-                        if (action.open_in_new_tab) {
+                        if (action.is_download) {
+                            // The endpoint may take a moment to generate the file.
+                            // Fetch it as a blob so the global page-loading overlay
+                            // can cover the whole request and hide once it's ready.
+                            // href stays set so modified clicks still work as a link.
+                            element.addEventListener('click', (event) => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) {
+                                    return
+                                }
+                                event.preventDefault()
+                                self.downloadWithLoading(action.url)
+                            })
+                        } else if (action.open_in_new_tab) {
                             element.target = '_blank'
                             element.rel = 'noopener'
                         }
@@ -540,6 +553,44 @@ class SBAdminTable {
         })
     }
 
+    downloadWithLoading(url) {
+        document.documentElement.classList.add('htmx-request')
+        let filename = ''
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok " + response.statusText)
+                }
+                const header = response.headers.get('Content-Disposition')
+                if (header) {
+                    const match = header.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i)
+                    if (match) {
+                        filename = decodeURIComponent(match[1])
+                    }
+                }
+                return response.blob()
+            })
+            .then(function(blob) {
+                const objectUrl = window.URL.createObjectURL(blob)
+                const a = document.createElement("a")
+                a.style.display = "none"
+                a.href = objectUrl
+                a.download = filename
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
+                window.URL.revokeObjectURL(objectUrl)
+            })
+            .catch(function(error) {
+                console.error("There was a problem with the download:", error)
+                // Fall back to a plain navigation so the user still gets the file.
+                window.location.href = url
+            })
+            .finally(function() {
+                document.documentElement.classList.remove('htmx-request')
+            })
+    }
+
     executeListAction(action_url, no_params, open_in_new_tab = false) {
         const params = this.getUrlParamsString()
         if (this.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
@@ -553,6 +604,7 @@ class SBAdminTable {
                 ...JSON.parse(document.body.getAttribute('hx-headers')),
             }
             let filename = ''
+            document.documentElement.classList.add('htmx-request')
             fetch(action_url, {
                 method: "POST",
                 headers: headers,
@@ -582,6 +634,9 @@ class SBAdminTable {
                 })
                 .catch(function(error) {
                     console.error("There was a problem with the fetch operation:", error)
+                })
+                .finally(function() {
+                    document.documentElement.classList.remove('htmx-request')
                 })
         } else {
             if (!no_params) {

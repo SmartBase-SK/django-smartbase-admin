@@ -666,6 +666,7 @@ class SBAdminListAction(SBAdminAction):
             "css_class": action.get_css_class(action_row) or "",
             "open_in_modal": bool(action.open_in_modal),
             "is_method_action": bool(action.action_id) and not action.open_in_modal,
+            "is_download": bool(getattr(action, "is_download", False)),
             "open_in_new_tab": bool(action.open_in_new_tab),
         }
         if action.sub_actions:
