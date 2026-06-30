@@ -124,7 +124,7 @@ class SBAdminMCPToolAPIView(APIView):
                 {"detail": "Invalid MCP REST credentials."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        except PermissionDenied:
+        except (PermissionDenied, PermissionError):
             return Response(
                 {"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN
             )

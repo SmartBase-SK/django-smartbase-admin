@@ -28,6 +28,10 @@ class RestDispatchTools(SBAdminTools):
     def ping(self, value: str) -> dict:
         return {"value": value}
 
+    @_guarded_tool_call
+    def denied(self) -> dict:
+        raise PermissionError("No access.")
+
     def accidental_public_helper(self) -> dict:
         return {"unsafe": True}
 
@@ -137,6 +141,23 @@ class RestViewTests(SimpleTestCase):
         response = view(request, tool_name="accidental_public_helper")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_view_maps_builtin_permission_error_to_403(self):
+        user = _staff_user()
+        view = SBAdminMCPToolAPIView.as_view(
+            authenticator=StaticAuthenticator(user),
+            toolset_cls=RestDispatchTools,
+        )
+        request = APIRequestFactory().post(
+            "/mcp-rest/tools/denied/",
+            {},
+            format="json",
+        )
+
+        response = view(request, tool_name="denied")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data, {"detail": "Permission denied."})
 
     @override_settings(
         SBADMIN_MCP_REST_AUTHENTICATOR=(
