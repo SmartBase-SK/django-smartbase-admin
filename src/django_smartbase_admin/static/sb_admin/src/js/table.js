@@ -526,9 +526,19 @@ class SBAdminTable {
                 "sort": this.constants.TABLE_PARAMS_SORT_NAME,
             },
             rowFormatter: (row) => {
+                const el = row.getElement()
+                const prev = el.dataset.sbRowClass
+                if (prev) {
+                    el.classList.remove(...prev.split(/\s+/).filter(Boolean))
+                    delete el.dataset.sbRowClass
+                }
                 const cls = (row.getData() || {})._row_class
                 if (cls) {
-                    row.getElement().classList.add(...cls.split(/\s+/).filter(Boolean))
+                    const tokens = cls.split(/\s+/).filter(Boolean)
+                    if (tokens.length) {
+                        el.classList.add(...tokens)
+                        el.dataset.sbRowClass = tokens.join(' ')
+                    }
                 }
             },
             ...this.tabulatorOptions
