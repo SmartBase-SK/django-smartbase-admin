@@ -5707,7 +5707,7 @@ urlpatterns = [
 Exposed endpoints:
 
 - MCP JSON-RPC: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
-- Optional REST `list_rows`: `{SITE_ROOT}rest/tools/list_rows/`. This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
+- Optional REST `list_rows`: `{SITE_ROOT}{DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` (for `DJANGO_MCP_ENDPOINT = "mcp/"`, this is `{SITE_ROOT}mcp/rest/tools/list_rows/`). This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
 
 ### MCP Settings
 
@@ -5753,7 +5753,7 @@ Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTI
 
 ### REST `list_rows`
 
-`django_smartbase_admin.mcp.urls` exposes only `POST rest/tools/list_rows/` for REST. It calls the same guarded `list_rows` MCP tool and accepts the same JSON arguments, for example:
+`django_smartbase_admin.mcp.urls` exposes only `POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` for REST. It calls the same guarded `list_rows` MCP tool and accepts the same JSON arguments, for example:
 
 ```json
 {
@@ -5772,7 +5772,7 @@ SBADMIN_MCP_REST_AUTHENTICATOR = "my_project.mcp_auth.MyMCPRestAuthenticator"
 
 ### Dashboard Usage
 
-`POST rest/tools/list_rows/` can back local live dashboards when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured and an authenticated probe succeeds. A 401 response means the REST authenticator rejected the request or is not configured for that deployment.
+`POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` can back local live dashboards when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured and an authenticated probe succeeds. A 401 response means the REST authenticator rejected the request or is not configured for that deployment.
 
 ### Current User / Whoami
 
@@ -5895,6 +5895,16 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
   SBADMIN_MCP_ALLOWED_ORIGINS = [
       "https://claude.ai",
       "https://cursor.com",
+  ]
+
+  # Optional: extend when a project REST authenticator needs custom headers.
+  # Defaults to Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id.
+  SBADMIN_MCP_ALLOWED_HEADERS = [
+      "Authorization",
+      "Content-Type",
+      "MCP-Protocol-Version",
+      "MCP-Session-Id",
+      "X-Project-Auth",
   ]
   ```
 Use the stock DOT `oauth2_provider.contrib.rest_framework.OAuth2Authentication` as your `DJANGO_MCP_AUTHENTICATION_CLASSES` (as shown above) for **all** clients. Its `401` `WWW-Authenticate` header carries no `resource_metadata` pointer, but every client — browser-hosted and native alike — falls back to probing `/.well-known/*` directly, so header-driven discovery isn't needed. (An earlier `SBAdminMCPOAuth2Authentication` subclass that added the pointer was removed once probing proved sufficient.)

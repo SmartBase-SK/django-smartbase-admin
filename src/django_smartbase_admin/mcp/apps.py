@@ -24,9 +24,12 @@ class MCPConfig(AppConfig):
 
     * **REST list_rows transport (opt-in)** — mounted by
       ``include("django_smartbase_admin.mcp.urls")`` at
-      ``rest/tools/list_rows/``. Set ``SBADMIN_MCP_REST_AUTHENTICATOR`` to
-      an import path, class, or instance implementing
+      ``{DJANGO_MCP_ENDPOINT}rest/tools/list_rows/`` (for example,
+      ``mcp/rest/tools/list_rows/``). Set
+      ``SBADMIN_MCP_REST_AUTHENTICATOR`` to an import path, class, or instance implementing
       ``SBAdminMCPRestAuthenticator`` / DRF ``BaseAuthentication``.
+      If that authenticator uses custom request headers, add them to
+      ``SBADMIN_MCP_ALLOWED_HEADERS`` in the host project.
     """
 
     # Explicit label so it doesn't collide with the unrelated top-level

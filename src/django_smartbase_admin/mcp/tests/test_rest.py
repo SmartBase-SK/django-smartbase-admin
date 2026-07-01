@@ -201,8 +201,8 @@ class RestViewTests(SimpleTestCase):
 
 @override_settings(ROOT_URLCONF="django_smartbase_admin.mcp.urls")
 class RestURLTests(SimpleTestCase):
-    def test_main_urls_include_fixed_list_rows_rest_route(self):
+    def test_main_urls_include_mcp_prefixed_list_rows_rest_route(self):
         self.assertEqual(
             reverse("sbadmin_mcp_rest_tool"),
-            "/rest/tools/list_rows/",
+            "/mcp/rest/tools/list_rows/",
         )

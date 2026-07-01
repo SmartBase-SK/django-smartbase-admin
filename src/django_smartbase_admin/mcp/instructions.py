@@ -43,8 +43,9 @@ need ``autocomplete`` on another admin with the same ``filter.target_model``.
 Custom dashboard: to build a local, single-user dashboard — any creative live
 view of this data (metrics, tables, charts/graphs) — read the
 ``dashboard://blueprint`` resource (setup is in its description). If the host
-also exposes ``POST rest/tools/list_rows/`` and an authenticated probe succeeds,
-the dashboard can use that REST endpoint for live list data. If the probe
+also exposes the MCP-endpoint-prefixed REST route, e.g.
+``POST mcp/rest/tools/list_rows/``, and an authenticated probe succeeds, the
+dashboard can use that REST endpoint for live list data. If the probe
 returns 401 or the URL is unavailable, do not propose the REST dashboard path;
 ``SBADMIN_MCP_REST_AUTHENTICATOR`` is probably not configured for that project.
 """

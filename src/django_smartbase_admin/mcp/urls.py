@@ -13,9 +13,18 @@ For the bundled OAuth 2.1 Authorization Server (Cursor / Claude / IDE
 clients), additionally include ``django_smartbase_admin.mcp.oauth.urls``.
 """
 
+from django.conf import settings
 from django.urls import include, path
 
 from django_smartbase_admin.mcp.rest import SBAdminMCPToolAPIView
+
+_mcp_endpoint = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/")
+_mcp_endpoint = _mcp_endpoint.strip("/")
+_rest_list_rows_path = (
+    f"{_mcp_endpoint}/rest/tools/list_rows/"
+    if _mcp_endpoint
+    else "rest/tools/list_rows/"
+)
 
 urlpatterns = [
     # MCP JSON-RPC endpoint. Path is controlled by ``DJANGO_MCP_ENDPOINT``
@@ -23,7 +32,7 @@ urlpatterns = [
     # metadata's trailing slash).
     path("", include("mcp_server.urls")),
     path(
-        "rest/tools/list_rows/",
+        _rest_list_rows_path,
         SBAdminMCPToolAPIView.as_view(),
         {"tool_name": "list_rows"},
         name="sbadmin_mcp_rest_tool",
