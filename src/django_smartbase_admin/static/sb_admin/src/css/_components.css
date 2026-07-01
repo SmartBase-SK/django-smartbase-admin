@@ -551,4 +551,96 @@
             @apply absolute;
         }
     }
+
+    .permission-tree {
+        @apply flex flex-col;
+    }
+    .permission-tree__search {
+        @apply mb-12;
+    }
+    .permission-tree__body {
+        @apply flex flex-col border border-dark-200 rounded-lg overflow-hidden;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .permission-tree__app {
+        @apply flex flex-col border-b border-dark-200;
+        &:last-child {
+            @apply border-b-0;
+        }
+    }
+    .permission-tree__app-toggle {
+        @apply flex items-center gap-8 px-16 h-44 w-full text-left font-medium bg-dark-50 border-0;
+        @apply text-14 text-dark-900;
+        cursor: pointer;
+        svg {
+            transition: transform .2s;
+            @apply shrink-0 text-dark-400;
+        }
+        &[aria-expanded="true"] svg {
+            @apply rotate-90;
+        }
+        &:hover {
+            @apply bg-dark-100;
+        }
+    }
+    .permission-tree__models {
+        display: grid;
+        grid-template-rows: 1fr;
+        transition: grid-template-rows .2s ease-out;
+        overflow: hidden;
+    }
+    .permission-tree__app-toggle[aria-expanded="false"] + .permission-tree__models {
+        grid-template-rows: 0fr;
+    }
+    .permission-tree__app-toggle[aria-expanded="false"] + .permission-tree__help-text {
+        display: none;
+    }
+    .permission-tree__app-toggle[aria-expanded="false"] + .permission-tree__help-text + .permission-tree__models {
+        grid-template-rows: 0fr;
+    }
+    .permission-tree__help-text {
+        @apply px-16 py-8 text-12 text-dark-400 bg-light border-t border-dark-200;
+    }
+    .permission-tree__model {
+        @apply border-t border-dark-200;
+        overflow: hidden;
+        &:first-child {
+            @apply border-t-0;
+        }
+    }
+    .permission-tree__model-header {
+        @apply flex items-center justify-between px-16 py-10 bg-light;
+    }
+    .permission-tree__model-name {
+        @apply text-14 font-medium text-dark-900;
+    }
+    .permission-tree__select-all-label {
+        @apply flex items-center gap-8 text-12 text-dark-600 cursor-pointer select-none;
+    }
+    .permission-tree__count {
+        @apply text-12 text-dark-400 font-medium tabular-nums;
+    }
+    .permission-tree__perms {
+        @apply flex flex-col gap-6 px-16 py-8;
+    }
+    .permission-tree__standard-row {
+        @apply flex flex-wrap gap-x-12 gap-y-6;
+    }
+    .permission-tree__perm {
+        @apply relative flex items-center min-h-24;
+    }
+    .permission-tree__perm .permission-tree__perm-name {
+        @apply text-12 cursor-pointer select-none top-0;
+    }
+    .permission-tree__perm-name {
+        @apply text-dark-700;
+    }
+    .permission-tree__toggle-track {
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .permission-tree mark {
+        @apply bg-notice-200 text-dark-900 rounded-sm px-2;
+    }
 }

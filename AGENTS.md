@@ -12,7 +12,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
-| [Form Widgets](#form-widgets) | input prefix/suffix text and icon buttons, `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON |
+| [Form Widgets](#form-widgets) | input prefix/suffix text and icon buttons, `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON, `SBAdminPermissionWidget` for collapsible permission tree |
 | [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview) | Full SBAdmin pages backed by a regular Django form instead of a model change view |
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
@@ -57,6 +57,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Comma-separated tags input?** → [Form Widgets](#form-widgets)
 - **Copy-to-clipboard text input?** → [Input prefix and suffix](#input-prefix-and-suffix-text-and-number-widgets)
 - **Schema-driven JSON editor (array/object editing)?** → [`SBAdminJsonEditorWidget`](#sbadminjsoneditorwidget--schema-driven-json-editor)
+- **Collapsible permission tree for Groups?** → [`SBAdminPermissionWidget`](#sbadminpermissionwidget--collapsible-searchable-permission-tree)
 - **Full admin page with a non-model form?** → [Standalone Form Views](#standalone-form-views-sbadminstandaloneformview)
 - **Show/hide fields based on another form field?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
 - **Refresh choices or layout without reloading the whole form?** → [Dynamic Regions](#dynamic-regions-sbdynamicregion)
@@ -1389,6 +1390,145 @@ tags_config = SBAdminJsonEditorField(
 - Client-side errors are inline only — submitting still goes through. Server-side validation is what actually rejects bad submissions, so always wire it via the field (or `run_schema_validation`).
 - `add_to_top=True` reorders the **root** array only; nested arrays still append.
 - Multiple editors on the same page get unique input `name` prefixes automatically (`form_name_root` is set per widget).
+
+### `SBAdminPermissionWidget` — collapsible, searchable permission tree
+
+Replace Django's default multi-select widget for ``auth.Permission`` with a
+collapsible tree.  Two modes:
+
+**Default mode** — groups all permissions by ``app_label`` / model.  Every
+Django permission is shown.  Each model row shows the four standard
+permissions (view / add / change / delete) as compact checkboxes, plus any
+custom codenames as individual rows.  A per-model "select all" checkbox
+toggles all permissions in that group, and a client-side search input filters
+permissions with text highlighting.
+
+**Groups mode** — pass ``groups`` (a list of :class:`PermissionGroup`) to
+show only a curated set of permissions, with custom labels, help text, and
+control over which standard actions appear.
+
+**Default mode rendering:**
+```
+┌─ Authentication and Authorization ────────────────────────┐
+│  Search permissions… [🔍]                                 │
+├─ ▼ Auth ──────────────────────────────────────────────────┤
+│  ┌─ Permission ──────────────────────────── [5/5] ──────┐ │
+│  │  ☐ Can view permission  ☐ Can add permission          │ │
+│  │  ☐ Can change permission  ☐ Can delete permission     │ │
+│  │  ☐ Custom action                                       │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  ┌─ Group ──────────────────────────────── [0/4] ───────┐ │
+│  │  ☐ Can view group  ☐ Can add group                   │ │
+│  │  ☐ Can change group  ☐ Can delete group              │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Usage in a Group admin (default mode):**
+
+```python
+from django.contrib import admin
+from django.contrib.auth.models import Group
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminBaseForm
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.admin.widgets import SBAdminPermissionWidget
+
+
+class GroupForm(SBAdminBaseForm):
+    class Meta:
+        model = Group
+        fields = "__all__"
+        widgets = {
+            "permissions": SBAdminPermissionWidget(),
+        }
+
+
+@admin.register(Group, site=sb_admin_site)
+class GroupAdmin(SBAdmin):
+    form = GroupForm
+```
+
+#### Groups mode — `PermissionGroup` DTO
+
+Use ``groups=`` to declare exactly which permissions to show, with custom
+labels and help text.  Pass a list of :class:`PermissionGroup` objects.
+
+``PermissionGroup`` fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| ``label`` | ``str`` | **required** | Display name for the collapsible section. |
+| ``model`` | ``type[Model]`` | ``None`` | Django model class — permissions are resolved via its content type. |
+| ``codenames`` | ``list[str]`` | ``None`` | Explicit list of permission codenames (overrides ``model`` / ``actions``). |
+| ``actions`` | ``tuple[str]`` | ``("view", "add", "change", "delete")`` | Which standard actions to show. Ignored when ``codenames`` is set. |
+| ``action_labels`` | ``dict[str, str]`` | ``{}`` | Custom checkbox labels for standard actions, e.g. ``{"view": "See items"}``. |
+| ``help_text`` | ``str`` | ``""`` | Help text displayed below the section header. |
+
+**Examples:**
+
+```python
+from django.contrib.auth.models import Group, Permission, User
+from django_smartbase_admin.admin.widgets import (
+    PermissionGroup,
+    SBAdminPermissionWidget,
+)
+
+# Only view/add for a specific model, with custom labels + help text
+SBAdminPermissionWidget(
+    groups=[
+        PermissionGroup(
+            model=Article,
+            label=_("Article permissions"),
+            help_text=_("Controls what users can do with articles."),
+            actions=("view", "add", "change"),
+            action_labels={
+                "view": _("Browse articles"),
+                "add": _("Create articles"),
+                "change": _("Edit articles"),
+            },
+        ),
+    ],
+)
+```
+
+```python
+# Multiple groups — each becomes its own collapsible section
+SBAdminPermissionWidget(
+    groups=[
+        PermissionGroup(
+            model=Article,
+            label=_("Articles"),
+            actions=("view", "add", "change"),
+        ),
+        PermissionGroup(
+            model=User,
+            label=_("User administration"),
+            actions=("view",),
+        ),
+    ],
+)
+```
+
+```python
+# Explicit codenames — full control over which perms appear
+SBAdminPermissionWidget(
+    groups=[
+        PermissionGroup(
+            label=_("Custom selection"),
+            codenames=["view_article", "change_article", "publish_article"],
+        ),
+    ],
+)
+```
+
+**Key points:**
+- Selected values are stored as a JSON array of permission PKs in a hidden ``<input>``, matching the pattern used by `SBAdminMultipleChoiceWidget`.
+- ``SBAdminPermissionWidget.value_from_datadict()`` parses that JSON back to a Python list when the form is submitted.
+- Standard permissions (view / add / change / delete) are detected by the ``view_<model>`` / ``add_<model>`` / ``change_<model>`` / ``delete_<model>`` codename prefix. Any other codename is treated as a custom permission and rendered as an individual row.
+- The search input filters permissions client-side with real-time highlighting.
+- Default-mode app sections are collapsible; model sections show a "select all" toggle with a checked/total count.
+- In groups mode, each ``PermissionGroup`` becomes its own collapsible section with an optional help text row.
+- Use ``codenames`` when you need arbitrary permissions from different models in the same section. Use ``model`` when you want all (or a subset of) permissions for one content type.
 
 ---
 

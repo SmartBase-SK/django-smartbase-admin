@@ -33,6 +33,7 @@ import TextTags from "./text_tags"
 import { ensureFilterForms, setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
+import PermissionTree from "./permission_tree"
 import "./inline_paginator"
 
 const CKEDITOR_READY_MAX_FRAMES = 120
@@ -109,6 +110,7 @@ class Main {
         this.staticAutocomplete = new StaticAutocomplete()
         this.textTags = new TextTags()
         this.choicesJS = new ChoicesJS()
+        this.permissionTree = new PermissionTree()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)
