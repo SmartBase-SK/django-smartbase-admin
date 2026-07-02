@@ -71,6 +71,7 @@ class CopyableWidgetTests(SimpleTestCase):
             attrs={"readonly": "readonly"},
             copy_label="Copy key",
             copied_label="Copied key",
+            copy_notification_label="API key copied",
         )
 
         html = form["api_key"].as_widget()
@@ -82,6 +83,7 @@ class CopyableWidgetTests(SimpleTestCase):
         self.assertIn("data-sbadmin-copy-button", html)
         self.assertIn('data-sbadmin-copy-label="Copy key"', html)
         self.assertIn('data-sbadmin-copied-label="Copied key"', html)
+        self.assertIn('data-sbadmin-copy-notification-label="API key copied"', html)
         self.assertIn('href="#Minus-the-top"', html)
         self.assertIn("Keep this private.", html)
         self.assertNotIn("copy_to_clipboard.js", media)

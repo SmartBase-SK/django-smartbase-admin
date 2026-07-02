@@ -278,8 +278,10 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
         *,
         copy_label="Copy",
         copied_label="Copied",
+        copy_notification_label=None,
         copy_icon="Minus-the-top",
     ):
+        copy_notification_label = copy_notification_label or copied_label
         super().__init__(
             form_field=form_field,
             attrs=attrs,
@@ -292,6 +294,7 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
                 "data-sbadmin-copy-button": True,
                 "data-sbadmin-copy-label": copy_label,
                 "data-sbadmin-copied-label": copied_label,
+                "data-sbadmin-copy-notification-label": copy_notification_label,
             },
         )
 

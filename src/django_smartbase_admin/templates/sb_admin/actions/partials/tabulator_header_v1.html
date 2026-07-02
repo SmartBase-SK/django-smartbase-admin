@@ -14,28 +14,35 @@
                                     data-bs-target="#save-view-modal">
                                 {% trans 'Save view' %}
                             </button>
-                            <button
-                                id="{{ filters_collapse_button_id }}"
-                                type="button"
-                                class="btn collapse-btn btn-icon js-save-state{% block tabulator_filters_collapse_button_class %}{% if not collapse_opened %} collapsed{% endif %}{% endblock %}"
-                                data-bs-toggle="collapse"
-                                role="button"
-                                aria-expanded="{% block tabulator_filters_collapse_button_expanded %}{% if collapse_opened %}true{% else %}false{% endif %}{% endblock %}"
-                                data-bs-target="#filters-collapse"
-                                aria-controls="filters-collapse">
-                                <svg class="w-16 h-16 md:mr-8">
-                                    <use xlink:href="#Find"></use>
-                                </svg>
-                                <span>{% trans 'Search and filter' %}</span>
-                            </button>
+                            {% if content_context.search_fields %}
+                                <div class="relative ml-auto max-sm:ml-0">
+                                    {% include 'sb_admin/actions/partials/full_text_search.html' with input_classes='w-192 md:w-280 xl:w-320' %}
+                                </div>
+                            {% endif %}
+                            <div class="js-tooltip relative flex" data-bs-toggle="tooltip" data-bs-trigger="hover" title="{% trans 'Filters' %}">
+                                <button
+                                    id="{{ filters_collapse_button_id }}"
+                                    type="button"
+                                    class="btn collapse-btn btn-only-icon js-save-state{% block tabulator_filters_collapse_button_class %}{% if not collapse_opened %} collapsed{% endif %}{% endblock %}"
+                                    data-bs-toggle="collapse"
+                                    role="button"
+                                    aria-expanded="{% block tabulator_filters_collapse_button_expanded %}{% if collapse_opened %}true{% else %}false{% endif %}{% endblock %}"
+                                    data-bs-target="#filters-collapse"
+                                    aria-controls="filters-collapse">
+                                    <svg class="w-16 h-16 md:mr-8">
+                                        <use xlink:href="#Find"></use>
+                                    </svg>
+                                    <span></span>
+                                </button>
+                            </div>
                             {% include 'sb_admin/components/columns.html' %}
                         </div>
                     {% endblock %}
                 </div>
             {% endblock %}
             {% block tabulator_header_filters %}
-                <div id="filters-collapse" class="collapse border-t border-dark-200 max-sm:overflow-x-auto custom-scrollbar{% if collapse_opened %} show{% endif %}">
-                    {% include content_context.filters_template_name with filters=content_context.filters show_full_text_search=content_context.search_fields %}
+                <div id="filters-collapse" class="collapse border-t border-dark-200 {% if collapse_opened %} show{% endif %}">
+                    {% include content_context.filters_template_name with filters=content_context.filters %}
                 </div>
             {% endblock %}
         {% endwith %}

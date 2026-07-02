@@ -69,8 +69,8 @@
 
     .custom-scrollbar {
         &::-webkit-scrollbar {
-            width: 9px;
-            height: 9px;
+            width: 10px;
+            height: 10px;
         }
 
         &::-webkit-scrollbar-track {
@@ -103,6 +103,10 @@
 
     mark {
         @apply text-dark-900 bg-notice-100;
+    }
+
+    #main-navigation {
+        z-index: 11;
     }
 
     #notification-messages {

@@ -609,7 +609,7 @@ class DateFilterWidget(SBAdminFilterWidget):
     def get_default_label(self):
         if self.default_value_shortcut_index is not None:
             return self.get_shortcuts()[self.default_value_shortcut_index]["label"]
-        return super().get_default_value()
+        return super().get_default_label()
 
     def get_default_value(self):
         if self.default_value_shortcut_index is not None:
@@ -713,7 +713,7 @@ class DateFilterWidget(SBAdminFilterWidget):
 
     @classmethod
     def get_value_from_date_or_range(cls, date_or_range):
-        if not isinstance(date_or_range, list):
+        if not isinstance(date_or_range, (list, tuple)):
             return datetime.strftime(date_or_range, cls.DATE_FORMAT)
         if type(date_or_range[0]) is int:
             return date_or_range

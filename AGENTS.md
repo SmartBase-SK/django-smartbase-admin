@@ -5672,11 +5672,13 @@ This is the preferred pattern for autocomplete placeholders, empty states, and o
 
 Optional `django-mcp-server` integration. Requires normal SBAdmin setup (`SB_ADMIN_CONFIGURATION`, `sb_admin_site.urls`).
 
+### Install
+
 ```bash
 pip install "django-smartbase-admin[mcp]"
 ```
 
-### Host project — `INSTALLED_APPS`
+### Installed Apps
 
 ```python
 INSTALLED_APPS = [
@@ -5689,7 +5691,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-### Host project — `urls.py`
+### URL Setup
 
 Mount **before** catch-all routes:
 
@@ -5702,9 +5704,12 @@ urlpatterns = [
 ]
 ```
 
-Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+Exposed endpoints:
 
-### Host project — `settings.py`
+- MCP JSON-RPC: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+- Optional REST `list_rows`: `{SITE_ROOT}{DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` (for `DJANGO_MCP_ENDPOINT = "mcp/"`, this is `{SITE_ROOT}mcp/rest/tools/list_rows/`). This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
+
+### MCP Settings
 
 ```python
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
@@ -5722,7 +5727,15 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "stateless": True,
 }
 DJANGO_MCP_ENDPOINT = "mcp/"
+```
 
+This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
+
+### OAuth Auth
+
+Use the bundled OAuth 2.1 Authorization Server by adding `oauth2_provider`, including `django_smartbase_admin.mcp.oauth.urls`, and configuring DOT:
+
+```python
 OAUTH2_PROVIDER = {
     "SCOPES": {"sbadmin:write": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
@@ -5736,9 +5749,30 @@ OAUTH2_PROVIDER = {
 }
 ```
 
-This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
-
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
+
+### REST `list_rows`
+
+`django_smartbase_admin.mcp.urls` exposes only `POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` for REST. It calls the same guarded `list_rows` MCP tool and accepts the same JSON arguments, for example:
+
+```json
+{
+  "view_id": "app_model",
+  "fields": ["id", "name"],
+  "page": 1,
+  "page_size": 20
+}
+```
+
+Authentication is configured once via `SBADMIN_MCP_REST_AUTHENTICATOR`; host projects should not subclass the REST API views just to attach an authenticator. The authenticator may be an import path, class, or instance extending `SBAdminMCPRestAuthenticator` / DRF `BaseAuthentication`. Return `(user, auth)` when credentials are valid and `None` when invalid.
+
+```python
+SBADMIN_MCP_REST_AUTHENTICATOR = "my_project.mcp_auth.MyMCPRestAuthenticator"
+```
+
+### Dashboard Usage
+
+`POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` can back local live dashboards when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured and an authenticated probe succeeds. A 401 response means the REST authenticator rejected the request or is not configured for that deployment.
 
 ### Current User / Whoami
 
@@ -5861,6 +5895,16 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
   SBADMIN_MCP_ALLOWED_ORIGINS = [
       "https://claude.ai",
       "https://cursor.com",
+  ]
+
+  # Optional: extend when a project REST authenticator needs custom headers.
+  # Defaults to Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id.
+  SBADMIN_MCP_ALLOWED_HEADERS = [
+      "Authorization",
+      "Content-Type",
+      "MCP-Protocol-Version",
+      "MCP-Session-Id",
+      "X-Project-Auth",
   ]
   ```
 Use the stock DOT `oauth2_provider.contrib.rest_framework.OAuth2Authentication` as your `DJANGO_MCP_AUTHENTICATION_CLASSES` (as shown above) for **all** clients. Its `401` `WWW-Authenticate` header carries no `resource_metadata` pointer, but every client — browser-hosted and native alike — falls back to probing `/.well-known/*` directly, so header-driven discovery isn't needed. (An earlier `SBAdminMCPOAuth2Authentication` subclass that added the pointer was removed once probing proved sufficient.)

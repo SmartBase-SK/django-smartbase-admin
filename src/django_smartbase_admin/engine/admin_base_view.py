@@ -1126,6 +1126,10 @@ class SBAdminBaseListView(SBAdminBaseView):
             ),
         )
 
+    def get_sbadmin_list_row_class(self, request, row) -> str:
+        # Return a space-separated CSS class string applied to a list-view ``tabulator-row``.
+        return ""
+
     def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:
         return [*(self.sbadmin_row_actions or [])]
 

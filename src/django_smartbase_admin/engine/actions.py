@@ -137,6 +137,12 @@ class SBAdminRowAction(SBAdminCustomAction):
     receiving the row dict and takes precedence; ``enabled_field`` renders the
     action only when ``row[enabled_field] == enabled_value``. Without either,
     the action is enabled for every row.
+
+    ``is_download`` only applies to ``url`` actions. When set, the link is
+    fetched as a blob in JS (instead of a plain browser navigation) so the
+    global page-loading overlay can be shown for the whole request and hidden
+    once the file is ready — useful for endpoints that take a moment to
+    generate the file (e.g. shipping labels/stickers).
     """
 
     target_view = None
@@ -146,6 +152,7 @@ class SBAdminRowAction(SBAdminCustomAction):
     enabled_if = None
     enabled_field = None
     enabled_value = None
+    is_download = False
 
     def __init__(
         self,
@@ -163,6 +170,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         enabled_value=None,
         sub_actions=None,
         mcp_description=None,
+        is_download=None,
     ) -> None:
         resolved_title = title if title is not None else self.title
         resolved_icon = icon if icon is not None else self.icon
@@ -175,6 +183,9 @@ class SBAdminRowAction(SBAdminCustomAction):
         resolved_css_class = css_class if css_class is not None else self.css_class
         resolved_open_in_new_tab = (
             open_in_new_tab if open_in_new_tab is not None else self.open_in_new_tab
+        )
+        resolved_is_download = (
+            is_download if is_download is not None else self.is_download
         )
         resolved_sub_actions = (
             sub_actions if sub_actions is not None else self.sub_actions
@@ -220,6 +231,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         self.enabled_value = (
             enabled_value if enabled_value is not None else self.enabled_value
         )
+        self.is_download = resolved_is_download
 
     def resolve_row_value(self, value, row):
         if callable(value):

@@ -40,11 +40,42 @@ class CorsMiddlewareTests(SimpleTestCase):
         self.assertEqual(pre["Access-Control-Allow-Origin"], ORIGIN)
         self.assertNotIn("Access-Control-Allow-Credentials", pre)
 
-    def test_mcp_and_oauth_paths_are_decorated(self):
-        for path in ("/mcp/", "/o/token/", "/.well-known/oauth-authorization-server"):
+    def test_mcp_rest_and_oauth_paths_are_decorated(self):
+        for path in (
+            "/mcp/",
+            "/mcp/rest/tools/list_rows/",
+            "/o/token/",
+            "/.well-known/oauth-authorization-server",
+        ):
             self.assertEqual(
                 self._send(path, method="get")["Access-Control-Allow-Origin"], ORIGIN
             )
+
+    def test_preflight_uses_default_allowed_headers(self):
+        resp = self._send("/mcp/rest/tools/list_rows/", preflight=True)
+
+        allowed_headers = resp["Access-Control-Allow-Headers"]
+        self.assertIn("Authorization", allowed_headers)
+        self.assertIn("Content-Type", allowed_headers)
+        self.assertNotIn("X-App-Secret", allowed_headers)
+        self.assertNotIn("X-Shop-Id", allowed_headers)
+
+    @override_settings(
+        SBADMIN_MCP_ALLOWED_HEADERS=[
+            "Authorization",
+            "Content-Type",
+            "MCP-Protocol-Version",
+            "MCP-Session-Id",
+            "X-App-Secret",
+            "X-Shop-Id",
+        ]
+    )
+    def test_preflight_allows_project_configured_headers(self):
+        resp = self._send("/mcp/rest/tools/list_rows/", preflight=True)
+
+        allowed_headers = resp["Access-Control-Allow-Headers"]
+        self.assertIn("X-App-Secret", allowed_headers)
+        self.assertIn("X-Shop-Id", allowed_headers)
 
     def test_disallowed_origin_and_unrelated_paths_get_no_cors(self):
         self.assertNotIn(

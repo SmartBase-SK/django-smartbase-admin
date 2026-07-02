@@ -10,8 +10,9 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory, TransactionTestCase
-
 from django_smartbase_admin.audit.manager import (
+    AuditParentContext,
+    audit_parent_context,
     install_manager_hooks,
     uninstall_manager_hooks,
 )
@@ -349,6 +350,48 @@ class TestInlineFormset(BaseAuditTest):
         self.assertEqual(log.changes["name"]["old"], "Before")
         self.assertEqual(log.changes["name"]["new"], "After")
         self.assertEqual(log.parent_content_type, self.user_ct)
+
+    def test_explicit_request_audit_parent_context_overrides_fallback_parent(self):
+        with NoAdminContext():
+            permission = Permission.objects.create(
+                content_type=self.user_ct,
+                codename="explicit_audit_parent",
+                name="Explicit audit parent before",
+            )
+        AdminAuditLog.objects.all().delete()
+
+        parent_view = MagicMock()
+        parent_view.model = ContentType
+        selected_view = MagicMock()
+        selected_view.model = Permission
+
+        permission.name = "Explicit audit parent after"
+        with MockSBAdminContext(
+            user=self.admin_user,
+            parent_model=Permission,
+            parent_object_id=str(permission.pk),
+        ) as context:
+            context.mock_request.request_data.selected_view = selected_view
+            with audit_parent_context(
+                context.mock_request,
+                lambda: AuditParentContext(
+                    parent_view=parent_view,
+                    parent_object_id=self.user_ct.pk,
+                ),
+            ):
+                self.admin.save_formset(
+                    self.request,
+                    form=None,
+                    formset=MockFormset(instances=[permission]),
+                    change=True,
+                )
+
+        log = AdminAuditLog.objects.get(action_type="update")
+        self.assertEqual(
+            log.parent_content_type, ContentType.objects.get_for_model(ContentType)
+        )
+        self.assertEqual(log.parent_object_id, str(self.user_ct.pk))
+        self.assertEqual(log.parent_object_repr, str(self.user_ct)[:255])
 
     def test_inline_delete_records_snapshot_and_parent(self):
         with NoAdminContext():

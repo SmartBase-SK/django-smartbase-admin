@@ -2240,6 +2240,45 @@ class DynamicFormTests(SimpleTestCase):
             },
         )
 
+    def test_dynamic_region_initial_ignores_omitted_builtin_checkbox(self):
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False)
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict(""),
+            {},
+        )
+
+        self.assertEqual(initial, {})
+
+    def test_dynamic_region_initial_ignores_omitted_custom_checkbox(self):
+        class CustomCheckboxInput(forms.CheckboxInput):
+            pass
+
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False, widget=CustomCheckboxInput())
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict(""),
+            {},
+        )
+
+        self.assertEqual(initial, {})
+
+    def test_dynamic_region_initial_includes_submitted_checkbox_false_value(self):
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False)
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict("enabled=false"),
+            {},
+        )
+
+        self.assertEqual(initial, {"enabled": False})
+
     def test_dynamic_region_initial_includes_uploaded_files(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 

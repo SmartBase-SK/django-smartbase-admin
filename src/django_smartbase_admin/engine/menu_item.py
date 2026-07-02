@@ -18,6 +18,7 @@ class SBAdminMenuItem(object):
     parent_menu_item = None
     badge = None
     badge_class = DEFAULT_MENU_ITEM_BADGE_CLASS
+    css_class = None
 
     def __init__(
         self,
@@ -28,6 +29,7 @@ class SBAdminMenuItem(object):
         sub_items=None,
         badge=None,
         badge_class=None,
+        css_class=None,
     ) -> None:
         super().__init__()
         self.view_id = view_id or self.view_id
@@ -37,6 +39,7 @@ class SBAdminMenuItem(object):
         self.sub_items = sub_items or self.sub_items or []
         self.badge = badge if badge is not None else self.badge
         self.badge_class = badge_class or self.badge_class
+        self.css_class = css_class if css_class is not None else self.css_class or ""
 
     @classmethod
     def init_menu_item_static_cls(cls, menu_item, view_id, view_map):
@@ -84,6 +87,9 @@ class SBAdminMenuItem(object):
             badge = badge(request)
         return badge or None
 
+    def get_css_class(self):
+        return self.css_class or ""
+
     def get_badge_class(self, request):
         return self.badge_class
 
@@ -117,6 +123,7 @@ class SBAdminMenuItem(object):
             "get_id": self.get_id(),
             "get_view_id": self.get_view_id(),
             "get_badge": self.render_badge(request),
+            "get_css_class": self.get_css_class(),
             "is_active": active,
         }
         return json_dict, active

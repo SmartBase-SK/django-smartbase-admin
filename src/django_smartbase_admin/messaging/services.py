@@ -3,7 +3,11 @@
 from django.utils import timezone
 
 from django_smartbase_admin.engine.field_formatter import format_badge
-from django_smartbase_admin.messaging.models import MessageRecipient
+from django_smartbase_admin.messaging.models import (
+    Message,
+    MessageAttachment,
+    MessageRecipient,
+)
 
 
 class SBAdminMessagingService:
@@ -123,34 +127,75 @@ class SBAdminMessagingService:
         return user_ids
 
     @classmethod
-    def sync_recipients(cls, message, request, messaging_config):
-        """Reconcile ``MessageRecipient`` rows for a message against its targeting.
+    def add_recipients(cls, message, user_ids):
+        """Create ``MessageRecipient`` rows for ``user_ids`` that don't have one.
 
-        Creates rows for newly targeted users and removes rows for users no
-        longer targeted — but never removes a recipient who has already read the
-        message, so read history is preserved.
+        Idempotent: skips ids that already have a row and relies on the
+        ``(message, user)`` unique constraint (``ignore_conflicts``) as a
+        backstop, so it is safe to call repeatedly. Returns the number created.
         """
-        target_ids = cls.resolve_target_user_ids(message, request, messaging_config)
-        existing = {
-            recipient.user_id: recipient for recipient in message.recipients.all()
-        }
-
+        user_ids = set(user_ids or [])
+        if not user_ids:
+            return 0
+        existing = set(message.recipients.values_list("user_id", flat=True))
         to_create = [
             MessageRecipient(message=message, user_id=user_id)
-            for user_id in target_ids
+            for user_id in user_ids
             if user_id not in existing
         ]
-        if to_create:
-            MessageRecipient.objects.bulk_create(
-                to_create,
-                batch_size=cls.RECIPIENT_SYNC_BATCH_SIZE,
-                ignore_conflicts=True,
-            )
+        if not to_create:
+            return 0
+        MessageRecipient.objects.bulk_create(
+            to_create,
+            batch_size=cls.RECIPIENT_SYNC_BATCH_SIZE,
+            ignore_conflicts=True,
+        )
+        return len(to_create)
 
-        stale_ids = [
-            user_id
-            for user_id, recipient in existing.items()
-            if user_id not in target_ids and recipient.read_at is None
-        ]
-        if stale_ids:
-            message.recipients.filter(user_id__in=stale_ids).delete()
+    @classmethod
+    def create_message(
+        cls,
+        *,
+        title,
+        type,
+        content="",
+        targeting=None,
+        created_by=None,
+        request=None,
+        messaging_config=None,
+        user_ids=None,
+        attachments=None,
+    ):
+        """Author a message and its recipients — the entry point for code.
+
+        Use this anywhere outside the admin (management commands, signals, other
+        services) so message creation goes through one code path. The recipients
+        are the union of:
+
+        * ``user_ids`` — an explicit iterable of user ids, and
+        * the users resolved from ``targeting`` via ``messaging_config``'s
+          audiences. ``request`` is forwarded to each audience's
+          ``resolve_users`` and may be required by custom audiences; pass
+          explicit ``user_ids`` instead when no request/config is available.
+
+        ``attachments`` is an optional iterable of Django ``File`` objects (each
+        must carry a name, e.g. an ``UploadedFile`` or a named ``ContentFile``).
+
+        Returns the created :class:`~django_smartbase_admin.messaging.models.Message`.
+        """
+        message = Message.objects.create(
+            title=title,
+            type=type,
+            content=content or "",
+            targeting=targeting or {},
+            created_by=created_by,
+        )
+        recipient_ids = set(user_ids or [])
+        if messaging_config and message.targeting:
+            recipient_ids |= set(
+                cls.resolve_target_user_ids(message, request, messaging_config)
+            )
+        cls.add_recipients(message, recipient_ids)
+        for attachment in attachments or []:
+            MessageAttachment.objects.create(message=message, file=attachment)
+        return message

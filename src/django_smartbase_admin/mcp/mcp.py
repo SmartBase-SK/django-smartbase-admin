@@ -291,6 +291,7 @@ def _guarded_tool_call(method):
             )
             SBAdminThreadLocalService.clear_request()
 
+    wrapper.sbadmin_mcp_tool = True
     return wrapper
 
 

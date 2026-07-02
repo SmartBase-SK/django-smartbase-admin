@@ -261,25 +261,38 @@ class MessageAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin)
         return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, obj, form, change):
+        # An existing message is read-only — editing never recomputes targeting
+        # or recipients, so just persist and return.
+        if change:
+            return super().save_model(request, obj, form, change)
+
+        # New message: stamp the author + the targeting blob from the submitted
+        # audience fields, persist the row (attachments save via the inline),
+        # then resolve the targeting into recipients. The recipient creation
+        # itself lives in SBAdminMessagingService so code outside the admin
+        # (e.g. SBAdminMessagingService.create_message) shares it.
         messaging_config = SBAdminMessagingService.get_messaging_config(request)
-        # Recipients are resolved once, at creation; an existing message is
-        # read-only so editing never recomputes targeting or recipients.
-        if not change:
-            if obj.created_by_id is None:
-                user = getattr(request, "user", None)
-                obj.created_by = user if (user and user.is_authenticated) else None
-            if messaging_config:
-                targeting = {}
-                for audience in getattr(form, "_sbadmin_audiences", []):
-                    name = audience_field_name(audience.key)
-                    if name in form.cleaned_data:
-                        targeting[audience.key] = audience.serialize(
-                            form.cleaned_data[name]
-                        )
-                obj.targeting = targeting
+        if obj.created_by_id is None:
+            user = getattr(request, "user", None)
+            obj.created_by = user if (user and user.is_authenticated) else None
+        if messaging_config:
+            obj.targeting = self._build_targeting(form, messaging_config)
         super().save_model(request, obj, form, change)
-        if not change and messaging_config:
-            SBAdminMessagingService.sync_recipients(obj, request, messaging_config)
+        if messaging_config:
+            target_ids = SBAdminMessagingService.resolve_target_user_ids(
+                obj, request, messaging_config
+            )
+            SBAdminMessagingService.add_recipients(obj, target_ids)
+
+    @staticmethod
+    def _build_targeting(form, messaging_config):
+        """Serialize the submitted audience form fields into a targeting blob."""
+        targeting = {}
+        for audience in getattr(form, "_sbadmin_audiences", []):
+            name = audience_field_name(audience.key)
+            if name in form.cleaned_data:
+                targeting[audience.key] = audience.serialize(form.cleaned_data[name])
+        return targeting
 
 
 class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBAdmin):
@@ -446,9 +459,12 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
         if not messaging_config or not (user and user.is_authenticated):
             return HttpResponse("")
 
+        # Only surface messages that are still unread *and* not yet shown.
+        # Filtering on ``read_at`` too means a message read by other means
+        # (e.g. opening it in the inbox) never pops a stale toast/modal.
         pending = list(
             MessageRecipient.objects.filter(
-                user=user, notified_at__isnull=True
+                user=user, read_at__isnull=True, notified_at__isnull=True
             ).select_related("message", "message__created_by")[:50]
         )
         if not pending:
@@ -476,7 +492,14 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
                             "action_acknowledge", "json", object_id=recipient.pk
                         ),
                     }
-                    notified_ids.append(recipient.pk)
+                    # A modal that must be acknowledged keeps prompting until the
+                    # user explicitly acknowledges it (which sets ``read_at`` and
+                    # drops it from the pending query). Marking it notified on
+                    # display would let a mere page refresh dismiss it while it
+                    # is still unread — so only non-acknowledge modals are
+                    # "shown once".
+                    if not message_type.require_acknowledge:
+                        notified_ids.append(recipient.pk)
             else:
                 toast_candidates.append((recipient, message_type))
 
