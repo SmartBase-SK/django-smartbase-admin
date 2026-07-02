@@ -539,6 +539,9 @@ msgstr "Rýchle vyhľadávanie"
 msgid "Saved Views"
 msgstr "Uložené zobrazenia"
 
+msgid "Filters"
+msgstr "Filtre"
+
 msgid "Advanced Filters"
 msgstr "Rozšírené filtrovanie"
 
