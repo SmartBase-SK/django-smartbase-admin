@@ -37,8 +37,11 @@ export default class SBAdminFormset {
             this.processAfterSwap(event.target)
         })
         window.htmx.on('htmx:oobAfterSwap', (event) => {
-            const target = event.detail?.target || event.target
-            if (!target) {
+            // fix duplicit oobAfterSwap events triggered for multiple oob swaps
+            // https://github.com/bigskysoftware/htmx/issues/1803
+            const target = event.detail.elt
+            const swapTarget = event.detail.target
+            if (!target || !swapTarget || (target !== swapTarget && target.id !== swapTarget.id)) {
                 return
             }
             this.processAfterSwap(target)

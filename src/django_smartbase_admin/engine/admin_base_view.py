@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponse, JsonResponse, HttpRequest, Http404
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -44,6 +44,7 @@ from django_smartbase_admin.engine.const import (
     SUPPORTED_FILE_TYPE_ICONS,
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
 )
+from django_smartbase_admin.audit.views import should_link_history_to_audit
 from django_smartbase_admin.engine.inline_pagination import SBADMIN_INLINE_PREFIX_HEADER
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
@@ -290,7 +291,7 @@ class SBAdminBaseView(object):
 
     def get_field_map(self, request) -> dict[str, "SBAdminField"]:
         return self.init_fields_cache(
-            self.get_sbadmin_list_display(request),
+            self.get_effective_list_display(request),
             request.request_data.configuration,
             request=request,
         )
@@ -601,7 +602,23 @@ class SBAdminBaseView(object):
             ),
             **self.get_color_scheme_context(request),
             **self.get_language_form_context(request),
+            **self.get_messaging_context(request),
         }
+
+    def get_messaging_context(self, request) -> dict[str, Any]:
+        """Inject the notification poller URL/interval when messaging is enabled.
+
+        Kept defensive (returns ``{}`` on any error or when disabled) so the
+        global context never breaks pages on projects without messaging.
+        """
+        try:
+            from django_smartbase_admin.messaging.services import (
+                SBAdminMessagingService,
+            )
+
+            return SBAdminMessagingService.get_poller_context(request)
+        except Exception:
+            return {}
 
     def get_model_path(self) -> str:
         return SBAdminViewService.get_model_path(self.model)
@@ -672,6 +689,9 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def get_list_view_media(self, request):
         return forms.Media(js=("sb_admin/dist/table.js",))
+
+    def get_extra_filter_from_request(self, request, list_action):
+        return Q()
 
     @classmethod
     def _postgres_unaccent_extension_available(cls) -> bool:
@@ -826,6 +846,69 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_display(self, request) -> list[str] | list:
         return self.sbadmin_list_display or self.list_display or []
 
+    def get_effective_list_display(self, request) -> list:
+        """``get_sbadmin_list_display`` augmented with a synthetic,
+        read-only primary-key column when the admin hasn't declared one.
+
+        The list pipeline already emits every row's pk under a normalized
+        ``"id"`` key, but without a matching field nothing can *select*,
+        *sort*, or *filter* by it — the field map rejects the name (this is
+        what made MCP ``list_rows(fields=["id"])`` fail, and why the browser
+        only ever got a display-only id column). Promoting the pk to a real,
+        hidden column closes that round-trip through the normal column /
+        sort / filter machinery, for the UI and MCP alike. Hidden by default
+        (``list_visible=False``) so it doesn't clutter the grid. With the pk
+        now a real column, :meth:`get_tabulator_columns` reports its id-column
+        name directly instead of grafting on a display-only one.
+        """
+        list_display = list(self.get_sbadmin_list_display(request) or [])
+        pk_field = self._build_synthetic_pk_field(list_display)
+        if pk_field is not None:
+            list_display.append(pk_field)
+        return list_display
+
+    def _build_synthetic_pk_field(self, list_display):
+        """Synthetic read-only pk column for the list — the canonical ``id``
+        column the agent uses for select / sort / filter, and the frontend for
+        row identity.
+
+        Returns ``None`` when a declared column already addresses the pk — by
+        name, by an explicit ``filter_field`` pointing at it, or via a method
+        ``@admin.display(ordering="id")`` — since the author has already
+        exposed it and a second column would be redundant; or when the pk
+        can't be resolved (e.g. a composite pk).
+        """
+        from django_smartbase_admin.engine.filter_widgets import (
+            PrimaryKeyFilterWidget,
+        )
+
+        model = getattr(self, "model", None)
+        if model is None:
+            return None
+        pk_model_field = getattr(model._meta, "pk", None)
+        pk_name = getattr(pk_model_field, "name", None)
+        if not pk_name:
+            return None
+
+        for entry in list_display:
+            name = getattr(entry, "name", entry)
+            method = getattr(self, name, None) if isinstance(name, str) else None
+            if (
+                name == pk_name
+                or getattr(entry, "filter_field", None) == pk_name
+                or (
+                    callable(method)
+                    and getattr(method, "admin_order_field", None) == pk_name
+                )
+            ):
+                return None
+
+        field = self.auto_create_field_from_model_field(pk_model_field)
+        field.title = "ID"
+        field.list_visible = False  # off by default; still select/sort/filterable
+        field.filter_widget = PrimaryKeyFilterWidget()
+        return field
+
     def _register_list_filter_autocomplete(self, request) -> None:
         field_map = self.init_fields_cache(
             self.get_sbadmin_list_display(request),
@@ -840,7 +923,7 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_list_display(self, request) -> list[str]:
         return [
             getattr(field, "name", field)
-            for field in self.get_sbadmin_list_display(request)
+            for field in self.get_effective_list_display(request)
         ]
 
     def get_search_fields(self, request):
@@ -976,10 +1059,7 @@ class SBAdminBaseListView(SBAdminBaseView):
                     no_params=True,
                 ),
             ]
-        if (
-            self.sbadmin_list_history_enabled
-            and "django_smartbase_admin.audit" in settings.INSTALLED_APPS
-        ):
+        if self.sbadmin_list_history_enabled and should_link_history_to_audit(request):
             try:
                 from django_smartbase_admin.audit.views import (
                     get_audit_model_history_url,
@@ -1045,6 +1125,10 @@ class SBAdminBaseListView(SBAdminBaseView):
                 getattr(request, "request_data", None), "object_id", None
             ),
         )
+
+    def get_sbadmin_list_row_class(self, request, row) -> str:
+        # Return a space-separated CSS class string applied to a list-view ``tabulator-row``.
+        return ""
 
     def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:
         return [*(self.sbadmin_row_actions or [])]

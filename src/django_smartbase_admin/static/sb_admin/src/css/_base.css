@@ -69,8 +69,8 @@
 
     .custom-scrollbar {
         &::-webkit-scrollbar {
-            width: 9px;
-            height: 9px;
+            width: 10px;
+            height: 10px;
         }
 
         &::-webkit-scrollbar-track {
@@ -105,11 +105,25 @@
         @apply text-dark-900 bg-notice-100;
     }
 
+    #main-navigation {
+        z-index: 11;
+    }
+
     #notification-messages {
         @apply z-1000 fixed bottom-72 left-24 right-24 mx-auto max-w-1180 mb-24 flex flex-col items-center gap-16;
         max-height: calc(100vh - 6rem);
         @screen xl {
             left: 17.75rem;
+        }
+    }
+
+    #messaging-toasts {
+        @apply z-1000 fixed top-0 right-0 left-0 p-24 sm:left-auto sm:w-370 flex flex-col gap-12 pointer-events-none;
+        max-height: calc(100vh - 3rem);
+        overflow-y: auto;
+
+        > * {
+            @apply pointer-events-auto;
         }
     }
 }

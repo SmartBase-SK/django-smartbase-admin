@@ -49,8 +49,11 @@ _MCP_PATH_PREFIXES: tuple[str, ...] = (
     "/o/",
 )
 
-_ALLOWED_REQUEST_HEADERS = (
-    "Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id"
+DEFAULT_ALLOWED_REQUEST_HEADERS: tuple[str, ...] = (
+    "Authorization",
+    "Content-Type",
+    "MCP-Protocol-Version",
+    "MCP-Session-Id",
 )
 # ``WWW-Authenticate`` carries the ``resource_metadata`` pointer the
 # client needs to read across origins to start the OAuth flow.
@@ -64,6 +67,15 @@ def _allowed_origins() -> frozenset[str]:
     )
 
 
+def _allowed_request_headers() -> str:
+    headers = getattr(
+        settings, "SBADMIN_MCP_ALLOWED_HEADERS", DEFAULT_ALLOWED_REQUEST_HEADERS
+    )
+    if isinstance(headers, str):
+        return headers
+    return ", ".join(headers)
+
+
 def _path_needs_cors(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in _MCP_PATH_PREFIXES)
 
@@ -71,7 +83,7 @@ def _path_needs_cors(path: str) -> bool:
 def _apply_cors_headers(response: HttpResponse, origin: str) -> None:
     response["Access-Control-Allow-Origin"] = origin
     response["Access-Control-Allow-Methods"] = _ALLOWED_METHODS
-    response["Access-Control-Allow-Headers"] = _ALLOWED_REQUEST_HEADERS
+    response["Access-Control-Allow-Headers"] = _allowed_request_headers()
     response["Access-Control-Expose-Headers"] = _EXPOSED_RESPONSE_HEADERS
     # Reflect that the response varies by Origin so caches don't serve
     # the wrong CORS headers to a different origin.

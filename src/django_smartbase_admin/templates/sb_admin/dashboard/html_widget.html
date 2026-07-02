@@ -1,0 +1,32 @@
+{% extends "sb_admin/dashboard/widget_base.html" %}
+
+{% block filters %}
+{% endblock %}
+
+{% block content_inner %}
+    <div id="{{ widget_id }}" class="{% block widget_card_classes %}card p-16 col-span-12{% endblock %}">
+        <div data-dashboard-html-widget-content>
+            {{ html|safe }}
+        </div>
+    </div>
+    {% if parent_widget_id %}
+        <script>
+            (function() {
+                const registerHtmlWidget = function() {
+                    const element = document.getElementById("{{ widget_id }}");
+                    const contentElement = element ? element.querySelector('[data-dashboard-html-widget-content]') : null;
+                    if (!contentElement) {
+                        return;
+                    }
+                    window.SBAdminRegisterDashboardSubWidget("{{ parent_widget_id }}", {
+                        widgetId: "{{ widget_id }}",
+                        onData: function(data) {
+                            contentElement.innerHTML = data.html || '';
+                        }
+                    });
+                };
+                registerHtmlWidget();
+            })();
+        </script>
+    {% endif %}
+{% endblock %}

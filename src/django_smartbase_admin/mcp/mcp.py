@@ -161,7 +161,9 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
         field_map = admin.get_field_map(request)
     field_map = field_map or {}
     for entry in sort:
-        if not isinstance(entry, dict) or "field" not in entry:
+        # ``dir`` is required, not defaulted — the list pipeline reads
+        # ``sort['dir']`` directly, so a missing key must fail clearly here.
+        if not isinstance(entry, dict) or "field" not in entry or "dir" not in entry:
             raise ValueError(
                 "Each sort entry must be {'field': <name>, 'dir': "
                 f"'asc'|'desc'}}, got {entry!r}"
@@ -172,9 +174,8 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
                 f"Admin {admin.get_id()!r} cannot sort by {name!r}; "
                 f"sortable fields: {sorted(field_map)}."
             )
-        direction = entry.get("dir", "asc")
-        if direction not in ("asc", "desc"):
-            raise ValueError(f"sort dir must be 'asc' or 'desc', got {direction!r}")
+        if entry["dir"] not in ("asc", "desc"):
+            raise ValueError(f"sort dir must be 'asc' or 'desc', got {entry['dir']!r}")
 
 
 def _decode_preset_url_params(url_params) -> dict:
@@ -269,6 +270,7 @@ def _guarded_tool_call(method):
         finally:
             SBAdminThreadLocalService.clear_request()
 
+    wrapper.sbadmin_mcp_tool = True
     return wrapper
 
 
@@ -360,6 +362,11 @@ class SBAdminTools(MCPToolset):
           - ``list_actions``: global buttons above the list, no row
             context (e.g. "Create…" modals, exports).
           - ``selection_actions``: bulk buttons over selected rows.
+
+        When configured by the host project, the top-level
+        ``whoami`` entry points at the current user's own profile
+        detail target: ``{"view_id", "object_id"}``. Pass those to
+        ``fetch_detail`` / ``update_detail`` or call ``fetch_whoami``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -384,11 +391,19 @@ class SBAdminTools(MCPToolset):
         # ``action_invokers`` is a sibling legend to ``widget_shapes`` —
         # keyed by action-list name, value is the MCP tool to call.
         # Saves repeating ``invoke_with`` on every individual action.
-        return {
+        result = {
             "admin_views": admins,
             "widget_shapes": get_widget_shapes(),
             "action_invokers": ACTION_INVOKERS,
         }
+        try:
+            whoami = request.request_data.configuration.get_whoami_target(request)
+        except LookupError:
+            pass
+        else:
+            if whoami is not None:
+                result["whoami"] = whoami
+        return result
 
     @_guarded_tool_call
     def fetch_filter_preset(
@@ -517,6 +532,9 @@ class SBAdminTools(MCPToolset):
             ``list_admins["admin_views"][].fields[].name``. Every row also
             carries a normalized ``"id"`` key for row identity, regardless
             of the model's pk field name (so ``row["id"]`` is always safe).
+            ``"id"`` is itself a selectable, sortable, and filterable column
+            — filter it with one id or a list of ids to re-fetch the exact
+            rows behind ids you already saw.
           filter_data: ``{field: value}`` mapping. Each **key** is a column
             ``name`` from ``list_admins["admin_views"][].fields[].name`` —
             the same identifier ``fields`` and ``sort`` use. (Keys returned
@@ -565,18 +583,22 @@ class SBAdminTools(MCPToolset):
             ``fn`` is one of ``sum / avg / min / max / count``; ``field``
             must be a declared column from ``list_admins`` —
             ``sum/avg/min/max`` need a numeric one, ``count`` may omit
-            ``field`` for a row count. Without ``group_by`` the results
-            land under ``aggregates``, keyed ``f"{fn}_{field}"`` (or
-            ``"count"``).
+            ``field`` for a row count. Each result is keyed by a derived
+            alias — ``f"{fn}_{field}"`` (or ``"count"`` for a bare count);
+            aliases can't be overridden. Without ``group_by`` the results
+            land under ``aggregates`` as a flat ``{alias: value}`` dict.
           group_by: optional list of declared column names to break the
             ``aggregate`` totals down by (SQL ``GROUP BY``) — e.g.
             ``group_by=["queue"]`` with ``aggregate=[{"fn": "count"}]`` for
             tickets-per-queue in one call instead of one call per queue.
             Multi-valued (relation) columns are rejected. Requires
             ``aggregate``. Results land under ``groups`` as a list of
-            ``{**group_columns, **aggregate_aliases}`` rows ordered by the
-            group columns; a column grouped on a foreign key comes back as
-            the bare pk (resolve names with ``autocomplete``).
+            ``{"group": {column: value, ...}, "aggregates": {alias: value,
+            ...}}`` rows ordered by the group columns — group columns and
+            aggregate aliases are nested under separate keys so a column whose
+            name equals an aggregate alias can't collide. A column grouped on a
+            foreign key comes back as the bare pk (resolve names with
+            ``autocomplete``).
 
         Returns ``{"data": [...], "last_page": int, "last_row": int}``
         plus any pagination metadata the list view emits, ``aggregates``
@@ -590,6 +612,25 @@ class SBAdminTools(MCPToolset):
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
         field_map = admin.get_field_map(request)
+        # Accept ``"id"`` as an alias for a differently-named pk on input, so
+        # the documented refetch works (output always mirrors the pk to
+        # ``"id"``). No-op for the usual ``id``-pk model.
+        pk_name = admin.model._meta.pk.name
+        if pk_name != "id" and "id" not in field_map:
+            fields = [pk_name if f == "id" else f for f in fields]
+            if filter_data:
+                filter_data = {
+                    (pk_name if k == "id" else k): v for k, v in filter_data.items()
+                }
+            if sort:
+                sort = [
+                    (
+                        {**s, "field": pk_name}
+                        if isinstance(s, dict) and s.get("field") == "id"
+                        else s
+                    )
+                    for s in sort
+                ]
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)
@@ -661,6 +702,23 @@ class SBAdminTools(MCPToolset):
             result["groups" if group_by else "aggregates"] = aggregates
         return result
 
+    def _fetch_detail_payload(
+        self,
+        view_id: str,
+        object_id: str,
+        fields: list[str] | None = None,
+    ) -> dict:
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        admin = resolve_admin(view_id, request=request)
+        try:
+            admin.init_view_dynamic(request, request.request_data)
+            return SBAdminMCPDetailService.get_detail_data(
+                admin, request, object_id, fields=fields
+            )
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
+
     @_guarded_tool_call
     def fetch_detail(
         self,
@@ -712,16 +770,44 @@ class SBAdminTools(MCPToolset):
         Raises ``LookupError`` if the object isn't visible,
         ``PermissionError`` if permission is denied.
         """
+        return self._fetch_detail_payload(view_id, object_id, fields=fields)
+
+    @_guarded_tool_call
+    def fetch_whoami(
+        self,
+        fields: list[str] | None = None,
+    ) -> dict:
+        """Fetch the current authenticated user's configured profile detail.
+
+        Host projects opt in with
+        ``SBAdminRoleConfiguration(mcp_whoami_sbadmin=SBAdminWhoamiConfig(...))``.
+        The result is the same shape as ``fetch_detail`` with ``view_id`` and
+        ``object_id`` included so callers can reuse the regular detail tools.
+
+        Args:
+          fields: optional subset of the configured profile admin's
+            ``detail_fields``.
+
+        Raises ``LookupError`` when no profile admin is configured or the
+        target object is not visible, ``PermissionError`` if permission is
+        denied.
+        """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id, request=request)
-        admin.init_view_dynamic(request, request.request_data)
         try:
-            return SBAdminMCPDetailService.get_detail_data(
-                admin, request, object_id, fields=fields
-            )
+            target = request.request_data.configuration.get_whoami_target(request)
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
+        if target is None:
+            raise LookupError("No mcp_whoami_sbadmin is configured for this user.")
+        detail = self._fetch_detail_payload(
+            target["view_id"], target["object_id"], fields=fields
+        )
+        return {
+            "view_id": target["view_id"],
+            "object_id": target["object_id"],
+            **detail,
+        }
 
     @_guarded_tool_call
     def fetch_add_form(

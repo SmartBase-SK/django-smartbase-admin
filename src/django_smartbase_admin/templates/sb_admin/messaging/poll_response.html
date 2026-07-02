@@ -1,0 +1,60 @@
+{% load i18n %}
+
+{% if toasts %}
+    <div id="messaging-toasts" hx-swap-oob="beforeend">
+        {% for toast in toasts %}
+            <div class="alert alert-{{ toast.type.color }} border shadow group p-12">
+                <div class="flex items-start">
+                    {% if toast.type.icon %}
+                        <svg class="alert-icon w-16 h-16 mt-2 mr-8 shrink-0">
+                            <use xlink:href="#{{ toast.type.icon }}"></use>
+                        </svg>
+                    {% endif %}
+                    <a href="{{ toast.detail_url }}"
+                       class="flex-1 min-w-0 no-underline text-current">
+                        <div class="font-semibold text-14 leading-18 line-clamp-1">{{ toast.message.title }}</div>
+                        {% if toast.message.created_by %}
+                            <div class="text-10 leading-14 opacity-80 line-clamp-1">{% trans 'From' %} {{ toast.message.created_by.get_full_name|default:toast.message.created_by.email|default:toast.message.created_by }}</div>
+                        {% endif %}
+                    </a>
+                    {% include 'sb_admin/partials/messages/alert_close.html' with css_class="alert-icon" %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div id="messaging-modal-slot" hx-swap-oob="innerHTML">
+    {% if modal %}
+        <div id="messaging-modal-{{ modal.recipient.pk }}" class="modal fade" tabindex="-1"
+             data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="font-semibold text-18 text-dark-900">
+                            {% if modal.message.created_by %}{% trans 'From' %} {{ modal.message.created_by.get_full_name|default:modal.message.created_by.email|default:modal.message.created_by }}{% endif %}
+                        </h3>
+                    </div>
+                    <div class="modal-body">
+                        {% include 'sb_admin/messaging/detail_card.html' with message=modal.message %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary"
+                                data-bs-dismiss="modal"
+                                hx-post="{{ modal.acknowledge_url }}" hx-swap="none">
+                            {% trans 'Acknowledge' %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var el = document.getElementById("messaging-modal-{{ modal.recipient.pk }}");
+                if (el && window.bootstrap5 && window.bootstrap5.Modal) {
+                    new window.bootstrap5.Modal(el).show();
+                }
+            })();
+        </script>
+    {% endif %}
+</div>

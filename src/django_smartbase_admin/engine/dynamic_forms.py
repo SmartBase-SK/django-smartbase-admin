@@ -73,10 +73,30 @@ def dynamic_region_initial_from_data(
         prefixed_name = probe_form.add_prefix(field_name)
         if field.widget.value_omitted_from_data(data, files, prefixed_name):
             continue
+        # CheckboxInput treats a missing key as submitted False; dynamic regions only preserve fields in the payload.
+        if not _dynamic_region_widget_has_data(
+            field.widget, data, files, prefixed_name
+        ):
+            continue
         initial[field_name] = field.widget.value_from_datadict(
             data, files, prefixed_name
         )
     return initial
+
+
+def _dynamic_region_widget_has_data(
+    widget: forms.Widget, data: Any, files: Any, name: str
+) -> bool:
+    if name in data or name in files:
+        return True
+    if not isinstance(widget, forms.MultiWidget):
+        return False
+    return any(
+        subwidget_name in data or subwidget_name in files
+        for subwidget_name in (
+            f"{name}_{index}" for index in range(len(widget.widgets))
+        )
+    )
 
 
 class SBInactiveFieldPolicy(models.TextChoices):
@@ -587,7 +607,11 @@ class SBAdminDynamicFormMixin:
         layout = (fieldset_data or {}).get("fields") or ()
         widgets = self.get_fieldset_widgets(request)
         has_dynamic_region = any(isinstance(item, SBDynamicRegion) for item in layout)
-        has_widget = any(item in widgets for item in layout)
+        has_widget = any(
+            item in widgets
+            for item in layout
+            if not isinstance(item, (list, tuple, SBDynamicRegion))
+        )
         if not has_dynamic_region and not has_widget:
             return ()
 
@@ -622,15 +646,15 @@ class SBAdminDynamicFormMixin:
                     {"region": self.get_dynamic_region_context(item, request)}
                 )
                 continue
-            widget = widgets.get(item)
-            if widget is not None:
-                flush_static_fields()
-                chunks.append({"widget": widget})
-                continue
             if isinstance(item, (list, tuple)):
                 group = tuple(field for field in item if isinstance(field, str))
                 if group:
                     static_fields.append(group)
+                continue
+            widget = widgets.get(item)
+            if widget is not None:
+                flush_static_fields()
+                chunks.append({"widget": widget})
                 continue
             static_fields.append(item)
         flush_static_fields()

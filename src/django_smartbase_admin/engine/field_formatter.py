@@ -1,9 +1,13 @@
 import datetime
+from collections.abc import Callable
 from enum import Enum
+from typing import Any
 
+from django.db.models import Field
 from django.template.defaultfilters import date, time
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.hashable import make_hashable
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -19,10 +23,30 @@ class BadgeType(Enum):
     PRIMARY = "primary"
 
 
+def format_badge(value, badge_type: "BadgeType | str" = BadgeType.NOTICE, simple=True):
+    if value is None or value == "":
+        return ""
+    css = badge_type.value if isinstance(badge_type, BadgeType) else badge_type
+    simple_class = "badge-simple " if simple else ""
+    return format_html(
+        '<span class="badge {}badge-{}">{}</span>', simple_class, css, value
+    )
+
+
+def badge_formatter(badge_type: "BadgeType | str" = BadgeType.NOTICE, simple=True):
+    """``python_formatter`` factory rendering a column's value as a badge."""
+
+    def inner_formatter(object_id, value):
+        return format_badge(value, badge_type, simple=simple)
+
+    return inner_formatter
+
+
 def datetime_formatter(object_id, value):
     if value is None:
         return None
-    value = timezone.localtime(value)
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
     return f"{date(value)} {time(value)}"
 
 
@@ -38,7 +62,8 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
     def inner_formatter(object_id, value):
         if value is None:
             return None
-        value = timezone.localtime(value)
+        if timezone.is_aware(value):
+            value = timezone.localtime(value)
         return_value = ""
         if date_format:
             return_value += date(value, date_format)
@@ -53,12 +78,31 @@ def datetime_formatter_with_format(date_format=None, time_format=None):
 
 def boolean_formatter(object_id, value):
     if value:
-        return format_html(
-            '<span class="badge badge-simple badge-positive">{}</span>', _("Yes")
-        )
-    return format_html(
-        '<span class="badge badge-simple badge-neutral">{}</span>', _("No")
-    )
+        return format_badge(_("Yes"), BadgeType.POSITIVE)
+    return format_badge(_("No"), BadgeType.NEUTRAL)
+
+
+def build_choice_formatter_for_field(
+    model_field: Field, empty_value_display: Any
+) -> Callable[[Any, Any], Any] | None:
+    """Build a formatter that resolves stored choice values to human-readable labels.
+
+    Mirrors ``django.contrib.admin.utils.display_for_field`` for fields with
+    ``flatchoices``.
+    """
+    flatchoices = getattr(model_field, "flatchoices", None)
+    if not flatchoices:
+        return None
+
+    def formatter(object_id, value):
+        try:
+            return dict(flatchoices).get(value, empty_value_display)
+        except TypeError:
+            return dict(make_hashable(flatchoices)).get(
+                make_hashable(value), empty_value_display
+            )
+
+    return formatter
 
 
 # Built-in formatters that produce locale-dependent strings. The MCP

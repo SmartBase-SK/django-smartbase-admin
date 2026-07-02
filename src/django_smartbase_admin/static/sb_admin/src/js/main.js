@@ -42,6 +42,9 @@ const MODAL_SCROLL_MARGIN_PX = 24
 const SBADMIN_MAIN_LOADED_EVENT = 'SBAdminMainLoaded'
 const COPY_BUTTON_SELECTOR = '[data-sbadmin-copy-button]'
 const COPIED_TIMEOUT_MS = 1500
+const NOTIFICATION_SLOT_ID = 'notification-messages'
+const NOTIFICATION_AUTO_REMOVE_TIMEOUT = '5s'
+const NOTIFICATION_TYPES = new Set(['success', 'warning', 'negative', 'notice'])
 
 class Main {
     constructor() {
@@ -79,7 +82,6 @@ class Main {
                 this.syncEmptyFieldsets(target)
                 this.scheduleScrollToFirstErrorField(target)
             }
-
             window.htmx.on("htmx:afterSwap", (event) => {
                 if (!shouldProcessAfterSwap(event)) {
                     return
@@ -90,11 +92,12 @@ class Main {
             window.htmx.on("htmx:oobAfterSwap", (event) => {
                 // fix duplicit oobAfterSwap events triggered for multiple oob swaps
                 // https://github.com/bigskysoftware/htmx/issues/1803
-                if (event.detail.__seen) {
+                const target = event.detail.elt
+                const swapTarget = event.detail.target
+                if (!target || !swapTarget || (target !== swapTarget && target.id !== swapTarget.id)) {
                     return
                 }
-                event.detail.__seen = true
-                processAfterSwap(event.detail.elt)
+                processAfterSwap(target)
             })
 
             window.htmx.on("htmx:afterSettle", (event) => {
@@ -827,6 +830,38 @@ class Main {
         button.setAttribute('aria-label', label)
     }
 
+    renderNotification(message, type = 'notice', timeout = NOTIFICATION_AUTO_REMOVE_TIMEOUT) {
+        const slot = document.getElementById(NOTIFICATION_SLOT_ID)
+        if (!slot || !message) {
+            return
+        }
+
+        const notificationType = NOTIFICATION_TYPES.has(type) ? type : 'notice'
+        const alert = document.createElement('div')
+        alert.className = `alert border shadow alert-${notificationType}`
+        if (timeout) {
+            alert.setAttribute('remove-me', timeout)
+        }
+        alert.innerHTML = `
+            <div class="flex">
+                <svg class="alert-icon w-20 h-20 mr-12 shrink-0">
+                    <use xlink:href="${notificationType === 'success' ? '#Check-one' : '#Info'}"></use>
+                </svg>
+                <h5 class="font-semibold"></h5>
+                <div class="flex ml-auto items-center">
+                    <div class="ml-16 flex-center js-alert-close p-8 -m-8 cursor-pointer group">
+                        <svg class="w-20 h-20 group-hover:text-primary">
+                            <use xlink:href="#Close"></use>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        `
+        alert.querySelector('h5').textContent = message
+        slot.appendChild(alert)
+        window.htmx?.process(alert)
+    }
+
     copyToClipboard(event) {
         const button = event.target.closest(COPY_BUTTON_SELECTOR)
         if (!button) {
@@ -844,6 +879,7 @@ class Main {
             const copyLabel = button.dataset.sbadminCopyLabel || button.title || 'Copy'
             const copiedLabel = button.dataset.sbadminCopiedLabel || 'Copied'
             this.setCopyButtonLabel(button, copiedLabel)
+            this.renderNotification(button.dataset.sbadminCopyNotificationLabel || copiedLabel, 'success', '1s')
             window.setTimeout(() => this.setCopyButtonLabel(button, copyLabel), COPIED_TIMEOUT_MS)
         })
     }

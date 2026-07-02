@@ -20,6 +20,7 @@ from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import BadgeType, format_badge
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
@@ -811,14 +812,10 @@ class AdminAuditLogAdmin(SBAdmin):
     def action_type_display(self, obj_id, value, **additional_data):
         color = ACTION_COLORS.get(value, "secondary")
         label = dict(AdminAuditLog.ActionType.choices).get(value, value)
-        return mark_safe(
-            f'<span class="badge badge-simple badge-{color}">{label}</span>'
-        )
+        return format_badge(label, color)
 
     def bulk_info(self, obj_id, value, **additional_data):
         if value:
             count = additional_data.get("bulk_count_val", 0)
-            return mark_safe(
-                f'<span class="badge badge-simple badge-warning">{count} items</span>'
-            )
+            return format_badge(f"{count} items", BadgeType.WARNING)
         return "-"

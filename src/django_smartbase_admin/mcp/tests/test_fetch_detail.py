@@ -22,6 +22,7 @@ from django_smartbase_admin.admin.admin_base import (
     SBAdminTableInlinePaginated,
 )
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
@@ -58,9 +59,11 @@ class _FetchDetailTestBase(TestCase):
         sb_admin_site.register(Folder, self.admin_class)
         MCPToolTestConfig().init_view_map()
         MCPToolTestConfig.view_permission_for = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
 
     def tearDown(self):
         MCPToolTestConfig.view_permission_for = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
         sb_admin_site._registry.pop(Folder, None)
         if self._original_admin is not None:
             sb_admin_site._registry[Folder] = self._original_admin
@@ -122,6 +125,72 @@ class FetchDetailTests(_FetchDetailTestBase):
         parent_row = self._fetch(self.parent.pk)
         self.assertIsNone(parent_row["fields"]["parent"]["value"])
         self.assertEqual(parent_row["fields"]["child_count"]["value"], 2)
+
+    def test_fetch_whoami_matches_fetch_detail_for_configured_target(self):
+        user = MagicMock(
+            pk=self.child_a.pk,
+            id=self.child_a.pk,
+            is_authenticated=True,
+            is_anonymous=False,
+            is_superuser=True,
+        )
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        profile = tools.fetch_whoami(fields=["name"])
+        detail = self._fetch(self.child_a.pk, fields=["name"], user=user)
+
+        self.assertEqual(profile["view_id"], "filer_folder")
+        self.assertEqual(profile["object_id"], str(self.child_a.pk))
+        self.assertEqual(
+            {k: v for k, v in profile.items() if k not in {"view_id", "object_id"}},
+            detail,
+        )
+
+    def test_fetch_whoami_raises_when_unconfigured(self):
+        user = MagicMock(
+            pk=self.child_a.pk,
+            id=self.child_a.pk,
+            is_authenticated=True,
+            is_anonymous=False,
+            is_superuser=True,
+        )
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=build_mcp_request(user)).fetch_whoami()
+
+    def test_fetch_whoami_raises_when_configured_admin_is_missing(self):
+        user = MagicMock(
+            pk=self.child_a.pk,
+            id=self.child_a.pk,
+            is_authenticated=True,
+            is_anonymous=False,
+            is_superuser=True,
+        )
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="missing_profile"
+        )
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=build_mcp_request(user)).fetch_whoami()
+
+    def test_fetch_whoami_raises_permission_error_when_target_denied(self):
+        user = MagicMock(
+            pk=self.child_a.pk,
+            id=self.child_a.pk,
+            is_authenticated=True,
+            is_anonymous=False,
+            is_superuser=False,
+        )
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
+        MCPToolTestConfig.view_permission_for = set()
+
+        with self.assertRaises(PermissionError):
+            SBAdminTools(request=build_mcp_request(user)).fetch_whoami()
 
     def test_field_subset_projection(self):
         row = self._fetch(self.child_a.pk, fields=["name"])

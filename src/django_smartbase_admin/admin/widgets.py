@@ -282,8 +282,10 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
         *,
         copy_label="Copy",
         copied_label="Copied",
+        copy_notification_label=None,
         copy_icon="Minus-the-top",
     ):
+        copy_notification_label = copy_notification_label or copied_label
         super().__init__(
             form_field=form_field,
             attrs=attrs,
@@ -296,6 +298,7 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
                 "data-sbadmin-copy-button": True,
                 "data-sbadmin-copy-label": copy_label,
                 "data-sbadmin-copied-label": copied_label,
+                "data-sbadmin-copy-notification-label": copy_notification_label,
             },
         )
 
@@ -1796,12 +1799,14 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
             if current_app != ct.app_label:
                 app_idx += 1
                 model_idx = -1
-                apps.append({
-                    "app_label": ct.app_label,
-                    "app_verbose": ct.app_label.replace("_", " ").title(),
-                    "help_text": "",
-                    "models": [],
-                })
+                apps.append(
+                    {
+                        "app_label": ct.app_label,
+                        "app_verbose": ct.app_label.replace("_", " ").title(),
+                        "help_text": "",
+                        "models": [],
+                    }
+                )
                 current_app = ct.app_label
                 current_model = None
 
@@ -1812,14 +1817,16 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                     if ct.name
                     else ct.model.replace("_", " ").title()
                 )
-                apps[app_idx]["models"].append({
-                    "model_name": ct.model,
-                    "model_verbose": model_verbose,
-                    "standard_perms": {},
-                    "standard_perms_list": [],
-                    "custom_perms": [],
-                    "permissions": [],
-                })
+                apps[app_idx]["models"].append(
+                    {
+                        "model_name": ct.model,
+                        "model_verbose": model_verbose,
+                        "standard_perms": {},
+                        "standard_perms_list": [],
+                        "custom_perms": [],
+                        "permissions": [],
+                    }
+                )
                 current_model = ct_key
 
             is_standard = self._is_standard_codename(p.codename)
@@ -1889,12 +1896,14 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
 
             model_data["standard_perms_list"] = self._ordered_standard_perms(model_data)
 
-            apps.append({
-                "app_label": group.label,
-                "app_verbose": group.label,
-                "help_text": group.help_text,
-                "models": [model_data],
-            })
+            apps.append(
+                {
+                    "app_label": group.label,
+                    "app_verbose": group.label,
+                    "help_text": group.help_text,
+                    "models": [model_data],
+                }
+            )
         return apps
 
     # ------------------------------------------------------------------
@@ -1960,7 +1969,9 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
         for group in self._groups:
             perms_qs = self._resolve_group_permissions(group)
             for p in perms_qs:
-                if not self._skip_standard_perm(group, p, self._is_standard_codename(p.codename)):
+                if not self._skip_standard_perm(
+                    group, p, self._is_standard_codename(p.codename)
+                ):
                     allowed.add(p.pk)
         return frozenset(allowed)
 

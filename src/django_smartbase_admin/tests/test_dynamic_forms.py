@@ -1031,6 +1031,17 @@ class DynamicFormTests(SimpleTestCase):
     def tearDown(self):
         sb_admin_request.reset(self.request_token)
 
+    def test_hidden_model_choice_field_keeps_hidden_widget(self):
+        class HiddenModelChoiceForm(SBAdminBaseFormInit, forms.Form):
+            parent_node = forms.ModelChoiceField(
+                queryset=DynamicRegionDemoModel.objects.none(),
+                widget=forms.HiddenInput,
+            )
+
+        form = HiddenModelChoiceForm(request=self.request)
+
+        self.assertIsInstance(form.fields["parent_node"].widget, SBAdminHiddenWidget)
+
     def render_fieldset(self, form, index=0):
         fieldsets = []
         for fieldset in form.fieldsets():
@@ -2228,6 +2239,45 @@ class DynamicFormTests(SimpleTestCase):
                 "starts_at": ["2026-05-18", "09:30:00"],
             },
         )
+
+    def test_dynamic_region_initial_ignores_omitted_builtin_checkbox(self):
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False)
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict(""),
+            {},
+        )
+
+        self.assertEqual(initial, {})
+
+    def test_dynamic_region_initial_ignores_omitted_custom_checkbox(self):
+        class CustomCheckboxInput(forms.CheckboxInput):
+            pass
+
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False, widget=CustomCheckboxInput())
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict(""),
+            {},
+        )
+
+        self.assertEqual(initial, {})
+
+    def test_dynamic_region_initial_includes_submitted_checkbox_false_value(self):
+        class CheckboxForm(forms.Form):
+            enabled = forms.BooleanField(required=False)
+
+        initial = SBAdmin._dynamic_region_initial_from_data(
+            CheckboxForm,
+            QueryDict("enabled=false"),
+            {},
+        )
+
+        self.assertEqual(initial, {"enabled": False})
 
     def test_dynamic_region_initial_includes_uploaded_files(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

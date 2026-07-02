@@ -19,7 +19,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement |
-| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options |
+| [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options, automatic choice formatting |
 | [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
 | [Performance Optimization](#performance-optimization) | `Subquery` patterns, `ArrayAgg`, avoiding N+1 queries |
@@ -36,11 +36,13 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Fieldset Options](#fieldset-options) | Supported keys for `fieldsets` / `sbadmin_fieldsets`, including descriptions, classes, dynamic regions, and collapse |
 | [Detail View Layout (Sidebar)](#detail-view-layout-sidebar) | Placing fieldsets in the right sidebar using `DETAIL_STRUCTURE_RIGHT_CLASS` |
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
+| [Dashboard Widgets](#dashboard-widgets) | Standalone dashboards: simple widgets, lightweight subwidgets, real subwidgets with separate or grouped AJAX |
 | [Detail View Widgets](#detail-view-widgets) | Embedding dashboard-style list/chart widgets inside detail fieldsets |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
 | [Audit Logging](#audit-logging) | Built-in audit trail — installation, configuration, skip models/fields, history button, programmatic entries, programmatic URLs |
+| [Messaging](#messaging) | Built-in in-app messaging — install, attachment upload path/storage settings, `messaging_config` (types/audiences/poller), inbox vs management views, menu wiring, custom recipient audiences, contributing |
 | [Internationalization](#internationalization) | Locale workflow, `makemessages.py`, `compilemessages.py`, JS translation strings |
 | [MCP (AI agents)](#mcp-ai-agents) | Optional MCP server: install, host wiring, Cursor config |
 | [Testing](#testing) | How to install test dependencies, run tests, and add new tests |
@@ -85,9 +87,14 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Collapse a form fieldset?** → [Fieldset Options](#fieldset-options)
 - **Fields in sidebar?** → [Detail View Layout (Sidebar)](#detail-view-layout-sidebar)
 - **Fieldsets/inlines in tabs?** → [Detail View Tabs](#detail-view-tabs-sbadmin_tabs)
+- **Building a dashboard page?** → [Dashboard Widgets](#dashboard-widgets)
+- **One AJAX call for several dashboard widgets?** → [Real Subwidgets With One AJAX](#4-real-subwidgets-with-one-ajax)
 - **List or chart inside detail page?** → [Detail View Widgets](#detail-view-widgets)
 - **Custom permission system (non-Django)?** → [Custom Permission System](#custom-permission-system-has_permission)
 - **Audit trail / change history?** → [Audit Logging](#audit-logging)
+- **Send in-app messages / notifications to users?** → [Messaging](#messaging)
+- **Custom message recipient group?** → [Recipient audiences](#recipient-audiences)
+- **Render a single value as a badge?** → [Single-Value Badge](#single-value-badge-format_badge--badge_formatter)
 - **Regenerate translations?** → [Internationalization](#internationalization)
 - **Wire MCP / Cursor?** → [MCP (AI agents)](#mcp-ai-agents)
 - **“View on site” icon next to a list column?** → [View on Site link in list](#view-on-site-link-in-list)
@@ -854,6 +861,7 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 | `get_autocomplete_widget()` | Customize autocomplete labels, search, and dependent dropdowns | [Global Autocomplete Widget Customization](#global-autocomplete-widget-customization) |
 | `enable_url_compression` | Toggle compression for `?params=` and `_changelist_filters` payloads. Default `True`; set `False` to emit plain JSON in URLs. Decoding accepts both formats. | [URL Params Compression Toggle](#url-params-compression-toggle) |
 | `mcp_readonly` | Make MCP requests read-only for non-superusers. Default `False`; set `True` to block MCP add/change/delete and mutating actions while leaving browser admin writes unchanged. | [MCP Read-Only Toggle](#mcp-read-only-toggle) |
+| `mcp_whoami_sbadmin` | Tell MCP which change view is the current user's own profile. | [Current User / Whoami](#current-user--whoami) |
 
 ### URL Params Compression Toggle
 
@@ -2636,13 +2644,18 @@ from django_smartbase_admin.engine.field_formatter import (
     array_badge_formatter,                  # Display list as horizontal badges
     newline_separated_array_badge_formatter, # Display list as vertical badges (one per line)
     boolean_formatter,                      # Yes/No badges
+    build_choice_formatter_for_field,       # Choice value → label (auto-assigned on choice fields)
     datetime_formatter,                     # Localized datetime
     datetime_formatter_with_format,         # Custom date/time format
     link_formatter,                         # Clickable URL
     rich_text_formatter,                    # HTML content with max-width
     format_array,                           # Custom badge formatting with BadgeType
+    format_badge,                           # Single value → one badge (BadgeType or colour token)
+    badge_formatter,                        # python_formatter factory wrapping format_badge
 )
 ```
+
+`SBAdminField.init_field_static()` also auto-assigns `python_formatter` for date, boolean, and choice (`flatchoices`) model fields. Choice fields use `build_choice_formatter_for_field`. Set `python_formatter` explicitly or use an admin method to override.
 
 ### Array Badge Formatters
 
@@ -2683,6 +2696,38 @@ from django_smartbase_admin.engine.field_formatter import format_array, BadgeTyp
 # ERROR (red), NEUTRAL (gray), PRIMARY (brand color)
 format_array(["Published", "Featured"], badge_type=BadgeType.SUCCESS)
 ```
+
+### Single-Value Badge (`format_badge` / `badge_formatter`)
+
+For a single value (not a list), `format_badge(value, badge_type=BadgeType.NOTICE, simple=True)` renders one badge. `badge_type` accepts a `BadgeType` **or** a raw colour token (e.g. `"warning"`); an empty/`None` value renders nothing; `simple=False` keeps the leading dot indicator.
+
+```python
+from django_smartbase_admin.engine.field_formatter import (
+    format_badge, badge_formatter, BadgeType,
+)
+
+class ArticleAdmin(SBAdmin):
+    # Inline use in an admin method:
+    def status_display(self, obj_id, value, **additional_data):
+        color = BadgeType.SUCCESS if value == "published" else BadgeType.NEUTRAL
+        return format_badge(value, color)
+
+    sbadmin_list_display = (
+        SBAdminField(name="status_display", title="Status", annotate=F("status"), filter_disabled=True),
+        # Or `badge_formatter(...)` straight as a column's python_formatter:
+        SBAdminField(
+            name="category_badge",
+            title="Category",
+            annotate=F("category__name"),
+            python_formatter=badge_formatter(BadgeType.PRIMARY),
+            filter_disabled=True,
+        ),
+    )
+```
+
+**Key points:**
+- Prefer `format_badge` over hand-written `<span class="badge …">` markup so colour/markup stays consistent (it's what `boolean_formatter` and the messaging badges use).
+- `badge_formatter(badge_type, simple=True)` returns a `(object_id, value)` callable — drop it straight into `python_formatter`.
 
 ---
 
@@ -4588,6 +4633,530 @@ In this example, the "Content" tab has a two-column layout (main fields on the l
 
 ---
 
+## Dashboard Widgets
+
+Use `SBAdminDashboardView` in `registered_views` to build standalone dashboard pages. Dashboard widgets are regular SBAdmin views: each widget has a stable `widget_id`, permission checks, optional settings/filters, a template, media, and an AJAX `action_get_data` endpoint.
+
+Dashboard widgets are usually built in one of four ways:
+
+| Pattern | Use when |
+|---------|----------|
+| Simple widget | The widget is independent and owns its own HTML/chart/list data. |
+| Lightweight chart subwidgets | One chart has small metric tabs/aggregates over the same queryset. |
+| Real subwidgets with separate AJAX | A parent owns common layout/settings, but each child should load independently. |
+| Real subwidgets with one AJAX | A parent/group owns common settings and one AJAX response refreshes all children together. |
+
+Register dashboards from the configuration:
+
+```python
+# blog/sbadmin_config.py
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
+from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
+
+from blog.dashboard_widgets import ArticleSummaryWidget
+
+
+class AdminConfiguration(SBAdminRoleConfiguration):
+    default_view = SBAdminMenuItem(view_id="dashboard")
+    menu_items = [
+        SBAdminMenuItem(label=_("Dashboard"), icon="All-application", view_id="dashboard"),
+    ]
+    registered_views = [
+        SBAdminDashboardView(
+            widgets=[
+                ArticleSummaryWidget(),
+            ],
+            title=_("Dashboard"),
+        ),
+    ]
+```
+
+All examples below assume the demo `Article` model from [Demo Schema Reference](#demo-schema-reference).
+
+### 1. Simple Widget
+
+Use a simple top-level widget when it does not need a parent. This is the default choice for independent counters, cards, charts, lists, and HTML blocks.
+
+```python
+# blog/dashboard_widgets.py
+from django.db.models import Count
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import SBAdminDashboardHtmlWidget
+
+from blog.models import Article
+
+
+class ArticleSummaryWidget(SBAdminDashboardHtmlWidget):
+    widget_id = "article_summary"
+    name = _("Article summary")
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_html(self, request):
+        counts = dict(
+            Article.objects.values_list("status").annotate(total=Count("id"))
+        )
+        return format_html(
+            """
+            <div class="card p-16 col-span-12">
+                <h3 class="text-16 font-semibold mb-16">{title}</h3>
+                <div class="grid grid-cols-3 gap-16">
+                    <div><div class="text-12">{draft_label}</div><div class="text-24 font-semibold">{draft}</div></div>
+                    <div><div class="text-12">{published_label}</div><div class="text-24 font-semibold">{published}</div></div>
+                    <div><div class="text-12">{archived_label}</div><div class="text-24 font-semibold">{archived}</div></div>
+                </div>
+            </div>
+            """,
+            title=_("Article summary"),
+            draft_label=_("Draft"),
+            published_label=_("Published"),
+            archived_label=_("Archived"),
+            draft=counts.get("draft", 0),
+            published=counts.get("published", 0),
+            archived=counts.get("archived", 0),
+        )
+```
+
+Register it as a top-level widget:
+
+```python
+SBAdminDashboardView(
+    widgets=[ArticleSummaryWidget()],
+    title=_("Dashboard"),
+)
+```
+
+### 2. Lightweight Chart Subwidgets
+
+Use `SBAdminChartAggregateSubWidget` when the children are not real dashboard widgets. These are lightweight metric selectors rendered inside one chart widget. They do not get their own AJAX URLs; the parent chart owns the query and response.
+
+```python
+# blog/dashboard_widgets.py
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminChartAggregateSubWidget,
+    SBAdminDashboardChartWidget,
+)
+
+from blog.models import Article
+
+
+class ArticleStatusChartWidget(SBAdminDashboardChartWidget):
+    widget_id = "article_status_chart"
+    name = _("Articles")
+    model = Article
+    chart_type = "line"
+    x_axis_annotate = TruncMonth("created_at")
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+    sub_widgets = [
+        SBAdminChartAggregateSubWidget(
+            title=_("All"),
+            aggregate=Count("id"),
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Published"),
+            aggregate=Count("id", filter=Q(status="published")),
+        ),
+        SBAdminChartAggregateSubWidget(
+            title=_("Draft"),
+            aggregate=Count("id", filter=Q(status="draft")),
+        ),
+    ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def process_label(self, request, label, data, labels, dataset_data):
+        return label.strftime("%Y-%m") if label else _("No date")
+```
+
+Register it as a top-level widget:
+
+```python
+SBAdminDashboardView(
+    widgets=[ArticleStatusChartWidget()],
+    title=_("Dashboard"),
+)
+```
+
+### 3. Real Subwidgets With Separate AJAX
+
+Use a normal `SBAdminDashboardWidget` parent with real dashboard widgets in `sub_widgets` when the parent owns common layout/settings, but every child should keep its own AJAX endpoint. This is useful when children may be slow or independent.
+
+The parent template renders each child. Chart children use the parent filter form id, so common parent settings are sent with every child AJAX request.
+
+```python
+# blog/dashboard_widgets.py
+from django.db.models import Count, F
+from django.db.models.functions import TruncMonth
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardChartWidget,
+    SBAdminDashboardWidget,
+)
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget
+
+from blog.models import Article
+
+
+class ArticleOverviewWidget(SBAdminDashboardWidget):
+    widget_id = "article_overview"
+    name = _("Article overview")
+    template_name = "dashboard/article_overview.html"
+    settings = [
+        SBAdminField(
+            title=_("Status"),
+            name="status",
+            filter_widget=ChoiceFilterWidget(
+                choices=[
+                    ("", _("All")),
+                    ("draft", _("Draft")),
+                    ("published", _("Published")),
+                    ("archived", _("Archived")),
+                ],
+                default_value="",
+            ),
+        )
+    ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        return {}
+
+
+class ArticleMonthlyChartWidget(SBAdminDashboardChartWidget):
+    name = _("Articles by month")
+    model = Article
+    chart_type = "bar"
+    x_axis_annotate = TruncMonth("created_at")
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        status = request.request_data.request_get.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def process_label(self, request, label, data, labels, dataset_data):
+        return label.strftime("%Y-%m") if label else _("No date")
+
+
+class ArticleAuthorChartWidget(SBAdminDashboardChartWidget):
+    name = _("Articles by author")
+    model = Article
+    chart_type = "bar"
+    x_axis_annotate = F("author__name")
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        status = request.request_data.request_get.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+```
+
+```django
+{# templates/dashboard/article_overview.html #}
+{% extends "sb_admin/dashboard/widget_base.html" %}
+{% load sb_admin_tags %}
+
+{% block content_inner %}
+    <section id="{{ widget_id }}" class="col-span-12 grid grid-cols-12 gap-24">
+        {% for sub_widget in sub_widgets %}
+            {% render_widget sub_widget request %}
+        {% endfor %}
+    </section>
+{% endblock %}
+```
+
+```python
+SBAdminDashboardView(
+    widgets=[
+        ArticleOverviewWidget(
+            sub_widgets=[
+                ArticleMonthlyChartWidget(),
+                ArticleAuthorChartWidget(),
+            ],
+        ),
+    ],
+    title=_("Dashboard"),
+)
+```
+
+### 4. Real Subwidgets With One AJAX
+
+Use `SBAdminDashboardGroupWidget` when the parent is a group container and one parent AJAX response should refresh all children. The parent calls each child `get_data(request)` and returns:
+
+```python
+{
+    "sub_widget": {
+        "article_group_0": {...},
+        "article_group_1": {...},
+    }
+}
+```
+
+Charts and HTML widgets already know how to register with the group and update themselves from their slice of the response. List widgets can render inside a group, but their Tabulator data still uses the list widget's own table AJAX endpoint.
+
+```python
+# blog/dashboard_widgets.py
+from django.db.models import Count
+from django.db.models.functions import TruncMonth
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardChartWidget,
+    SBAdminDashboardGroupWidget,
+    SBAdminDashboardHtmlWidget,
+)
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget
+
+from blog.models import Article
+
+
+class ArticleGroupWidget(SBAdminDashboardGroupWidget):
+    widget_id = "article_group"
+    name = _("Article dashboard")
+    settings = [
+        SBAdminField(
+            title=_("Status"),
+            name="status",
+            filter_widget=ChoiceFilterWidget(
+                choices=[
+                    ("", _("All")),
+                    ("draft", _("Draft")),
+                    ("published", _("Published")),
+                    ("archived", _("Archived")),
+                ],
+                default_value="",
+            ),
+        )
+    ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_filtered_queryset(self, request):
+        qs = Article.objects.all()
+        status = request.request_data.request_get.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def get_data(self, request):
+        request.article_group_queryset = self.get_filtered_queryset(request)
+        return super().get_data(request)
+
+
+class GroupedArticleMonthlyChartWidget(SBAdminDashboardChartWidget):
+    name = _("Articles by month")
+    chart_type = "bar"
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_data(self, request):
+        qs = getattr(request, "article_group_queryset", Article.objects.none())
+        rows = (
+            qs.annotate(month=TruncMonth("created_at"))
+            .values("month")
+            .annotate(total=Count("id"))
+            .order_by("month")
+        )
+        labels = [
+            row["month"].strftime("%Y-%m") if row["month"] else str(_("No date"))
+            for row in rows
+        ]
+        values = [row["total"] for row in rows]
+        return {
+            "main": {
+                "labels": labels,
+                "datasets": [
+                    {
+                        "label": str(_("Articles")),
+                        "data": values,
+                        "backgroundColor": "#2368A9",
+                    }
+                ],
+            }
+        }
+
+
+class GroupedArticleSummaryWidget(SBAdminDashboardHtmlWidget):
+    name = _("Summary")
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_html(self, request):
+        qs = getattr(request, "article_group_queryset", Article.objects.none())
+        return format_html(
+            '<div class="card p-16 col-span-12"><div class="text-12">{label}</div>'
+            '<div class="text-24 font-semibold">{count}</div></div>',
+            label=_("Articles"),
+            count=qs.count(),
+        )
+```
+
+```python
+SBAdminDashboardView(
+    widgets=[
+        ArticleGroupWidget(
+            sub_widgets=[
+                GroupedArticleMonthlyChartWidget(),
+                GroupedArticleSummaryWidget(),
+            ],
+        ),
+    ],
+    title=_("Dashboard"),
+)
+```
+
+**Grouped AJAX rules:**
+- Put common settings/filters on the parent group.
+- Child widgets should return their normal widget data shape. Chart widgets return `{"main": {"labels": ..., "datasets": ...}}`; HTML widgets return `{"html": "..."}`.
+- If the parent preloads shared data on `request`, use a project-specific attribute such as `request.article_group_queryset` and guard child initial render with `getattr(...)`.
+- Prefer this for chart/card/summary widgets. Use separate AJAX for expensive children or full list/table widgets.
+
+### Local Graph Settings
+
+Use `settings` for UI controls that affect how a dashboard widget displays data but are not ordinary queryset filters. Read them with `get_settings_from_request(request)`.
+
+```python
+# blog/dashboard_widgets.py
+from django.db.models import Count
+from django.db.models.functions import TruncDay, TruncMonth
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
+from django_smartbase_admin.engine.dashboard import SBAdminDashboardChartWidget
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.filter_widgets import ChoiceFilterWidget
+
+from blog.models import Article
+
+
+class ArticleResolutionChartWidget(SBAdminDashboardChartWidget):
+    widget_id = "article_resolution_chart"
+    name = _("Articles")
+    model = Article
+    chart_type = "line"
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+    RESOLUTION_KEY = "article_resolution"
+    settings = [
+        SBAdminField(
+            title=_("Resolution"),
+            name=RESOLUTION_KEY,
+            filter_widget=ChoiceFilterWidget(
+                choices=[
+                    ("day", _("Day")),
+                    ("month", _("Month")),
+                ],
+                default_value="month",
+                allow_clear=False,
+            ),
+        )
+    ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_resolution(self, request):
+        return self.get_settings_from_request(request).get(self.RESOLUTION_KEY) or "month"
+
+    def get_x_axis_annotate(self, request):
+        if self.get_resolution(request) == "day":
+            return TruncDay("created_at")
+        return TruncMonth("created_at")
+
+    def process_label(self, request, label, data, labels, dataset_data):
+        if not label:
+            return _("No date")
+        if self.get_resolution(request) == "day":
+            return label.strftime("%Y-%m-%d")
+        return label.strftime("%Y-%m")
+```
+
+For a child chart in the same module that has a local setting but should submit through the parent form together with common parent settings, retarget only that child's setting widgets after static initialization:
+
+```python
+class ParentFormSettingMixin:
+    def init_widget_static(self, configuration):
+        super().init_widget_static(configuration)
+        if not self.parent_view:
+            return
+        for setting in self.get_settings():
+            setting.filter_widget.view_id = self.parent_view.get_id()
+
+
+class ArticleCostChartWidget(ParentFormSettingMixin, SBAdminDashboardChartWidget):
+    name = _("Cost")
+    model = Article
+    chart_type = "bar"
+    y_axis_annotate = Count("id")
+    order_by = "x_axis"
+    TIME_FRAME_KEY = "article_cost_time_frame"
+    settings = [
+        SBAdminField(
+            title=_("Time frame"),
+            name=TIME_FRAME_KEY,
+            filter_widget=ChoiceFilterWidget(
+                choices=[
+                    ("year", _("Year")),
+                    ("all", _("All")),
+                ],
+                default_value="year",
+                allow_clear=False,
+            ),
+        )
+    ]
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return True
+
+    def get_x_axis_annotate(self, request):
+        return TruncMonth("created_at")
+
+    def get_queryset(self, request=None):
+        qs = super().get_queryset(request)
+        if request.request_data.request_get.get(self.TIME_FRAME_KEY, "year") == "year":
+            qs = qs.filter(created_at__year=timezone.now().year)
+        return qs
+```
+
+Use this child-local setting pattern only when the parent renders one shared filter form and one child needs an extra control. Keep setting names unique (`article_cost_time_frame`, not `time_frame`) to avoid collisions between sibling widgets.
+
+**Source:** `django_smartbase_admin/engine/dashboard.py`; `django_smartbase_admin/templates/sb_admin/dashboard/widget_base.html`; `django_smartbase_admin/templates/sb_admin/dashboard/chart_widget.html`; `django_smartbase_admin/templates/sb_admin/dashboard/group_widget.html`; `django_smartbase_admin/static/sb_admin/src/js/chart.js`; `django_smartbase_admin/static/sb_admin/src/js/dashboard_group.js`
+
+---
+
 ## Detail View Widgets
 
 SBAdmin admins can register dashboard-style widgets and place them inside detail/change fieldsets. Use this when related data belongs on the object page but should stay read-only and self-contained, for example a compact related-row list or a small aggregate chart.
@@ -5072,6 +5641,131 @@ Projects can further restrict access by:
 
 ---
 
+## Messaging
+
+Built-in optional app (`django_smartbase_admin.messaging`) for sending in-app messages to users. It ships a `Message` model (title, type, rich-HTML content, file attachments, JSON `targeting`), a per-recipient `MessageRecipient` join (with `notified_at` / `read_at`), two auto-registered admin views, and a notification poller that surfaces new messages as a toast or an acknowledge-modal on every page load. Disabled until a project attaches an `SBAdminMessagingConfig` to its role configuration.
+
+The two auto-registered views (no `@admin.register` needed):
+- **`MessageAdmin`** (`messaging_message`) — authoring/management list + add form, gated by Django model permissions on `Message`. The detail of a created message is read-only.
+- **`MessageInboxAdmin`** (`messaging_messagerecipient`) — per-user inbox over `MessageRecipient`, visible to any authenticated user and scoped to their own rows; opening a message marks it read.
+
+### Installation
+
+1. Add to `INSTALLED_APPS` (after `django_smartbase_admin`):
+
+```python
+INSTALLED_APPS = [
+    "django_smartbase_admin",
+    "django_smartbase_admin.messaging",
+]
+```
+
+2. Run migrations: `python manage.py migrate`
+
+3. Attachments use a plain Django `FileField`, so ensure `MEDIA_ROOT` / `MEDIA_URL` are configured (no `filer` dependency).
+
+### Attachment upload path & storage
+
+`MessageAttachment.file` resolves both its upload directory and its storage backend through stable module-level callables (`message_attachment_upload_to` / `message_attachment_storage`). Django serializes a *callable* `upload_to`/`storage` into migrations as its import path and never inspects what it returns, so a project can override either via settings **without generating a migration** — only the callables' runtime results change, not the field definition. Both default to `messaging/attachments/` and the project's default storage when unset.
+
+```python
+# settings.py — all optional, all migration-free
+
+# upload directory: a string prefix, "" for the storage/container root,
+# or an (instance, filename) -> path callable
+SB_ADMIN_MESSAGING_ATTACHMENT_UPLOAD_TO = "tenant/attachments/"
+
+# storage backend: a STORAGES alias, a Storage instance, or a callable returning one
+SB_ADMIN_MESSAGING_ATTACHMENT_STORAGE = "messaging"   # -> storages["messaging"]
+```
+
+Caveat: the override must flow through these fixed callables via the settings. Pointing the field at a *different* callable changes the serialized import path and *would* require a migration.
+
+### Enabling — `messaging_config`
+
+Set `messaging_config` on the role configuration. With no arguments it uses sensible defaults (info→toast, warning→ack-modal; users/groups/all-users audiences); pass `message_types` / `audiences` to override.
+
+```python
+from django_smartbase_admin.messaging.config import (
+    SBAdminMessagingConfig, SBAdminMessageType, NotificationStyle,
+    UsersAudience, GroupsAudience, AllUsersAudience,
+)
+
+class _RoleConfig(SBAdminRoleConfiguration):
+    messaging_config = SBAdminMessagingConfig(
+        message_types=[
+            SBAdminMessageType(
+                key="info", label=_("Info"),
+                notification_style=NotificationStyle.TOAST,
+                icon="Info", color="notice",
+            ),
+            SBAdminMessageType(
+                key="warning", label=_("Warning"),
+                notification_style=NotificationStyle.MODAL,
+                icon="Attention", color="warning", require_acknowledge=True,
+            ),
+        ],
+        audiences=[UsersAudience(), GroupsAudience(), AllUsersAudience()],
+        poll_interval_seconds=60,   # how often the page polls for new messages
+        scope_by_author=False,      # True → MessageAdmin lists only the current user's sent messages
+    )
+```
+
+**`SBAdminMessageType`** — `key` (stored on `Message.type`), `label`, `notification_style` (`TOAST` or `MODAL`), `icon` (sb_admin sprite id), `color` (badge/alert colour token, e.g. `"notice"`/`"warning"`/`"primary"`), `require_acknowledge` (modal-only; forces an explicit Acknowledge click).
+
+### Menu wiring
+
+The framework only registers the views — the project adds the menu entries. Typical split: senders get a submenu (received + sent), receive-only users get just the inbox. Show the inbox unread count with `SBAdminMessagingService.get_unread_count` as the menu item's `badge`.
+
+```python
+from django_smartbase_admin.messaging.services import SBAdminMessagingService
+
+SBAdminMenuItem(
+    view_id="messaging_messagerecipient",   # the inbox
+    label=_("My messages"), icon="Mail",
+    badge=SBAdminMessagingService.get_unread_count,
+)
+SBAdminMenuItem(view_id="messaging_message", label=_("Sent"))   # management view
+```
+
+### Recipient audiences
+
+An **audience** is a pluggable recipient source. On the add form each audience contributes one field under "Recipients"; on save the selections are stored in `Message.targeting` (`{audience_key: value}`) and resolved to `MessageRecipient` rows. Built-ins: `UsersAudience` (autocomplete), `GroupsAudience` (Django groups), `AllUsersAudience` (no selection).
+
+Add a custom audience by subclassing `SBAdminMessageAudience` — implement `get_form_field` (return `None` for no per-message selection), `serialize` (cleaned value → JSON-safe), `get_initial` (stored → form initial), and `resolve_users` (stored value → **auth user** queryset). Do model imports lazily (the module loads during settings).
+
+```python
+from django_smartbase_admin.messaging.config import SBAdminMessageAudience
+
+class StaffAudience(SBAdminMessageAudience):
+    """No selection — targets all staff users whenever chosen."""
+    key = "staff"
+    label = _("Staff users")
+
+    def get_form_field(self, request):
+        from django import forms
+        return forms.BooleanField(required=False, label=self.label)
+
+    def serialize(self, cleaned_value):
+        return bool(cleaned_value)
+
+    def resolve_users(self, stored_value, request):
+        from django.contrib.auth import get_user_model
+        model = get_user_model()
+        return model.objects.filter(is_staff=True) if stored_value else model.objects.none()
+```
+
+For a selection-based custom audience, return a `forms.MultipleChoiceField`/`ModelMultipleChoiceField` from `get_form_field` and resolve the stored ids in `resolve_users` (see `UsersAudience` / `GroupsAudience` for the pattern).
+
+### Contributing to the messaging app
+
+- **Where logic lives:** query/badge/read-state helpers go on `SBAdminMessagingService` (classmethods) in `messaging/services.py` — don't inline `.objects.filter(...)` or `<span class="badge">` markup in `sb_admin.py`. Reuse `format_badge` for badges and `datetime_formatter` for dates.
+- **Templates:** the message card (`templates/sb_admin/messaging/detail_card.html`), toast/modal poller (`poller.html`, `poll_response.html`) are shared by the inbox detail, admin detail, and modal — change them in one place. The per-model submit row override lives at `templates/sb_admin/sb_admin_messaging/message/submit_line.html`.
+- **Type-badge filter:** the type badge in lists comes from `SBAdminMessagingService.render_message_type_badge` and the `sb_admin_messaging_tags` template filter (resolves the active `messaging_config` from the thread-local request).
+- **Strings:** wrap user-facing text in `_()` and recompile catalogs (see [Internationalization](#internationalization)). After `makemessages`, clear any `#, fuzzy` flags on new strings or they render untranslated.
+
+---
+
 ## Internationalization
 
 SBAdmin now ships locale catalogs for multiple languages and includes helper scripts to regenerate them in one pass.
@@ -5118,11 +5812,13 @@ This is the preferred pattern for autocomplete placeholders, empty states, and o
 
 Optional `django-mcp-server` integration. Requires normal SBAdmin setup (`SB_ADMIN_CONFIGURATION`, `sb_admin_site.urls`).
 
+### Install
+
 ```bash
 pip install "django-smartbase-admin[mcp]"
 ```
 
-### Host project — `INSTALLED_APPS`
+### Installed Apps
 
 ```python
 INSTALLED_APPS = [
@@ -5135,7 +5831,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-### Host project — `urls.py`
+### URL Setup
 
 Mount **before** catch-all routes:
 
@@ -5148,9 +5844,12 @@ urlpatterns = [
 ]
 ```
 
-Endpoint: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+Exposed endpoints:
 
-### Host project — `settings.py`
+- MCP JSON-RPC: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
+- Optional REST `list_rows`: `{SITE_ROOT}{DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` (for `DJANGO_MCP_ENDPOINT = "mcp/"`, this is `{SITE_ROOT}mcp/rest/tools/list_rows/`). This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
+
+### MCP Settings
 
 ```python
 from django_smartbase_admin.mcp.instructions import SBADMIN_MCP_SERVER_INSTRUCTIONS
@@ -5168,7 +5867,15 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "stateless": True,
 }
 DJANGO_MCP_ENDPOINT = "mcp/"
+```
 
+This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
+
+### OAuth Auth
+
+Use the bundled OAuth 2.1 Authorization Server by adding `oauth2_provider`, including `django_smartbase_admin.mcp.oauth.urls`, and configuring DOT:
+
+```python
 OAUTH2_PROVIDER = {
     "SCOPES": {"sbadmin:write": "SBAdmin MCP access"},
     "PKCE_REQUIRED": True,
@@ -5182,16 +5889,165 @@ OAUTH2_PROVIDER = {
 }
 ```
 
-This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
-
 Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTICATION_CLASSES` to your DRF `BaseAuthentication` subclass.
 
-### Two browser-only extras
+### REST `list_rows`
 
-The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. Two bundled classes, however, only matter for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
+`django_smartbase_admin.mcp.urls` exposes only `POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` for REST. It calls the same guarded `list_rows` MCP tool and accepts the same JSON arguments, for example:
 
-- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them.
-- **`SBAdminMCPOAuth2Authentication`** (`mcp/oauth/auth.py`) — adds `resource_metadata="…"` to the `WWW-Authenticate` header for header-driven discovery. Native clients fall back to probing `/.well-known/*` directly, so the stock DOT `OAuth2Authentication` also works for them. Keep the subclass for broad compatibility.
+```json
+{
+  "view_id": "app_model",
+  "fields": ["id", "name"],
+  "page": 1,
+  "page_size": 20
+}
+```
+
+Authentication is configured once via `SBADMIN_MCP_REST_AUTHENTICATOR`; host projects should not subclass the REST API views just to attach an authenticator. The authenticator may be an import path, class, or instance extending `SBAdminMCPRestAuthenticator` / DRF `BaseAuthentication`. Return `(user, auth)` when credentials are valid and `None` when invalid.
+
+```python
+SBADMIN_MCP_REST_AUTHENTICATOR = "my_project.mcp_auth.MyMCPRestAuthenticator"
+```
+
+### Dashboard Usage
+
+`POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` can back local live dashboards when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured and an authenticated probe succeeds. A 401 response means the REST authenticator rejected the request or is not configured for that deployment.
+
+### Current User / Whoami
+
+MCP requests know the authenticated Django user internally, but agents should not guess the matching admin row by scanning user lists. Configure `SBAdminRoleConfiguration.mcp_whoami_sbadmin` to expose the current user's profile detail target through `list_admins()["whoami"]` and the `fetch_whoami` MCP tool.
+
+For a user-profile admin, keep the profile admin project-side. A common setup is a `User` proxy model whose changelist URL renders the logged-in user's change form:
+
+```python
+# accounts/models.py
+from django.contrib.auth import get_user_model
+
+BaseUser = get_user_model()
+
+
+class MyProfile(BaseUser):
+    class Meta:
+        proxy = True
+        verbose_name = "my profile"
+        verbose_name_plural = "my profile"
+```
+
+```python
+# accounts/sb_admin.py
+from django.contrib import admin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseRedirect
+
+from accounts.models import MyProfile
+from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.configuration import (
+    SBAdminWhoamiConfig,
+    SBAdminRoleConfiguration,
+)
+
+@admin.register(MyProfile, site=sb_admin_site)
+class MyProfileAdmin(SBAdmin):
+    model = MyProfile
+    fieldsets = (
+        (None, {"fields": ("username", "first_name", "last_name", "email")}),
+    )
+    readonly_fields = ("username",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        if obj is None:
+            return request.user.is_authenticated
+        return obj.pk == request.user.pk
+
+    def has_change_permission(self, request, obj=None):
+        if obj is None:
+            return request.user.is_authenticated
+        return obj.pk == request.user.pk
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field=from_field)
+        if obj and obj.pk != request.user.pk:
+            raise PermissionDenied
+        return obj
+
+    def changelist_view(self, request, extra_context=None):
+        profile_url = self.get_menu_view_url(request)
+        return self.change_view(
+            request,
+            str(request.user.pk),
+            form_url=profile_url,
+            extra_context=extra_context,
+        )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        profile_url = self.get_menu_view_url(request)
+        if str(object_id) != str(request.user.pk):
+            return HttpResponseRedirect(profile_url)
+        return super().change_view(request, object_id, form_url, extra_context)
+
+
+_role_config = SBAdminRoleConfiguration(
+    default_view=SBAdminMenuItem(view_id="dashboard"),
+    menu_items=[
+        SBAdminMenuItem(view_id="accounts_myprofile", label="My profile", icon="User-business"),
+        ...
+    ],
+    registered_views=[...],
+    mcp_whoami_sbadmin=SBAdminWhoamiConfig(
+        view_id="accounts_myprofile",
+    ),
+)
+```
+
+`SBAdminWhoamiConfig` defaults to `request.user.pk` as the detail `object_id`, which matches proxy-user profile admins. Use `object_id_getter` only when the profile object has a different key:
+
+```python
+mcp_whoami_sbadmin=SBAdminWhoamiConfig(
+    view_id="accounts_customerprofile",
+    object_id_getter=lambda request: request.user.customer_profile_id,
+)
+```
+
+Agents can either call `fetch_whoami(fields=[...])` directly, or read `list_admins()["whoami"]` and pass its `view_id` / `object_id` to `fetch_detail` or `update_detail`. The target is still checked through normal SBAdmin view and object permissions.
+
+### The browser-only extra
+
+The discovery endpoints (`authorization_server_metadata`, `protected_resource_metadata` in `mcp.oauth.urls`) are **always required** — every client reads them to find the auth/token endpoints. One bundled class, however, only matters for **browser-hosted** clients (claude.ai Cowork, cursor.com web):
+
+- **`SBAdminMCPCorsMiddleware`** (`mcp/middleware.py`) — path-scoped CORS so browsers don't block cross-origin `/mcp/` calls. Native/CLI clients send no `Origin`; omit it if you only target them. Wire it into `MIDDLEWARE` **before** anything that 401/403s the MCP path (Django's `SecurityMiddleware`, then this, then session/auth) so the preflight short-circuits, and list the browser origins it may reflect in `SBADMIN_MCP_ALLOWED_ORIGINS` (defaults: `https://claude.ai`, `https://cursor.com`):
+
+  ```python
+  MIDDLEWARE = [
+      "django.middleware.security.SecurityMiddleware",
+      "django_smartbase_admin.mcp.middleware.SBAdminMCPCorsMiddleware",
+      # ... session / locale / common / auth ...
+  ]
+
+  # Override/extend the default allowlist; values are matched exactly.
+  SBADMIN_MCP_ALLOWED_ORIGINS = [
+      "https://claude.ai",
+      "https://cursor.com",
+  ]
+
+  # Optional: extend when a project REST authenticator needs custom headers.
+  # Defaults to Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id.
+  SBADMIN_MCP_ALLOWED_HEADERS = [
+      "Authorization",
+      "Content-Type",
+      "MCP-Protocol-Version",
+      "MCP-Session-Id",
+      "X-Project-Auth",
+  ]
+  ```
+Use the stock DOT `oauth2_provider.contrib.rest_framework.OAuth2Authentication` as your `DJANGO_MCP_AUTHENTICATION_CLASSES` (as shown above) for **all** clients. Its `401` `WWW-Authenticate` header carries no `resource_metadata` pointer, but every client — browser-hosted and native alike — falls back to probing `/.well-known/*` directly, so header-driven discovery isn't needed. (An earlier `SBAdminMCPOAuth2Authentication` subclass that added the pointer was removed once probing proved sufficient.)
 
 (Verified: a Claude Code CLI connection completed OAuth with the plain auth class and no CORS middleware.)
 
@@ -5200,7 +6056,7 @@ The discovery endpoints (`authorization_server_metadata`, `protected_resource_me
 A ready-to-use single-page dashboard blueprint is exposed as the MCP **resource** `dashboard://blueprint` (read it; full setup is in its description). It logs in via OAuth PKCE and reads live data through an `api(tool, args)` helper over the MCP tools. To run one locally against a deployed (HTTPS) admin:
 
 1. **Serve over http on localhost** — fine as-is: loopback is a browser *secure context* (so `crypto.subtle` PKCE works) and the OAuth/MCP traffic to the admin is HTTPS regardless. Serve on a spare port (`python -m http.server 8010`).
-2. **Allow the origin** — add `http://localhost:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS`. `SBAdminMCPCorsMiddleware` reflects it **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session.
+2. **Allow the origin** — add both `http://localhost:8010` and `http://127.0.0.1:8010` to `SBADMIN_MCP_ALLOWED_ORIGINS` (`8010` is the blueprint's canonical serve port; the two loopback hosts aren't interchangeable to a browser, so list both). `SBAdminMCPCorsMiddleware` reflects them **without** `Access-Control-Allow-Credentials` (the flow is Bearer + PKCE, cookieless), so an allowed local page can't ride the user's admin session — which is why it's safe to keep these loopback origins allowed in **every** environment, including production, so one locally-served page can target any deployed backend without per-environment config.
 3. **Connect** — the page self-registers an OAuth client via DCR (`POST <issuer>/oauth/register`) on first connect and caches the `client_id` in `localStorage`; no manual registration. The DCR endpoint and `SBAdminMCPOAuth2Validator` accept the page's plain-http redirect because it's **loopback** (`localhost`, `127.0.0.1`, `::1`); any other http host is rejected.
 
 No HTTPS is needed locally; only if you serve the page on a non-loopback host (LAN IP / custom domain), which isn't a secure context over http — then use a TLS static server (e.g. mkcert) and register an `https://` redirect URI.

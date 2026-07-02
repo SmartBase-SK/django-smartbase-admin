@@ -175,6 +175,18 @@ class Singleton(type):
         return cls._instances[cls]
 
 
+class SBAdminWhoamiConfig:
+    """MCP pointer to the current user's profile change view."""
+
+    def __init__(self, view_id, object_id_getter=None):
+        self.view_id = view_id
+        self.object_id_getter = object_id_getter or self.get_default_object_id
+
+    @staticmethod
+    def get_default_object_id(request):
+        return getattr(request.user, "pk", None)
+
+
 class SBAdminRoleConfiguration(metaclass=Singleton):
     default_view = None
     registered_views = None
@@ -194,6 +206,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     default_list_sticky_header_and_footer = True
     enable_url_compression = True
     mcp_readonly = False
+    link_history_to_audit = True
+    messaging_config = None
+    mcp_whoami_sbadmin = None
 
     def __init__(
         self,
@@ -209,6 +224,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         default_list_sticky_header_and_footer=None,
         enable_url_compression=None,
         mcp_readonly=None,
+        link_history_to_audit=None,
+        messaging_config=None,
+        mcp_whoami_sbadmin=None,
     ) -> None:
         super().__init__()
         self.default_view = default_view or self.default_view or []
@@ -235,6 +253,19 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         )
         self.mcp_readonly = (
             mcp_readonly if mcp_readonly is not None else self.mcp_readonly
+        )
+        self.link_history_to_audit = (
+            link_history_to_audit
+            if link_history_to_audit is not None
+            else self.link_history_to_audit
+        )
+        self.messaging_config = (
+            messaging_config if messaging_config is not None else self.messaging_config
+        )
+        self.mcp_whoami_sbadmin = (
+            mcp_whoami_sbadmin
+            if mcp_whoami_sbadmin is not None
+            else self.mcp_whoami_sbadmin
         )
 
     def init_registered_views(self):
@@ -332,6 +363,27 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         request_data = getattr(request, "request_data", None)
         if request_data is not None:
             request_data.register_autocomplete_view(view)
+
+    def get_whoami_target(self, request):
+        """Return the current user's configured profile target for MCP."""
+        config = self.mcp_whoami_sbadmin
+        user = getattr(request, "user", None)
+        if not config or not getattr(user, "is_authenticated", False):
+            return None
+
+        view_id = getattr(config, "view_id", None)
+        if not view_id:
+            return None
+        view = self.view_map.get(view_id)
+        if view is None:
+            raise LookupError(f"No SBAdmin view registered with view_id={view_id!r}.")
+
+        object_id_getter = getattr(config, "object_id_getter", None)
+        object_id = object_id_getter(request) if callable(object_id_getter) else None
+        if object_id is None:
+            return None
+
+        return {"view_id": view_id, "object_id": str(object_id)}
 
     def restrict_queryset(
         self,

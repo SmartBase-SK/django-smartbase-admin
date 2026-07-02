@@ -6,6 +6,10 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.views.generic import FormView
 from django_htmx.http import trigger_client_event
+from django_smartbase_admin.audit.manager import (
+    AuditParentContext,
+    audit_parent_context as sbadmin_audit_parent_context,
+)
 from django_smartbase_admin.engine.const import (
     IGNORE_LIST_SELECTION,
     TABLE_RELOAD_DATA_EVENT_NAME,
@@ -343,8 +347,23 @@ class RowActionModalView(ActionModalView):
             return HttpResponse(self.not_found_message, status=404)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_audit_parent_context(self, request, obj):
+        return AuditParentContext.from_parent_path(
+            getattr(self.view, "parent_view", None),
+            obj,
+            getattr(self.view, "path_to_parent_instance_id", None),
+        )
+
+    def audit_parent_context(self, request, obj):
+        return sbadmin_audit_parent_context(
+            request,
+            lambda: self.get_audit_parent_context(request, obj),
+        )
+
     def process_form_valid(self, request, form):
-        self.process_form_valid_object(request, form, self.get_object())
+        obj = self.get_object()
+        with self.audit_parent_context(request, obj):
+            self.process_form_valid_object(request, form, obj)
         return super().process_form_valid(request, form)
 
     def process_form_valid_object(self, request, form, obj):
