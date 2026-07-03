@@ -30,7 +30,7 @@
           {% endif %}
         </button>
         <span class="permission-tree__count mr-10 text-14" data-permission-tree-count>{{ section.selected_count }}/{{ section.permissions_count }}</span>
-        <div class="permission-tree__select-all relative min-h-24">
+        <div class="permission-tree__select-all">
           <input type="checkbox" class="toggle" data-permission-tree-select-all id="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all">
           <label for="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all"></label>
         </div>
