@@ -7,8 +7,10 @@ import { shouldProcessAfterSwap } from './utils'
 
 const FORMSET_SELECTOR = '.sbadmin-formset-dynamic'
 const ROW_SELECTOR = '.sbadmin-formset-row'
+const FORMS_WRAP_SELECTOR = '.sbadmin-formset-forms'
 const DELETE_ROW_SELECTOR = '[data-sbadmin-formset-delete-row]'
 const INIT_ATTR = 'data-sbadmin-formset-initialized'
+const INITIAL_ROW_ATTR = 'data-sbadmin-formset-initial-row'
 
 export default class SBAdminFormset {
     constructor() {
@@ -75,7 +77,7 @@ export default class SBAdminFormset {
         const totalInput = container.querySelector(
             `input[name="${prefix}-TOTAL_FORMS"]`
         )
-        const formsWrap = container.querySelector('.sbadmin-formset-forms')
+        const formsWrap = container.querySelector(FORMS_WRAP_SELECTOR)
         const tpl = document.getElementById(`${prefix}-empty-template`)
         const addBtn = container.querySelector('.sbadmin-formset-add')
         if (!totalInput || !formsWrap || !tpl || !tpl.content || !addBtn) return
@@ -88,7 +90,7 @@ export default class SBAdminFormset {
             if (!row) return
             SBAdminFormset.replacePrefix(row, total)
             row.id = `${prefix}-${total}`
-            row.removeAttribute('data-sbadmin-formset-initial-row')
+            row.removeAttribute(INITIAL_ROW_ATTR)
             row.style.order = total
             row.querySelectorAll("script:not([type='application/json'])").forEach((s) => {
                 s.remove()
@@ -115,9 +117,12 @@ export default class SBAdminFormset {
 
     syncDeletedRows(formset) {
         if (!formset) return
-        const formsWrap = formset.querySelector('.sbadmin-formset-forms')
+        const formsWrap = formset.querySelector(FORMS_WRAP_SELECTOR)
         if (!formsWrap) return
         formsWrap.querySelectorAll(ROW_SELECTOR).forEach((row) => {
+            if (row.hasAttribute(INITIAL_ROW_ATTR)) {
+                return
+            }
             const deleteInput = row.querySelector(
                 'input[type="checkbox"][name$="-DELETE"]'
             )
@@ -128,7 +133,7 @@ export default class SBAdminFormset {
 
     syncDeleteButtons(formset) {
         if (!formset) return
-        const formsWrap = formset.querySelector('.sbadmin-formset-forms')
+        const formsWrap = formset.querySelector(FORMS_WRAP_SELECTOR)
         let protectedRows = parseInt(
             formset.getAttribute('data-delete-protected-rows') || '0',
             10
@@ -136,7 +141,7 @@ export default class SBAdminFormset {
         if (isNaN(protectedRows)) protectedRows = 0
         const visibleRows = this.getVisibleRows(formsWrap)
         const protectedVisibleInitialRows = visibleRows
-            .filter((row) => row.hasAttribute('data-sbadmin-formset-initial-row'))
+            .filter((row) => row.hasAttribute(INITIAL_ROW_ATTR))
             .slice(0, protectedRows)
         visibleRows.forEach((row) => {
             const isProtected = protectedVisibleInitialRows.indexOf(row) !== -1
@@ -151,7 +156,7 @@ export default class SBAdminFormset {
         const row = button.closest(ROW_SELECTOR)
         if (!row) return
         const formset = row.closest(FORMSET_SELECTOR)
-        const formsWrap = row.closest('.sbadmin-formset-forms')
+        const formsWrap = row.closest(FORMS_WRAP_SELECTOR)
         let minForms = parseInt(
             formset ? formset.getAttribute('data-min-forms') || '0' : '0',
             10
