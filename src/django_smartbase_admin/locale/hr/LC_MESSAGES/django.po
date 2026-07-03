@@ -422,6 +422,9 @@ msgstr ""
 msgid "Saved Views"
 msgstr ""
 
+msgid "Filters"
+msgstr ""
+
 msgid "Advanced Filters"
 msgstr ""
 
