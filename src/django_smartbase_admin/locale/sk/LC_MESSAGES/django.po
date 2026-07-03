@@ -1267,3 +1267,11 @@ msgstr "Jazyk"
 
 msgid "Notified"
 msgstr "Notifikovaný"
+
+msgctxt "pagination"
+msgid "Page"
+msgstr "Strana"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr "Prejsť"

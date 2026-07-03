@@ -1285,3 +1285,11 @@ msgstr "Jazyk"
 
 msgid "Notified"
 msgstr "Notifikováno"
+
+msgctxt "pagination"
+msgid "Page"
+msgstr "Strana"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr "Přejít"

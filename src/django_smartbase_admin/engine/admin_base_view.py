@@ -994,6 +994,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             "stickyHeaderAndFooter": sticky_header_and_footer,
+            "paginationPageInputMinPages": request.request_data.configuration.list_pagination_page_input_min_pages,
             "enableUrlCompression": request.request_data.configuration.enable_url_compression,
             # used to initialize all columns with these values
             "defaultColumnData": {},
