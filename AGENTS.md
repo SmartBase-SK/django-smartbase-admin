@@ -1584,6 +1584,7 @@ self.fields["permissions"].widget = SBAdminPermissionWidget(
 - ``SBAdminPermissionWidget.value_from_datadict()`` parses that JSON back to a Python list when the form is submitted.
 - The form field queryset decides which permissions may be referenced. In groups mode, every ``PermissionOption.codenames`` ref must exist in that queryset.
 - Permissions referenced by ``PermissionOption`` are marked as seen and are not duplicated in the automatic leftover groups.
+- Group options are all-or-nothing: a ``PermissionOption`` checkbox renders checked only when all of its backing permission IDs are already selected. Partial legacy selections are not shown in the automatic fallback section because those permissions are still marked as seen, and the client rewrites the hidden input from visible checked boxes. When adding codenames to an existing option or changing option membership, ship a data migration that updates existing groups/users to the intended complete permission set, or intentionally clears the old partial assignment.
 - When the widget is assigned after the field has been constructed, pass ``queryset=`` explicitly.
 - Permission refs must use ``app_label.model:codename``. Bare codenames are not supported.
 - If a permission ref is malformed or missing from the widget queryset, rendering raises ``ImproperlyConfigured``.
