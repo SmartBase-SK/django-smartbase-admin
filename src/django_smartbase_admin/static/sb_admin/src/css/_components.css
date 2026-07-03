@@ -601,258 +601,251 @@
         z-index: 1020;
     }
 
-    [data-permission-tree] {
+    .permission-tree {
         --permission-tree-standard-cell-width: 4.5rem;
         @apply flex flex-col gap-12;
     }
 
-    [data-permission-tree-list] {
+    .permission-tree__list {
         @apply flex flex-col border border-dark-200 rounded overflow-hidden;
     }
 
-    [data-permission-tree-app] {
+    .permission-tree__section {
         @apply border-b border-dark-200;
     }
 
-    [data-permission-tree-list] > [data-permission-tree-app]:nth-last-child(2) {
+    .permission-tree__section--last {
         @apply border-b-0;
     }
 
-    [data-permission-tree-header] {
+    .permission-tree__header {
         @apply flex items-center bg-dark-50 transition-colors;
     }
 
-    [data-permission-tree-header]:hover {
+    .permission-tree__header:hover {
         @apply bg-dark-100;
     }
 
-    [data-permission-tree-collapse-toggle] {
+    .permission-tree__collapse-toggle {
         @apply flex items-center gap-8 h-44 px-16 flex-1 min-w-0 text-left text-14 font-medium text-dark-900 bg-transparent border-0;
     }
 
-    [data-permission-tree-chevron] {
+    .permission-tree__chevron {
         @apply shrink-0 text-dark-400 transition-transform;
     }
 
-    [data-permission-tree-help] {
+    .permission-tree__help {
         @apply inline-flex items-center justify-center shrink-0 w-16 h-16 text-dark-400;
     }
 
-    [data-permission-tree-help] svg {
+    .permission-tree__help svg {
         @apply w-16 h-16;
     }
 
-    [data-permission-tree-collapse-toggle][aria-expanded="true"] [data-permission-tree-chevron] {
+    .permission-tree__collapse-toggle[aria-expanded="true"] .permission-tree__chevron {
         @apply rotate-90;
     }
 
-    [data-permission-tree-select-all-wrapper] {
+    .permission-tree__select-all {
         @apply shrink-0 mr-16;
     }
 
-    [data-permission-tree-count] {
+    .permission-tree__count {
         @apply text-12 text-dark-400 tabular-nums;
         font-family: monospace;
     }
 
-    [data-permission-tree-collapse-body] {
+    .permission-tree__body {
         @apply bg-light;
     }
 
-    [data-permission-tree-collapse-body] > p {
+    .permission-tree__body > p {
         @apply px-16 py-8 text-12 text-dark-400 border-t border-dark-200;
     }
 
-    [data-permission-tree-collapse-body] > div {
+    .permission-tree__body-content {
         @apply flex flex-col px-16 py-10;
     }
 
-    [data-permission-tree-collapse-body] > div > [data-permission-tree-perm] + [data-permission-tree-perm] {
+    .permission-tree__body-content > .permission-tree__perm + .permission-tree__perm {
         @apply border-t border-dark-200;
     }
 
-    [data-permission-tree-model] {
+    .permission-tree__model {
         @apply border-t border-dark-200 w-full;
     }
 
-    [data-permission-tree-model]:first-child {
+    .permission-tree__model:first-child {
         @apply border-t-0;
     }
 
-    [data-permission-tree-standard-grid] {
+    .permission-tree__standard-grid {
         @apply flex flex-col;
     }
 
-    [data-permission-tree-standard-header-row],
-    [data-permission-tree-standard-row] {
+    .permission-tree__standard-header-row,
+    .permission-tree__standard-row {
         display: grid;
         grid-template-columns: minmax(max-content, 1fr) repeat(4, var(--permission-tree-standard-cell-width));
         @apply gap-x-12 items-center;
     }
 
-    [data-permission-tree-standard-row] {
+    .permission-tree__standard-row {
         @apply py-8;
     }
 
-    [data-permission-tree-standard-model][hidden],
-    [data-permission-tree-standard-row][hidden] {
+    .permission-tree__model[hidden],
+    .permission-tree__standard-row[hidden] {
         display: none;
     }
 
-    [data-permission-tree-standard-header] {
+    .permission-tree__standard-header {
         @apply text-12 font-medium text-dark-400 text-center;
     }
 
-    [data-permission-tree-standard-cell] {
+    .permission-tree__standard-cell {
         @apply w-44 justify-self-center;
     }
 
-    [data-permission-tree-standard-action-label],
-    input[type="checkbox"].toggle ~ [data-permission-tree-standard-action-label] {
+    .permission-tree__standard-action-label,
+    input[type="checkbox"].toggle ~ .permission-tree__standard-action-label {
         @apply hidden;
     }
 
-    [data-permission-tree-model-name] {
+    .permission-tree__model-name {
         @apply text-14 font-medium text-dark-900;
     }
 
-    [data-permission-tree-custom-list] {
+    .permission-tree__custom-list {
         @apply flex flex-col;
     }
 
-    [data-permission-tree-custom-row] + [data-permission-tree-custom-row] {
+    .permission-tree__custom-row + .permission-tree__custom-row {
         @apply border-t border-dark-200;
     }
 
-    [data-permission-tree-standard-grid] + [data-permission-tree-custom-list] {
+    .permission-tree__standard-grid + .permission-tree__custom-list {
         @apply border-t border-dark-200;
     }
 
-    [data-permission-tree-custom-header] {
+    .permission-tree__custom-header {
         display: grid;
         grid-template-columns: minmax(0, 1fr) var(--permission-tree-standard-cell-width);
         @apply items-center py-8 text-12 font-medium text-dark-400;
     }
 
-    [data-permission-tree-custom-header-action] {
+    .permission-tree__custom-header-action {
         @apply text-center;
     }
 
-    [data-permission-tree-custom-header] + [data-permission-tree-custom-row] {
+    .permission-tree__custom-header + .permission-tree__custom-row {
         @apply border-t border-dark-200;
     }
 
-    [data-permission-tree-custom-row] {
+    .permission-tree__custom-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) var(--permission-tree-standard-cell-width);
         @apply items-center py-8 text-14 text-dark-800;
     }
 
-    [data-permission-tree-option-row] {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) var(--permission-tree-standard-cell-width);
-        @apply items-center py-8 text-14 text-dark-800;
-    }
-
-    [data-permission-tree-option-row] > input[type="checkbox"].toggle + label,
-    [data-permission-tree-custom-row] > input[type="checkbox"].toggle + label {
+    .permission-tree__custom-row > input[type="checkbox"].toggle + label {
         @apply left-auto;
         right: calc((var(--permission-tree-standard-cell-width) - 2.75rem) / 2);
     }
 
-    [data-permission-tree-option-row] > input[type="checkbox"].toggle + label,
-    [data-permission-tree-custom-row] > input[type="checkbox"].toggle + label {
+    .permission-tree__custom-row > input[type="checkbox"].toggle + label {
         top: calc(50% - 0.75rem);
     }
 
-    [data-permission-tree-option-row] > [data-permission-tree-text],
-    [data-permission-tree-option-row] > input[type="checkbox"].toggle ~ [data-permission-tree-text],
-    [data-permission-tree-custom-row] > [data-permission-tree-text],
-    [data-permission-tree-custom-row] > input[type="checkbox"].toggle ~ [data-permission-tree-text] {
+    .permission-tree__custom-row > .permission-tree__custom-label,
+    .permission-tree__custom-row > input[type="checkbox"].toggle ~ .permission-tree__custom-label {
         @apply top-0 pl-0 font-medium text-dark-800;
     }
 
-    [data-permission-tree-option-row] > label[data-permission-tree-text],
-    [data-permission-tree-custom-row] > label[data-permission-tree-text] {
+    .permission-tree__custom-label {
         @apply flex items-center min-h-24;
     }
 
-    [data-permission-tree-option-row] > p[data-permission-tree-text],
-    [data-permission-tree-option-row] > input[type="checkbox"].toggle ~ p[data-permission-tree-text] {
-        grid-column: 1;
-        @apply mt-2 text-12 font-normal text-dark-400;
+    .permission-tree__custom-row--has-help {
+        @apply min-h-44;
     }
 
-    [data-permission-tree-perm] {
+    .permission-tree__custom-row > .permission-tree__custom-help,
+    .permission-tree__custom-row > input[type="checkbox"].toggle ~ .permission-tree__custom-help {
+        grid-column: 1;
+        @apply top-0 pl-0 mt-2 mb-0 text-12 leading-18 font-normal text-dark-400;
+    }
+
+    .permission-tree__perm {
         @apply text-14 text-dark-800;
     }
 
-    [data-permission-tree-perm][hidden] {
+    .permission-tree__perm[hidden] {
         display: none !important;
     }
 
-    [data-permission-tree-perm] > p {
+    .permission-tree__perm > p {
         @apply text-12 text-dark-400;
     }
 
     @screen max-sm {
-        [data-permission-tree-standard-grid] {
+        .permission-tree__standard-grid {
             display: flex;
             @apply flex-col gap-10;
         }
 
-        [data-permission-tree-standard-header-row],
-        [data-permission-tree-standard-header] {
+        .permission-tree__standard-header-row,
+        .permission-tree__standard-header {
             @apply hidden;
         }
 
-        [data-permission-tree-standard-model] {
+        .permission-tree__model {
             display: block;
         }
 
-        [data-permission-tree-standard-header-row] + [data-permission-tree-standard-model] {
+        .permission-tree__standard-header-row + .permission-tree__model {
             @apply border-t-0;
         }
 
-        [data-permission-tree-standard-row] {
+        .permission-tree__standard-row {
             display: flex;
             @apply flex-col gap-8;
         }
 
-        [data-permission-tree-standard-model][hidden],
-        [data-permission-tree-standard-row][hidden] {
+        .permission-tree__model[hidden],
+        .permission-tree__standard-row[hidden] {
             display: none;
         }
 
-        [data-permission-tree-standard-row] > [data-permission-tree-model-name] {
+        .permission-tree__standard-row > .permission-tree__model-name {
             grid-column: 1 / -1;
             grid-row: auto;
             justify-self: start;
             width: 100%;
         }
 
-        [data-permission-tree-standard-cell] {
+        .permission-tree__standard-cell {
             grid-column: 1 / -1;
             padding-right: var(--permission-tree-standard-cell-width);
             @apply w-full justify-self-stretch;
         }
 
-        [data-permission-tree-standard-action-label],
-        input[type="checkbox"].toggle ~ [data-permission-tree-standard-action-label] {
+        .permission-tree__standard-action-label,
+        input[type="checkbox"].toggle ~ .permission-tree__standard-action-label {
             @apply flex top-0 pl-0 font-medium text-dark-800;
         }
 
-        [data-permission-tree-standard-cell] > input[type="checkbox"].toggle + label {
+        .permission-tree__standard-cell > input[type="checkbox"].toggle + label {
             @apply left-auto;
             right: calc((var(--permission-tree-standard-cell-width) - 2.75rem) / 2);
         }
     }
 
-    [data-permission-tree-empty] {
+    .permission-tree__empty {
         @apply m-16 px-24 py-32 text-center text-14 text-dark-400 border border-dashed border-dark-200 rounded;
     }
 
-    [data-permission-tree] mark {
+    .permission-tree mark {
         @apply bg-primary text-light rounded-sm px-2;
     }
 

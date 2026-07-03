@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
-from django_smartbase_admin.admin.widgets import (
+from django_smartbase_admin.admin.permission_widget import (
     PermissionGroup,
     PermissionOption,
     SBAdminPermissionWidget,
@@ -52,17 +52,27 @@ class PermissionWidgetStaticTests(TestCase):
             SBAdminPermissionWidget._standard_action("change_article"), "change"
         )
 
-    def test_parse_value_none(self):
-        self.assertEqual(SBAdminPermissionWidget._parse_value(None), set())
+    def test_parse_selected_permission_ids_none(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids(None), set()
+        )
 
-    def test_parse_value_list(self):
-        self.assertEqual(SBAdminPermissionWidget._parse_value([1, 2, 3]), {1, 2, 3})
+    def test_parse_selected_permission_ids_list(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids([1, 2, 3]),
+            {1, 2, 3},
+        )
 
-    def test_parse_value_json_string(self):
-        self.assertEqual(SBAdminPermissionWidget._parse_value("[1, 2, 3]"), {1, 2, 3})
+    def test_parse_selected_permission_ids_json_string(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids('["1", 2, 3]'),
+            {1, 2, 3},
+        )
 
-    def test_parse_value_empty_string(self):
-        self.assertEqual(SBAdminPermissionWidget._parse_value(""), set())
+    def test_parse_selected_permission_ids_empty_string(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids(""), set()
+        )
 
     def test_value_from_datadict(self):
         widget = SBAdminPermissionWidget()
@@ -114,32 +124,34 @@ class PermissionWidgetContextTests(TestCase):
     def test_context_structure(self):
         widget = SBAdminPermissionWidget(queryset=Permission.objects.all())
         context = widget.get_context("permissions", None, {"id": "id_permissions"})
-        apps = context["widget"]["permission_apps"]
+        sections = context["widget"]["permission_sections"]
 
-        self.assertGreater(len(apps), 0)
+        self.assertGreater(len(sections), 0)
 
         found = False
-        for app in apps:
-            if app["app_label"] == "auth":
-                for model in app["models"]:
-                    if model["model_name"] == "permission":
-                        self.assertIn("standard_perms_list", model)
-                        self.assertIn("custom_perms", model)
-                        self.assertIn("permissions", model)
-                        actions = {p["codename"] for p in model["standard_perms_list"]}
+        for section in sections:
+            if section.key == "auth":
+                for model in section.models:
+                    if model.model_name == "permission":
+                        actions = {
+                            p.codename
+                            for p in model.standard_perms.values()
+                            if p is not None
+                        }
                         self.assertIn("view_permission", actions)
                         self.assertIn("add_permission", actions)
                         self.assertIn("change_permission", actions)
                         self.assertIn("delete_permission", actions)
                         labels = {
-                            p["codename"]: str(p["name"])
-                            for p in model["standard_perms_list"]
+                            p.codename: str(p.name)
+                            for p in model.standard_perms.values()
+                            if p is not None
                         }
                         self.assertEqual(labels["view_permission"], "View")
                         self.assertEqual(labels["add_permission"], "Create")
                         self.assertEqual(labels["change_permission"], "Edit")
                         self.assertEqual(labels["delete_permission"], "Delete")
-                        custom = {p["codename"] for p in model["custom_perms"]}
+                        custom = {p.codename for p in model.custom_perms}
                         self.assertIn("custom_action", custom)
                         self.assertIn("view_dashboard", custom)
                         self.assertIn("view_testmodel", custom)
@@ -160,27 +172,46 @@ class PermissionWidgetContextTests(TestCase):
         stored = json.loads(context["widget"]["selected_values"])
         self.assertIn(perm.pk, stored)
 
+    def test_default_selected_values_reuse_permission_data_query(self):
+        ct = ContentType.objects.get_for_model(Permission)
+        expected_ids = set(
+            Permission.objects.filter(content_type=ct).values_list("pk", flat=True)
+        )
+        widget = SBAdminPermissionWidget(
+            queryset=Permission.objects.filter(content_type=ct)
+        )
+
+        with self.assertNumQueries(1):
+            context = widget.get_context("permissions", None, {"id": "id_permissions"})
+
+        stored = set(json.loads(context["widget"]["selected_values"]))
+        self.assertEqual(stored, expected_ids)
+
     def test_selected_perm_has_selected_flag(self):
         widget = SBAdminPermissionWidget(queryset=Permission.objects.all())
         perm = Permission.objects.get(codename="view_testmodel")
 
         context = widget.get_context("permissions", [perm.pk], {"id": "id_permissions"})
-        apps = context["widget"]["permission_apps"]
-        for app in apps:
-            for model in app["models"]:
-                for p in model["permissions"]:
-                    if p["id"] == perm.pk:
-                        self.assertTrue(p["selected"])
+        sections = context["widget"]["permission_sections"]
+        for section in sections:
+            for model in section.models:
+                permissions = [
+                    *(p for p in model.standard_perms.values() if p is not None),
+                    *model.custom_perms,
+                ]
+                for p in permissions:
+                    if p.id == perm.pk:
+                        self.assertTrue(p.selected)
                     else:
-                        self.assertFalse(p["selected"])
+                        self.assertFalse(p.selected)
 
     def test_standard_perms_ordered(self):
         widget = SBAdminPermissionWidget(queryset=Permission.objects.all())
         context = widget.get_context("permissions", None, {"id": "id_permissions"})
-        apps = context["widget"]["permission_apps"]
-        for app in apps:
-            for model in app["models"]:
-                names = [p["codename"] for p in model["standard_perms_list"] if p]
+        sections = context["widget"]["permission_sections"]
+        for section in sections:
+            for model in section.models:
+                names = [p.codename for p in model.standard_perms.values() if p]
                 # Standard perms should be grouped together but not necessarily all 4 exist
                 # Just verify no custom perms leaked in
                 for n in names:
@@ -218,19 +249,27 @@ class PermissionWidgetContextTests(TestCase):
             queryset=Permission.objects.filter(content_type__app_label="catalog")
         )
         context = widget.get_context("permissions", None, {"id": "id_permissions"})
-        apps = context["widget"]["permission_apps"]
+        sections = context["widget"]["permission_sections"]
 
-        self.assertEqual(len(apps), 1)
-        self.assertEqual(apps[0]["app_label"], "catalog")
-        self.assertEqual(apps[0]["app_verbose"], "Catalog")
-        models = {model["model_name"]: model for model in apps[0]["models"]}
+        self.assertEqual(len(sections), 1)
+        self.assertEqual(sections[0].key, "catalog")
+        self.assertEqual(sections[0].label, "Catalog")
+        models = {model.model_name: model for model in sections[0].models}
         self.assertEqual(set(models), {"article", "category"})
         self.assertEqual(
-            {perm["codename"] for perm in models["article"]["standard_perms_list"]},
+            {
+                perm.codename
+                for perm in models["article"].standard_perms.values()
+                if perm
+            },
             {"view_article", "add_article"},
         )
         self.assertEqual(
-            {perm["codename"] for perm in models["category"]["standard_perms_list"]},
+            {
+                perm.codename
+                for perm in models["category"].standard_perms.values()
+                if perm
+            },
             {"view_category"},
         )
 
@@ -317,22 +356,31 @@ class PermissionGroupTests(TestCase):
             {"id": "id_permissions"},
         )
 
+    def _all_model_permissions(self, section):
+        return [
+            permission
+            for model in section.models
+            for permission in [
+                *(p for p in model.standard_perms.values() if p is not None),
+                *model.custom_perms,
+            ]
+        ]
+
     def test_groups_none_keeps_automatic_queryset_grouping(self):
         ct = ContentType.objects.get_for_model(Permission)
         context = self._context_for_queryset(
             Permission.objects.filter(content_type=ct),
             groups=None,
         )
-        apps = context["widget"]["permission_apps"]
+        sections = context["widget"]["permission_sections"]
 
-        self.assertEqual(len(apps), 1)
-        self.assertEqual(apps[0]["app_label"], "auth")
+        self.assertEqual(len(sections), 1)
+        self.assertEqual(sections[0].key, "auth")
         self.assertEqual(
-            str(apps[0]["app_verbose"]),
+            str(sections[0].label),
             "Authentication and Authorization",
         )
-        self.assertEqual(apps[0]["options"], [])
-        codenames = {p["codename"] for p in apps[0]["models"][0]["permissions"]}
+        codenames = {p.codename for p in self._all_model_permissions(sections[0])}
         self.assertIn("view_testmodel", codenames)
         self.assertIn("custom_action", codenames)
 
@@ -361,20 +409,20 @@ class PermissionGroupTests(TestCase):
             groups=groups,
             value=[],
         )
-        app = context["widget"]["permission_apps"][0]
-        option = app["options"][0]
+        section = context["widget"]["permission_sections"][0]
+        option = section.models[0].custom_perms[0]
 
-        self.assertEqual(app["app_verbose"], "Packages")
-        self.assertEqual(app["help_text"], "Controls package workflows.")
-        self.assertEqual(app["models"], [])
-        self.assertEqual(option["name"], "Create package")
+        self.assertEqual(section.label, "Packages")
+        self.assertEqual(section.help_text, "Controls package workflows.")
+        self.assertFalse(section.models[0].show_header)
+        self.assertEqual(option.name, "Create package")
         self.assertEqual(
-            option["help_text"],
+            option.help_text,
             "Allows creating packages with dependencies.",
         )
-        self.assertEqual(set(option["permission_ids"]), {view_perm.pk, add_perm.pk})
-        self.assertFalse(option["selected"])
-        self.assertFalse(option["indeterminate"])
+        self.assertEqual(set(option.permission_ids), {view_perm.pk, add_perm.pk})
+        self.assertFalse(option.selected)
+        self.assertFalse(option.indeterminate)
 
     def test_groups_mode_appends_unseen_permissions_grouped_by_app_label(self):
         view_perm = Permission.objects.get(codename="view_testmodel")
@@ -398,18 +446,17 @@ class PermissionGroupTests(TestCase):
             ),
             groups=groups,
         )
-        apps = context["widget"]["permission_apps"]
+        sections = context["widget"]["permission_sections"]
         leftover_ids = {
-            permission["id"]
-            for app in apps[1:]
-            for model in app["models"]
-            for permission in model["permissions"]
+            permission.id
+            for section in sections[1:]
+            for permission in self._all_model_permissions(section)
         }
 
-        self.assertEqual(apps[0]["app_verbose"], "Packages")
-        self.assertEqual(apps[1]["app_label"], "auth")
+        self.assertEqual(sections[0].label, "Packages")
+        self.assertEqual(sections[1].key, "auth")
         self.assertEqual(
-            str(apps[1]["app_verbose"]),
+            str(sections[1].label),
             "Authentication and Authorization",
         )
         self.assertNotIn(view_perm.pk, leftover_ids)
@@ -458,19 +505,27 @@ class PermissionGroupTests(TestCase):
             ),
             groups=groups,
         )
-        apps = context["widget"]["permission_apps"]
-        models = {model["model_name"]: model for model in apps[1]["models"]}
+        sections = context["widget"]["permission_sections"]
+        models = {model.model_name: model for model in sections[1].models}
 
-        self.assertEqual(apps[0]["app_verbose"], "Parcel workflows")
-        self.assertEqual(apps[1]["app_label"], "warehouse")
-        self.assertEqual(apps[1]["app_verbose"], "Warehouse")
+        self.assertEqual(sections[0].label, "Parcel workflows")
+        self.assertEqual(sections[1].key, "warehouse")
+        self.assertEqual(sections[1].label, "Warehouse")
         self.assertEqual(set(models), {"parcel", "shipment"})
         self.assertEqual(
-            {perm["codename"] for perm in models["parcel"]["standard_perms_list"]},
+            {
+                perm.codename
+                for perm in models["parcel"].standard_perms.values()
+                if perm
+            },
             {"add_parcel"},
         )
         self.assertEqual(
-            {perm["codename"] for perm in models["shipment"]["standard_perms_list"]},
+            {
+                perm.codename
+                for perm in models["shipment"].standard_perms.values()
+                if perm
+            },
             {"view_shipment"},
         )
 
@@ -501,10 +556,9 @@ class PermissionGroupTests(TestCase):
             groups=groups,
         )
         leftover_ids = {
-            permission["id"]
-            for app in context["widget"]["permission_apps"][1:]
-            for model in app["models"]
-            for permission in model["permissions"]
+            permission.id
+            for section in context["widget"]["permission_sections"][1:]
+            for permission in self._all_model_permissions(section)
         }
 
         self.assertEqual(leftover_ids, set())
@@ -532,10 +586,10 @@ class PermissionGroupTests(TestCase):
             groups=groups,
             value=[view_perm.pk, add_perm.pk],
         )
-        option = context["widget"]["permission_apps"][0]["options"][0]
+        option = context["widget"]["permission_sections"][0].models[0].custom_perms[0]
 
-        self.assertTrue(option["selected"])
-        self.assertFalse(option["indeterminate"])
+        self.assertTrue(option.selected)
+        self.assertFalse(option.indeterminate)
 
     def test_group_option_is_indeterminate_when_some_backing_permissions_selected(self):
         view_perm = Permission.objects.get(codename="view_testmodel")
@@ -560,11 +614,11 @@ class PermissionGroupTests(TestCase):
             groups=groups,
             value=[view_perm.pk],
         )
-        option = context["widget"]["permission_apps"][0]["options"][0]
+        option = context["widget"]["permission_sections"][0].models[0].custom_perms[0]
 
-        self.assertFalse(option["selected"])
-        self.assertTrue(option["indeterminate"])
-        self.assertEqual(json.loads(option["selected_ids_json"]), [view_perm.pk])
+        self.assertFalse(option.selected)
+        self.assertTrue(option.indeterminate)
+        self.assertEqual(json.loads(option.selected_ids_json), [view_perm.pk])
 
     def test_groups_mode_rejects_malformed_permission_refs(self):
         groups = [
@@ -636,9 +690,9 @@ class PermissionGroupTests(TestCase):
         )
 
         context = widget.get_context("permissions", None, {"id": "id_permissions"})
-        option = context["widget"]["permission_apps"][0]["options"][0]
+        option = context["widget"]["permission_sections"][0].models[0].custom_perms[0]
 
-        self.assertEqual(option["permission_ids"], [view_perm.pk])
+        self.assertEqual(option.permission_ids, [view_perm.pk])
 
     def test_groups_mode_render(self):
         group = PermissionGroup(
