@@ -1,0 +1,102 @@
+{% load i18n %}
+{% if not subwidget %}
+  {% if not widget.attrs.sbadmin_hide_label %}
+    {% if widget.form_field.label %}
+      <label for="{{ widget.attrs.id }}-search" class="inline-flex text-dark-900 mb-8 text-14 leading-18 font-medium">
+        {{ widget.form_field.label }}{% if widget.form_field.required %}<span class="ml-4 text-negative">*</span>{% endif %}
+      </label>
+    {% endif %}
+  {% endif %}
+{% endif %}
+
+<div class="permission-tree" data-permission-tree>
+  <input type="search" class="input" data-permission-tree-search id="{{ widget.attrs.id }}-search" placeholder="{% trans "Search permissions…" %}" aria-label="{% trans "Search permissions" %}">
+
+  <input type="hidden" name="{{ widget.name }}" id="{{ widget.attrs.id }}" value="{{ widget.selected_values }}" data-permission-tree-value>
+
+  <div class="permission-tree__list">
+    {% for section in widget.permission_sections %}
+    <div class="permission-tree__section{% if forloop.last %} permission-tree__section--last{% endif %}" data-permission-tree-app>
+      <div class="permission-tree__header">
+        <button type="button" class="permission-tree__collapse-toggle" data-bs-toggle="collapse" data-bs-target="#{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}" aria-expanded="true" aria-controls="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}">
+          <svg class="permission-tree__chevron" width="12" height="12" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></svg>
+          {{ section.label }}
+          {% if section.help_text %}
+          <span class="permission-tree__help" data-bs-toggle="tooltip" data-bs-container="body" data-bs-placement="bottom" title="{{ section.help_text|striptags }}" aria-label="{{ section.help_text|striptags }}">
+            <svg width="16" height="16" aria-hidden="true">
+              <use xlink:href="#Info"></use>
+            </svg>
+          </span>
+          {% endif %}
+        </button>
+        <span class="permission-tree__count mr-10 text-14" data-permission-tree-count>{{ section.selected_count }}/{{ section.permissions_count }}</span>
+        <div class="permission-tree__select-all">
+          <input type="checkbox" class="toggle" data-permission-tree-select-all id="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all">
+          <label for="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all"></label>
+        </div>
+      </div>
+      <div id="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}" class="permission-tree__body collapse show">
+      <div class="permission-tree__body-content">
+        {% if section.has_standard_permissions %}
+        <div class="permission-tree__standard-grid">
+          <div class="permission-tree__standard-header-row">
+            <div></div>
+            {% for action in widget.standard_action_headers %}
+            <div class="permission-tree__standard-header">{{ action.label }}</div>
+            {% endfor %}
+          </div>
+          {% for model in section.models %}
+          {% if model.has_standard_permissions %}
+          <div class="permission-tree__model" data-permission-tree-model>
+            <div class="permission-tree__perm permission-tree__standard-row" data-permission-tree-perm data-permission-tree-search-text="{{ model.standard_search_text }}">
+              <div class="permission-tree__model-name" data-permission-tree-model-name data-permission-tree-text>{{ model.model_verbose }}</div>
+              {% for cell in model.standard_cells %}
+              <div class="permission-tree__standard-cell relative min-h-24">
+                {% if cell.permission %}
+                <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ cell.permission.id }}" id="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}"{% if cell.permission.selected %} checked{% endif %} aria-label="{{ model.model_verbose }} - {{ cell.label }}">
+                <label for="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}" title="{{ model.model_verbose }} - {{ cell.label }}"></label>
+                <label for="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}" class="permission-tree__standard-action-label">{{ cell.label }}</label>
+                {% else %}
+                <input type="checkbox" class="toggle" disabled id="{{ widget.attrs.id }}-missing-{{ section.key }}-{{ model.model_name }}-{{ cell.action }}" aria-label="{{ model.model_verbose }} - {{ cell.label }}">
+                <label for="{{ widget.attrs.id }}-missing-{{ section.key }}-{{ model.model_name }}-{{ cell.action }}" data-bs-toggle="tooltip" data-bs-container="body" title="{% trans "Permission is not available" %}"></label>
+                <label for="{{ widget.attrs.id }}-missing-{{ section.key }}-{{ model.model_name }}-{{ cell.action }}" class="permission-tree__standard-action-label">{{ cell.label }}</label>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if section.has_custom_permissions %}
+        <div class="permission-tree__custom-list" data-permission-tree-custom-list>
+          <div class="permission-tree__custom-header">
+            <span>{% trans "Custom permissions" %}</span>
+            <span class="permission-tree__custom-header-action">{% trans "Allowed" %}</span>
+          </div>
+          {% for model in section.models %}
+          {% for perm in model.custom_perms %}
+          <div class="permission-tree__perm permission-tree__custom-row{% if perm.help_text %} permission-tree__custom-row--has-help{% endif %} relative min-h-24" data-permission-tree-perm data-permission-tree-custom-row data-permission-tree-search-text="{{ perm.search_text }}">
+            <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ perm.value }}" data-perm-ids="{{ perm.permission_ids_json }}" id="{{ widget.attrs.id }}-perm-{{ perm.id }}"{% if perm.selected %} checked{% endif %}>
+            <label for="{{ widget.attrs.id }}-perm-{{ perm.id }}"></label>
+            <label for="{{ widget.attrs.id }}-perm-{{ perm.id }}" class="permission-tree__custom-label" data-permission-tree-text>{% if model.show_header %}{{ model.model_verbose }} - {% endif %}{{ perm.name }}</label>
+            {% if perm.help_text %}
+            <p class="permission-tree__custom-help" data-permission-tree-text>{{ perm.help_text }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="permission-tree__empty" data-permission-tree-empty hidden>
+      <div>{% trans "No permissions found" %}</div>
+      <div>{% trans "Try clearing your search to see more results" %}</div>
+    </div>
+  </div>
+</div>
+{% include 'sb_admin/widgets/includes/help_text.html' %}

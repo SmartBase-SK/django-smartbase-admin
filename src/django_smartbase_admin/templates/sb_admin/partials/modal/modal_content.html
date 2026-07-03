@@ -36,6 +36,9 @@
                 </div>
             {% endblock %}
         </div>
+        {% if form %}
+            {{ form.media }}
+        {% endif %}
     </div>
     <script>
         (function(){
