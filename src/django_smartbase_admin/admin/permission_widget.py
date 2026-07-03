@@ -134,6 +134,14 @@ class PermissionRenderModel:
             1 for permission in self.standard_perms.values() if permission
         ) + len(self.custom_perms)
 
+    @property
+    def selected_count(self):
+        return sum(
+            1
+            for permission in self.standard_perms.values()
+            if permission is not None and permission.selected
+        ) + sum(1 for permission in self.custom_perms if permission.selected)
+
 
 @dataclass
 class PermissionRenderSection:
@@ -147,6 +155,10 @@ class PermissionRenderSection:
     @property
     def permissions_count(self):
         return sum(model.permission_count for model in self.models)
+
+    @property
+    def selected_count(self):
+        return sum(model.selected_count for model in self.models)
 
     @property
     def has_standard_permissions(self):
@@ -176,7 +188,6 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
     """
 
     template_name = "sb_admin/widgets/permission_tree.html"
-    sb_admin_widget = True
 
     class Media:
         js = [
@@ -220,9 +231,7 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
         context["widget"]["selected_values"] = json.dumps(list(selected))
         return context
 
-    def _build_auto_context(
-        self, selected, permissions, exclude_ids=None, group_by_model=False
-    ):
+    def _build_auto_context(self, selected, permissions, exclude_ids=None):
         """Build context grouping permissions by app_label → model."""
         exclude_ids = exclude_ids or set()
         sections = []
@@ -236,30 +245,20 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                 continue
 
             ct_key = (permission.app_label, permission.model_name)
-            app_key = ct_key if group_by_model else permission.app_label
-            app_label = (
-                f"{permission.app_label}.{permission.model_name}"
-                if group_by_model
-                else permission.app_label
-            )
-            app_verbose = (
-                permission.model_verbose if group_by_model else permission.app_verbose
-            )
 
-            if current_app != app_key:
+            if current_app != permission.app_label:
                 section = PermissionRenderSection(
-                    key=app_label,
-                    label=app_verbose,
+                    key=permission.app_label,
+                    label=permission.app_verbose,
                 )
                 sections.append(section)
-                current_app = app_key
+                current_app = permission.app_label
                 current_model = None
 
             if current_model != ct_key:
                 model = PermissionRenderModel(
                     model_name=permission.model_name,
                     model_verbose=permission.model_verbose,
-                    show_header=not group_by_model,
                 )
                 section.models.append(model)
                 current_model = ct_key

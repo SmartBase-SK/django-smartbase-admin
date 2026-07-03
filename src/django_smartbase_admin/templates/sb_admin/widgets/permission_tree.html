@@ -29,10 +29,9 @@
           </span>
           {% endif %}
         </button>
-        <span class="permission-tree__count mr-10 text-14" data-permission-tree-count>0/{{ section.permissions_count }}</span>
+        <span class="permission-tree__count mr-10 text-14" data-permission-tree-count>{{ section.selected_count }}/{{ section.permissions_count }}</span>
         <div class="permission-tree__select-all relative min-h-24">
           <input type="checkbox" class="toggle" data-permission-tree-select-all id="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all">
-          <label for="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all"></label>
           <label for="{{ widget.attrs.id }}-permission-group-{{ forloop.counter0 }}-select-all"></label>
         </div>
       </div>
@@ -54,9 +53,9 @@
               {% for cell in model.standard_cells %}
               <div class="permission-tree__standard-cell relative min-h-24">
                 {% if cell.permission %}
-                <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ cell.permission.id }}" id="perm-{{ cell.permission.id }}"{% if cell.permission.selected %} checked{% endif %} aria-label="{{ model.model_verbose }} - {{ cell.label }}">
-                <label for="perm-{{ cell.permission.id }}" title="{{ model.model_verbose }} - {{ cell.label }}"></label>
-                <label for="perm-{{ cell.permission.id }}" class="permission-tree__standard-action-label">{{ cell.label }}</label>
+                <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ cell.permission.id }}" id="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}"{% if cell.permission.selected %} checked{% endif %} aria-label="{{ model.model_verbose }} - {{ cell.label }}">
+                <label for="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}" title="{{ model.model_verbose }} - {{ cell.label }}"></label>
+                <label for="{{ widget.attrs.id }}-perm-{{ cell.permission.id }}" class="permission-tree__standard-action-label">{{ cell.label }}</label>
                 {% else %}
                 <input type="checkbox" class="toggle" disabled id="{{ widget.attrs.id }}-missing-{{ section.key }}-{{ model.model_name }}-{{ cell.action }}" aria-label="{{ model.model_verbose }} - {{ cell.label }}">
                 <label for="{{ widget.attrs.id }}-missing-{{ section.key }}-{{ model.model_name }}-{{ cell.action }}" data-bs-toggle="tooltip" data-bs-container="body" title="{% trans "Permission is not available" %}"></label>
@@ -79,9 +78,9 @@
           {% for model in section.models %}
           {% for perm in model.custom_perms %}
           <div class="permission-tree__perm permission-tree__custom-row{% if perm.help_text %} permission-tree__custom-row--has-help{% endif %} relative min-h-24" data-permission-tree-perm data-permission-tree-custom-row data-permission-tree-search-text="{{ perm.search_text }}">
-            <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ perm.value }}" data-perm-ids="{{ perm.permission_ids_json }}" id="perm-{{ perm.id }}"{% if perm.selected %} checked{% endif %}>
-            <label for="perm-{{ perm.id }}"></label>
-            <label for="perm-{{ perm.id }}" class="permission-tree__custom-label" data-permission-tree-text>{% if model.show_header %}{{ model.model_verbose }} - {% endif %}{{ perm.name }}</label>
+            <input type="checkbox" class="toggle" data-permission-tree-checkbox value="{{ perm.value }}" data-perm-ids="{{ perm.permission_ids_json }}" id="{{ widget.attrs.id }}-perm-{{ perm.id }}"{% if perm.selected %} checked{% endif %}>
+            <label for="{{ widget.attrs.id }}-perm-{{ perm.id }}"></label>
+            <label for="{{ widget.attrs.id }}-perm-{{ perm.id }}" class="permission-tree__custom-label" data-permission-tree-text>{% if model.show_header %}{{ model.model_verbose }} - {% endif %}{{ perm.name }}</label>
             {% if perm.help_text %}
             <p class="permission-tree__custom-help" data-permission-tree-text>{{ perm.help_text }}</p>
             {% endif %}

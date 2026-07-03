@@ -235,6 +235,20 @@ class PermissionWidgetContextTests(TestCase):
                     else:
                         self.assertFalse(p.selected)
 
+    def test_section_selected_count_matches_selected_permissions(self):
+        widget = SBAdminPermissionWidget(queryset=Permission.objects.all())
+        perm = Permission.objects.get(codename="view_testmodel")
+
+        context = widget.get_context("permissions", [perm.pk], {"id": "id_permissions"})
+        section = next(
+            section
+            for section in context["widget"]["permission_sections"]
+            if section.key == "auth"
+        )
+
+        self.assertEqual(section.selected_count, 1)
+        self.assertGreaterEqual(section.permissions_count, section.selected_count)
+
     def test_standard_perms_ordered(self):
         widget = SBAdminPermissionWidget(queryset=Permission.objects.all())
         context = widget.get_context("permissions", None, {"id": "id_permissions"})
@@ -323,6 +337,10 @@ class PermissionWidgetRenderingTests(TestCase):
         self.assertIn('class="toggle"', html)
         self.assertIn('data-bs-toggle="collapse"', html)
         self.assertIn("collapse show", html)
+        self.assertIn('id="id_permissions-perm-', html)
+        self.assertIn('for="id_permissions-perm-', html)
+        self.assertNotIn('id="perm-', html)
+        self.assertNotIn('for="perm-', html)
 
     def test_widget_has_sbadmin_flag(self):
         widget = SBAdminPermissionWidget()
@@ -363,11 +381,6 @@ class PermissionGroupTests(TestCase):
             content_type=ct,
             codename="custom_action",
             defaults={"name": "Can perform custom action"},
-        )
-        Permission.objects.get_or_create(
-            content_type=ct,
-            codename="view_dashboard",
-            defaults={"name": "Can view dashboard"},
         )
         Permission.objects.get_or_create(
             content_type=ct,
@@ -744,6 +757,10 @@ class PermissionGroupTests(TestCase):
         self.assertIn("Some help", html)
         self.assertIn("data-permission-tree-checkbox", html)
         self.assertIn("Option help", html)
+        self.assertIn('id="id_permissions-perm-group-0-option-0"', html)
+        self.assertIn('for="id_permissions-perm-group-0-option-0"', html)
+        self.assertNotIn('id="perm-', html)
+        self.assertNotIn('for="perm-', html)
 
     def test_value_from_datadict_default_mode_allows_all_ids(self):
         view_perm = Permission.objects.get(codename="view_testmodel")
