@@ -1407,13 +1407,16 @@ collapsible tree.  Two modes:
 **Default mode** — groups all permissions by ``app_label`` / model.  Every
 Django permission is shown.  Each model row shows the four standard
 permissions (view / add / change / delete) as compact checkboxes, plus any
-custom codenames as individual rows.  A per-model "select all" checkbox
-toggles all permissions in that group, and a client-side search input filters
+custom codenames as individual rows.  A section-level "select all" switch
+toggles all permissions in that section, and a client-side search input filters
 permissions with text highlighting.
 
 **Groups mode** — pass ``groups`` (a list of :class:`PermissionGroup`) to
-show only a curated set of permissions, with custom labels, help text, and
-control over which standard actions appear.
+define business-level permission options.  Each visible option can map to one
+or more strict ``app_label.model:codename`` permission refs from the widget
+queryset.  Explicit groups render first; any queryset permissions not
+referenced by those groups render afterward using the default app/model
+grouping.
 
 **Default mode rendering:**
 ```
@@ -1456,21 +1459,32 @@ class GroupAdmin(SBAdmin):
     form = GroupForm
 ```
 
-#### Groups mode — `PermissionGroup` DTO
+#### Groups mode — `PermissionGroup` and `PermissionOption`
 
-Use ``groups=`` to declare exactly which permissions to show, with custom
-labels and help text.  Pass a list of :class:`PermissionGroup` objects.
+Omit ``groups`` to automatically render all permissions from the form field
+queryset grouped by app and model. Pass ``groups=`` when you want to define
+business permission sections first while still showing every other queryset
+permission below them.
 
 ``PermissionGroup`` fields:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| ``label`` | ``str`` | **required** | Display name for the collapsible section. |
-| ``model`` | ``type[Model]`` | ``None`` | Django model class — permissions are resolved via its content type. |
-| ``codenames`` | ``list[str]`` | ``None`` | Explicit list of permission codenames (overrides ``model`` / ``actions``). |
-| ``actions`` | ``tuple[str]`` | ``("view", "add", "change", "delete")`` | Which standard actions to show. Ignored when ``codenames`` is set. |
-| ``action_labels`` | ``dict[str, str]`` | ``{}`` | Custom checkbox labels for standard actions, e.g. ``{"view": "See items"}``. |
+| ``label`` | ``str`` | required | Display name for the collapsible section. |
+| ``options`` | ``list[PermissionOption]`` | ``[]`` | Visible permission rows in the section. |
 | ``help_text`` | ``str`` | ``""`` | Help text displayed below the section header. |
+
+``PermissionOption`` fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| ``label`` | ``str`` | required | Display name for the visible checkbox. |
+| ``codenames`` | ``list[str]`` | required | Strict permission refs in ``app_label.model:codename`` format. |
+| ``help_text`` | ``str`` | ``""`` | Help text displayed below the option label. |
+
+``SBAdminPermissionWidget`` also accepts ``queryset=``. Use it when assigning
+the widget dynamically after the form field has already been constructed, so
+the widget does not have to rely on Django's field/widget binding.
 
 **Examples:**
 
@@ -1478,52 +1492,80 @@ labels and help text.  Pass a list of :class:`PermissionGroup` objects.
 from django.contrib.auth.models import Group, Permission, User
 from django_smartbase_admin.admin.widgets import (
     PermissionGroup,
+    PermissionOption,
     SBAdminPermissionWidget,
 )
 
-# Only view/add for a specific model, with custom labels + help text
+# One visible option can submit several real Django permissions.
 SBAdminPermissionWidget(
     groups=[
         PermissionGroup(
-            model=Article,
-            label=_("Article permissions"),
-            help_text=_("Controls what users can do with articles."),
-            actions=("view", "add", "change"),
-            action_labels={
-                "view": _("Browse articles"),
-                "add": _("Create articles"),
-                "change": _("Edit articles"),
-            },
+            label=_("Packages"),
+            help_text=_("Controls package workflows."),
+            options=[
+                PermissionOption(
+                    label=_("Create package"),
+                    help_text=_("Includes required lookup permissions."),
+                    codenames=[
+                        "packages.package:add_package",
+                        "accounts.userpickupaddress:view_userpickupaddress",
+                        "carriers.shipper:view_shipper",
+                    ],
+                ),
+            ],
         ),
     ],
 )
 ```
 
 ```python
-# Multiple groups — each becomes its own collapsible section
+# Multiple business sections.
 SBAdminPermissionWidget(
     groups=[
         PermissionGroup(
-            model=Article,
             label=_("Articles"),
-            actions=("view", "add", "change"),
+            options=[
+                PermissionOption(
+                    label=_("Edit articles"),
+                    codenames=["blog.article:change_article"],
+                ),
+            ],
         ),
         PermissionGroup(
-            model=User,
             label=_("User administration"),
-            actions=("view",),
+            options=[
+                PermissionOption(
+                    label=_("Invite users"),
+                    codenames=[
+                        "auth.user:add_user",
+                        "auth.user:view_user",
+                    ],
+                ),
+            ],
         ),
     ],
 )
 ```
 
 ```python
-# Explicit codenames — full control over which perms appear
-SBAdminPermissionWidget(
+# Dynamic form setup — pass the same queryset to the field and widget.
+permissions = self._account_user_permissions()
+self.fields["permissions"].queryset = permissions
+self.fields["permissions"].widget = SBAdminPermissionWidget(
+    queryset=permissions,
     groups=[
         PermissionGroup(
-            label=_("Custom selection"),
-            codenames=["view_article", "change_article", "publish_article"],
+            label=AccountGroupName.USER.label,
+            options=[
+                PermissionOption(
+                    label=_("Create package"),
+                    codenames=[
+                        "packages.package:add_package",
+                        "accounts.userpickupaddress:view_userpickupaddress",
+                        "carriers.shipper:view_shipper",
+                    ],
+                ),
+            ],
         ),
     ],
 )
@@ -1532,11 +1574,15 @@ SBAdminPermissionWidget(
 **Key points:**
 - Selected values are stored as a JSON array of permission PKs in a hidden ``<input>``, matching the pattern used by `SBAdminMultipleChoiceWidget`.
 - ``SBAdminPermissionWidget.value_from_datadict()`` parses that JSON back to a Python list when the form is submitted.
+- The form field queryset decides which permissions may be referenced. In groups mode, every ``PermissionOption.codenames`` ref must exist in that queryset.
+- Permissions referenced by ``PermissionOption`` are marked as seen and are not duplicated in the automatic leftover groups.
+- When the widget is assigned after the field has been constructed, pass ``queryset=`` explicitly.
+- Permission refs must use ``app_label.model:codename``. Bare codenames are not supported.
+- If a permission ref is malformed or missing from the widget queryset, rendering raises ``ImproperlyConfigured``.
 - Standard permissions (view / add / change / delete) are detected by the ``view_<model>`` / ``add_<model>`` / ``change_<model>`` / ``delete_<model>`` codename prefix. Any other codename is treated as a custom permission and rendered as an individual row.
 - The search input filters permissions client-side with real-time highlighting.
-- Default-mode app sections are collapsible; model sections show a "select all" toggle with a checked/total count.
-- In groups mode, each ``PermissionGroup`` becomes its own collapsible section with an optional help text row.
-- Use ``codenames`` when you need arbitrary permissions from different models in the same section. Use ``model`` when you want all (or a subset of) permissions for one content type.
+- Default-mode app sections are collapsible and render permissions grouped by model.
+- In groups mode, each ``PermissionGroup`` becomes its own collapsible section, each ``PermissionOption`` renders as one checkbox that may submit multiple permission IDs, and all unseen permissions are appended in automatic app/model sections.
 
 ---
 

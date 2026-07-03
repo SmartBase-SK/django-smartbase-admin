@@ -2,11 +2,11 @@ import json
 import logging
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
 
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
+from django.apps import apps as django_apps
 from django.conf import settings
 from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
@@ -14,7 +14,6 @@ from django.contrib.admin.widgets import (
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
 from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.forms import RangeWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
@@ -22,12 +21,13 @@ from django.core.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from django.db.models import ForeignKey, OneToOneField, Model
+from django.db.models import ForeignKey, OneToOneField
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.formats import get_format
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
+from django.utils.text import capfirst
 from django.utils.timezone import get_current_timezone_name
 from django.utils.translation import gettext_lazy as _, get_language
 from django.views.generic.base import ContextMixin
@@ -1706,38 +1706,40 @@ except ImportError:
 
 
 @dataclass
-class PermissionGroup:
-    """Declarative definition for a group of permissions in
-    :class:`SBAdminPermissionWidget`.
+class PermissionOption:
+    """One visible permission switch backed by one or more Django permissions."""
 
-    Each group targets one model (or a set of explicit codenames).
-    Use ``model`` (a Django model class) to look up permissions by
-    content type, or ``codenames`` for an explicit list.  ``actions``
-    controls which of the four standard Django actions are shown.
-    """
+    label: str
+    """Display name for the visible permission option."""
+
+    codenames: list[str]
+    """Strict permission refs in ``app_label.model:codename`` format."""
+
+    help_text: str = ""
+    """Help text displayed below the option label."""
+
+
+@dataclass
+class PermissionGroup:
+    """Declarative business group for :class:`SBAdminPermissionWidget`."""
 
     label: str
     """Display name for the group section."""
 
-    model: Optional[type[Model]] = None
-    """Django model class.  Permissions are resolved via content type."""
-
-    codenames: Optional[list[str]] = None
-    """Explicit list of permission codenames to include."""
-
-    actions: tuple[str, ...] = ("view", "add", "change", "delete")
-    """Which standard actions to show (``"view"``, ``"add"``,
-    ``"change"``, ``"delete"``).  Ignored when ``codenames`` is set."""
-
-    action_labels: dict[str, str] = field(default_factory=dict)
-    """Custom labels for standard actions, e.g.
-    ``{"view": _("See items"), "add": _("Create items")}``."""
+    options: list[PermissionOption] = field(default_factory=list)
+    """Visible permission options. Each option can map to multiple permissions."""
 
     help_text: str = ""
     """Help text displayed below the group header."""
 
 
 STANDARD_ACTIONS = ("view", "add", "change", "delete")
+STANDARD_ACTION_LABELS = {
+    "view": _("View"),
+    "add": _("Create"),
+    "change": _("Edit"),
+    "delete": _("Delete"),
+}
 
 
 class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
@@ -1750,19 +1752,25 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
     tree without any filtering.
 
     **Groups mode** — pass ``groups`` (a list of :class:`PermissionGroup`)
-    to show only the permissions you define, with custom labels, help text,
-    and control over which standard actions appear.
+    to define user-facing permission options. Each option resolves one or more
+    strict ``app_label.model:codename`` refs against the widget queryset.
     """
 
     template_name = "sb_admin/widgets/permission_tree.html"
     sb_admin_widget = True
 
-    def __init__(self, form_field=None, attrs=None, groups=None):
+    class Media:
+        js = [
+            "sb_admin/dist/permission_tree.js",
+        ]
+
+    def __init__(self, form_field=None, attrs=None, groups=None, queryset=None):
         super().__init__(
             form_field,
             attrs={"class": "permission-tree", **(attrs or {})},
         )
         self._groups = groups
+        self.queryset = queryset
 
     # ------------------------------------------------------------------
     # Context building
@@ -1771,21 +1779,34 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         selected = self._parse_value(value)
+        if value is None:
+            selected = self._get_default_selected_ids()
 
-        if self._groups is not None:
-            apps = self._build_groups_context(selected)
-        else:
-            apps = self._build_default_context(selected)
+        apps = self._build_context(selected)
 
         context["widget"]["permission_apps"] = apps
+        context["widget"]["standard_action_headers"] = [
+            {"action": action, "label": STANDARD_ACTION_LABELS[action]}
+            for action in STANDARD_ACTIONS
+        ]
         context["widget"]["selected_values"] = json.dumps(list(selected))
         return context
 
-    def _build_default_context(self, selected):
+    def _build_context(self, selected):
+        if self._groups is not None:
+            return self._build_group_context(selected)
+        return self._build_auto_context(selected)
+
+    def _build_auto_context(self, selected, exclude_ids=None, group_by_model=False):
         """Build context grouping permissions by app_label → model."""
-        qs = Permission.objects.select_related("content_type").order_by(
-            "content_type__app_label", "content_type__model", "codename"
+        exclude_ids = exclude_ids or set()
+        qs = (
+            self._get_permission_queryset()
+            .select_related("content_type")
+            .order_by("content_type__app_label", "content_type__model", "codename")
         )
+        if exclude_ids:
+            qs = qs.exclude(pk__in=exclude_ids)
         apps = []
         current_app = None
         current_model = None
@@ -1795,32 +1816,38 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
         for p in qs:
             ct = p.content_type
             ct_key = (ct.app_label, ct.model)
+            model_verbose = self._model_verbose_name(ct)
+            app_key = ct_key if group_by_model else ct.app_label
+            app_label = f"{ct.app_label}.{ct.model}" if group_by_model else ct.app_label
+            app_verbose = (
+                model_verbose
+                if group_by_model
+                else self._app_verbose_name(ct.app_label)
+            )
 
-            if current_app != ct.app_label:
+            if current_app != app_key:
                 app_idx += 1
                 model_idx = -1
                 apps.append(
                     {
-                        "app_label": ct.app_label,
-                        "app_verbose": ct.app_label.replace("_", " ").title(),
+                        "app_label": app_label,
+                        "app_verbose": app_verbose,
                         "help_text": "",
+                        "permissions_count": 0,
+                        "options": [],
                         "models": [],
                     }
                 )
-                current_app = ct.app_label
+                current_app = app_key
                 current_model = None
 
             if current_model != ct_key:
                 model_idx += 1
-                model_verbose = (
-                    ct.name.replace("_", " ").title()
-                    if ct.name
-                    else ct.model.replace("_", " ").title()
-                )
                 apps[app_idx]["models"].append(
                     {
                         "model_name": ct.model,
                         "model_verbose": model_verbose,
+                        "show_header": not group_by_model,
                         "standard_perms": {},
                         "standard_perms_list": [],
                         "custom_perms": [],
@@ -1829,120 +1856,183 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                 )
                 current_model = ct_key
 
-            is_standard = self._is_standard_codename(p.codename)
+            is_standard = self._is_standard_codename(p.codename, ct.model)
+            action = self._standard_action(p.codename) if is_standard else None
             perm_data = {
                 "id": p.pk,
                 "codename": p.codename,
-                "name": p.name,
+                "name": (
+                    STANDARD_ACTION_LABELS.get(action, p.name)
+                    if is_standard
+                    else p.name
+                ),
+                "search_text": f"{p.name} {p.codename} {model_verbose}",
                 "selected": p.pk in selected,
                 "is_standard": is_standard,
             }
             apps[app_idx]["models"][model_idx]["permissions"].append(perm_data)
+            apps[app_idx]["permissions_count"] += 1
 
             if is_standard:
-                action = self._standard_action(p.codename)
                 apps[app_idx]["models"][model_idx]["standard_perms"][action] = perm_data
             else:
                 apps[app_idx]["models"][model_idx]["custom_perms"].append(perm_data)
 
         for app in apps:
+            app["has_standard_permissions"] = False
+            app["has_custom_permissions"] = False
             for model in app["models"]:
                 model["standard_perms_list"] = self._ordered_standard_perms(model)
+                model["standard_perms_cells"] = [
+                    {
+                        "action": action,
+                        "label": STANDARD_ACTION_LABELS[action],
+                        "permission": model["standard_perms"].get(action),
+                    }
+                    for action in STANDARD_ACTIONS
+                ]
+                model["standard_search_text"] = " ".join(
+                    perm["search_text"] for perm in model["standard_perms_list"]
+                )
+                model["permissions_list"] = [
+                    *model["standard_perms_list"],
+                    *model["custom_perms"],
+                ]
+                app["has_standard_permissions"] = app[
+                    "has_standard_permissions"
+                ] or bool(model["standard_perms_list"])
+                app["has_custom_permissions"] = app["has_custom_permissions"] or bool(
+                    model["custom_perms"]
+                )
         return apps
 
-    def _build_groups_context(self, selected):
-        """Build context from declared PermissionGroup definitions."""
+    def _build_group_context(self, selected):
+        qs = (
+            self._get_permission_queryset()
+            .select_related("content_type")
+            .order_by("content_type__app_label", "content_type__model", "codename")
+        )
+        permissions_by_ref = {
+            self._permission_ref(permission): permission for permission in qs
+        }
+
         apps = []
-        for idx, group in enumerate(self._groups):
-            perms_qs = self._resolve_group_permissions(group)
-            if not perms_qs.exists():
-                continue
-
-            ct = perms_qs.first().content_type
-            model_verbose = (
-                ct.name.replace("_", " ").title()
-                if ct.name
-                else ct.model.replace("_", " ").title()
-            )
-
-            model_data = {
-                "model_name": ct.model,
-                "model_verbose": model_verbose,
-                "standard_perms": {},
-                "standard_perms_list": [],
-                "custom_perms": [],
-                "permissions": [],
-            }
-
-            for p in perms_qs:
-                is_standard = self._is_standard_codename(p.codename)
-                if self._skip_standard_perm(group, p, is_standard):
-                    continue
-                name = self._resolve_group_perm_name(group, p, is_standard)
-                perm_data = {
-                    "id": p.pk,
-                    "codename": p.codename,
-                    "name": name,
-                    "selected": p.pk in selected,
-                    "is_standard": is_standard,
-                }
-                model_data["permissions"].append(perm_data)
-
-                if is_standard:
-                    action = self._standard_action(p.codename)
-                    model_data["standard_perms"][action] = perm_data
-                else:
-                    model_data["custom_perms"].append(perm_data)
-
-            model_data["standard_perms_list"] = self._ordered_standard_perms(model_data)
+        seen_permission_ids = set()
+        for group_idx, group in enumerate(self._groups):
+            options = []
+            for option_idx, option in enumerate(group.options):
+                if not option.codenames:
+                    raise ImproperlyConfigured(
+                        "PermissionOption.codenames must define at least one "
+                        "permission ref."
+                    )
+                permissions = [
+                    self._resolve_permission_ref(ref, permissions_by_ref)
+                    for ref in option.codenames
+                ]
+                permission_ids = [permission.pk for permission in permissions]
+                seen_permission_ids.update(permission_ids)
+                selected_ids = [
+                    permission_id
+                    for permission_id in permission_ids
+                    if permission_id in selected
+                ]
+                options.append(
+                    {
+                        "id": f"group-{group_idx}-option-{option_idx}",
+                        "name": option.label,
+                        "help_text": option.help_text,
+                        "permission_ids": permission_ids,
+                        "permission_ids_json": json.dumps(permission_ids),
+                        "selected_ids_json": json.dumps(selected_ids),
+                        "selected": len(selected_ids) == len(permission_ids),
+                        "indeterminate": bool(selected_ids)
+                        and len(selected_ids) != len(permission_ids),
+                    }
+                )
 
             apps.append(
                 {
-                    "app_label": group.label,
+                    "app_label": f"group-{group_idx}",
                     "app_verbose": group.label,
                     "help_text": group.help_text,
-                    "models": [model_data],
+                    "permissions_count": len(options),
+                    "options": options,
+                    "models": [],
                 }
             )
+        apps.extend(
+            self._build_auto_context(
+                selected,
+                exclude_ids=seen_permission_ids,
+            )
+        )
         return apps
+
+    @staticmethod
+    def _app_verbose_name(app_label):
+        try:
+            app_config = django_apps.get_app_config(app_label)
+        except LookupError:
+            return app_label.replace("_", " ").title()
+        return app_config.verbose_name
+
+    @staticmethod
+    def _model_verbose_name(content_type):
+        model_class = content_type.model_class()
+        if model_class is not None:
+            return capfirst(model_class._meta.verbose_name)
+        return capfirst(content_type.name or content_type.model.replace("_", " "))
 
     # ------------------------------------------------------------------
     # Permission resolution helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _resolve_group_permissions(group):
-        """Return a queryset of Permission objects for one PermissionGroup."""
-        if group.codenames is not None:
-            qs = Permission.objects.filter(codename__in=group.codenames)
-        elif group.model is not None:
-            ct = ContentType.objects.get_for_model(group.model)
-            qs = Permission.objects.filter(content_type=ct)
-        else:
-            return Permission.objects.none()
-        return qs.select_related("content_type")
+    def _get_permission_queryset(self):
+        if self.queryset is not None:
+            return self.queryset
+        if self.form_field is not None and hasattr(self.form_field, "queryset"):
+            return self.form_field.queryset
+        choices_field = getattr(getattr(self, "choices", None), "field", None)
+        if choices_field is not None and hasattr(choices_field, "queryset"):
+            return choices_field.queryset
+        return Permission.objects.none()
+
+    def _get_default_selected_ids(self):
+        return set(self._get_permission_queryset().values_list("pk", flat=True))
 
     @staticmethod
-    def _resolve_group_perm_name(group, perm, is_standard):
-        """Return the display name for a permission, checking
-        ``group.action_labels`` for standard actions first."""
-        if is_standard:
-            action = perm.codename.rsplit("_", 1)[0]
-            override = group.action_labels.get(action)
-            if override is not None:
-                return override
-        return perm.name
+    def _permission_ref(permission):
+        content_type = permission.content_type
+        return f"{content_type.app_label}.{content_type.model}:{permission.codename}"
 
     @staticmethod
-    def _skip_standard_perm(group, perm, is_standard):
-        """Return True if this standard permission should be skipped
-        because its action is not in ``group.actions``."""
-        if not is_standard:
-            return False
-        if group.codenames is not None:
-            return False  # explicit list — show everything listed
-        action = perm.codename.rsplit("_", 1)[0]
-        return action not in group.actions
+    def _resolve_permission_ref(ref, permissions_by_ref):
+        SBAdminPermissionWidget._validate_permission_ref(ref)
+        permission = permissions_by_ref.get(ref)
+        if permission is None:
+            raise ImproperlyConfigured(
+                f"Permission ref '{ref}' was not found in "
+                "SBAdminPermissionWidget queryset."
+            )
+        return permission
+
+    @staticmethod
+    def _validate_permission_ref(ref):
+        if not isinstance(ref, str) or ref.count(":") != 1:
+            raise ImproperlyConfigured(
+                "Permission refs must use 'app_label.model:codename' format."
+            )
+        model_ref, codename = ref.split(":", 1)
+        if model_ref.count(".") != 1:
+            raise ImproperlyConfigured(
+                "Permission refs must use 'app_label.model:codename' format."
+            )
+        app_label, model = model_ref.split(".", 1)
+        if not app_label or not model or not codename:
+            raise ImproperlyConfigured(
+                "Permission refs must use 'app_label.model:codename' format."
+            )
 
     @staticmethod
     def _ordered_standard_perms(model_data):
@@ -1956,42 +2046,18 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
     # Value I/O
     # ------------------------------------------------------------------
 
-    def _get_allowed_permission_ids(self):
-        """Return a ``frozenset`` of permission PKs that are valid
-        given the current ``groups`` definition.
-
-        When ``groups`` is ``None`` (default mode) all permissions are
-        allowed, so this returns ``None`` (no restriction).
-        """
-        if self._groups is None:
-            return None
-        allowed = set()
-        for group in self._groups:
-            perms_qs = self._resolve_group_permissions(group)
-            for p in perms_qs:
-                if not self._skip_standard_perm(
-                    group, p, self._is_standard_codename(p.codename)
-                ):
-                    allowed.add(p.pk)
-        return frozenset(allowed)
-
     def value_from_datadict(self, data, files, name):
         raw = data.get(name)
         if not raw:
             return []
         try:
-            values = json.loads(raw)
+            return json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             return []
-        allowed = self._get_allowed_permission_ids()
-        if allowed is not None:
-            return [v for v in values if v in allowed]
-        return values
 
     @staticmethod
-    def _is_standard_codename(codename):
-        prefix = codename.rsplit("_", 1)[0] if "_" in codename else ""
-        return prefix in ("view", "add", "change", "delete")
+    def _is_standard_codename(codename, model_name):
+        return codename in {f"{action}_{model_name}" for action in STANDARD_ACTIONS}
 
     @staticmethod
     def _standard_action(codename):

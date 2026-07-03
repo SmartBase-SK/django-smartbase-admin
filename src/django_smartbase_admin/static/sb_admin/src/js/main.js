@@ -3,6 +3,7 @@ import Collapse from 'bootstrap/js/dist/collapse'
 import Tab from 'bootstrap/js/dist/tab'
 import Modal from 'bootstrap/js/dist/modal'
 import Tooltip from 'bootstrap/js/dist/tooltip'
+import Popover from 'bootstrap/js/dist/popover'
 import debounce from 'lodash/debounce'
 
 // remove Modal focus trap to fix interaction with fields in modals inside another modal
@@ -17,6 +18,7 @@ Modal.prototype._initializeFocusTrap = function () {
 window.bootstrap5 = {
     Modal: Modal,
     Tooltip: Tooltip,
+    Popover: Popover,
     Collapse: Collapse,
     Tab: Tab,
     Dropdown: Dropdown
@@ -33,7 +35,6 @@ import TextTags from "./text_tags"
 import { ensureFilterForms, setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
-import PermissionTree from "./permission_tree"
 import "./inline_paginator"
 
 const CKEDITOR_READY_MAX_FRAMES = 120
@@ -113,7 +114,6 @@ class Main {
         this.staticAutocomplete = new StaticAutocomplete()
         this.textTags = new TextTags()
         this.choicesJS = new ChoicesJS()
-        this.permissionTree = new PermissionTree()
         document.addEventListener('click', (e) => {
             this.closeAlert(e)
             this.selectAll(e)
