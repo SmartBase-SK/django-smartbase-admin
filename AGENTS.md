@@ -1418,6 +1418,11 @@ queryset.  Explicit groups render first; any queryset permissions not
 referenced by those groups render afterward using the default app/model
 grouping.
 
+Unbound forms, including add pages, select no permissions by default. This is
+intentional fail-closed behavior for permission editors. Pass
+``preselect_all=True`` only when new objects should explicitly start with every
+permission in the widget queryset selected.
+
 **Default mode rendering:**
 ```
 ┌─ Authentication and Authorization ────────────────────────┐
@@ -1482,9 +1487,12 @@ permission below them.
 | ``codenames`` | ``list[str]`` | required | Strict permission refs in ``app_label.model:codename`` format. |
 | ``help_text`` | ``str`` | ``""`` | Help text displayed below the option label. |
 
-``SBAdminPermissionWidget`` also accepts ``queryset=``. Use it when assigning
-the widget dynamically after the form field has already been constructed, so
-the widget does not have to rely on Django's field/widget binding.
+``SBAdminPermissionWidget`` also accepts ``queryset=`` and
+``preselect_all=False``. Use ``queryset=`` when assigning the widget
+dynamically after the form field has already been constructed, so the widget
+does not have to rely on Django's field/widget binding. Use
+``preselect_all=True`` only for an intentional opt-in "all selected" initial
+state on unbound forms.
 
 **Examples:**
 

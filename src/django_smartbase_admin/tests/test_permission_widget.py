@@ -51,6 +51,9 @@ class PermissionWidgetStaticTests(TestCase):
         self.assertEqual(
             SBAdminPermissionWidget._standard_action("change_article"), "change"
         )
+        self.assertEqual(
+            SBAdminPermissionWidget._standard_action("view_order_item"), "view"
+        )
 
     def test_parse_selected_permission_ids_none(self):
         self.assertEqual(
@@ -63,10 +66,24 @@ class PermissionWidgetStaticTests(TestCase):
             {1, 2, 3},
         )
 
+    def test_parse_selected_permission_ids_skips_invalid_entries(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids(
+                [1, "2", "abc", None, {}, "3.5"]
+            ),
+            {1, 2},
+        )
+
     def test_parse_selected_permission_ids_json_string(self):
         self.assertEqual(
             SBAdminPermissionWidget._parse_selected_permission_ids('["1", 2, 3]'),
             {1, 2, 3},
+        )
+
+    def test_parse_selected_permission_ids_json_string_skips_invalid_entries(self):
+        self.assertEqual(
+            SBAdminPermissionWidget._parse_selected_permission_ids('["1", "abc", 2]'),
+            {1, 2},
         )
 
     def test_parse_selected_permission_ids_empty_string(self):
@@ -172,13 +189,26 @@ class PermissionWidgetContextTests(TestCase):
         stored = json.loads(context["widget"]["selected_values"])
         self.assertIn(perm.pk, stored)
 
-    def test_default_selected_values_reuse_permission_data_query(self):
+    def test_unbound_value_selects_no_permissions_by_default(self):
+        ct = ContentType.objects.get_for_model(Permission)
+        widget = SBAdminPermissionWidget(
+            queryset=Permission.objects.filter(content_type=ct)
+        )
+
+        with self.assertNumQueries(1):
+            context = widget.get_context("permissions", None, {"id": "id_permissions"})
+
+        stored = json.loads(context["widget"]["selected_values"])
+        self.assertEqual(stored, [])
+
+    def test_preselect_all_reuses_permission_data_query(self):
         ct = ContentType.objects.get_for_model(Permission)
         expected_ids = set(
             Permission.objects.filter(content_type=ct).values_list("pk", flat=True)
         )
         widget = SBAdminPermissionWidget(
-            queryset=Permission.objects.filter(content_type=ct)
+            queryset=Permission.objects.filter(content_type=ct),
+            preselect_all=True,
         )
 
         with self.assertNumQueries(1):
@@ -422,7 +452,6 @@ class PermissionGroupTests(TestCase):
         )
         self.assertEqual(set(option.permission_ids), {view_perm.pk, add_perm.pk})
         self.assertFalse(option.selected)
-        self.assertFalse(option.indeterminate)
 
     def test_groups_mode_appends_unseen_permissions_grouped_by_app_label(self):
         view_perm = Permission.objects.get(codename="view_testmodel")
@@ -589,9 +618,8 @@ class PermissionGroupTests(TestCase):
         option = context["widget"]["permission_sections"][0].models[0].custom_perms[0]
 
         self.assertTrue(option.selected)
-        self.assertFalse(option.indeterminate)
 
-    def test_group_option_is_indeterminate_when_some_backing_permissions_selected(self):
+    def test_group_option_is_unselected_when_some_backing_permissions_selected(self):
         view_perm = Permission.objects.get(codename="view_testmodel")
         add_perm = Permission.objects.get(codename="add_testmodel")
         groups = [
@@ -617,8 +645,6 @@ class PermissionGroupTests(TestCase):
         option = context["widget"]["permission_sections"][0].models[0].custom_perms[0]
 
         self.assertFalse(option.selected)
-        self.assertTrue(option.indeterminate)
-        self.assertEqual(json.loads(option.selected_ids_json), [view_perm.pk])
 
     def test_groups_mode_rejects_malformed_permission_refs(self):
         groups = [

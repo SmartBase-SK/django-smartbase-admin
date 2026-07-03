@@ -22,13 +22,20 @@ export default class PermissionTree {
     }
 
     initTree(container) {
-        container.querySelectorAll('[data-permission-tree-checkbox][data-indeterminate="true"]').forEach(cb => {
-            cb.indeterminate = true
-        })
         this.initBootstrapOverlays(container)
+        this.prepareSearchIndexes(container)
         this.syncHiddenInput(container)
         this.updateCounts(container)
         this.updateEmptyState(container)
+    }
+
+    prepareSearchIndexes(container) {
+        container.querySelectorAll('[data-permission-tree-text]').forEach(el => {
+            this.searchIndexForTextElement(el)
+        })
+        container.querySelectorAll('[data-permission-tree-perm]').forEach(perm => {
+            perm.permissionTreeSearchText = this.buildSearchIndex(this.searchTextForPermission(perm)).text
+        })
     }
 
     initBootstrapOverlays(container) {
@@ -59,12 +66,7 @@ export default class PermissionTree {
             const appDiv = checkbox.closest('[data-permission-tree-app]')
             appDiv.querySelectorAll('[data-permission-tree-checkbox]').forEach(cb => {
                 cb.checked = checkbox.checked
-                cb.indeterminate = false
-                delete cb.dataset.selectedIds
             })
-        } else {
-            checkbox.indeterminate = false
-            delete checkbox.dataset.selectedIds
         }
 
         this.updateCounts(container)
@@ -79,16 +81,12 @@ export default class PermissionTree {
 
         container.querySelectorAll('[data-permission-tree-perm]').forEach(perm => {
             const textElements = perm.querySelectorAll('[data-permission-tree-text]')
-            const searchText = [
-                perm.dataset.permissionTreeSearchText || '',
-                ...Array.from(textElements).map(el => this.getRawText(el)),
-            ].join(' ')
-            const match = !query || this.buildSearchIndex(searchText).text.includes(query)
+            const match = !query || this.searchTextForElement(perm).includes(query)
             perm.hidden = !match
             textElements.forEach(el => {
                 const rawText = this.getRawText(el)
                 if (match && query) {
-                    this.highlightText(el, rawText, query)
+                    this.highlightText(el, query)
                     return
                 }
                 el.textContent = rawText
@@ -100,8 +98,8 @@ export default class PermissionTree {
             m.hidden = !visible
             m.querySelectorAll('[data-permission-tree-model-name][data-permission-tree-text]').forEach(el => {
                 const rawText = this.getRawText(el)
-                if (visible && query && this.buildSearchIndex(rawText).text.includes(query)) {
-                    this.highlightText(el, rawText, query)
+                if (visible && query && this.searchIndexForTextElement(el).text.includes(query)) {
+                    this.highlightText(el, query)
                     return
                 }
                 el.textContent = rawText
@@ -138,6 +136,21 @@ export default class PermissionTree {
         if (emptyState) {
             emptyState.hidden = visibleApps > 0
         }
+    }
+
+    searchTextForPermission(perm) {
+        const textElements = perm.querySelectorAll('[data-permission-tree-text]')
+        return [
+            perm.dataset.permissionTreeSearchText || '',
+            ...Array.from(textElements).map(el => this.getRawText(el)),
+        ].join(' ')
+    }
+
+    searchTextForElement(element) {
+        if (!element.permissionTreeSearchText) {
+            element.permissionTreeSearchText = this.buildSearchIndex(this.searchTextForPermission(element)).text
+        }
+        return element.permissionTreeSearchText
     }
 
     getRawText(element) {
@@ -190,8 +203,18 @@ export default class PermissionTree {
         }[char]))
     }
 
-    highlightText(element, rawText, query) {
-        const searchIndex = this.buildSearchIndex(rawText)
+    searchIndexForTextElement(element) {
+        const rawText = this.getRawText(element)
+        if (!element.permissionTreeSearchIndex || element.permissionTreeRawText !== rawText) {
+            element.permissionTreeRawText = rawText
+            element.permissionTreeSearchIndex = this.buildSearchIndex(rawText)
+        }
+        return element.permissionTreeSearchIndex
+    }
+
+    highlightText(element, query) {
+        const rawText = this.getRawText(element)
+        const searchIndex = this.searchIndexForTextElement(element)
         let offset = 0
         let html = ''
         let searchOffset = 0
@@ -215,7 +238,6 @@ export default class PermissionTree {
         container.querySelectorAll('[data-permission-tree-app]').forEach(appDiv => {
             const checkboxes = appDiv.querySelectorAll('[data-permission-tree-checkbox]')
             const checked = appDiv.querySelectorAll('[data-permission-tree-checkbox]:checked')
-            const partiallyChecked = Array.from(checkboxes).filter(cb => cb.indeterminate)
             const countEl = appDiv.querySelector('[data-permission-tree-count]')
             if (countEl) {
                 countEl.textContent = checked.length + '/' + checkboxes.length
@@ -225,13 +247,10 @@ export default class PermissionTree {
             if (selectAll) {
                 if (checked.length === 0) {
                     selectAll.checked = false
-                    selectAll.indeterminate = partiallyChecked.length > 0
                 } else if (checked.length === checkboxes.length) {
                     selectAll.checked = true
-                    selectAll.indeterminate = false
                 } else {
                     selectAll.checked = false
-                    selectAll.indeterminate = true
                 }
             }
         })
@@ -242,10 +261,6 @@ export default class PermissionTree {
         container.querySelectorAll('[data-permission-tree-checkbox]').forEach(cb => {
             if (cb.checked) {
                 this.permissionIdsForCheckbox(cb).forEach(id => checked.add(id))
-                return
-            }
-            if (cb.indeterminate && cb.dataset.selectedIds) {
-                this.parseIds(cb.dataset.selectedIds).forEach(id => checked.add(id))
             }
         })
         const hidden = container.querySelector('[data-permission-tree-value]')

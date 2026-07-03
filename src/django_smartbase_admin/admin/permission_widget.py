@@ -68,7 +68,7 @@ class PermissionRenderRow:
     id: int | str
     name: str
     permission_ids: list[int]
-    selected_ids: list[int]
+    selected: bool
     search_text: str
     codename: str = ""
     help_text: str = ""
@@ -80,18 +80,6 @@ class PermissionRenderRow:
     @property
     def permission_ids_json(self):
         return json.dumps(self.permission_ids)
-
-    @property
-    def selected_ids_json(self):
-        return json.dumps(self.selected_ids)
-
-    @property
-    def selected(self):
-        return len(self.selected_ids) == len(self.permission_ids)
-
-    @property
-    def indeterminate(self):
-        return bool(self.selected_ids) and not self.selected
 
 
 @dataclass
@@ -181,6 +169,10 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
     **Groups mode** — pass ``groups`` (a list of :class:`PermissionGroup`)
     to define user-facing permission options. Each option resolves one or more
     strict ``app_label.model:codename`` refs against the widget queryset.
+
+    Unbound forms select no permissions by default. Pass ``preselect_all=True``
+    only when a new object should intentionally start with every queryset
+    permission selected.
     """
 
     template_name = "sb_admin/widgets/permission_tree.html"
@@ -191,13 +183,21 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
             "sb_admin/dist/permission_tree.js",
         ]
 
-    def __init__(self, form_field=None, attrs=None, groups=None, queryset=None):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        groups=None,
+        queryset=None,
+        preselect_all=False,
+    ):
         super().__init__(
             form_field,
             attrs={"class": "permission-tree", **(attrs or {})},
         )
         self._groups = groups or []
         self.queryset = queryset
+        self.preselect_all = preselect_all
 
     # ------------------------------------------------------------------
     # Context building
@@ -207,7 +207,7 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
         context = super().get_context(name, value, attrs)
         permissions = self._get_permission_data()
         selected = self._parse_selected_permission_ids(value)
-        if value is None:
+        if value is None and self.preselect_all:
             selected = self._get_default_selected_ids(permissions)
 
         sections = self._build_group_context(selected, permissions)
@@ -277,7 +277,7 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                     else permission.name
                 ),
                 permission_ids=[permission.id],
-                selected_ids=[permission.id] if permission.id in selected else [],
+                selected=permission.id in selected,
                 search_text=(
                     f"{permission.name} {permission.codename} "
                     f"{permission.model_verbose}"
@@ -315,18 +315,16 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                 ]
                 permission_ids = [permission.id for permission in option_permissions]
                 seen_permission_ids.update(permission_ids)
-                selected_ids = [
-                    permission_id
-                    for permission_id in permission_ids
-                    if permission_id in selected
-                ]
                 custom_perms.append(
                     PermissionRenderRow(
                         id=f"group-{group_idx}-option-{option_idx}",
                         name=option.label,
                         help_text=option.help_text,
                         permission_ids=permission_ids,
-                        selected_ids=selected_ids,
+                        selected=all(
+                            permission_id in selected
+                            for permission_id in permission_ids
+                        ),
                         search_text=f"{option.label} {option.help_text}",
                     )
                 )
@@ -482,7 +480,7 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
 
     @staticmethod
     def _standard_action(codename):
-        return codename.rsplit("_", 1)[0]
+        return codename.split("_", 1)[0]
 
     @staticmethod
     def _parse_selected_permission_ids(value):
@@ -497,6 +495,14 @@ class SBAdminPermissionWidget(SBAdminBaseWidget, forms.Widget):
                 return set()
 
         if isinstance(value, (list, tuple)):
-            return {int(v) for v in value if v is not None}
+            selected = set()
+            for item in value:
+                if item is None:
+                    continue
+                try:
+                    selected.add(int(item))
+                except (TypeError, ValueError):
+                    continue
+            return selected
 
         return set()
