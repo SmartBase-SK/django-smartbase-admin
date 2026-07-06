@@ -363,8 +363,7 @@ class MessageInboxAdmin(_MessageTypeBadgeMixin, SBAdminNoHistoryDetailMixin, SBA
             permission = getattr(permission, "permission", None) or "view"
         if permission in ("add", "change", "delete"):
             return False
-        user = getattr(request, "user", None)
-        return bool(user and user.is_authenticated)
+        return super().has_permission(request, obj, permission)
 
     def get_queryset(self, request=None):
         qs = super().get_queryset(request)

@@ -283,11 +283,35 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             menu_item.init_menu_item_static(self.view_map)
 
     def init_menu_items_dynamic(self, request, request_data):
-        menu_items = [
-            item.process_and_serialize(request, request_data)[0]
-            for item in self.menu_items
-        ]
+        menu_items = []
+        for item in self.menu_items:
+            item_dict, _item_active = item.process_and_serialize(request, request_data)
+            if item_dict is not None:
+                menu_items.append(item_dict)
         request_data.menu_items = menu_items
+
+    def get_default_view_id(self, request, request_data):
+        if self.default_view:
+            return self.default_view.get_view_id()
+        return self.get_first_menu_view_id(request, request_data)
+
+    def get_first_menu_view_id(self, request, request_data):
+        for item in self.menu_items:
+            view_id = self._first_permitted_menu_view_id(item, request, request_data)
+            if view_id:
+                return view_id
+        return None
+
+    def _first_permitted_menu_view_id(self, item, request, request_data):
+        if item.has_menu_permission(request, request_data) and item.get_view_id():
+            return item.get_view_id()
+        for sub_item in item.sub_items:
+            view_id = self._first_permitted_menu_view_id(
+                sub_item, request, request_data
+            )
+            if view_id:
+                return view_id
+        return None
 
     def init_view_map(self):
         self.view_map.update({view.get_id(): view for view in self.registered_views})

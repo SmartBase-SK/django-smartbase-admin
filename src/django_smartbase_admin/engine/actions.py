@@ -163,6 +163,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         target_view=None,
         action_id=None,
         url=None,
+        permission=None,
         css_class=None,
         open_in_new_tab=None,
         enabled_if=None,
@@ -180,6 +181,7 @@ class SBAdminRowAction(SBAdminCustomAction):
         )
         resolved_action_id = action_id if action_id is not None else self.action_id
         resolved_url = url if url is not None else self.url
+        resolved_permission = permission if permission is not None else self.permission
         resolved_css_class = css_class if css_class is not None else self.css_class
         resolved_open_in_new_tab = (
             open_in_new_tab if open_in_new_tab is not None else self.open_in_new_tab
@@ -221,6 +223,7 @@ class SBAdminRowAction(SBAdminCustomAction):
             open_in_new_tab=resolved_open_in_new_tab,
             icon=resolved_icon,
             sub_actions=resolved_sub_actions,
+            permission=resolved_permission,
             mcp_description=mcp_description,
         )
 
