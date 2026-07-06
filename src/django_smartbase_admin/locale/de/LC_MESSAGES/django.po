@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-# 
+#
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-08 12:40+0200\n"
+"POT-Creation-Date: 2026-07-03 17:03+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -95,6 +95,20 @@ msgstr "Halten Sie “Strg“ oder auf einem Mac “Befehl” gedrückt, um mehr
 #, python-format
 msgid "Change history: %s"
 msgstr "Änderungsverlauf: %s"
+
+msgid "View"
+msgstr "Ansehen"
+
+#, fuzzy
+#| msgid "Created"
+msgid "Create"
+msgstr "Erstellt"
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Delete"
+msgstr "Löschen"
 
 msgid "Log in"
 msgstr "Anmelden"
@@ -222,9 +236,6 @@ msgstr ""
 msgid "Form"
 msgstr ""
 
-msgid "View"
-msgstr "Ansehen"
-
 msgid "Yes"
 msgstr "Ja"
 
@@ -262,6 +273,92 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr "Keine Daten."
 
+msgid "Toast"
+msgstr ""
+
+msgid "Modal"
+msgstr ""
+
+#, fuzzy
+#| msgid "User"
+msgid "Users"
+msgstr "Benutzer"
+
+msgid "User groups"
+msgstr ""
+
+msgid "All users"
+msgstr ""
+
+msgid "Info"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "Type"
+msgstr "Typ"
+
+#, fuzzy
+#| msgid "Contains"
+msgid "Content"
+msgstr "Enthält"
+
+msgid "Message"
+msgstr ""
+
+msgid "Messages"
+msgstr ""
+
+#, fuzzy
+#| msgid "Filer"
+msgid "File"
+msgstr "Filer"
+
+msgid "Attachment"
+msgstr ""
+
+msgid "Attachments"
+msgstr ""
+
+msgid "Message recipient"
+msgstr ""
+
+msgid "Message recipients"
+msgstr ""
+
+msgid "New message"
+msgstr ""
+
+#, fuzzy
+#| msgid "Modified"
+msgid "Notified"
+msgstr "Geändert"
+
+msgid "Read"
+msgstr ""
+
+msgid "Created"
+msgstr "Erstellt"
+
+msgid "Unread"
+msgstr ""
+
+msgid "Recipients"
+msgstr ""
+
+msgid "My messages"
+msgstr ""
+
+msgid "From"
+msgstr "Von"
+
+msgid "Received"
+msgstr ""
+
 msgid "System"
 msgstr "System"
 
@@ -276,6 +373,9 @@ msgstr "Design"
 
 msgid "Translations"
 msgstr "Übersetzungen"
+
+msgid "SBAdmin XLSX lazy proxy type sentinel"
+msgstr ""
 
 msgid "Save"
 msgstr "Speichern"
@@ -426,8 +526,8 @@ msgstr "Keine auswählen"
 msgid "Save view"
 msgstr "Ansicht speichern"
 
-msgid "Search and filter"
-msgstr "Suchen und filtern"
+msgid "Filters"
+msgstr "Filter"
 
 msgid "Quick Search"
 msgstr "Schnellsuche"
@@ -639,9 +739,6 @@ msgstr "Aktion"
 msgid "Timezone"
 msgstr "Zeitzone"
 
-msgid "From"
-msgstr "Von"
-
 msgid "To"
 msgstr "Bis"
 
@@ -678,9 +775,6 @@ msgstr "Weitere(n) %(verbose_name)s hinzufügen"
 
 msgid "Change"
 msgstr "Ändern"
-
-msgid "Delete"
-msgstr "Löschen"
 
 msgid "results"
 msgstr "Ergebnisse"
@@ -852,9 +946,6 @@ msgstr "Erweitern"
 msgid "File is missing"
 msgstr "Datei fehlt"
 
-msgid "Type"
-msgstr "Typ"
-
 msgid "Size"
 msgstr "Größe"
 
@@ -864,11 +955,11 @@ msgstr "Dateigröße"
 msgid "Modified"
 msgstr "Geändert"
 
-msgid "Created"
-msgstr "Erstellt"
-
 msgid "Owner"
 msgstr "Eigentümer"
+
+msgid "Acknowledge"
+msgstr ""
 
 msgid "Logout"
 msgstr "Abmelden"
@@ -921,6 +1012,9 @@ msgstr "Verwandte Änderungen"
 msgid "This list has unsaved changes. Changing page will discard them."
 msgstr ""
 
+msgid "Send"
+msgstr ""
+
 msgid "Basic Settings"
 msgstr "Grundeinstellungen"
 
@@ -936,19 +1030,11 @@ msgstr "Speichern und weiteres hinzufügen"
 msgid "Save and continue editing"
 msgstr "Speichern und weiter bearbeiten"
 
-#, fuzzy
-#| msgid "Select all"
-msgid "Select"
-msgstr "Alle auswählen"
-
 msgid "Add file"
 msgstr "Datei hinzufügen"
 
 msgid "or move here"
 msgstr "oder hierher verschieben"
-
-msgid "Edit"
-msgstr "Bearbeiten"
 
 msgid "Open color picker"
 msgstr "Farbauswahl öffnen"
@@ -992,6 +1078,29 @@ msgstr "Nachschlagen"
 
 msgid "Choose File"
 msgstr "Datei auswählen"
+
+msgid "Search permissions…"
+msgstr ""
+
+msgid "Search permissions"
+msgstr ""
+
+msgid "Permission is not available"
+msgstr ""
+
+msgid "Custom permissions"
+msgstr ""
+
+msgid "Allowed"
+msgstr ""
+
+#, fuzzy
+#| msgid "results"
+msgid "No permissions found"
+msgstr "Ergebnisse"
+
+msgid "Try clearing your search to see more results"
+msgstr ""
 
 msgid "Wizard"
 msgstr "Assistent"
@@ -1067,6 +1176,14 @@ msgstr " von "
 
 msgid "Language"
 msgstr ""
+
+#~ msgid "Search and filter"
+#~ msgstr "Suchen und filtern"
+
+#, fuzzy
+#~| msgid "Select all"
+#~ msgid "Select"
+#~ msgstr "Alle auswählen"
 
 #, python-format
 #~ msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"

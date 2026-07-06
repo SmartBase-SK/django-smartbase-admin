@@ -994,6 +994,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableInitialPageSize": self.get_list_per_page(request),
             "tableHistoryEnabled": self.sbadmin_table_history_enabled,
             "stickyHeaderAndFooter": sticky_header_and_footer,
+            "paginationPageInputMinPages": request.request_data.configuration.list_pagination_page_input_min_pages,
             "enableUrlCompression": request.request_data.configuration.enable_url_compression,
             # used to initialize all columns with these values
             "defaultColumnData": {},
@@ -1125,6 +1126,10 @@ class SBAdminBaseListView(SBAdminBaseView):
                 getattr(request, "request_data", None), "object_id", None
             ),
         )
+
+    def get_sbadmin_list_row_class(self, request, row) -> str:
+        # Return a space-separated CSS class string applied to a list-view ``tabulator-row``.
+        return ""
 
     def get_sbadmin_row_actions(self, request) -> list[SBAdminRowAction]:
         return [*(self.sbadmin_row_actions or [])]

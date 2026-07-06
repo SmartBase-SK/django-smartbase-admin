@@ -5,18 +5,67 @@ Patches Django's QuerySet methods to intercept database operations.
 
 import logging
 import uuid
-from typing import Any
+from contextlib import contextmanager
+from dataclasses import dataclass
 
-from django.db import models, transaction
-
-from django_smartbase_admin.audit.utils.serialization import serialize_instance
+from django.db import transaction
 from django_smartbase_admin.audit.utils.diff import (
-    compute_diff,
     compute_bulk_diff,
     compute_bulk_snapshot,
+    compute_diff,
 )
+from django_smartbase_admin.audit.utils.serialization import serialize_instance
 
 logger = logging.getLogger(__name__)
+
+_AUDIT_PARENT_CONTEXT_REQUEST_ATTR = "_sbadmin_audit_parent_context"
+
+
+@dataclass(frozen=True)
+class AuditParentContext:
+    parent_view: object
+    parent_object_id: object
+
+    @classmethod
+    def from_parent_path(cls, parent_view, obj, parent_id_path):
+        if parent_view is None or obj is None or not parent_id_path:
+            return None
+
+        parent_object_id = getattr(obj, parent_id_path, None)
+        if parent_object_id is None:
+            return None
+        if hasattr(parent_object_id, "pk"):
+            parent_object_id = parent_object_id.pk
+        return cls(parent_view=parent_view, parent_object_id=parent_object_id)
+
+    @property
+    def parent_model(self):
+        return getattr(self.parent_view, "model", None)
+
+
+@contextmanager
+def audit_parent_context(request, context):
+    context = context() if callable(context) else context
+    if context is None:
+        yield
+        return
+    if not isinstance(context, AuditParentContext):
+        raise TypeError("audit_parent_context expects AuditParentContext.")
+
+    missing = object()
+    previous_context = getattr(request, _AUDIT_PARENT_CONTEXT_REQUEST_ATTR, missing)
+    setattr(request, _AUDIT_PARENT_CONTEXT_REQUEST_ATTR, context)
+    try:
+        yield
+    finally:
+        if previous_context is missing:
+            try:
+                delattr(request, _AUDIT_PARENT_CONTEXT_REQUEST_ATTR)
+            except AttributeError:
+                pass
+        else:
+            setattr(request, _AUDIT_PARENT_CONTEXT_REQUEST_ATTR, previous_context)
+
 
 # Models to skip auditing (besides AdminAuditLog)
 SKIP_MODELS = {
@@ -190,6 +239,14 @@ def _get_request_id() -> uuid.UUID | None:
         return None
 
 
+def _get_object_repr(model, object_id) -> str:
+    try:
+        obj = model._default_manager.get(pk=object_id)
+        return str(obj)[:255]
+    except Exception:
+        return f"{model.__name__} #{object_id}"
+
+
 def _get_parent_context() -> tuple[type | None, str, str]:
     """
     Get parent context from SBAdmin request_data.
@@ -204,6 +261,18 @@ def _get_parent_context() -> tuple[type | None, str, str]:
         if request is None:
             return None, "", ""
 
+        context = getattr(request, _AUDIT_PARENT_CONTEXT_REQUEST_ATTR, None)
+        if (
+            isinstance(context, AuditParentContext)
+            and context.parent_model is not None
+            and context.parent_object_id is not None
+        ):
+            return (
+                context.parent_model,
+                str(context.parent_object_id),
+                _get_object_repr(context.parent_model, context.parent_object_id),
+            )
+
         request_data = getattr(request, "request_data", None)
         if request_data is None:
             return None, "", ""
@@ -213,24 +282,17 @@ def _get_parent_context() -> tuple[type | None, str, str]:
         if selected_view is None:
             return None, "", ""
 
-        # Get the model from the view
         parent_model = getattr(selected_view, "model", None)
-        if parent_model is None:
+        parent_object_id = getattr(request_data, "object_id", None)
+
+        if parent_model is None or parent_object_id is None:
             return None, "", ""
 
-        # Get the object_id being edited
-        object_id = getattr(request_data, "object_id", None)
-        if not object_id:
-            return None, "", ""
-
-        # Try to get the object repr
-        try:
-            parent_obj = parent_model._default_manager.get(pk=object_id)
-            parent_repr = str(parent_obj)[:255]
-        except Exception:
-            parent_repr = f"{parent_model.__name__} #{object_id}"
-
-        return parent_model, str(object_id), parent_repr
+        return (
+            parent_model,
+            str(parent_object_id),
+            _get_object_repr(parent_model, parent_object_id),
+        )
 
     except Exception:
         return None, "", ""

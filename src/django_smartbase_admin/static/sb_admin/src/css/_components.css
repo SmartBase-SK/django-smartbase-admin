@@ -7,6 +7,7 @@
 @import "components/_query-builder.css";
 @import "components/_table.css";
 @import "components/_json-editor.css";
+@import "components/_permission-tree.css";
 
 @layer components {
     fieldset, .stacked-row {
@@ -386,6 +387,12 @@
         }
     }
 
+    .tabulator-change-view-filters {
+        .filters-list {
+            @apply pt-4;
+        }
+    }
+
     .table-selected-rows-bar {
         @apply flex items-center h-48 pr-16 py-8;
         @apply bg-light custom-scrollbar;
@@ -496,6 +503,7 @@
         transition-duration: 120ms;
         transition-timing-function: ease-in;
         transition-delay: 0ms;
+        z-index: 12;
 
        &.htmx-request,
        .htmx-request & {
@@ -588,4 +596,10 @@
             @apply pl-20;
         }
     }
+
+    .tooltip,
+    .popover {
+        z-index: 1020;
+    }
+
 }

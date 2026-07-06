@@ -43,11 +43,20 @@ export class DataTreeModule extends SBAdminTableModule {
             this.freezeTableHeight()
         }, true)
 
-        const restoreHeight = () => {
-            this.restoreTableHeight()
+        const processRowTree = (row) => {
+            const el = row.getElement()
+            if (el) {
+                window.htmx?.process(el)
+            }
+            row.getTreeChildren().forEach(processRowTree)
         }
 
-        this.table.tabulator.on("dataTreeRowExpanded", restoreHeight)
-        this.table.tabulator.on("dataTreeRowCollapsed", restoreHeight)
+        const onTreeToggle = (row) => {
+            this.restoreTableHeight()
+            processRowTree(row)
+        }
+
+        this.table.tabulator.on("dataTreeRowExpanded", onTreeToggle)
+        this.table.tabulator.on("dataTreeRowCollapsed", onTreeToggle)
     }
 }

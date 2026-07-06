@@ -104,7 +104,7 @@
     }
 
     .dropdown-menu-datepicker {
-        @appy w-auto h-auto max-w-none max-h-none;
+        @apply w-auto h-auto max-w-none max-h-none;
         .flatpickr-calendar {
             @apply -mx-12 shadow-none;
         }

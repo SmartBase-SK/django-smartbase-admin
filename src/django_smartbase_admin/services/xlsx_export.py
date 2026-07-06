@@ -16,6 +16,7 @@ from django_smartbase_admin.engine.const import Formatter
 from django_smartbase_admin.utils import JSONSerializableMixin
 
 _IMAGE_FORMULA_ALLOWED_SCHEMES = ("http", "https")
+_LAZY_TRANSLATION_TYPE = type(gettext_lazy("SBAdmin XLSX lazy proxy type sentinel"))
 
 
 def _safe_image_formula_url(value):
@@ -80,7 +81,7 @@ class SBAdminXLSXExportService(object):
         worksheet = workbook.add_worksheet()
 
         worksheet.set_default_row(options.get("default_row_height", 15))
-        worksheet.add_write_handler(type(gettext_lazy("")), cls.write_proxy)
+        worksheet.add_write_handler(_LAZY_TRANSLATION_TYPE, cls.write_proxy)
         header_rows_count = options.get("header_rows_count", 0)
         header_rows_height = options.get("header_rows_height", 25)
         header_rows_freeze = options.get("header_rows_freeze", True)

@@ -23,7 +23,7 @@ Why the pipeline looks the way it does:
 
 * The page slice knows *which parent groups* are visible but not the
   rows themselves. ``modify_base_queryset`` stashes the **unfiltered**
-  base qs so ``modify_final_data`` can hydrate rows (parents always
+  base qs so ``modify_raw_data`` can hydrate rows (parents always
   resolve, even when the filter excluded them but matched a child).
   Two filter shapes, same downstream tree-assembly loop:
 
@@ -145,7 +145,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         if nested is None:
             return qs
         # parent_field has to be in the values list so
-        # ``modify_final_data`` can map each row back to its parent.
+        # ``modify_raw_data`` can map each row back to its parent.
         parent_field: str = nested["parent_field"]
         hydration_values = list(values)
         if parent_field not in hydration_values:
@@ -186,7 +186,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         nested = resolve_nested(action.view, request)
         if nested is None:
             return qs
-        # Stash caller ordering so ``modify_final_data`` can apply it
+        # Stash caller ordering so ``modify_raw_data`` can apply it
         # to child rows too — otherwise groups sort correctly but
         # children land in whatever order the hydration query returned.
         store = cls.get_request_data_plugin_store(request)
@@ -207,14 +207,14 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         return cls._build_parent_group_qs(action, qs, nested)
 
     @classmethod
-    def modify_final_data(
+    def modify_raw_data(
         cls,
         action: "SBAdminListAction",
         request: "HttpRequest",
         data: list[dict[str, Any]],
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
-        """Replace page-group rows with hydrated parents and ``_children``."""
+        """Replace page-group rows with raw hydrated parents and children."""
         nested = resolve_nested(action.view, request)
         if nested is None:
             return data
@@ -222,13 +222,13 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         parent_field: str = nested["parent_field"]
         only_filtered = nested.get("only_show_filtered_children", True)
 
-        # ``data`` currently contains one dict per visible parent group,
-        # not full parent/child rows.
-        parent_ids: set[Any] = set()
-        for group in data:
-            root_id = group.get(PARENT_REAL_ID)
-            if root_id is not None:
-                parent_ids.add(root_id)
+        parent_ids = [
+            root_id
+            for group in data
+            if (root_id := group.get(PARENT_REAL_ID)) is not None
+        ]
+        store = cls.get_request_data_plugin_store(request)
+        store["parent_ids"] = parent_ids
         if not parent_ids:
             return []
 
@@ -236,14 +236,13 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         # unfiltered base qs from ``modify_base_queryset``. Parents
         # excluded by the list filter still resolve here, which is
         # why the base qs is kept unfiltered.
-        store = cls.get_request_data_plugin_store(request)
         base_qs = store.get("base_qs")
         if base_qs is None:
             return data
 
         # Build both sides from ``base_qs`` so UNION ALL has an
         # identical selected-column shape on every supported backend.
-        parent_qs = base_qs.filter(**{f"{pk_name}__in": list(parent_ids)}).order_by()
+        parent_qs = base_qs.filter(**{f"{pk_name}__in": parent_ids}).order_by()
         if only_filtered:
             filtered_child_ids_qs = store.get("filtered_child_ids_qs")
             if filtered_child_ids_qs is None:
@@ -254,9 +253,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
                 )
         else:
             child_qs = base_qs
-        child_qs = child_qs.filter(
-            **{f"{parent_field}__in": list(parent_ids)}
-        ).order_by()
+        child_qs = child_qs.filter(**{f"{parent_field}__in": parent_ids}).order_by()
         hydrated = parent_qs.union(child_qs, all=True)
         # Apply the caller's sort to children too so each parent's
         # ``_children`` list follows the same order the user chose
@@ -266,27 +263,42 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         order_by = store.get("order_by") or []
         if order_by:
             hydrated = hydrated.order_by(*order_by)
-        rows = list(hydrated)
+        return list(hydrated)
 
-        # Format hydrated rows the same way normal list rows are
-        # formatted before nesting them under their parent.
-        raw_rows_by_pk = {row[pk_name]: dict(row) for row in rows}
-        action.process_final_data(rows)
-        action.inject_row_actions(rows, raw_rows_by_pk=raw_rows_by_pk)
+    @classmethod
+    def modify_final_data(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        data: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """Assemble finalized parent and child rows into ``_children``."""
+        nested = resolve_nested(action.view, request)
+        if nested is None:
+            return data
+        pk_name = action.get_pk_field().name
+        parent_field: str = nested["parent_field"]
+        store = cls.get_request_data_plugin_store(request)
+        parent_ids = store.get("parent_ids")
+        if parent_ids is None:
+            return data
+        if not parent_ids:
+            return []
 
         # Group direct children by their root parent id; grandchildren
         # are already excluded unless the admin opted out via config.
-        by_id = {row[pk_name]: row for row in rows}
+        parent_id_set = set(parent_ids)
+        by_id = {row[pk_name]: row for row in data}
         children_by_parent: dict[Any, list[dict[str, Any]]] = {}
-        for row in rows:
+        for row in data:
             pid = row.get(parent_field)
-            if pid is None or pid == row.get(pk_name) or pid not in parent_ids:
+            if pid is None or pid == row.get(pk_name) or pid not in parent_id_set:
                 continue
             children_by_parent.setdefault(pid, []).append(row)
 
         result: list[dict[str, Any]] = []
-        for group in data:
-            root_id = group.get(PARENT_REAL_ID)
+        for root_id in parent_ids:
             root_row = by_id.get(root_id)
             if root_row is None:
                 continue

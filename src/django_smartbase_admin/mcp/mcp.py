@@ -294,6 +294,7 @@ def _guarded_tool_call(method):
                 duration_ms=int((time.perf_counter() - start) * 1000),
             )
 
+    wrapper.sbadmin_mcp_tool = True
     return wrapper
 
 

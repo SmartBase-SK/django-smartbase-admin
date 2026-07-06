@@ -278,8 +278,10 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
         *,
         copy_label="Copy",
         copied_label="Copied",
+        copy_notification_label=None,
         copy_icon="Minus-the-top",
     ):
+        copy_notification_label = copy_notification_label or copied_label
         super().__init__(
             form_field=form_field,
             attrs=attrs,
@@ -292,6 +294,7 @@ class SBAdminCopyableTextInputWidget(SBAdminTextInputWidget):
                 "data-sbadmin-copy-button": True,
                 "data-sbadmin-copy-label": copy_label,
                 "data-sbadmin-copied-label": copied_label,
+                "data-sbadmin-copy-notification-label": copy_notification_label,
             },
         )
 
@@ -1696,3 +1699,18 @@ try:
 
 except ImportError:
     pass
+
+
+_PERMISSION_WIDGET_EXPORTS = {
+    "PermissionGroup",
+    "PermissionOption",
+    "SBAdminPermissionWidget",
+}
+
+
+def __getattr__(name):
+    if name in _PERMISSION_WIDGET_EXPORTS:
+        from django_smartbase_admin.admin import permission_widget
+
+        return getattr(permission_widget, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

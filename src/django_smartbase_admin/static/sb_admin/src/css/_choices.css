@@ -74,6 +74,9 @@
 .choices__list.choices__list--multiple {
     @apply flex flex-wrap gap-4;
     @apply px-12 pb-0 -mx-12;
+    max-height: 11rem;
+    @apply overflow-y-auto;
+    @extend .custom-scrollbar;
     &:not(:empty) {
         @apply pt-12;
         @apply border-t border-dark-200;

@@ -131,6 +131,7 @@ class SBAdminListAction(SBAdminAction):
         # Plugins emitting their own row keys extend this set.
         self.allowed_framework_keys: set[str] = {
             "_row_actions",
+            "_row_class",
             "_children",
             "_sbadmin_tree_last_child",
         }
@@ -521,19 +522,26 @@ class SBAdminListAction(SBAdminAction):
 
         data_qs = self.build_final_data_queryset(page_num, page_size, additional_filter)
         data = list(data_qs)
-
-        self.process_final_data(data)
         request = self.threadsafe_request
         plugins = list(request.request_data.configuration.plugins)
         for plugin in plugins:
-            data = plugin.modify_final_data(
+            data = plugin.modify_raw_data(
                 self,
                 request=request,
                 data=data,
             )
 
         raw_rows_by_pk = {row[self.get_pk_field().name]: dict(row) for row in data}
+        self.inject_row_class(data)
+        self.process_final_data(data)
         self.inject_row_actions(data, raw_rows_by_pk=raw_rows_by_pk)
+
+        for plugin in plugins:
+            data = plugin.modify_final_data(
+                self,
+                request=request,
+                data=data,
+            )
 
         return {
             "last_page": math.ceil(total_count / page_size),
@@ -569,6 +577,21 @@ class SBAdminListAction(SBAdminAction):
                     value = escape(value)
                 row[field_key] = value
 
+    def inject_row_class(self, final_data: list[dict[str, Any]]) -> None:
+        """Attach a ``_row_class`` CSS string to each row, computed from the RAW
+        row dict (must run before ``process_final_data`` formats column values).
+
+        Not every view that uses this action inherits ``SBAdminBaseListView``
+        (e.g. integration admins), so the hook is resolved defensively and rows
+        are left untouched when it is absent."""
+        row_class_hook = getattr(self.view, "get_sbadmin_list_row_class", None)
+        if not callable(row_class_hook):
+            return
+        for row in final_data:
+            if "_row_class" in row:
+                continue
+            row["_row_class"] = row_class_hook(self.threadsafe_request, row) or ""
+
     def inject_row_actions(
         self, final_data: list[dict[str, Any]], raw_rows_by_pk: dict | None = None
     ) -> None:
@@ -577,6 +600,8 @@ class SBAdminListAction(SBAdminAction):
             return
         pk_field = self.get_pk_field().name
         for row in final_data:
+            if "_row_actions" in row:
+                continue
             obj_id = row.get(pk_field)
             raw_row = (raw_rows_by_pk or {}).get(obj_id)
             row["_row_actions"] = [
@@ -641,6 +666,7 @@ class SBAdminListAction(SBAdminAction):
             "css_class": action.get_css_class(action_row) or "",
             "open_in_modal": bool(action.open_in_modal),
             "is_method_action": bool(action.action_id) and not action.open_in_modal,
+            "is_download": bool(getattr(action, "is_download", False)),
             "open_in_new_tab": bool(action.open_in_new_tab),
         }
         if action.sub_actions:

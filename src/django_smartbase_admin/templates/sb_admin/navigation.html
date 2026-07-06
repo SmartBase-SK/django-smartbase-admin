@@ -16,7 +16,7 @@
                 {{ username_data.initials }}
             </div>
         </header>
-        <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50 z-1"
+        <nav class="w-260 xl:fixed top-0 bottom-0 left-0 max-lg:sidebar border-r border-dark-200 overflow-hidden flex flex-col relative bg-dark-50"
              id="main-navigation">
             <header class="px-24 py-32 hidden xl:!block">
                 <img src="{% static 'sb_admin/images/logo.svg' %}" class="h-32 w-auto dark:hidden"
@@ -38,7 +38,7 @@
                             {% if menu_item.sub_items %}
                                 <div class="menu-item">
                                     <a href="{{ menu_item.get_url|default:menu_item.sub_items.0.get_url }}"
-                                       class="inline-flex w-full p-8 justify-start collapse-btn{% if not menu_item.is_active %} collapsed{% endif %}"
+                                       class="inline-flex w-full p-8 justify-start collapse-btn{% if not menu_item.is_active %} collapsed{% endif %}{% if menu_item.get_css_class %} {{ menu_item.get_css_class }}{% endif %}"
                                        aria-expanded="{% if menu_item.is_active %}true{% else %}false{% endif %}"
                                     >
                                         {% if menu_item.get_icon %}
@@ -53,7 +53,7 @@
                                         {% for sub_menu_item in menu_item.sub_items %}
                                             <li class="py-2">
                                                 <a href="{{ sub_menu_item.get_url }}"
-                                                   class="menu-item text-dark-600 leading-20 pl-36 py-8 pr-8{% if sub_menu_item.is_active %} active{% endif %}">
+                                                   class="menu-item text-dark-600 leading-20 pl-36 py-8 pr-8{% if sub_menu_item.is_active %} active{% endif %}{% if sub_menu_item.get_css_class %} {{ sub_menu_item.get_css_class }}{% endif %}">
                                                     <span>{{ sub_menu_item.get_label }}</span>
                                                 </a>
                                             </li>
@@ -62,7 +62,7 @@
                                 </div>
                             {% else %}
                                 <div class="menu-item{% if menu_item.is_active %} active{% endif %}">
-                                    <a href="{{ menu_item.get_url }}" class="inline-flex w-full p-8">
+                                    <a href="{{ menu_item.get_url }}" class="inline-flex w-full p-8{% if menu_item.get_css_class %} {{ menu_item.get_css_class }}{% endif %}">
                                         {% if menu_item.get_icon %}
                                             <svg class="w-20 h-20 mr-8 flex-shrink-0">
                                                 <use xlink:href="#{{ menu_item.get_icon }}"></use>
@@ -75,6 +75,7 @@
                             {% endif %}
                         </li>
                     {% endfor %}
+                    {% block after_menu_items %}{% endblock %}
                 </ul>
                 {#            <hr class="my-32">#}
                 {#            <div class="text-14 mb-24 px-16">#}
