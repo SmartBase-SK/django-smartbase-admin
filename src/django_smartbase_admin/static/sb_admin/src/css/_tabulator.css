@@ -343,6 +343,33 @@
     }
 }
 
+.tabulator-page-jump {
+    @apply flex items-center gap-8 ml-8 sm:ml-16 max-sm:hidden;
+
+    span {
+        @apply text-dark-600;
+    }
+}
+
+.tabulator-page-jump-input {
+    @apply w-56 h-40 text-center rounded;
+    @apply bg-bg-input border border-dark-300 text-dark-900 shadow-xs;
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    &:focus {
+        @apply border-primary;
+        box-shadow: 0 0 0 2px theme('colors.primary.100');
+        outline: none;
+    }
+}
+
 .tabulator .tabulator-col-resize-handle {
     position: relative;
     display: inline-block;
