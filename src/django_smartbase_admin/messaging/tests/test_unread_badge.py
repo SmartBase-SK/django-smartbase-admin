@@ -21,6 +21,17 @@ from django_smartbase_admin.messaging.models import Message, MessageRecipient
 from django_smartbase_admin.messaging.services import SBAdminMessagingService
 
 
+class _PermittedView:
+    def get_id(self):
+        return "inbox"
+
+    def get_menu_view_url(self, request):
+        return "/inbox/"
+
+    def has_view_permission(self, request):
+        return True
+
+
 class MenuItemBadgeTestCase(SimpleTestCase):
     def test_static_badge_value(self):
         item = SBAdminMenuItem(label="Inbox", badge=3)
@@ -75,6 +86,7 @@ class MenuItemBadgeTestCase(SimpleTestCase):
 
     def test_serialization_includes_rendered_badge(self):
         item = SBAdminMenuItem(label="Inbox", badge=lambda r: 7)
+        item.view = _PermittedView()
         request_data = SimpleNamespace(view="other")
         json_dict, _active = item.process_and_serialize(
             request=None, request_data=request_data

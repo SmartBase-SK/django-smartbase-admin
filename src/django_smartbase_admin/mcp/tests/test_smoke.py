@@ -24,7 +24,10 @@ import secrets
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import Client, TestCase, override_settings
+
+from django_smartbase_admin.messaging.models import MessageRecipient
 
 
 def _b64url(b: bytes) -> str:
@@ -51,6 +54,12 @@ class MCPOAuthSmokeTests(TestCase):
         self.user = User.objects.create(username="alice", is_active=True, is_staff=True)
         self.user.set_password("pw")
         self.user.save()
+        self.user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label=MessageRecipient._meta.app_label,
+                codename=f"view_{MessageRecipient._meta.model_name}",
+            )
+        )
         self.client = Client()
         self.assertTrue(
             self.client.login(username="alice", password="pw"),
