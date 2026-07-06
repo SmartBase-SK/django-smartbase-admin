@@ -204,6 +204,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     # to self-guard based on admin config (e.g. ``sbadmin_nested``).
     plugins: list = []
     default_list_sticky_header_and_footer = True
+    # Minimum number of pages from which a separate 'jump to page' input
+    # is shown next to list pagination. None disables the input entirely.
+    list_pagination_page_input_min_pages = 50
     enable_url_compression = True
     mcp_readonly = False
     link_history_to_audit = True
@@ -222,6 +225,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         admin_title=None,
         plugins=None,
         default_list_sticky_header_and_footer=None,
+        list_pagination_page_input_min_pages=None,
         enable_url_compression=None,
         mcp_readonly=None,
         link_history_to_audit=None,
@@ -245,6 +249,10 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         if default_list_sticky_header_and_footer is not None:
             self.default_list_sticky_header_and_footer = (
                 default_list_sticky_header_and_footer
+            )
+        if list_pagination_page_input_min_pages is not None:
+            self.list_pagination_page_input_min_pages = (
+                list_pagination_page_input_min_pages
             )
         self.enable_url_compression = (
             enable_url_compression

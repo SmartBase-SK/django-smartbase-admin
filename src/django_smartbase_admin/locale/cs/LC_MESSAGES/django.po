@@ -1196,3 +1196,11 @@ msgstr "Jazyk"
 #, python-format
 #~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
 #~ msgstr "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující objekty a jejich související položky budou smazány:"
+
+msgctxt "pagination"
+msgid "Page"
+msgstr "Strana"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr "Přejít"

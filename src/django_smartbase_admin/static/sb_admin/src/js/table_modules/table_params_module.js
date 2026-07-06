@@ -102,6 +102,62 @@ export class TableParamsModule extends SBAdminTableModule {
         return button
     }
 
+    createPaginationEllipsis() {
+        return this.createPaginationButton(
+            createIcon('More', ['w-20', 'h-20', 'mt-8'])
+        )
+    }
+
+    createPageJumpInput(paginationWidget, maxPage, currentPage) {
+        const minPages = this.table.paginationPageInputMinPages
+        if(!minPages || maxPage < minPages) {
+            return
+        }
+        const goToPage = (input) => {
+            const page = parseInt(input.value, 10)
+            if(isNaN(page)) {
+                return
+            }
+            this.table.tabulator.setPage(Math.min(Math.max(page, 1), maxPage))
+        }
+
+        const wrapper = document.createElement('div')
+        wrapper.classList.add('tabulator-page-jump')
+
+        const label = document.createElement('span')
+        label.textContent = window.sb_admin_translation_strings["page_input_label"]
+
+        const input = document.createElement('input')
+        input.type = 'number'
+        input.min = 1
+        input.max = maxPage
+        input.value = currentPage
+        input.classList.add('tabulator-page-jump-input')
+        input.onfocus = () => {
+            input.select()
+        }
+        input.onkeydown = (event) => {
+            if(event.key !== 'Enter') {
+                return
+            }
+            event.preventDefault()
+            goToPage(input)
+        }
+
+        const goButton = document.createElement('button')
+        goButton.type = 'button'
+        goButton.classList.add('btn', 'px-10', 'font-normal')
+        goButton.textContent = window.sb_admin_translation_strings["page_input_go"]
+        goButton.onclick = () => {
+            goToPage(input)
+        }
+
+        wrapper.appendChild(label)
+        wrapper.appendChild(input)
+        wrapper.appendChild(goButton)
+        paginationWidget.appendChild(wrapper)
+    }
+
     createPaginationButtonsFromRange(range, mapFunction, paginationWrapper, currentPage) {
         Array.from({length: range}, mapFunction).forEach((pageNum) => {
             paginationWrapper.appendChild(
@@ -168,11 +224,7 @@ export class TableParamsModule extends SBAdminTableModule {
                         this.table.tabulator.setPage(1)
                     })
                 )
-                paginationWrapper.appendChild(
-                    this.createPaginationButton(
-                        createIcon('More', ['w-20', 'h-20', 'mt-8'])
-                    )
-                )
+                paginationWrapper.appendChild(this.createPaginationEllipsis())
                 if(currentPage > maxPage - activeRange + 1 ) {
                     // create '1 ... X'
                     this.createPaginationButtonsFromRange(
@@ -190,11 +242,7 @@ export class TableParamsModule extends SBAdminTableModule {
                         paginationWrapper,
                         currentPage
                     )
-                    paginationWrapper.appendChild(
-                        this.createPaginationButton(
-                            createIcon('More', ['w-20', 'h-20', 'mt-8'])
-                        )
-                    )
+                    paginationWrapper.appendChild(this.createPaginationEllipsis())
                     paginationWrapper.appendChild(this.createPaginationButton(
                         maxPage,
                         () => {
@@ -211,11 +259,7 @@ export class TableParamsModule extends SBAdminTableModule {
                     paginationWrapper,
                     currentPage
                 )
-                paginationWrapper.appendChild(
-                    this.createPaginationButton(
-                        createIcon('More', ['w-20', 'h-20', 'mt-8'])
-                    )
-                )
+                paginationWrapper.appendChild(this.createPaginationEllipsis())
                 paginationWrapper.appendChild(this.createPaginationButton(
                     maxPage,
                     () => {
@@ -242,6 +286,8 @@ export class TableParamsModule extends SBAdminTableModule {
         )
         nextButton.disabled = currentPage === maxPage
         paginationWrapper.appendChild(nextButton)
+
+        this.createPageJumpInput(paginationWidget, maxPage, currentPage)
     }
 
     createPageSize(pageSizeWidget) {
