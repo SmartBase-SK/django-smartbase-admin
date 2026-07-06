@@ -10,9 +10,7 @@ class MCPRequestLog(models.Model):
     Written by the ``mcp_tool_called`` receiver in :mod:`recorder`.
     """
 
-    timestamp = models.DateTimeField(
-        _("Time"), auto_now_add=True, db_index=True
-    )
+    timestamp = models.DateTimeField(_("Time"), auto_now_add=True, db_index=True)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name=_("User"),

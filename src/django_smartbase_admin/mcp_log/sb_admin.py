@@ -107,7 +107,9 @@ class MCPRequestLogAdmin(SBAdmin):
             filter_widget=BooleanFilterWidget(),
         ),
         SBAdminField(name="result_count", title=_("Items"), filter_disabled=True),
-        SBAdminField(name="duration_ms", title=_("Duration (ms)"), filter_disabled=True),
+        SBAdminField(
+            name="duration_ms", title=_("Duration (ms)"), filter_disabled=True
+        ),
         SBAdminField(name="request_size", title=_("Request (B)"), filter_disabled=True),
         SBAdminField(
             name="response_size", title=_("Response (B)"), filter_disabled=True

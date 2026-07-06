@@ -47,7 +47,9 @@ DATE_SHORTCUTS = [
     (365, _("Last Year")),
 ]
 DAYS_LABEL = dict(DATE_SHORTCUTS)
-WIDGET_SHORTCUTS = [{"value": [-days, 0], "label": label} for days, label in DATE_SHORTCUTS]
+WIDGET_SHORTCUTS = [
+    {"value": [-days, 0], "label": label} for days, label in DATE_SHORTCUTS
+]
 DEFAULT_SHORTCUT_INDEX = 0  # "Last 30 days"
 
 
