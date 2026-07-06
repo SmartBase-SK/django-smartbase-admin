@@ -233,7 +233,7 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         mcp_whoami_sbadmin=None,
     ) -> None:
         super().__init__()
-        self.default_view = default_view or self.default_view or []
+        self.default_view = default_view or self.default_view
         self.registered_views = registered_views or self.registered_views or []
         self.menu_items = menu_items or self.menu_items or []
         self.global_filter_form = global_filter_form or self.global_filter_form

@@ -2,7 +2,7 @@
 
 Browser-hosted MCP clients (claude.ai's Cowork integration, the various
 ChatGPT bridges, Cursor's web client) and custom browser dashboards
-cross-origin POST to ``/mcp/`` and send an OAuth preflight to
+cross-origin POST to the configured MCP endpoint and send an OAuth preflight to
 ``/.well-known/oauth-protected-resource``. Without
 ``Access-Control-Allow-Origin`` + matching ``-Methods`` / ``-Headers``,
 the browser blocks every request before it reaches Django.
@@ -41,8 +41,7 @@ DEFAULT_ALLOWED_ORIGINS: tuple[str, ...] = (
     "https://cursor.com",
 )
 
-_MCP_PATH_PREFIXES: tuple[str, ...] = (
-    "/mcp",
+_OAUTH_PATH_PREFIXES: tuple[str, ...] = (
     "/.well-known/oauth-authorization-server",
     "/.well-known/oauth-protected-resource",
     "/oauth/",
@@ -76,8 +75,23 @@ def _allowed_request_headers() -> str:
     return ", ".join(headers)
 
 
+def _mcp_path_prefix() -> str | None:
+    endpoint = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/")
+    endpoint = endpoint.strip("/")
+    if not endpoint:
+        return None
+    return f"/{endpoint}"
+
+
+def _path_matches_prefix(path: str, prefix: str) -> bool:
+    return path == prefix or path.startswith(f"{prefix}/")
+
+
 def _path_needs_cors(path: str) -> bool:
-    return any(path.startswith(prefix) for prefix in _MCP_PATH_PREFIXES)
+    mcp_prefix = _mcp_path_prefix()
+    if mcp_prefix and _path_matches_prefix(path, mcp_prefix):
+        return True
+    return any(path.startswith(prefix) for prefix in _OAUTH_PATH_PREFIXES)
 
 
 def _apply_cors_headers(response: HttpResponse, origin: str) -> None:
