@@ -234,9 +234,9 @@ class MCPCallsChartWidget(SBAdminDashboardLineChartWidgetByDate):
         series: dict = {}
         for row in rows:
             label = row.get(user_field) or "—"
-            series.setdefault(label, [0] * len(buckets))[index[row["x_axis"]]] += row[
-                "y_axis"
-            ]
+            series.setdefault(label, [0] * len(buckets))[index[row["x_axis"]]] += (
+                row["y_axis"] or 0
+            )
         labels = [
             self.process_label(request, bucket, None, [], []) for bucket in buckets
         ]
