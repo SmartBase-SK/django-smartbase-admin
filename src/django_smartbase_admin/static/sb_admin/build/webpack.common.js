@@ -12,6 +12,7 @@ const entries = {
     main_style: './src/django_smartbase_admin/static/sb_admin/src/css/style.css',
     translations: './src/django_smartbase_admin/static/sb_admin/src/js/translations.js',
     confirmation_modal: './src/django_smartbase_admin/static/sb_admin/src/js/confirmation_modal.js',
+    permission_tree: './src/django_smartbase_admin/static/sb_admin/src/js/permission_tree.js',
     tree_widget: './src/django_smartbase_admin/static/sb_admin/src/js/tree_widget.js',
     tree_widget_style: './src/django_smartbase_admin/static/sb_admin/src/css/tree_widget.css',
     calendar_style: './src/django_smartbase_admin/static/sb_admin/src/css/calendar.css',

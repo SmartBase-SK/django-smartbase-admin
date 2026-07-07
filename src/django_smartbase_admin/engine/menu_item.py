@@ -3,6 +3,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
 from django_smartbase_admin.services.configuration import SBAdminConfigurationService
+from django_smartbase_admin.services.request_cache import cache_on_request
 
 DEFAULT_MENU_ITEM_BADGE_CLASS = "badge badge-simple badge-primary ml-auto"
 
@@ -103,23 +104,82 @@ class SBAdminMenuItem(object):
             '<span class="{}">{}</span>', self.get_badge_class(request), badge
         )
 
+    def has_view_menu_permission(self, request):
+        if not self.view:
+            return True
+
+        has_menu_permission = getattr(self.view, "has_menu_permission", None)
+        if callable(has_menu_permission):
+            return has_menu_permission(request)
+
+        permission_checks = (
+            "has_view_permission",
+            "has_change_permission",
+            "has_add_permission",
+            "has_delete_permission",
+        )
+        checked_any_permission = False
+        for permission_check_name in permission_checks:
+            permission_check = getattr(self.view, permission_check_name, None)
+            if not callable(permission_check):
+                continue
+            checked_any_permission = True
+            if permission_check(request):
+                return True
+
+        if checked_any_permission:
+            return False
+
+        return True
+
+    def has_menu_permission(self, request, request_data):
+        if not self.view:
+            return True
+
+        cache_key = f"engine.menu_item.has_menu_permission:{self.view.get_id()}"
+        return cache_on_request(
+            cache_key,
+            lambda: self.has_view_menu_permission(request),
+            request=request,
+        )
+
+    def get_active_menu_view_id(self, request, request_data):
+        selected_view = getattr(request_data, "selected_view", None) or getattr(
+            request, "sbadmin_selected_view", None
+        )
+        return (
+            getattr(selected_view, "menu_highlight_view_id", None) or request_data.view
+        )
+
     def get_subitems_serialized(self, request, request_data):
         subitem_active = False
         subitems_serialized = []
         for item in self.sub_items:
             item_dict, item_active = item.process_and_serialize(request, request_data)
+            if item_dict is None:
+                continue
             subitems_serialized.append(item_dict)
             subitem_active = item_active or subitem_active
         return subitems_serialized, subitem_active
 
     def process_and_serialize(self, request, request_data):
         sub_items, subitem_active = self.get_subitems_serialized(request, request_data)
-        active = subitem_active or request_data.view == self.get_id()
+        has_menu_permission = self.has_menu_permission(request, request_data)
+        # Root menu item without permissions.
+        if not has_menu_permission and not sub_items:
+            return None, False
+        # Root wrapper menu item without visible children.
+        if not self.view and not sub_items:
+            return None, False
+        active = (
+            subitem_active
+            or self.get_active_menu_view_id(request, request_data) == self.get_id()
+        )
         json_dict = {
             "sub_items": sub_items,
             "get_label": self.get_label(),
             "get_icon": self.get_icon(),
-            "get_url": self.get_url(request),
+            "get_url": self.get_url(request) if has_menu_permission else "",
             "get_id": self.get_id(),
             "get_view_id": self.get_view_id(),
             "get_badge": self.render_badge(request),

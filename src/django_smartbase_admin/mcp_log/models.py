@@ -7,12 +7,10 @@ from django.utils.translation import gettext_lazy as _
 class MCPRequestLog(models.Model):
     """One row per MCP tool call: caller, payload, sizes, timing, outcome.
 
-    Written by the ``mcp_tool_called`` receiver in :mod:`recorder`.
+    Written by the ``mcp_tool_called`` receiver in :mod:`logger`.
     """
 
-    timestamp = models.DateTimeField(
-        _("Time"), auto_now_add=True, db_index=True
-    )
+    timestamp = models.DateTimeField(_("Time"), auto_now_add=True, db_index=True)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name=_("User"),
@@ -41,11 +39,18 @@ class MCPRequestLog(models.Model):
 
     # ─── Response shape (meta, not the body) ───
     result_status = models.CharField(_("Result status"), max_length=32, blank=True)
-    result_count = models.IntegerField(_("Items returned"), null=True, blank=True)
-    result_total = models.IntegerField(_("Total"), null=True, blank=True)
-    result_fields = models.IntegerField(_("Fields"), null=True, blank=True)
-    result_inlines = models.IntegerField(_("Inlines"), null=True, blank=True)
-    result_inline_rows = models.IntegerField(_("Inline rows"), null=True, blank=True)
+    result_total = models.IntegerField(_("Record count"), null=True, blank=True)
+    # Shape of the returned detail (echoed after a read/write), NOT a count of
+    # changed values — e.g. a product detail has 42 fields regardless of edit.
+    result_fields = models.IntegerField(
+        _("Returned field count"), null=True, blank=True
+    )
+    result_inlines = models.IntegerField(
+        _("Returned inline count"), null=True, blank=True
+    )
+    result_inline_rows = models.IntegerField(
+        _("Returned inline rows"), null=True, blank=True
+    )
 
     # ─── Outcome ───
     is_error = models.BooleanField(_("Error"), default=False, db_index=True)

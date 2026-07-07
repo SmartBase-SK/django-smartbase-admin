@@ -647,7 +647,15 @@ class SBAdminMCPDetailService:
             if not value:
                 return []
             ids = list(value)
-            objects = {item.pk: item for item in form_field.queryset.filter(pk__in=ids)}
+            try:
+                objects = {
+                    item.pk: item for item in form_field.queryset.filter(pk__in=ids)
+                }
+            except (ValueError, TypeError):
+                # An id that can't match the related pk type (e.g. a non-numeric
+                # value where the pk is integer) must not 500 the read-back; it
+                # falls back to str() below as an unresolved id.
+                objects = {}
             # Preserve submitted order; unresolved ids fall back to str()
             # rather than getting silently dropped.
             return [

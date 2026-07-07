@@ -1699,3 +1699,18 @@ try:
 
 except ImportError:
     pass
+
+
+_PERMISSION_WIDGET_EXPORTS = {
+    "PermissionGroup",
+    "PermissionOption",
+    "SBAdminPermissionWidget",
+}
+
+
+def __getattr__(name):
+    if name in _PERMISSION_WIDGET_EXPORTS:
+        from django_smartbase_admin.admin import permission_widget
+
+        return getattr(permission_widget, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-# 
+#
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-08 12:40+0200\n"
+"POT-Creation-Date: 2026-07-03 17:03+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -92,6 +92,18 @@ msgstr ""
 
 #, python-format
 msgid "Change history: %s"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Create"
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Delete"
 msgstr ""
 
 msgid "Log in"
@@ -220,9 +232,6 @@ msgstr ""
 msgid "Form"
 msgstr ""
 
-msgid "View"
-msgstr ""
-
 msgid "Yes"
 msgstr ""
 
@@ -260,6 +269,84 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr ""
 
+msgid "Toast"
+msgstr ""
+
+msgid "Modal"
+msgstr ""
+
+msgid "Users"
+msgstr ""
+
+msgid "User groups"
+msgstr ""
+
+msgid "All users"
+msgstr ""
+
+msgid "Info"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Content"
+msgstr ""
+
+msgid "Message"
+msgstr ""
+
+msgid "Messages"
+msgstr ""
+
+msgid "File"
+msgstr ""
+
+msgid "Attachment"
+msgstr ""
+
+msgid "Attachments"
+msgstr ""
+
+msgid "Message recipient"
+msgstr ""
+
+msgid "Message recipients"
+msgstr ""
+
+msgid "New message"
+msgstr ""
+
+msgid "Notified"
+msgstr ""
+
+msgid "Read"
+msgstr ""
+
+msgid "Created"
+msgstr ""
+
+msgid "Unread"
+msgstr ""
+
+msgid "Recipients"
+msgstr ""
+
+msgid "My messages"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "Received"
+msgstr ""
+
 msgid "System"
 msgstr ""
 
@@ -273,6 +360,9 @@ msgid "Theme"
 msgstr ""
 
 msgid "Translations"
+msgstr ""
+
+msgid "SBAdmin XLSX lazy proxy type sentinel"
 msgstr ""
 
 msgid "Save"
@@ -413,16 +503,13 @@ msgstr ""
 msgid "Save view"
 msgstr ""
 
-msgid "Search and filter"
+msgid "Filters"
 msgstr ""
 
 msgid "Quick Search"
 msgstr ""
 
 msgid "Saved Views"
-msgstr ""
-
-msgid "Filters"
 msgstr ""
 
 msgid "Advanced Filters"
@@ -610,9 +697,6 @@ msgstr ""
 msgid "Timezone"
 msgstr ""
 
-msgid "From"
-msgstr ""
-
 msgid "To"
 msgstr ""
 
@@ -648,9 +732,6 @@ msgid "Add another %(verbose_name)s"
 msgstr ""
 
 msgid "Change"
-msgstr ""
-
-msgid "Delete"
 msgstr ""
 
 msgid "results"
@@ -812,9 +893,6 @@ msgstr ""
 msgid "File is missing"
 msgstr ""
 
-msgid "Type"
-msgstr ""
-
 msgid "Size"
 msgstr ""
 
@@ -824,10 +902,10 @@ msgstr ""
 msgid "Modified"
 msgstr ""
 
-msgid "Created"
+msgid "Owner"
 msgstr ""
 
-msgid "Owner"
+msgid "Acknowledge"
 msgstr ""
 
 msgid "Logout"
@@ -877,6 +955,9 @@ msgstr ""
 msgid "This list has unsaved changes. Changing page will discard them."
 msgstr ""
 
+msgid "Send"
+msgstr ""
+
 msgid "Basic Settings"
 msgstr ""
 
@@ -892,16 +973,10 @@ msgstr ""
 msgid "Save and continue editing"
 msgstr ""
 
-msgid "Select"
-msgstr ""
-
 msgid "Add file"
 msgstr ""
 
 msgid "or move here"
-msgstr ""
-
-msgid "Edit"
 msgstr ""
 
 msgid "Open color picker"
@@ -945,6 +1020,27 @@ msgid "Lookup"
 msgstr ""
 
 msgid "Choose File"
+msgstr ""
+
+msgid "Search permissions…"
+msgstr ""
+
+msgid "Search permissions"
+msgstr ""
+
+msgid "Permission is not available"
+msgstr ""
+
+msgid "Custom permissions"
+msgstr ""
+
+msgid "Allowed"
+msgstr ""
+
+msgid "No permissions found"
+msgstr ""
+
+msgid "Try clearing your search to see more results"
 msgstr ""
 
 msgid "Wizard"

@@ -8,10 +8,20 @@ the cookie-authed (navigation-only) authorize endpoint off the CORS surface.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from django_smartbase_admin.mcp.middleware import SBAdminMCPCorsMiddleware
+
+if not settings.configured:
+    settings.configure(
+        DEFAULT_CHARSET="utf-8",
+        SECRET_KEY="test-secret-key",
+        DATABASES={
+            "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+        },
+    )
 
 ORIGIN = "http://localhost:8010"
 
@@ -50,6 +60,19 @@ class CorsMiddlewareTests(SimpleTestCase):
             self.assertEqual(
                 self._send(path, method="get")["Access-Control-Allow-Origin"], ORIGIN
             )
+
+    @override_settings(DJANGO_MCP_ENDPOINT="api/mcp/")
+    def test_configured_mcp_endpoint_is_used_for_cors(self):
+        resp = self._send("/api/mcp/rest/tools/list_rows/", preflight=True)
+
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(resp["Access-Control-Allow-Origin"], ORIGIN)
+
+    @override_settings(DJANGO_MCP_ENDPOINT="api/mcp/")
+    def test_default_mcp_endpoint_is_not_decorated_when_endpoint_moves(self):
+        resp = self._send("/mcp/rest/tools/list_rows/", method="get")
+
+        self.assertNotIn("Access-Control-Allow-Origin", resp)
 
     def test_preflight_uses_default_allowed_headers(self):
         resp = self._send("/mcp/rest/tools/list_rows/", preflight=True)

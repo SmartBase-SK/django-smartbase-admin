@@ -57,7 +57,7 @@ class SBAdminViewRequestData(object):
     def refresh_selected_view(self, request):
         self.configuration = SBAdminConfigurationService.get_configuration(self)
         if not self.view:
-            self.view = self.configuration.default_view.get_view_id()
+            self.view = self.configuration.get_default_view_id(request, self)
         try:
             self.selected_view = self.configuration.view_map[self.view]
         except KeyError:

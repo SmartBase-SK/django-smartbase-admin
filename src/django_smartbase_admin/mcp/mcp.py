@@ -278,6 +278,10 @@ def _guarded_tool_call(method):
             error = exc
             raise
         finally:
+            # Clear the bound request BEFORE notifying listeners so a logging
+            # receiver's own DB writes don't run inside the SBAdmin/audit
+            # context (which would emit an AdminAuditLog row per log row).
+            SBAdminThreadLocalService.clear_request()
             # send_robust: a failing receiver must not break the tool call.
             mcp_tool_called.send_robust(
                 sender=type(self),
@@ -289,7 +293,6 @@ def _guarded_tool_call(method):
                 error=error,
                 duration_ms=int((time.perf_counter() - start) * 1000),
             )
-            SBAdminThreadLocalService.clear_request()
 
     wrapper.sbadmin_mcp_tool = True
     return wrapper
@@ -988,14 +991,18 @@ class SBAdminTools(MCPToolset):
             fetched payload back. Unknown or readonly names raise
             ``LookupError``.
           inlines: ``{inline_name: [row_op, ...]}`` keyed by the same
-            ``inline_name`` used by ``fetch_detail``. Each op is:
+            ``inline_name`` used by ``fetch_detail``. Pass it as a real
+            JSON object/array — never a stringified one. Each op is:
 
             * ``{"id": <pk>, ...overrides}`` — update an existing row.
             * ``{"id": <pk>, "_delete": true}`` — delete the row.
             * ``{...field values}`` (no ``id``) — create a new row.
 
-            Inlines not mentioned are passed through unchanged. Unknown
-            inline names or row ids raise ``LookupError``.
+            ``id`` is the **integer** pk exactly as ``fetch_detail``
+            returns it — send it as a JSON number (``174``), not a string
+            (``"174"``), or the row won't match. Inlines not mentioned are
+            passed through unchanged. Unknown inline names or row ids raise
+            ``LookupError``.
 
         Returns ``{"status": "ok", "id": ..., "fields": ...,
         "inlines": ...}`` mirroring ``fetch_detail`` after the save, or

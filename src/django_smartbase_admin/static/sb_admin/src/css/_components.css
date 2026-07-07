@@ -7,6 +7,7 @@
 @import "components/_query-builder.css";
 @import "components/_table.css";
 @import "components/_json-editor.css";
+@import "components/_permission-tree.css";
 
 @layer components {
     fieldset, .stacked-row {
@@ -595,4 +596,10 @@
             @apply pl-20;
         }
     }
+
+    .tooltip,
+    .popover {
+        z-index: 1020;
+    }
+
 }

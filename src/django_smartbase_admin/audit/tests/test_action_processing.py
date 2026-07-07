@@ -454,6 +454,23 @@ class RowActionIntegrationTests(TestCase):
             "/actions/PublishArticleView/template/",
         )
 
+    def test_row_target_view_action_preserves_permission(self):
+        view = FakeAdminView()
+        action = SBAdminRowAction(
+            target_view=PublishArticleView,
+            title="Publish",
+            icon="Check-correct",
+            view=view,
+            permission="delete",
+        )
+
+        processed = view.process_detail_actions(self.request, [action], object_id=123)
+
+        self.assertEqual(processed[0].permission, "delete")
+        self.assertEqual(
+            view.PublishArticleView._sbadmin_action_attrs["permission"], "delete"
+        )
+
     def test_detail_action_without_object_modifier_keeps_template_modifier(self):
         view = FakeAdminView()
         action = SBAdminCustomAction(

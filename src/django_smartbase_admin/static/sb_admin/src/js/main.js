@@ -3,6 +3,7 @@ import Collapse from 'bootstrap/js/dist/collapse'
 import Tab from 'bootstrap/js/dist/tab'
 import Modal from 'bootstrap/js/dist/modal'
 import Tooltip from 'bootstrap/js/dist/tooltip'
+import Popover from 'bootstrap/js/dist/popover'
 import debounce from 'lodash/debounce'
 
 // remove Modal focus trap to fix interaction with fields in modals inside another modal
@@ -17,6 +18,7 @@ Modal.prototype._initializeFocusTrap = function () {
 window.bootstrap5 = {
     Modal: Modal,
     Tooltip: Tooltip,
+    Popover: Popover,
     Collapse: Collapse,
     Tab: Tab,
     Dropdown: Dropdown

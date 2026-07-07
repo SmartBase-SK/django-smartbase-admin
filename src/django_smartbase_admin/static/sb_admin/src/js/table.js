@@ -56,6 +56,7 @@ class SBAdminTable {
         this.tableInitialPage = options.tableInitialPage || 1
         this.tableInitialPageSize = options.tableInitialPageSize
         this.tableHistoryEnabled = options.tableHistoryEnabled
+        this.paginationPageInputMinPages = options.paginationPageInputMinPages
         this.enableUrlCompression = options.enableUrlCompression !== false
         this.constants = options.constants
         this.tabulatorOptions = options.tabulatorOptions

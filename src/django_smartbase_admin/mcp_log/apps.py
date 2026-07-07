@@ -4,7 +4,7 @@ from django.apps import AppConfig
 class MCPLogConfig(AppConfig):
     """Optional MCP request logging.
 
-    Opt-in via ``INSTALLED_APPS``; ``ready()`` connects the recorder to
+    Opt-in via ``INSTALLED_APPS``; ``ready()`` connects the logger to
     ``mcp_tool_called`` and registers the admin view. The host project
     schedules retention (``MCPRequestLog.prune``).
     """
@@ -18,11 +18,11 @@ class MCPLogConfig(AppConfig):
         from django_smartbase_admin.admin.site import sb_admin_site
         from django_smartbase_admin.mcp.signals import mcp_tool_called
         from django_smartbase_admin.mcp_log.models import MCPRequestLog
-        from django_smartbase_admin.mcp_log.recorder import on_mcp_tool_called
+        from django_smartbase_admin.mcp_log.logger import on_mcp_tool_called
         from django_smartbase_admin.mcp_log.sb_admin import MCPRequestLogAdmin
 
         mcp_tool_called.connect(
-            on_mcp_tool_called, dispatch_uid="sbadmin_mcp_log_recorder"
+            on_mcp_tool_called, dispatch_uid="sbadmin_mcp_log_logger"
         )
 
         if not sb_admin_site.is_registered(MCPRequestLog):
