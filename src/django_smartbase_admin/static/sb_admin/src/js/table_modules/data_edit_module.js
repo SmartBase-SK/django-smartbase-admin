@@ -18,19 +18,21 @@ export class DataEditModule extends SBAdminTableModule {
 
     afterInit() {
         this.table.tabulator.on("cellEdited", (cell) => {
-            const row = cell.getRow()
-            const currentRowId = row.getData()[this.table.tableIdColumnName]
-            const editRequestData = new FormData()
-            editRequestData.set('currentRowId', currentRowId)
-            editRequestData.set('columnFieldName', cell.getColumn().getField())
-            editRequestData.set('cellValue', cell.getValue())
-            window.htmx.ajax('POST', this.table.tableDataEditUrl, {
+            const currentRowId = cell.getRow().getData()[this.table.tableIdColumnName]
+            const field = cell.getColumn().getField()
+            const value = cell.getValue()
+            const request = window.htmx.ajax('POST', this.table.tableDataEditUrl, {
                 'swap': 'none',
                 'values': {
                     'currentRowId': currentRowId,
-                    'columnFieldName': cell.getColumn().getField(),
-                    'cellValue': cell.getValue()
+                    'columnFieldName': field,
+                    'cellValue': value
                 }
+            })
+            Promise.resolve(request).then(() => {
+                document.dispatchEvent(new CustomEvent(window.sb_admin_const.TABLE_CELL_EDITED_EVENT_NAME, {
+                    detail: {table: this.table, rowId: currentRowId, field: field, value: value}
+                }))
             })
         })
     }
