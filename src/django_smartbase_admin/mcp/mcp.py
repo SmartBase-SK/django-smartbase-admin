@@ -1224,7 +1224,6 @@ class SBAdminTools(MCPToolset):
         object_id: str,
         field_values: dict | None = None,
         confirmed: bool = False,
-        parent_object_id: str | None = None,
     ) -> dict:
         """Invoke a row action against one object.
 
@@ -1241,8 +1240,6 @@ class SBAdminTools(MCPToolset):
           view_id: admin handle from ``list_admins``.
           action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
           object_id: target row id (as a string).
-          parent_object_id: for widget row actions, copy this from
-            ``fetch_detail.widgets[].parent_object_id``.
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
             ``{"value", "label"}`` envelope.
@@ -1264,7 +1261,6 @@ class SBAdminTools(MCPToolset):
             object_id,
             field_values,
             confirmed,
-            parent_object_id=parent_object_id,
         )
 
     @_guarded_tool_call
