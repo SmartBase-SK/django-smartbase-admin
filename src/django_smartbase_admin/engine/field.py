@@ -144,6 +144,7 @@ class SBAdminField(JSONSerializableMixin):
     auto_created = None
     formatter = None
     tabulator_editor = None
+    per_cell_editable_field = None
     python_formatter = None
     tabulator_options = None
     xlsx_options = None
@@ -166,6 +167,7 @@ class SBAdminField(JSONSerializableMixin):
         auto_created=None,
         formatter: Formatter = Formatter.HTML.value,
         tabulator_editor=None,
+        per_cell_editable_field=None,
         python_formatter=None,
         tabulator_options: "TabulatorFieldOptions" = None,
         xlsx_options: "XLSXFieldOptions" = None,
@@ -191,6 +193,7 @@ class SBAdminField(JSONSerializableMixin):
         self.auto_created = auto_created or self.auto_created or False
         self.formatter = formatter
         self.tabulator_editor = tabulator_editor
+        self.per_cell_editable_field = per_cell_editable_field
         self.python_formatter = python_formatter
         self.tabulator_options = tabulator_options
         self.xlsx_options = xlsx_options
@@ -339,6 +342,10 @@ class SBAdminField(JSONSerializableMixin):
             "formatter": self.formatter,
             "editor": self.tabulator_editor,
         }
+        if self.per_cell_editable_field:
+            # Name of a per-row boolean field in the row data; the DataEditModule turns this
+            # into a Tabulator ``editable`` callback so editability can vary per cell.
+            data["sbadminPerCellEditableField"] = self.per_cell_editable_field
         if self.tabulator_options:
             data.update(self.tabulator_options.to_json())
         return data

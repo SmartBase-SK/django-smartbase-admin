@@ -9,7 +9,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | Section | What it covers |
 |---------|----------------|
 | [Demo Schema Reference](#demo-schema-reference) | Models used in all examples (Article, Category, Tag, Author, Comment) |
-| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data` |
+| [SBAdminField](#sbadminfield---list-display-columns) | Defining list columns, annotations, `supporting_annotates`, admin methods, ordering with computed fields, `sbadmin_list_display_data`, inline cell editing (`tabulator_editor` / `per_cell_editable_field`) |
 | [Configuration](#configuration) | `INSTALLED_APPS`, role config, menu items, queryset restrictions, custom permissions |
 | [Filter Widgets](#filter-widgets) | Built-in widgets, custom filters, `filter_query_lambda` for M2M filtering |
 | [Form Widgets](#form-widgets) | input prefix/suffix text and icon buttons, `SBAdminTextTagsWidget`, `Meta.widgets` initialization, required select placeholders, `SBAdminJsonEditorWidget` for schema-driven JSON, `SBAdminPermissionWidget` for collapsible permission tree |
@@ -179,6 +179,8 @@ class ArticleAdmin(SBAdmin):
 | `python_formatter` | callable | Format value: `(obj_id, value) -> formatted_value` |
 | `list_visible` | bool | Show/hide column in list |
 | `tabulator_options` | TabulatorFieldOptions | Per-column Tabulator settings (width, grow, max, custom SBAdmin options) |
+| `tabulator_editor` | str | Tabulator editor type (`"number"`, `"input"`, …). Makes the column editable inline. See [Inline cell editing](#inline-cell-editing) |
+| `per_cell_editable_field` | str | Name of a per-row boolean in the row data that gates editability **per cell** (used only together with `tabulator_editor`). See [Inline cell editing](#inline-cell-editing) |
 
 ### Tabulator Options (table)
 
@@ -196,6 +198,102 @@ sbadmin_list_display = (
     ),
 )
 ```
+
+### Inline cell editing
+
+A list column can be edited in place (Tabulator cell editor) instead of only through a
+change form. The pieces:
+
+1. **`tabulator_editor`** on the `SBAdminField` — the Tabulator editor type
+   (`"number"`, `"input"`, `"select"`, …). This is what makes the column editable; it is
+   emitted as the column's `editor`. With it set and nothing else, **every cell** in the
+   column is editable.
+2. **Enable the `dataEditModule`** on the view's tabulator definition. It is *not* in the
+   default module set, so add it:
+
+   ```python
+   def get_tabulator_definition(self, request):
+       definition = super().get_tabulator_definition(request)
+       definition["modules"].append("dataEditModule")
+       return definition
+   ```
+
+   The module does two things: installs the per-cell `editable` gate (see below) and wires
+   `cellEdited → POST` to the `action_table_data_edit` action.
+3. **Implement `action_table_data_edit`** on the view (the base is a stub that returns
+   "Not Implemented"). It must be decorated with `@sbadmin_action`; it receives
+   `currentRowId`, `columnFieldName`, and `cellValue` in `request.POST` and is responsible
+   for persisting the change. Return `render_notifications(request)` (optionally with an
+   `HX-Trigger: SBAdminReloadTableData` header via `trigger_client_event` to refresh the
+   table after the edit).
+
+```python
+from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.utils import render_notifications
+
+class MyAdmin(SBAdmin):
+    sbadmin_list_display = (SBAdminField(name="qty", tabulator_editor="number"),)
+
+    def get_tabulator_definition(self, request):
+        definition = super().get_tabulator_definition(request)
+        definition["modules"].append("dataEditModule")
+        return definition
+
+    @sbadmin_action
+    def action_table_data_edit(self, request, modifier, object_id=None):
+        row_id = json.loads(request.POST.get("currentRowId", "null"))
+        column = request.POST.get("columnFieldName", "")
+        value = request.POST.get("cellValue", "")
+        ...  # validate + persist
+        return HttpResponse(status=200, content=render_notifications(request))
+```
+
+#### Per-cell editability — `per_cell_editable_field`
+
+`tabulator_editor` is all-or-nothing per column. To make editability vary **per row**, set
+`per_cell_editable_field` to the name of a per-row boolean present in the row data. The
+`dataEditModule` turns it into a Tabulator `editable` callback
+(`(cell) => Boolean(row.getData()[field])`): the cell opens its editor only when that
+boolean is truthy.
+
+```python
+from django.db.models import BooleanField, Case, Q, Value, When
+
+SBAdminField(
+    name="qty",
+    tabulator_editor="number",
+    per_cell_editable_field="qty_editable",
+    # the boolean must be selectable from the row data — provide it as a supporting annotate
+    supporting_annotates={
+        "qty_editable": Case(
+            When(~Q(status="locked"), then=Value(True)),
+            default=Value(False),
+            output_field=BooleanField(),
+        )
+    },
+)
+```
+
+Rules and gotchas:
+
+- **`per_cell_editable_field` needs `tabulator_editor`.** With no editor there is nothing to
+  open, so the gate does nothing on its own.
+- **The named field must exist in the row data.** A missing field reads as `undefined` →
+  `Boolean(undefined)` → `false` → the cell is read-only. Provide it via
+  `supporting_annotates` (or `sbadmin_list_display_data`). Such non-column keys are preserved
+  through `_strip_to_visible_keys` specifically because a column references them via
+  `per_cell_editable_field`.
+- **Needs the `dataEditModule`.** Both the `editable` gate (via `modifyTabulatorOptions`) and
+  the save pipeline live in that module.
+- Editing an ungated cell still POSTs to `action_table_data_edit`; enforce real
+  authorization/validation there too — the client gate is UX only.
+
+| `tabulator_editor` | `per_cell_editable_field` | Result |
+|---|---|---|
+| set | unset | Every cell in the column is editable. |
+| set | set | Editable only where the row boolean is truthy. |
+| unset | set | Nothing editable (the gate has no editor to act on). |
+| unset | unset | Plain read-only column. |
 
 ### When to set `filter_field`
 
