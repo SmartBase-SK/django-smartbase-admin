@@ -989,7 +989,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             "tableAjaxUrl": self.get_ajax_url(request),
             "tableDataEditUrl": self.get_action_url(
                 Action.TABLE_DATA_EDIT.value,
-                object_id=getattr(getattr(request, "request_data", None), "object_id", None),
+                object_id=getattr(
+                    getattr(request, "request_data", None), "object_id", None
+                ),
             ),
             "tableActionMoveUrl": self.get_action_url(
                 Action.TABLE_REORDER_ACTION.value
