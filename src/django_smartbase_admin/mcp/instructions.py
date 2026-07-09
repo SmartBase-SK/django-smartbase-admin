@@ -16,7 +16,11 @@ What you can do:
 * Browse: filter (text, choice, boolean, number range, date range,
   related-record), full-text search, sort, and paginate (``list_rows``).
 * Apply a named or saved filter preset and replay it (``fetch_filter_preset``).
-* Read one record in full, with related (inline) rows (``fetch_detail``).
+* Read one record in full, with related (inline) rows and detail widgets
+  (``fetch_detail``).
+* Read parent-scoped list widgets with ``list_rows`` using the widget
+  ``view_id`` and ``parent_object_id`` from ``fetch_detail.widgets``; read
+  non-list widgets with ``fetch_widget_data``.
 * Look up a related record by name to get its id — for filtering by it or
   setting it on a create/update form (``autocomplete``).
 * Create, update, and delete records — including their related rows

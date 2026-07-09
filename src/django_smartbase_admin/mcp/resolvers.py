@@ -26,6 +26,9 @@ def resolve_admin(view_id: str, request=None) -> SBAdminBaseListView:
     URL dispatch path.
     """
     if request is not None:
+        from django_smartbase_admin.mcp.bridge import ensure_sbadmin_request_data
+
+        ensure_sbadmin_request_data(request)
         view_map = getattr(
             getattr(request, "request_data", None), "configuration", None
         )

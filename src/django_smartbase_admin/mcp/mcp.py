@@ -46,6 +46,7 @@ from django_smartbase_admin.mcp.actions import (
 )
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.bridge import (
+    bind_sbadmin_request_data,
     build_columns_data,
     ensure_sbadmin_request_data,
     set_request_payload,
@@ -55,6 +56,10 @@ from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
 from django_smartbase_admin.mcp.schema import admin_entry, get_widget_shapes
+from django_smartbase_admin.mcp.widgets import (
+    ensure_dashboard_widget,
+    require_widget_parent_context,
+)
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 
@@ -472,7 +477,6 @@ class SBAdminTools(MCPToolset):
         )
 
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 
@@ -540,6 +544,7 @@ class SBAdminTools(MCPToolset):
         include_inlines: list | None = None,
         aggregate: list | None = None,
         group_by: list | None = None,
+        parent_object_id: str | None = None,
     ) -> dict:
         """List rows for one admin — same data the UI list shows.
 
@@ -552,6 +557,11 @@ class SBAdminTools(MCPToolset):
 
         Args:
           view_id: handle from ``list_admins``.
+            For detail widgets, use the widget ``view_id`` from
+            ``fetch_detail(...).widgets``.
+          parent_object_id: required for parent-scoped detail widgets.
+            Pass the ``parent_object_id`` returned with the widget entry so
+            the widget sees the same object context it has in the browser.
           fields: non-empty list of column names to return, drawn from
             ``list_admins["admin_views"][].fields[].name``. Every row also
             carries a normalized ``"id"`` key for row identity, regardless
@@ -630,14 +640,23 @@ class SBAdminTools(MCPToolset):
         when ``group_by`` is supplied.
         """
         request = self.request
-        ensure_sbadmin_request_data(request)
+        parent_object_id = (
+            str(parent_object_id) if parent_object_id is not None else None
+        )
         admin = resolve_admin(view_id, request=request)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            object_id=parent_object_id,
+            method="GET",
+        )
+        require_widget_parent_context(admin, parent_object_id)
         admin.init_view_dynamic(request, request.request_data)
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
         field_map = admin.get_field_map(request)
-        # Accept ``"id"`` as an alias for a differently-named pk on input, so
-        # the documented refetch works (output always mirrors the pk to
+        # Accept ``"id"`` as an alias for a differently-named pk on input,
+        # so the documented refetch works (output always mirrors the pk to
         # ``"id"``). No-op for the usual ``id``-pk model.
         pk_name = admin.model._meta.pk.name
         if pk_name != "id" and "id" not in field_map:
@@ -701,13 +720,14 @@ class SBAdminTools(MCPToolset):
         # Route through the same action dispatch as the browser so
         # ``has_permission_for_action`` stays the single gate, then unwrap
         # the JSON and drop UI-only payload (notifications, per-row action
-        # buttons advertised once via ``list_admins["admin_views"][].row_actions``, HTML
-        # markup in cell values).
+        # buttons advertised once via ``list_admins["admin_views"][].row_actions``,
+        # HTML markup in cell values).
         response = SBAdminViewService.delegate_to_action(
             request,
             view=admin.get_id(),
             action=Action.LIST_JSON.value,
             modifier="template",
+            object_id=parent_object_id,
         )
         result = json.loads(response.content.decode())
         result.pop(SB_ADMIN_AJAX_NOTIFICATIONS_KEY, None)
@@ -733,8 +753,13 @@ class SBAdminTools(MCPToolset):
         fields: list[str] | None = None,
     ) -> dict:
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            object_id=str(object_id),
+            method="GET",
+        )
         try:
             admin.init_view_dynamic(request, request.request_data)
             return SBAdminMCPDetailService.get_detail_data(
@@ -754,7 +779,8 @@ class SBAdminTools(MCPToolset):
 
         Permissions and row isolation match the UI detail page (an
         object the user wouldn't see there is reported missing). All
-        inlines the user can view are always hydrated.
+        inlines the user can view are always hydrated, and detail widgets
+        rendered by the page are advertised under ``widgets``.
 
         Display fields that render HTML in the UI are sanitized for the
         agent: structural markup (tables, lists, links, ``div`` / ``span``)
@@ -790,6 +816,11 @@ class SBAdminTools(MCPToolset):
         ``{"id", "fields"}`` shape. ``truncated`` is ``True`` when a
         paginated inline has more rows than carried here — drill in
         via ``list_rows`` on the inline's own admin.
+
+        ``widgets`` contains detail/dashboard widgets rendered in the
+        detail fieldsets. Use each widget's ``data_tool`` to choose the
+        next MCP call: ``list_rows`` with the widget ``view_id`` and
+        ``parent_object_id``, or ``fetch_widget_data`` for non-list data.
 
         Raises ``LookupError`` if the object isn't visible,
         ``PermissionError`` if permission is denied.
@@ -834,6 +865,57 @@ class SBAdminTools(MCPToolset):
         }
 
     @_guarded_tool_call
+    def fetch_widget_data(
+        self,
+        view_id: str,
+        parent_object_id: str | None = None,
+        params: dict | None = None,
+    ) -> dict:
+        """Fetch data for a non-list detail/dashboard widget.
+
+        For widgets with ``data_tool == "list_rows"`` use ``list_rows`` instead; table
+        widgets load through the list JSON pipeline, not ``get_data()``.
+
+        Args:
+          view_id: widget handle from ``fetch_detail(...).widgets``.
+          parent_object_id: object id from the widget entry when
+            ``requires_parent_object_id`` is true.
+          params: optional widget filter/settings query params.
+
+        Returns ``{"data": ...}`` from the widget's regular AJAX data path.
+        """
+        from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
+
+        request = self.request
+        try:
+            parent_object_id = (
+                str(parent_object_id) if parent_object_id is not None else None
+            )
+            widget = resolve_admin(view_id, request=request)
+            bind_sbadmin_request_data(
+                request,
+                view=widget.get_id(),
+                action="action_get_data",
+                modifier="template",
+                object_id=parent_object_id,
+                method="GET",
+                get=params or {},
+            )
+            ensure_dashboard_widget(widget)
+            require_widget_parent_context(widget, parent_object_id)
+            widget.init_view_dynamic(request, request.request_data)
+            if isinstance(widget, SBAdminDashboardListWidget):
+                raise ValueError(
+                    "List widgets are read with list_rows(..., "
+                    "parent_object_id=...), not fetch_widget_data."
+                )
+            if not widget.has_view_or_change_permission(request):
+                raise PermissionDenied
+            return {"data": widget.get_cached_data(request)}
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
+
+    @_guarded_tool_call
     def fetch_add_form(
         self,
         view_id: str,
@@ -857,7 +939,6 @@ class SBAdminTools(MCPToolset):
         Raises ``PermissionError`` if add permission is denied.
         """
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         try:
@@ -904,9 +985,9 @@ class SBAdminTools(MCPToolset):
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        admin = resolve_admin(view_id, request=request)
-        admin.init_view_dynamic(request, request.request_data)
         try:
+            admin = resolve_admin(view_id, request=request)
+            admin.init_view_dynamic(request, request.request_data)
             return SBAdminMCPActionFormService.get_action_form_data(
                 admin, request, action_id, object_id=object_id
             )
@@ -1143,6 +1224,7 @@ class SBAdminTools(MCPToolset):
         object_id: str,
         field_values: dict | None = None,
         confirmed: bool = False,
+        parent_object_id: str | None = None,
     ) -> dict:
         """Invoke a row action against one object.
 
@@ -1159,6 +1241,8 @@ class SBAdminTools(MCPToolset):
           view_id: admin handle from ``list_admins``.
           action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
           object_id: target row id (as a string).
+          parent_object_id: for widget row actions, copy this from
+            ``fetch_detail.widgets[].parent_object_id``.
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
             ``{"value", "label"}`` envelope.
@@ -1180,6 +1264,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             field_values,
             confirmed,
+            parent_object_id=parent_object_id,
         )
 
     @_guarded_tool_call
@@ -1288,7 +1373,6 @@ class SBAdminTools(MCPToolset):
         confirmed,
     ):
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         return SBAdminMCPActionInvokeService.invoke_row(
@@ -1351,7 +1435,6 @@ class SBAdminTools(MCPToolset):
         """
 
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
         return SBAdminMCPActionInvokeService.invoke_selection(
@@ -1410,12 +1493,12 @@ class SBAdminTools(MCPToolset):
         """
 
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
-        # Callers pass column-name keys (per the schema/presets), so re-key to
-        # the ``filter_field`` the list pipeline uses — same as ``list_rows``,
-        # otherwise a filter-aware action gets the wrong/unknown filter keys.
+        # Callers pass column-name keys (per the schema/presets), so re-key
+        # to the ``filter_field`` the list pipeline uses — same as
+        # ``list_rows``, otherwise a filter-aware action gets the
+        # wrong/unknown filter keys.
         field_map = admin.get_field_map(request)
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
@@ -1465,7 +1548,6 @@ class SBAdminTools(MCPToolset):
         into ``filter_data`` (or into a write call for form fields).
         """
         request = self.request
-        ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 

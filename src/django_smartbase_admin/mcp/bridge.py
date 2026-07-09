@@ -73,6 +73,28 @@ def ensure_sbadmin_request_data(request) -> None:
     request.request_data = request_data
 
 
+def bind_sbadmin_request_data(
+    request,
+    *,
+    view=None,
+    action=None,
+    modifier=None,
+    object_id=None,
+    method=None,
+    get=None,
+    post=None,
+) -> SBAdminViewRequestData:
+    """Bind MCP request context through SBAdmin's normal URL-request shape."""
+    set_request_payload(request, get=get, post=post, method=method)
+    return SBAdminViewRequestData.from_request_and_kwargs(
+        request,
+        view=view,
+        action=action,
+        modifier=modifier,
+        object_id=object_id,
+    )
+
+
 def _to_querydict(mapping: dict) -> QueryDict:
     """Build a ``QueryDict`` from a flat ``{str: scalar}`` mapping.
 

@@ -36,6 +36,7 @@ from django_smartbase_admin.engine.fake_inline import (
 )
 from django_smartbase_admin.engine.inline_pagination import InlinePaginated
 from django_smartbase_admin.mcp.bridge import (
+    bind_sbadmin_request_data,
     captured_messages,
     ensure_messages_storage,
     set_request_payload,
@@ -47,6 +48,7 @@ from django_smartbase_admin.mcp.form_encoding import (
     get_form_from_response,
     write_widget_input,
 )
+from django_smartbase_admin.mcp.widgets import detail_widget_entries
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +249,9 @@ class SBAdminMCPDetailService:
         model field, not just the fieldset declarations.
         """
         fieldsets = admin.get_fieldsets(request, obj)
-        return [str(name) for name in flatten_fieldsets(fieldsets)]
+        return [
+            str(name) for name in flatten_fieldsets(fieldsets) if isinstance(name, str)
+        ]
 
     @classmethod
     def get_detail_data(
@@ -378,7 +382,15 @@ class SBAdminMCPDetailService:
                 "truncated": truncated,
             }
 
-        return {"fields": field_data, "inlines": inlines_out}
+        payload = {
+            "fields": field_data,
+            "inlines": inlines_out,
+        }
+        if obj is not None:
+            payload["widgets"] = detail_widget_entries(
+                admin, request, ctx["adminform"], obj
+            )
+        return payload
 
     @classmethod
     def update_detail_data(
@@ -555,7 +567,12 @@ class SBAdminMCPDetailService:
                     f"Admin {admin.get_id()!r} returned a success redirect "
                     f"without a resolvable object pk: {response.url!r}."
                 )
-            set_request_payload(request, method="GET")
+            bind_sbadmin_request_data(
+                request,
+                view=admin.get_id(),
+                object_id=str(refetch_pk),
+                method="GET",
+            )
             result = {
                 "status": "ok",
                 **cls.get_detail_data(admin, request, refetch_pk),

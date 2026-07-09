@@ -23,6 +23,7 @@ from django_smartbase_admin.admin.admin_base import (
 )
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
+from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
@@ -44,6 +45,19 @@ class FolderDetailTestAdmin(SBAdmin):
 
     def child_count(self, obj):
         return obj.children.count() if obj else 0
+
+
+class ChildFolderListWidget(SBAdminDashboardListWidget):
+    widget_id = "child_folder_list_widget"
+    model = Folder
+    list_display = ("id", "name")
+    search_fields = ("name",)
+    path_to_parent_instance_id = "parent_id"
+
+
+class FolderDetailWithWidgetAdmin(FolderDetailTestAdmin):
+    widgets = [ChildFolderListWidget]
+    fieldsets = ((None, {"fields": ("name", ChildFolderListWidget)}),)
 
 
 @override_settings(
@@ -237,6 +251,68 @@ class FetchDetailTests(_FetchDetailTestBase):
             MCPToolTestConfig.restrict_qs = None
 
 
+class FetchDetailWidgetTests(_FetchDetailTestBase):
+    admin_class = FolderDetailWithWidgetAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+        cls.child_a = Folder.objects.create(name="child_a", parent=cls.parent)
+        cls.child_b = Folder.objects.create(name="child_b", parent=cls.parent)
+        cls.other_parent = Folder.objects.create(name="other_parent")
+        cls.other_child = Folder.objects.create(
+            name="other_child", parent=cls.other_parent
+        )
+
+    def setUp(self):
+        super().setUp()
+        MCPToolTestConfig().init_configuration_static()
+
+    def test_detail_surfaces_parent_scoped_list_widget(self):
+        result = self._fetch(self.parent.pk)
+
+        self.assertEqual(list(result["fields"]), ["name"])
+        widget = result["widgets"][0]
+        self.assertEqual(widget["view_id"], "filer_folder_child_folder_list_widget")
+        self.assertEqual(widget["parent_view_id"], "filer_folder")
+        self.assertEqual(widget["parent_object_id"], str(self.parent.pk))
+        self.assertTrue(widget["requires_parent_object_id"])
+        self.assertEqual(widget["data_tool"], "list_rows")
+        self.assertEqual([field["name"] for field in widget["fields"]], ["id", "name"])
+        self.assertEqual(widget["search_fields"], ["name"])
+
+    def test_list_rows_can_read_parent_scoped_widget_rows(self):
+        detail = self._fetch(self.parent.pk)
+        widget = detail["widgets"][0]
+
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+        rows = SBAdminTools(request=request).list_rows(
+            widget["view_id"],
+            fields=["id", "name"],
+            parent_object_id=widget["parent_object_id"],
+            page_size=10,
+        )["data"]
+
+        self.assertEqual({row["name"] for row in rows}, {"child_a", "child_b"})
+        self.assertNotIn("other_child", {row["name"] for row in rows})
+
+    def test_list_rows_requires_parent_for_parent_scoped_widget(self):
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        with self.assertRaises(ValueError):
+            SBAdminTools(request=request).list_rows(
+                "filer_folder_child_folder_list_widget",
+                fields=["id", "name"],
+                page_size=10,
+            )
+
+    def test_fetch_widget_data_rejects_non_widget_view(self):
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=request).fetch_widget_data("filer_folder")
+
+
 class FolderPermissionInline(SBAdminTableInline):
     model = FolderPermission
     fields = ("type", "everybody", "can_read")
@@ -279,7 +355,7 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
     def test_inlines_auto_hydrate_with_per_field_metadata(self):
         result = self._fetch(self.folder.pk, fields=["name"])
 
-        self.assertEqual(set(result), {"id", "fields", "inlines"})
+        self.assertEqual(set(result), {"id", "fields", "inlines", "widgets"})
         inline = result["inlines"]["FolderPermissionInline"]
         self.assertEqual(set(inline), {"rows", "truncated"})
         self.assertFalse(inline["truncated"])
