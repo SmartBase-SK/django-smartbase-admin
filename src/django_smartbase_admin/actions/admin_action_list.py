@@ -682,9 +682,18 @@ class SBAdminListAction(SBAdminAction):
         """Keep PK + visible columns + ``allowed_framework_keys``; drop the rest."""
         if not rows:
             return
-        allowed = {field.field for field in self.get_visible_column_fields()}
+        visible_fields = self.get_visible_column_fields()
+        allowed = {field.field for field in visible_fields}
         allowed.add(self.get_pk_field().name)
         allowed |= self.allowed_framework_keys
+        # Per-row editability flags a column references via ``per_cell_editable_field`` are not
+        # columns themselves, but the DataEditModule ``editable`` callback reads them from the
+        # row data — keep them.
+        allowed |= {
+            field.per_cell_editable_field
+            for field in visible_fields
+            if field.per_cell_editable_field
+        }
         for row in rows:
             for key in list(row.keys()):
                 if key not in allowed:
