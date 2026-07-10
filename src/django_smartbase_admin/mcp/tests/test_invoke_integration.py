@@ -34,6 +34,7 @@ from django_smartbase_admin.engine.modal_view import (
     SBAdminActionError,
 )
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.actions import get_declared_mcp_actions
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -98,6 +99,15 @@ class CreateFolderModalView(ActionModalView):
 
 class _InlineNoteForm(forms.Form):
     note = forms.CharField()
+
+
+class _MethodActionSchemaForm(forms.Form):
+    row_id = forms.IntegerField(label="Row")
+    column = forms.ChoiceField(
+        choices=(("name", "Name"),),
+        label="Column",
+    )
+    value = forms.CharField(required=False, initial="initial")
 
 
 class InlineRowRenameModalView(RowActionModalView):
@@ -177,6 +187,18 @@ class FolderInvokeTestAdmin(SBAdmin):
         response = HttpResponse(body, content_type="application/vnd.ms-excel")
         response["Content-Disposition"] = 'attachment; filename="export.xlsx"'
         return response
+
+    @sbadmin_action(
+        mcp_schema="get_action_schema",
+        mcp_description="Edit one folder field.",
+    )
+    def action_schema_declared(self, request, modifier, object_id):
+        from django.http import HttpResponse
+
+        return HttpResponse("")
+
+    def get_action_schema(self, request):
+        return _MethodActionSchemaForm()
 
     def get_sbadmin_row_actions(self, request):
         return [
@@ -290,6 +312,40 @@ class IntegrationTests(_Base):
         inline_titles = {a["title"]: a for a in inline_entry["inline_actions"]}
         self.assertNotIn("Help", inline_titles)  # URL-only filtered inside inlines too
         self.assertTrue(inline_titles["Rename file"]["requires_confirmation"])
+
+        method_actions = {a["action_id"]: a for a in folder["mcp_actions"]}
+        declared = method_actions["action_schema_declared"]
+        self.assertEqual(declared["kind"], "method")
+        self.assertEqual(declared["description"], "Edit one folder field.")
+        self.assertEqual(declared["input_schema"]["kind"], "form")
+        self.assertEqual(
+            list(declared["input_schema"]["fields"]),
+            ["row_id", "column", "value"],
+        )
+        self.assertEqual(
+            declared["input_schema"]["fields"]["column"]["choices"],
+            [{"value": "name", "label": "Name"}],
+        )
+        self.assertNotIn("action_touch", method_actions)
+
+    def test_mcp_action_discovery_respects_method_override(self):
+        class DeclaredBase:
+            @sbadmin_action(mcp_schema="get_schema")
+            def action_example(self, request, modifier, object_id):
+                return None
+
+        class UndeclaredOverride(DeclaredBase):
+            @sbadmin_action
+            def action_example(self, request, modifier, object_id):
+                return None
+
+        self.assertEqual(
+            dict(get_declared_mcp_actions(DeclaredBase))["action_example"][
+                "mcp_schema"
+            ],
+            "get_schema",
+        )
+        self.assertEqual(get_declared_mcp_actions(UndeclaredOverride), ())
 
     def test_row_modal_round_trip_persists_and_handles_invalid(self):
         """fetch_action_form → invoke → DB write → messages; invalid submission

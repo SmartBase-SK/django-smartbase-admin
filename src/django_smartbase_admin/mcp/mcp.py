@@ -23,6 +23,7 @@ from mcp_server import MCPToolset, mcp_server as global_mcp_server
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
+from django_smartbase_admin.engine.dashboard import SBAdminDashboardWidget
 from django_smartbase_admin.engine.const import (
     Action,
     ADVANCED_FILTER_DATA_NAME,
@@ -318,6 +319,8 @@ class SBAdminTools(MCPToolset):
          ``fetch_detail`` to read one object in full.
       4. ``update_detail`` / ``create_object`` to write. For new
          objects call ``fetch_add_form`` first for the field shape.
+      5. ``invoke_action`` for methods explicitly exposed under a view's
+         ``mcp_actions`` entry.
 
     Validation failures come back as ``{"status": "invalid",
     "errors": ...}`` with no DB change; permission denials raise
@@ -391,6 +394,11 @@ class SBAdminTools(MCPToolset):
           - ``list_actions``: global buttons above the list, no row
             context (e.g. "Create…" modals, exports).
           - ``selection_actions``: bulk buttons over selected rows.
+
+          Methods explicitly decorated with ``mcp_schema=...`` are reported
+          separately under ``mcp_actions``. Their ``input_schema`` is resolved
+          for the current request; Django-form schemas use the same field
+          representation as ``fetch_action_form``.
 
         When configured by the host project, the top-level
         ``whoami`` entry points at the current user's own profile
@@ -1214,6 +1222,56 @@ class SBAdminTools(MCPToolset):
             request,
             object_ids=object_ids,
             confirmed=confirmed,
+        )
+
+    @_guarded_tool_call
+    def invoke_action(
+        self,
+        view_id: str,
+        action_id: str,
+        field_values: dict | None = None,
+        object_id: str | None = None,
+        modifier: str | None = None,
+    ) -> dict:
+        """Invoke a method explicitly exposed through ``mcp_actions``.
+
+        The action's ``input_schema`` comes from its request-aware Django form
+        in ``list_admins`` or a detail widget's discovery entry. Supply those
+        fields in ``field_values``. Unknown fields and invalid form values are
+        rejected before dispatch.
+
+        For a detail-mounted widget, pass its discovered
+        ``parent_object_id`` as ``object_id``. For a regular view, ``object_id``
+        is the optional object context passed to the action URL.
+
+        Execution always routes through ``delegate_to_action``, including the
+        normal ``has_permission_for_action`` check. Only methods explicitly
+        decorated with ``mcp_schema`` are accepted.
+
+        Returns ``{"status": "ok", "messages": [...]}``, optionally with
+        ``client_events`` when the action emits an ``HX-Trigger`` response, or
+        ``{"status": "invalid", "errors": {...}}`` when its declared form
+        rejects the input.
+        """
+        request = self.request
+        ensure_sbadmin_request_data(request)
+        view = resolve_admin(view_id, request=request)
+        bind_sbadmin_request_data(
+            request,
+            view=view.get_id(),
+            object_id=object_id,
+            method="GET",
+        )
+        if isinstance(view, SBAdminDashboardWidget):
+            require_widget_parent_context(view, object_id)
+        view.init_view_dynamic(request, request.request_data)
+        return SBAdminMCPActionInvokeService.invoke_declared_method(
+            view,
+            request,
+            action_id=action_id,
+            field_values=field_values,
+            modifier=modifier,
+            object_id=object_id,
         )
 
     @_guarded_tool_call

@@ -21,6 +21,7 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminRowAction,
+    TableDataEditMCPForm,
     sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
@@ -817,7 +818,20 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
-    @sbadmin_action
+    def get_table_data_edit_mcp_schema(self, request):
+        try:
+            editable_fields = [
+                field
+                for field in self.get_field_map(request).values()
+                if field.tabulator_editor
+            ]
+        except ImproperlyConfigured:
+            return None
+        if not editable_fields:
+            return None
+        return TableDataEditMCPForm(editable_fields=editable_fields)
+
+    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
     def action_table_data_edit(self, request, modifier, object_id=None) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")

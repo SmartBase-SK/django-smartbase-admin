@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django import forms
 from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
@@ -23,6 +25,7 @@ from django_smartbase_admin.admin.admin_base import (
 )
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
@@ -53,6 +56,24 @@ class ChildFolderListWidget(SBAdminDashboardListWidget):
     list_display = ("id", "name")
     search_fields = ("name",)
     path_to_parent_instance_id = "parent_id"
+
+    @sbadmin_action(mcp_schema="get_refresh_schema")
+    def action_refresh_name(self, request, modifier, object_id=None):
+        return JsonResponse(
+            {
+                "object_id": object_id,
+                "parent_id": self.get_parent_instance_id(request),
+                "row_id": request.POST["row_id"],
+                "value": request.POST["value"],
+            }
+        )
+
+    def get_refresh_schema(self, request):
+        class RefreshNameForm(forms.Form):
+            row_id = forms.IntegerField()
+            value = forms.CharField(required=False)
+
+        return RefreshNameForm()
 
 
 class FolderDetailWithWidgetAdmin(FolderDetailTestAdmin):
@@ -280,6 +301,34 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
         self.assertEqual(widget["data_tool"], "list_rows")
         self.assertEqual([field["name"] for field in widget["fields"]], ["id", "name"])
         self.assertEqual(widget["search_fields"], ["name"])
+        self.assertEqual(
+            widget["mcp_actions"],
+            [
+                {
+                    "action_id": "action_refresh_name",
+                    "kind": "method",
+                    "input_schema": {
+                        "kind": "form",
+                        "fields": {
+                            "row_id": {
+                                "value": None,
+                                "required": True,
+                                "widget": "NumberInput",
+                                "readonly": False,
+                                "label": "row_id",
+                            },
+                            "value": {
+                                "value": None,
+                                "required": False,
+                                "widget": "TextInput",
+                                "readonly": False,
+                                "label": "value",
+                            },
+                        },
+                    },
+                }
+            ],
+        )
 
     def test_list_rows_can_read_parent_scoped_widget_rows(self):
         detail = self._fetch(self.parent.pk)
@@ -295,6 +344,23 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
 
         self.assertEqual({row["name"] for row in rows}, {"child_a", "child_b"})
         self.assertNotIn("other_child", {row["name"] for row in rows})
+
+    def test_invoke_action_binds_parent_scoped_widget_context(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        result = SBAdminTools(request=request).invoke_action(
+            widget["view_id"],
+            "action_refresh_name",
+            object_id=widget["parent_object_id"],
+            field_values={"row_id": self.child_a.pk, "value": "updated"},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["object_id"], str(self.parent.pk))
+        self.assertEqual(result["parent_id"], str(self.parent.pk))
+        self.assertEqual(result["row_id"], str(self.child_a.pk))
+        self.assertEqual(result["value"], "updated")
 
     def test_list_rows_requires_parent_for_parent_scoped_widget(self):
         request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))

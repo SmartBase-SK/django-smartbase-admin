@@ -1,4 +1,6 @@
+from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.translation import gettext_lazy as _
 
 
 def sbadmin_action(func=None, **kwargs):
@@ -16,6 +18,16 @@ def sbadmin_action(func=None, **kwargs):
       ``@sbadmin_action`` that does not declare a permission explicitly, so
       read-only endpoints (autocomplete, list_json, xlsx export, config, …)
       must opt in with ``permission="view"``.
+    - ``mcp_schema`` (str | callable | dict): Explicitly expose the method in
+      MCP discovery. A string names a bound provider method receiving
+      ``request``; a callable receives ``(view, request)``. The declaration
+      must resolve to an unbound Django form, a schema dictionary, or ``None``
+      when unavailable for the current request.
+    - ``mcp_description`` (str): Optional description emitted with the MCP
+      action schema.
+
+    An overriding method replaces the base method's decorator metadata. It
+    must therefore redeclare ``mcp_schema`` when it should remain exposed.
 
     Usage::
 
@@ -34,6 +46,28 @@ def sbadmin_action(func=None, **kwargs):
     if func is not None:
         return decorator(func)
     return decorator
+
+
+class TableDataEditMCPForm(forms.Form):
+    """MCP input contract for ``action_table_data_edit``.
+
+    Field names match the existing browser POST payload so a generic MCP
+    action invoker can submit the encoded form through ``delegate_to_action``.
+    """
+
+    currentRowId = forms.CharField(label=_("Row ID"))
+    columnFieldName = forms.ChoiceField(label=_("Column"))
+    cellValue = forms.CharField(label=_("Value"), required=False)
+
+    def __init__(self, *args, editable_fields=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["columnFieldName"].choices = [
+            (
+                field.name,
+                str(getattr(field, "title", None) or field.name),
+            )
+            for field in editable_fields
+        ]
 
 
 class SBAdminCustomAction(object):

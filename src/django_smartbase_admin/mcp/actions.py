@@ -13,13 +13,16 @@ admin / field / inline structure:
 from __future__ import annotations
 
 import base64
+import inspect
 import json
 import logging
 import re
+from functools import cache
 from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.forms.forms import BaseForm
 from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
 from django.utils.safestring import mark_safe
@@ -35,11 +38,12 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_messages_storage,
     set_request_payload,
 )
-from django_smartbase_admin.mcp.field_schema import field_info
+from django_smartbase_admin.mcp.field_schema import get_mcp_schema_from_form
 from django_smartbase_admin.mcp.form_encoding import (
     encode_field_values,
     form_errors_dict,
     get_form_from_response,
+    unwrap_envelope,
 )
 from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -53,6 +57,101 @@ logger = logging.getLogger(__name__)
 # exports / small PDFs. Larger downloads fail loud rather than silently
 # truncating.
 MAX_INLINE_DOWNLOAD_BYTES = 5 * 1024 * 1024
+
+
+@cache
+def get_declared_mcp_actions(view_class: type) -> tuple[tuple[str, dict], ...]:
+    """Return class methods explicitly exposed with ``mcp_schema``.
+
+    ``inspect.getmembers`` applies normal Python inheritance and override
+    resolution. Caching is safe because only the static decorator metadata is
+    retained here; request-dependent schema providers run in
+    ``collect_mcp_method_action_entries`` on every discovery request.
+    """
+    declarations: list[tuple[str, dict]] = []
+    for name, function in inspect.getmembers(view_class, inspect.isfunction):
+        if not getattr(function, "_is_sbadmin_action", False):
+            continue
+        attrs = getattr(function, "_sbadmin_action_attrs", {}) or {}
+        if attrs.get("mcp_schema") is None:
+            continue
+        declarations.append((name, dict(attrs)))
+    return tuple(declarations)
+
+
+def _resolve_mcp_action_input(view, request, declaration):
+    if isinstance(declaration, str):
+        return getattr(view, declaration)(request)
+    elif callable(declaration):
+        return declaration(view, request)
+    return declaration
+
+
+def _serialize_mcp_action_input(result):
+    if result is None:
+        return None
+    if isinstance(result, BaseForm):
+        return get_mcp_schema_from_form(result)
+    if isinstance(result, dict):
+        return result
+    raise TypeError(
+        "mcp_schema must resolve to a Django form, dictionary, or None; "
+        f"got {type(result).__name__}."
+    )
+
+
+def get_mcp_action_input(view, request, action_id: str):
+    """Resolve the declared input contract for one MCP-exposed method."""
+    declarations = dict(get_declared_mcp_actions(type(view)))
+    attrs = declarations.get(action_id)
+    if attrs is None:
+        raise LookupError(
+            f"Action {action_id!r} is not MCP-exposed on view {view.get_id()!r}. "
+            "Use an action_id from the view's mcp_actions discovery entry."
+        )
+    result = _resolve_mcp_action_input(view, request, attrs["mcp_schema"])
+    if result is None:
+        raise LookupError(
+            f"Action {action_id!r} is not available in the current request context."
+        )
+    if not isinstance(result, (BaseForm, dict)):
+        _serialize_mcp_action_input(result)
+    return result
+
+
+def collect_mcp_method_action_entries(view, request) -> list[dict]:
+    """Resolve request-aware schemas for decorated method actions.
+
+    Discovery is fail-soft per action, matching the existing UI action
+    collection: a broken provider is logged and skipped without hiding the
+    rest of the view.
+    """
+    entries: list[dict] = []
+    for action_id, attrs in get_declared_mcp_actions(type(view)):
+        try:
+            schema = _serialize_mcp_action_input(
+                _resolve_mcp_action_input(view, request, attrs["mcp_schema"])
+            )
+        except Exception:
+            logger.warning(
+                "MCP actions: schema provider failed for %s.%s",
+                type(view).__name__,
+                action_id,
+                exc_info=True,
+            )
+            continue
+        if schema is None:
+            continue
+        entry = {
+            "action_id": action_id,
+            "kind": "method",
+            "input_schema": schema,
+        }
+        description = attrs.get("mcp_description")
+        if description:
+            entry["description"] = str(description)
+        entries.append(entry)
+    return entries
 
 
 def _filename_from_disposition(header: str) -> str | None:
@@ -174,6 +273,7 @@ ACTION_INVOKERS: dict[str, str] = {
     "list_actions": "invoke_list_action",
     "selection_actions": "invoke_selection_action",
     "inline_actions": "invoke_inline_action",
+    "mcp_actions": "invoke_action",
 }
 
 
@@ -384,7 +484,7 @@ class SBAdminMCPActionFormService:
             title = getattr(target_view_cls, "modal_title", "")
         return {
             "title": str(title or ""),
-            "fields": cls._form_field_schema(form),
+            "fields": get_mcp_schema_from_form(form)["fields"],
         }
 
     @classmethod
@@ -448,23 +548,6 @@ class SBAdminMCPActionFormService:
 
         return None
 
-    @classmethod
-    def _form_field_schema(cls, form) -> dict:
-        """Walk ``form.fields`` into ``{name: info}`` via the shared
-        ``field_info`` helper. See ``mcp.field_schema.field_info`` for
-        the per-field dict shape.
-        """
-        result: dict = {}
-        for name, field in form.fields.items():
-            # Bound initial wins over field-level default.
-            initial = (form.initial or {}).get(name)
-            if initial is None:
-                raw = field.initial
-                initial = raw() if callable(raw) else raw
-
-            result[name] = field_info(field, initial, label=str(field.label or name))
-        return result
-
 
 class SBAdminMCPActionInvokeService:
     """Invocation for row / selection / list actions.
@@ -481,6 +564,93 @@ class SBAdminMCPActionInvokeService:
     """
 
     # -- public --------------------------------------------------------------
+
+    @classmethod
+    def invoke_declared_method(
+        cls,
+        view,
+        request,
+        action_id: str,
+        field_values: dict | None = None,
+        modifier: str | None = None,
+        object_id: str | None = None,
+    ) -> dict:
+        """Invoke one method explicitly exposed through ``mcp_schema``."""
+        action_input = get_mcp_action_input(view, request, action_id)
+        values = field_values or {}
+        if not isinstance(values, dict):
+            raise TypeError("field_values must be a dictionary.")
+
+        if isinstance(action_input, BaseForm):
+            errors: dict[str, list[str]] = {}
+            for name, field in action_input.fields.items():
+                if name not in values:
+                    if field.required:
+                        errors[name] = ["This field is required."]
+                    continue
+                try:
+                    field.clean(unwrap_envelope(values[name]))
+                except ValidationError as exc:
+                    errors[name] = [str(message) for message in exc.messages]
+            if errors:
+                return {"status": "invalid", "errors": errors}
+            post_qd = encode_field_values(action_input, values)
+        else:
+            post_qd = QueryDict(mutable=True)
+            for name, value in values.items():
+                if isinstance(value, list):
+                    post_qd.setlist(name, value)
+                else:
+                    post_qd[name] = value
+
+        # Raw action methods consume browser POST values, which are strings.
+        # Preserve multi-value/list contracts while normalizing scalar JSON
+        # values such as an integer row id to that browser representation.
+        for name in list(post_qd):
+            post_qd.setlist(
+                name,
+                [
+                    (
+                        value
+                        if isinstance(value, (list, tuple, dict))
+                        else "" if value is None else str(value)
+                    )
+                    for value in post_qd.getlist(name)
+                ],
+            )
+
+        set_request_payload(request, post=post_qd, method="POST")
+        ensure_messages_storage(request)
+        try:
+            response = SBAdminViewService.delegate_to_action(
+                request,
+                view=view.get_id(),
+                action=action_id,
+                modifier=modifier or "template",
+                object_id=object_id,
+            )
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
+        except Http404 as exc:
+            raise LookupError(
+                f"No invocable MCP action {action_id!r} on view {view.get_id()!r}."
+            ) from exc
+
+        result = cls._normalize_method_response(response)
+        messages = captured_messages(request)
+        if messages:
+            if isinstance(result, dict):
+                result["messages"] = messages
+            else:
+                result.insert(1, json.dumps({"messages": messages}))
+        if isinstance(result, dict):
+            trigger = response.get("HX-Trigger", "")
+            if trigger:
+                try:
+                    result["client_events"] = json.loads(trigger)
+                except (TypeError, ValueError):
+                    pass
+        return result
 
     @classmethod
     def delete_objects(

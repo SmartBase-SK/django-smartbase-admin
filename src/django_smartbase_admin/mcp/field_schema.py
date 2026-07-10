@@ -13,6 +13,7 @@ fieldsets vs. plain ``form.fields``), but these per-field bits do not.
 from __future__ import annotations
 
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
+from django.forms.forms import BaseForm
 
 from django_smartbase_admin.engine.filter_widgets import AutocompleteParseMixin
 
@@ -102,3 +103,20 @@ def field_info(field, value, *, readonly=False, label=None) -> dict:
     if label is not None:
         info["label"] = label
     return info
+
+
+def get_mcp_schema_from_form(form: BaseForm) -> dict:
+    """Convert an unbound Django form into the MCP action-input schema.
+
+    The field representation intentionally matches ``fetch_action_form`` so
+    callers see one form contract whether the form comes from a modal action
+    or an ``@sbadmin_action(mcp_schema=...)`` method.
+    """
+    fields: dict[str, dict] = {}
+    for name, field in form.fields.items():
+        initial = (form.initial or {}).get(name)
+        if initial is None:
+            raw = field.initial
+            initial = raw() if callable(raw) else raw
+        fields[name] = field_info(field, initial, label=str(field.label or name))
+    return {"kind": "form", "fields": fields}

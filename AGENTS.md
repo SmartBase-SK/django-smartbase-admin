@@ -239,7 +239,7 @@ class MyAdmin(SBAdmin):
         definition["modules"].append("dataEditModule")
         return definition
 
-    @sbadmin_action
+    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
     def action_table_data_edit(self, request, modifier, object_id=None):
         row_id = json.loads(request.POST.get("currentRowId", "null"))
         column = request.POST.get("columnFieldName", "")
@@ -285,6 +285,11 @@ Rules and gotchas:
   `per_cell_editable_field`.
 - **Needs the `dataEditModule`.** Both the `editable` gate (via `modifyTabulatorOptions`) and
   the save pipeline live in that module.
+- **Keep the built-in MCP schema on overrides.** An implementation that overrides
+  `action_table_data_edit` must use
+  `@sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")`. The inherited provider
+  returns the built-in `TableDataEditMCPForm`, with `columnFieldName` choices derived from
+  the request's fields that declare `tabulator_editor`.
 - Editing an ungated cell still POSTs to `action_table_data_edit`; enforce real
   authorization/validation there too — the client gate is UX only.
 
@@ -5435,6 +5440,24 @@ The default `SBAdminRoleConfiguration.has_action_permission()` requires the **`c
 The permission value is propagated end-to-end: `delegate_to_action` reads `_sbadmin_action_attrs.permission`, copies it onto the synthetic `SBAdminCustomAction.permission`, and `has_action_permission` forwards it into `has_permission()`. Actions declared directly with `SBAdminCustomAction(..., permission=...)` use the same path. Override `has_action_permission` on your role configuration if you need a different policy — `action.permission` is still readable there.
 
 Built-in read-only endpoints already carry `permission="view"`: `action_list`, `action_list_json`, `action_autocomplete` (on admins, filter widgets, and the tree widget), `action_xlsx_export`, `action_config`, dashboard widget `action_get_data`, audit log `action_list_json`, translations `list`. The reorder family (`action_table_reorder`, `action_table_data_edit`, `action_list_json_reorder`, `action_enter_reorder`) is intentionally left at the default — entering reorder mode is treated as a mutation.
+
+### MCP-exposed method actions
+
+Add `mcp_schema` to explicitly expose a method under the view's `mcp_actions`
+discovery entry. The provider receives the current request and may return an
+unbound Django form, a schema dictionary, or `None` when the action is not
+available in that context. Invoke the discovered method with the MCP
+`invoke_action` tool; it encodes the form values and routes through
+`delegate_to_action`, which remains the permission boundary.
+
+```python
+@sbadmin_action(mcp_schema="get_recalculate_mcp_schema")
+def action_recalculate(self, request, modifier, object_id=None):
+    ...
+
+def get_recalculate_mcp_schema(self, request):
+    return RecalculateForm()
+```
 
 ### Usage
 

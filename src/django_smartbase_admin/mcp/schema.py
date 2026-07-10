@@ -26,7 +26,10 @@ from django_smartbase_admin.engine.filter_widgets import (
     NumberRangeFilterWidget,
     PrimaryKeyFilterWidget,
 )
-from django_smartbase_admin.mcp.actions import collect_action_entries
+from django_smartbase_admin.mcp.actions import (
+    collect_action_entries,
+    collect_mcp_method_action_entries,
+)
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 
 logger = logging.getLogger(__name__)
@@ -433,11 +436,15 @@ def admin_entry(admin, request) -> dict:
 
 def list_view_entry(view, request) -> dict:
     """Return MCP schema shared by regular list views and list widgets."""
-    return {
+    entry = {
         "fields": list_field_entries(view, request),
         "search_fields": list(view.get_search_fields(request) or []),
         **list_action_entries(view, request),
     }
+    mcp_actions = collect_mcp_method_action_entries(view, request)
+    if mcp_actions:
+        entry["mcp_actions"] = mcp_actions
+    return entry
 
 
 def list_field_entries(view, request) -> list[dict]:

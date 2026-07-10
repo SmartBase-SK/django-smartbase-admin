@@ -8,16 +8,19 @@ full list-action / autocomplete-search code paths end to end.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
+from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import Action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
@@ -55,8 +58,25 @@ class FolderActionsTestAdmin(SBAdmin):
             filter_field="parent",
             filter_widget=AutocompleteFilterWidget(model=Folder, multiselect=False),
         ),
+        SBAdminField(
+            name="editable_name",
+            title="Editable name",
+            annotate=F("name"),
+            tabulator_editor="input",
+            filter_disabled=True,
+        ),
     )
     sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
+
+    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
+    def action_table_data_edit(self, request, modifier, object_id=None):
+        return JsonResponse(
+            {
+                "row_id": json.loads(request.POST["currentRowId"]),
+                "column": request.POST["columnFieldName"],
+                "value": request.POST["cellValue"],
+            }
+        )
 
 
 @override_settings(
@@ -186,6 +206,85 @@ class ListRowsTests(_ToolTestBase):
         with self.assertRaises(PermissionDenied):
             SBAdminTools(request=build_mcp_request(user)).list_rows(
                 "filer_folder", fields=["name"]
+            )
+
+    def test_table_data_edit_has_builtin_mcp_form_schema(self):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
+        folder = next(entry for entry in admins if entry["view_id"] == "filer_folder")
+        actions = {entry["action_id"]: entry for entry in folder["mcp_actions"]}
+
+        schema = actions[Action.TABLE_DATA_EDIT.value]["input_schema"]
+        self.assertEqual(schema["kind"], "form")
+        self.assertEqual(
+            list(schema["fields"]),
+            ["currentRowId", "columnFieldName", "cellValue"],
+        )
+        self.assertEqual(
+            schema["fields"]["columnFieldName"]["choices"],
+            [{"value": "editable_name", "label": "Editable name"}],
+        )
+
+        result = SBAdminTools(request=build_mcp_request(user)).invoke_action(
+            "filer_folder",
+            Action.TABLE_DATA_EDIT.value,
+            field_values={
+                "currentRowId": 42,
+                "columnFieldName": "editable_name",
+                "cellValue": "updated",
+            },
+        )
+        self.assertEqual(
+            result,
+            {
+                "status": "ok",
+                "row_id": 42,
+                "column": "editable_name",
+                "value": "updated",
+            },
+        )
+
+        invalid = SBAdminTools(request=build_mcp_request(user)).invoke_action(
+            "filer_folder",
+            Action.TABLE_DATA_EDIT.value,
+            field_values={
+                "currentRowId": 42,
+                "columnFieldName": "name",
+                "cellValue": "updated",
+            },
+        )
+        self.assertEqual(invalid["status"], "invalid")
+        self.assertIn("columnFieldName", invalid["errors"])
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=build_mcp_request(user)).invoke_action(
+                "filer_folder",
+                Action.LIST_JSON.value,
+            )
+
+    def test_invoke_action_permission_is_enforced_by_dispatch(self):
+        class FolderTableEditDeniedAdmin(FolderActionsTestAdmin):
+            def has_permission_for_action(self, request, action):
+                if action.action_id == Action.TABLE_DATA_EDIT.value:
+                    return False
+                return super().has_permission_for_action(request, action)
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderTableEditDeniedAdmin)
+        self._refresh_configuration_view_map()
+
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        with self.assertRaises(PermissionError):
+            SBAdminTools(request=build_mcp_request(user)).invoke_action(
+                "filer_folder",
+                Action.TABLE_DATA_EDIT.value,
+                field_values={
+                    "currentRowId": 42,
+                    "columnFieldName": "editable_name",
+                    "cellValue": "updated",
+                },
             )
 
 
