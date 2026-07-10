@@ -382,6 +382,20 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
+            if hasattr(action_view, "get_mcp_form") and hasattr(
+                action_view, "get_mcp_formsets"
+            ):
+                saved_action = getattr(request_data, "action", None)
+                try:
+                    request_data.action = action_id
+                    action_view.get_mcp_form()
+                    for formset in action_view.get_mcp_formsets().values():
+                        # Formsets construct forms lazily; touching empty_form
+                        # initializes row widgets and registers autocomplete ids.
+                        formset.empty_form
+                finally:
+                    request_data.action = saved_action
+                continue
             form_class = (
                 action_view.get_form_class()
                 if hasattr(action_view, "get_form_class")

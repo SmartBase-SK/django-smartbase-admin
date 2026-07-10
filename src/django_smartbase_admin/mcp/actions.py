@@ -21,8 +21,9 @@ from functools import cache
 from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied
 from django.forms.forms import BaseForm
+from django.forms.formsets import BaseFormSet
 from django.http import Http404, QueryDict
 from django.http.response import HttpResponseRedirectBase
 from django.utils.safestring import mark_safe
@@ -38,12 +39,19 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_messages_storage,
     set_request_payload,
 )
-from django_smartbase_admin.mcp.field_schema import get_mcp_schema_from_form
+from django_smartbase_admin.mcp.field_schema import (
+    get_mcp_schema_from_form,
+    get_mcp_schema_from_formset,
+)
 from django_smartbase_admin.mcp.form_encoding import (
+    encode_and_validate_form_values,
     encode_field_values,
+    encode_formset_rows,
+    encode_mapping_values,
     form_errors_dict,
+    formset_errors_dict,
     get_form_from_response,
-    unwrap_envelope,
+    normalize_querydict_values,
 )
 from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -381,6 +389,32 @@ def build_modal_view(target_view_cls, admin, request, modifier, object_id=None):
     return view
 
 
+def get_modal_mcp_components(view):
+    """Return the primary form and explicitly declared named formsets."""
+    form = view.get_mcp_form()
+    if form is not None and not isinstance(form, BaseForm):
+        raise TypeError(
+            f"{type(view).__name__}.get_mcp_form() must return a Django form "
+            f"or None, got {type(form).__name__}."
+        )
+    formsets = view.get_mcp_formsets() or {}
+    if not isinstance(formsets, dict):
+        raise TypeError(
+            f"{type(view).__name__}.get_mcp_formsets() must return a dictionary."
+        )
+    invalid = {
+        name: type(formset).__name__
+        for name, formset in formsets.items()
+        if not isinstance(name, str) or not isinstance(formset, BaseFormSet)
+    }
+    if invalid:
+        raise TypeError(
+            "MCP formsets must map string names to Django formsets; "
+            f"invalid: {invalid}."
+        )
+    return form, formsets
+
+
 class SBAdminMCPActionFormService:
     """Form discovery for modal actions — counterpart to ``fetch_add_form``.
 
@@ -409,7 +443,12 @@ class SBAdminMCPActionFormService:
         object is not visible. Raises ``PermissionDenied`` if the action
         is gated by a permission the user does not hold.
         """
-        _, target_view_cls = cls._find_modal_action(admin, action_id, request)
+        _, target_view_cls = cls._find_modal_action(
+            admin,
+            action_id,
+            request,
+            object_id=object_id,
+        )
 
         # Going through view.get_form() (instead of constructing the form
         # class directly) is the only way to honour subclass overrides of
@@ -453,14 +492,10 @@ class SBAdminMCPActionFormService:
                         f"Object pk={object_id!r} not visible in admin {admin.get_id()!r}."
                     )
 
-            form_class = (
-                view.get_form_class()
-                if hasattr(view, "get_form_class")
-                else getattr(view, "form_class", None)
-            )
+            form, formsets = get_modal_mcp_components(view)
 
             # Form-less modal (renders HTML in get()): return sanitized HTML.
-            if form_class is None:
+            if form is None and not formsets:
                 response = view.get(request, **view.kwargs)
                 html = response.content.decode(response.charset or "utf-8")
                 try:
@@ -472,7 +507,6 @@ class SBAdminMCPActionFormService:
                     "html": sanitize_html(mark_safe(html)),
                 }
 
-            form = view.get_form()
         finally:
             if request_data is not None:
                 request_data.action = saved_action
@@ -482,13 +516,27 @@ class SBAdminMCPActionFormService:
             title = view.get_modal_title()
         except Exception:
             title = getattr(target_view_cls, "modal_title", "")
-        return {
+        result = {
             "title": str(title or ""),
-            "fields": get_mcp_schema_from_form(form)["fields"],
         }
+        if form is not None:
+            result["fields"] = get_mcp_schema_from_form(form)["fields"]
+        if formsets:
+            result["formsets"] = {
+                name: get_mcp_schema_from_formset(formset)
+                for name, formset in formsets.items()
+            }
+        return result
 
     @classmethod
-    def _find_modal_action(cls, view, action_id: str, request):
+    def _find_modal_action(
+        cls,
+        view,
+        action_id: str,
+        request,
+        *,
+        object_id: str | None = None,
+    ):
         """Search ``view``'s action sources for a modal action.
 
         ``view`` is either an admin (walks the four admin-level lists)
@@ -497,7 +545,7 @@ class SBAdminMCPActionFormService:
         and dispatch through their own URL namespace, so an inline
         invocation lands here with the inline as ``view``.
         """
-        for action_list in cls._action_sources(view, request):
+        for action_list in cls._action_sources(view, request, object_id=object_id):
             for action in action_list or []:
                 found = cls._search_action_tree(action, action_id)
                 if found is not None:
@@ -509,7 +557,7 @@ class SBAdminMCPActionFormService:
         )
 
     @classmethod
-    def _action_sources(cls, view, request):
+    def _action_sources(cls, view, request, *, object_id=None):
         """Yield the right action lists for ``view`` (admin vs. inline).
 
         ``_processed`` variants run ``process_actions_permissions``, so
@@ -522,13 +570,11 @@ class SBAdminMCPActionFormService:
             yield view.get_sbadmin_inline_list_actions_processed(request)
             return
         yield view.get_sbadmin_row_actions_processed(request)
-        yield view.get_sbadmin_detail_actions_processed(request)
+        yield view.get_sbadmin_detail_actions_processed(request, object_id)
         yield view.get_sbadmin_list_selection_actions_processed(request)
         yield view.get_sbadmin_list_actions_processed(request)
-        # Fieldset-scoped actions dispatch through the same detail path,
-        # so include them in the modal-action lookup. ``object_id=None``
-        # for discovery / form-fetch; invoke supplies it via ``modifier``.
-        yield view.get_sbadmin_fieldsets_actions_processed(request)
+        # Fieldset-scoped actions dispatch through the same detail path.
+        yield view.get_sbadmin_fieldsets_actions_processed(request, object_id)
 
     @classmethod
     def _search_action_tree(cls, action, action_id: str):
@@ -578,46 +624,12 @@ class SBAdminMCPActionInvokeService:
         """Invoke one method explicitly exposed through ``mcp_schema``."""
         action_input = get_mcp_action_input(view, request, action_id)
         values = field_values or {}
-        if not isinstance(values, dict):
-            raise TypeError("field_values must be a dictionary.")
-
         if isinstance(action_input, BaseForm):
-            errors: dict[str, list[str]] = {}
-            for name, field in action_input.fields.items():
-                if name not in values:
-                    if field.required:
-                        errors[name] = ["This field is required."]
-                    continue
-                try:
-                    field.clean(unwrap_envelope(values[name]))
-                except ValidationError as exc:
-                    errors[name] = [str(message) for message in exc.messages]
+            post_qd, errors = encode_and_validate_form_values(action_input, values)
             if errors:
                 return {"status": "invalid", "errors": errors}
-            post_qd = encode_field_values(action_input, values)
         else:
-            post_qd = QueryDict(mutable=True)
-            for name, value in values.items():
-                if isinstance(value, list):
-                    post_qd.setlist(name, value)
-                else:
-                    post_qd[name] = value
-
-        # Raw action methods consume browser POST values, which are strings.
-        # Preserve multi-value/list contracts while normalizing scalar JSON
-        # values such as an integer row id to that browser representation.
-        for name in list(post_qd):
-            post_qd.setlist(
-                name,
-                [
-                    (
-                        value
-                        if isinstance(value, (list, tuple, dict))
-                        else "" if value is None else str(value)
-                    )
-                    for value in post_qd.getlist(name)
-                ],
-            )
+            post_qd = encode_mapping_values(values)
 
         set_request_payload(request, post=post_qd, method="POST")
         ensure_messages_storage(request)
@@ -727,6 +739,7 @@ class SBAdminMCPActionInvokeService:
         action_id: str,
         object_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke a row / detail / inline action against one object.
@@ -744,6 +757,7 @@ class SBAdminMCPActionInvokeService:
             modifier="template",
             object_id=str(object_id),
             field_values=field_values,
+            formset_values=formset_values,
             confirmed=confirmed,
         )
 
@@ -755,6 +769,7 @@ class SBAdminMCPActionInvokeService:
         action_id: str,
         object_ids: list,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
         modifier: str | None = None,
     ) -> dict:
@@ -783,6 +798,7 @@ class SBAdminMCPActionInvokeService:
             action_id=action_id,
             modifier=modifier or "template",
             field_values=field_values,
+            formset_values=formset_values,
             confirmed=confirmed,
             base_params={
                 admin.get_id(): {
@@ -801,6 +817,7 @@ class SBAdminMCPActionInvokeService:
         request,
         action_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         filter_data: dict | None = None,
         full_text_search: str | None = None,
         confirmed: bool = False,
@@ -830,6 +847,7 @@ class SBAdminMCPActionInvokeService:
             action_id=action_id,
             modifier=modifier or "template",
             field_values=field_values,
+            formset_values=formset_values,
             confirmed=confirmed,
             base_params=base_params,
         )
@@ -845,32 +863,62 @@ class SBAdminMCPActionInvokeService:
         action_id: str,
         modifier: str | None,
         field_values: dict | None,
+        formset_values: dict[str, list[dict]] | None = None,
         object_id: str | None = None,
         base_params: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
-        modal = cls._lookup_modal_action(admin, action_id, request)
+        modal = cls._lookup_modal_action(
+            admin,
+            action_id,
+            request,
+            object_id=object_id,
+        )
 
         if modal is None:
-            if field_values:
+            if field_values or formset_values:
                 raise LookupError(
                     f"Action {action_id!r} is not a modal action; "
-                    f"field_values is only valid for modal actions."
+                    "field_values/formset_values are only valid for modal actions."
                 )
             post_qd = QueryDict(mutable=True)
+            action_formsets = {}
         else:
             _action, target_view_cls = modal
             # Wire up the synthetic @sbadmin_action wrapper if the UI
             # render path hasn't already done so this process.
             if not hasattr(admin, action_id):
                 admin._register_form_view_action(target_view_cls, action_id, _action)
-            # Widget-aware POST encoding: build the form unbound to get
-            # the widget map, then route field_values through each
-            # widget (handles MultiWidget, autocomplete list-shape, etc.).
-            unbound_form = cls._build_unbound_form(
+            # Build the exact forms/formsets declared by the modal and encode
+            # the structured MCP payload into their native POST prefixes.
+            unbound_form, action_formsets = cls._build_unbound_components(
                 target_view_cls, admin, request, modifier, object_id=object_id
             )
-            post_qd = encode_field_values(unbound_form, field_values or {})
+            post_qd = QueryDict(mutable=True)
+            if unbound_form is not None:
+                encode_field_values(unbound_form, field_values or {}, qd=post_qd)
+            elif field_values:
+                raise LookupError(
+                    f"Action {action_id!r} has no primary form; omit field_values."
+                )
+
+            supplied_formsets = formset_values or {}
+            if not isinstance(supplied_formsets, dict):
+                raise TypeError("formset_values must be a dictionary.")
+            unknown_formsets = sorted(set(supplied_formsets) - set(action_formsets))
+            if unknown_formsets:
+                raise LookupError(
+                    f"Unknown action formsets: {unknown_formsets}; available: "
+                    f"{sorted(action_formsets)}."
+                )
+            for name, formset in action_formsets.items():
+                encode_formset_rows(
+                    formset,
+                    post_qd,
+                    supplied_formsets.get(name, []),
+                    scope=f"action formset {name!r} fields",
+                )
+            normalize_querydict_values(post_qd)
             if confirmed:
                 post_qd[ActionModalView.CONFIRMATION_POST_KEY] = "1"
 
@@ -919,6 +967,7 @@ class SBAdminMCPActionInvokeService:
                 request=request,
                 modifier=modifier,
                 object_id=object_id,
+                action_formsets=action_formsets,
             )
         messages = captured_messages(request)
         if messages:
@@ -934,23 +983,33 @@ class SBAdminMCPActionInvokeService:
     # -- helpers -------------------------------------------------------------
 
     @classmethod
-    def _lookup_modal_action(cls, admin, action_id, request):
+    def _lookup_modal_action(
+        cls,
+        admin,
+        action_id,
+        request,
+        *,
+        object_id=None,
+    ):
         """Return ``(action, target_view_cls)`` if ``action_id`` matches a
         modal action on this admin; ``None`` for method actions (so the
         caller treats them as plain ``@sbadmin_action`` dispatch).
         """
         try:
             return SBAdminMCPActionFormService._find_modal_action(
-                admin, action_id, request
+                admin,
+                action_id,
+                request,
+                object_id=object_id,
             )
         except LookupError:
             return None
 
     @classmethod
-    def _build_unbound_form(
+    def _build_unbound_components(
         cls, target_view_cls, admin, request, modifier, object_id=None
     ):
-        """Construct the modal view's form without binding POST data.
+        """Construct the modal view's MCP forms without binding POST data.
 
         Mirrors :meth:`SBAdminMCPActionFormService.get_action_form_data`'s
         form-construction path: drives ``view.get_form()`` under method=GET
@@ -966,7 +1025,7 @@ class SBAdminMCPActionInvokeService:
         saved_method = request.method
         set_request_payload(request, method="GET")
         try:
-            return view.get_form()
+            return get_modal_mcp_components(view)
         finally:
             set_request_payload(request, method=saved_method)
 
@@ -1040,6 +1099,7 @@ class SBAdminMCPActionInvokeService:
         request,
         modifier,
         object_id=None,
+        action_formsets=None,
     ) -> dict:
         """Modal success/failure detection via HX-Trigger from
         ``build_success_response`` — form_invalid responses don't carry
@@ -1060,6 +1120,18 @@ class SBAdminMCPActionInvokeService:
         # from there rather than rebuilding the form, so we capture
         # non-field errors the view added after validation.
         form = get_form_from_response(response, "form")
+        formset_errors = cls._formset_errors_from_response(
+            response,
+            action_formsets or {},
+        )
+        if action_formsets:
+            return {
+                "status": "invalid",
+                "errors": {
+                    "fields": form_errors_dict(form) if form is not None else {},
+                    "formsets": formset_errors,
+                },
+            }
         if form is not None:
             return {"status": "invalid", "errors": form_errors_dict(form)}
 
@@ -1071,10 +1143,43 @@ class SBAdminMCPActionInvokeService:
         )
         if object_id is not None and issubclass(target_view_cls, RowActionModalView):
             view.get_object()
-        form = view.get_form()
-        form.is_valid()
+        form, formsets = get_modal_mcp_components(view)
+        if form is not None:
+            form.is_valid()
+        fallback_formsets = {}
+        for name, formset in formsets.items():
+            formset.is_valid()
+            errors = formset_errors_dict(formset)
+            if errors["rows"] or errors["non_form"]:
+                fallback_formsets[name] = errors
         set_request_payload(request, method="GET")
-        return {"status": "invalid", "errors": form_errors_dict(form)}
+        if fallback_formsets:
+            return {
+                "status": "invalid",
+                "errors": {
+                    "fields": form_errors_dict(form) if form is not None else {},
+                    "formsets": fallback_formsets,
+                },
+            }
+        return {
+            "status": "invalid",
+            "errors": form_errors_dict(form) if form is not None else {},
+        }
+
+    @staticmethod
+    def _formset_errors_from_response(response, action_formsets) -> dict:
+        """Extract bound formsets from a custom modal response by prefix."""
+        context = getattr(response, "context_data", None) or {}
+        by_prefix = {formset.prefix: name for name, formset in action_formsets.items()}
+        errors_by_name = {}
+        for context_name, value in context.items():
+            if not isinstance(value, BaseFormSet):
+                continue
+            name = by_prefix.get(value.prefix, context_name)
+            errors = formset_errors_dict(value)
+            if errors["rows"] or errors["non_form"]:
+                errors_by_name[name] = errors
+        return errors_by_name
 
     @classmethod
     def _build_needs_confirmation(cls, hx_trigger: str) -> dict:

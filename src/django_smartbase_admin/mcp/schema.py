@@ -295,13 +295,13 @@ def _inline_entries(admin, request) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _fieldset_action_entries(admin, request) -> list[dict]:
+def _fieldset_action_entries(admin, request, object_id=None) -> list[dict]:
     """Per-fieldset actions, tagged with ``fieldset`` so they merge
     cleanly into ``detail_actions`` (invoked via ``invoke_detail_action``
     per the top-level ``action_invokers`` legend).
     """
     try:
-        fieldsets = admin.get_sbadmin_fieldsets(request, None) or []
+        fieldsets = admin.get_sbadmin_fieldsets(request, object_id) or []
     except Exception:
         return []
 
@@ -313,11 +313,24 @@ def _fieldset_action_entries(admin, request) -> list[dict]:
             request,
             fieldset=fieldset,
             fieldset_data=fieldset_data,
-            object_id=None,
+            object_id=object_id,
         ):
             entry["fieldset"] = str(fieldset) if fieldset is not None else None
             entries.append(entry)
     return entries
+
+
+def detail_action_entries(admin, request, object_id=None) -> list[dict]:
+    """Detail and fieldset actions available in the given object context."""
+    return [
+        *collect_action_entries(
+            admin,
+            "get_sbadmin_detail_actions_processed",
+            request,
+            object_id=object_id,
+        ),
+        *_fieldset_action_entries(admin, request, object_id=object_id),
+    ]
 
 
 def _detail_field_entries(admin, request) -> list[str]:
@@ -425,10 +438,7 @@ def admin_entry(admin, request) -> dict:
     }
     if admin.mcp_description:
         entry["description"] = str(admin.mcp_description)
-    detail_actions = [
-        *collect_action_entries(admin, "get_sbadmin_detail_actions_processed", request),
-        *_fieldset_action_entries(admin, request),
-    ]
+    detail_actions = detail_action_entries(admin, request)
     if detail_actions:
         entry["detail_actions"] = detail_actions
     return entry

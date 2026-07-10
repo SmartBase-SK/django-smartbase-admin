@@ -56,7 +56,11 @@ from django_smartbase_admin.mcp.bridge import (
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
-from django_smartbase_admin.mcp.schema import admin_entry, get_widget_shapes
+from django_smartbase_admin.mcp.schema import (
+    admin_entry,
+    detail_action_entries,
+    get_widget_shapes,
+)
 from django_smartbase_admin.mcp.widgets import (
     ensure_dashboard_widget,
     require_widget_parent_context,
@@ -390,7 +394,9 @@ class SBAdminTools(MCPToolset):
           (visual dropdown groups in the UI) are flattened to siblings.
 
           - ``row_actions``: per-row buttons on the list view.
-          - ``detail_actions``: buttons on the change / detail form.
+          - ``detail_actions``: buttons on the change / detail form. Actions
+            that only exist for a specific object are returned by
+            ``fetch_detail`` instead.
           - ``list_actions``: global buttons above the list, no row
             context (e.g. "Create…" modals, exports).
           - ``selection_actions``: bulk buttons over selected rows.
@@ -770,9 +776,13 @@ class SBAdminTools(MCPToolset):
         )
         try:
             admin.init_view_dynamic(request, request.request_data)
-            return SBAdminMCPDetailService.get_detail_data(
+            result = SBAdminMCPDetailService.get_detail_data(
                 admin, request, object_id, fields=fields
             )
+            actions = detail_action_entries(admin, request, object_id=object_id)
+            if actions:
+                result["detail_actions"] = actions
+            return result
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 
@@ -820,10 +830,15 @@ class SBAdminTools(MCPToolset):
         * ``widget_id`` — present on autocomplete-backed fields; pass to
           ``autocomplete`` (never construct by hand).
 
-        Each ``inlines[<name>].rows`` entry mirrors the parent
-        ``{"id", "fields"}`` shape. ``truncated`` is ``True`` when a
-        paginated inline has more rows than carried here — drill in
-        via ``list_rows`` on the inline's own admin.
+        Each inline includes ``row_schema`` describing a writable empty row;
+        this remains available when ``rows`` is empty. Existing ``rows``
+        entries mirror the parent ``{"id", "fields"}`` shape. ``truncated``
+        is ``True`` when a paginated inline has more rows than carried here —
+        drill in via ``list_rows`` on the inline's own admin.
+
+        ``detail_actions`` contains the actions available for this specific
+        object, including actions declared on object-dependent fieldsets.
+        Invoke them with ``invoke_detail_action``.
 
         ``widgets`` contains detail/dashboard widgets rendered in the
         detail fieldsets. Use each widget's ``data_tool`` to choose the
@@ -965,15 +980,19 @@ class SBAdminTools(MCPToolset):
     ) -> dict:
         """Fetch the form schema for a modal action — prerequisite for invoking it.
 
-        Works for any action with ``kind == "modal"`` in ``list_admins``.
-        ``action_id`` always comes from discovery.
+        Works for any action with ``kind == "modal"`` in ``list_admins`` or
+        ``fetch_detail.detail_actions``. ``action_id`` always comes from discovery.
 
         Pass ``object_id`` when the action is row- or detail-scoped so
         the form is pre-populated with that row's current values. Omit
         for list-level / selection modals that have no single-row context.
 
-        Returns ``{"title": "…", "fields": {<name>: <info>, …}}`` where
-        each ``<info>`` is:
+        Returns ``{"title": "…", "fields": {<name>: <info>, …},
+        "formsets": {<name>: {"fields": ..., ...}}}``. ``formsets`` is
+        present when the modal exposes action-owned formsets through the
+        conventional ``get_formset()`` method or ``mcp_formset_getters``; use
+        the same names in ``formset_values`` when invoking the action. Each
+        field ``<info>`` is:
 
           - ``label``        — human-readable field label.
           - ``value``        — initial / default value, or ``None``.
@@ -995,6 +1014,12 @@ class SBAdminTools(MCPToolset):
         ensure_sbadmin_request_data(request)
         try:
             admin = resolve_admin(view_id, request=request)
+            bind_sbadmin_request_data(
+                request,
+                view=admin.get_id(),
+                object_id=str(object_id) if object_id is not None else None,
+                method="GET",
+            )
             admin.init_view_dynamic(request, request.request_data)
             return SBAdminMCPActionFormService.get_action_form_data(
                 admin, request, action_id, object_id=object_id
@@ -1281,6 +1306,7 @@ class SBAdminTools(MCPToolset):
         action_id: str,
         object_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke a row action against one object.
@@ -1301,6 +1327,7 @@ class SBAdminTools(MCPToolset):
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
             ``{"value", "label"}`` envelope.
+          formset_values: named row lists from ``fetch_action_form.formsets``.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1318,6 +1345,7 @@ class SBAdminTools(MCPToolset):
             action_id,
             object_id,
             field_values,
+            formset_values,
             confirmed,
         )
 
@@ -1328,6 +1356,7 @@ class SBAdminTools(MCPToolset):
         action_id: str,
         object_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke a detail-page action against one object.
@@ -1348,6 +1377,7 @@ class SBAdminTools(MCPToolset):
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
             ``{"value", "label"}`` envelope.
+          formset_values: named row lists from ``fetch_action_form.formsets``.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1365,6 +1395,7 @@ class SBAdminTools(MCPToolset):
             action_id,
             object_id,
             field_values,
+            formset_values,
             confirmed,
         )
 
@@ -1375,6 +1406,7 @@ class SBAdminTools(MCPToolset):
         action_id: str,
         object_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke an inline-list action against one inline row.
@@ -1398,6 +1430,7 @@ class SBAdminTools(MCPToolset):
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``. Accepts raw scalars/pks or the
             ``{"value", "label"}`` envelope.
+          formset_values: named row lists from ``fetch_action_form.formsets``.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1415,6 +1448,7 @@ class SBAdminTools(MCPToolset):
             action_id,
             object_id,
             field_values,
+            formset_values,
             confirmed,
         )
 
@@ -1424,10 +1458,17 @@ class SBAdminTools(MCPToolset):
         action_id,
         object_id,
         field_values,
+        formset_values,
         confirmed,
     ):
         request = self.request
         admin = resolve_admin(view_id, request=request)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            object_id=str(object_id),
+            method="GET",
+        )
         admin.init_view_dynamic(request, request.request_data)
         return SBAdminMCPActionInvokeService.invoke_row(
             admin,
@@ -1435,6 +1476,7 @@ class SBAdminTools(MCPToolset):
             action_id=action_id,
             object_id=object_id,
             field_values=field_values,
+            formset_values=formset_values,
             confirmed=confirmed,
         )
 
@@ -1445,6 +1487,7 @@ class SBAdminTools(MCPToolset):
         action_id: str,
         object_ids: list,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         confirmed: bool = False,
         modifier: str | None = None,
     ) -> dict:
@@ -1473,6 +1516,7 @@ class SBAdminTools(MCPToolset):
           object_ids: non-empty list of row ids (as strings).
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
+          formset_values: named row lists from ``fetch_action_form.formsets``.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1497,6 +1541,7 @@ class SBAdminTools(MCPToolset):
             action_id=action_id,
             object_ids=object_ids,
             field_values=field_values,
+            formset_values=formset_values,
             confirmed=confirmed,
             modifier=modifier,
         )
@@ -1507,6 +1552,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         action_id: str,
         field_values: dict | None = None,
+        formset_values: dict[str, list[dict]] | None = None,
         filter_data: dict | None = None,
         full_text_search: str | None = None,
         confirmed: bool = False,
@@ -1531,6 +1577,7 @@ class SBAdminTools(MCPToolset):
             ``list_admins["admin_views"][].list_actions``.
           field_values: form submission for ``kind == "modal"``; absent
             for ``kind == "method"``.
+          formset_values: named row lists from ``fetch_action_form.formsets``.
           filter_data, full_text_search: optional scope, same shapes as
             ``list_rows`` — only used by filter-aware actions.
           confirmed: set to ``True`` on the second call after a
@@ -1561,6 +1608,7 @@ class SBAdminTools(MCPToolset):
             request,
             action_id=action_id,
             field_values=field_values,
+            formset_values=formset_values,
             filter_data=filter_data,
             full_text_search=full_text_search,
             confirmed=confirmed,

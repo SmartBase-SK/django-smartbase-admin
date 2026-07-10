@@ -27,6 +27,9 @@ encode_field_values(form, field_values)
 
 from __future__ import annotations
 
+from copy import copy
+
+from django.forms.formsets import BaseFormSet
 from django.forms.widgets import (
     CheckboxSelectMultiple,
     ClearableFileInput,
@@ -36,6 +39,7 @@ from django.forms.widgets import (
     SplitDateTimeWidget,
 )
 from django.http import QueryDict
+from django.utils.datastructures import MultiValueDict
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -111,7 +115,7 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
                     subvalues = parts if len(parts) == 2 else [parts[0], ""]
             elif hasattr(value, "date") and hasattr(value, "time"):
                 # datetime instance — flow used by form.initial values
-                # in ``_encode_form_native``.
+                # in ``encode_initial_form_values``.
                 local = timezone.localtime(value) if timezone.is_aware(value) else value
                 subvalues = [local.date(), local.time()]
             else:
@@ -198,7 +202,258 @@ def form_errors_dict(form) -> dict:
     }
 
 
-def encode_field_values(form, field_values: dict) -> QueryDict:
+def formset_errors_dict(formset: BaseFormSet) -> dict:
+    """Return row and formset-wide validation errors in MCP shape."""
+    rows = [
+        {"index": index, "errors": form_errors_dict(form)}
+        for index, form in enumerate(formset.forms)
+        if form.errors
+    ]
+    return {
+        "rows": rows,
+        "non_form": [str(error) for error in formset.non_form_errors()],
+    }
+
+
+def reject_non_writable_overrides(
+    overrides: dict,
+    writable: set[str],
+    scope: str,
+    *,
+    skip: frozenset[str] = frozenset(),
+) -> None:
+    """Reject unknown and readonly field names before Django can ignore them."""
+    invalid = sorted(
+        key for key in overrides if key not in writable and key not in skip
+    )
+    if invalid:
+        raise LookupError(f"Cannot set {scope} {invalid}; writable: {sorted(writable)}")
+
+
+def encode_initial_form_values(
+    form, qd: QueryDict, overrides: dict, *, prefix: str | None = None
+) -> None:
+    """Encode a form's initial state with caller-provided overrides layered on."""
+    reject_non_writable_overrides(
+        overrides,
+        set(form.fields),
+        "form fields",
+    )
+    prefix = form.prefix if prefix is None else prefix
+    for name, field in form.fields.items():
+        full_name = f"{prefix}-{name}" if prefix else name
+        value = overrides[name] if name in overrides else form.initial.get(name)
+        write_widget_input(qd, full_name, field.widget, value)
+
+
+def _write_formset_management(formset: BaseFormSet, qd: QueryDict, total: int) -> None:
+    prefix = formset.prefix
+    initial = len(formset.initial_forms)
+    qd[f"{prefix}-TOTAL_FORMS"] = str(total)
+    qd[f"{prefix}-INITIAL_FORMS"] = str(initial)
+    qd[f"{prefix}-MIN_NUM_FORMS"] = str(formset.min_num)
+    qd[f"{prefix}-MAX_NUM_FORMS"] = str(formset.max_num)
+
+
+def encode_formset_rows(
+    formset: BaseFormSet,
+    qd: QueryDict,
+    rows: list[dict],
+    *,
+    scope: str = "formset fields",
+) -> None:
+    """Encode a complete row list for an action-owned Django formset.
+
+    Prefixes and management-form values are derived from the live formset.
+    Initial forms are positional and must be included in ``rows``; extra rows
+    are encoded against ``empty_form``. ``_delete`` and ``_order`` are the
+    transport-friendly aliases for Django's generated control fields.
+    """
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise TypeError("formset values must be a list of field dictionaries.")
+
+    initial_count = len(formset.initial_forms)
+    if len(rows) < initial_count:
+        raise ValueError(
+            f"Formset {formset.prefix!r} has {initial_count} initial rows; "
+            f"received only {len(rows)} rows."
+        )
+
+    _write_formset_management(formset, qd, len(rows))
+    special = frozenset({"_delete", "_order"})
+    row_field_names = getattr(formset, "mcp_field_names", None)
+    if row_field_names is None:
+        row_field_names = getattr(formset, "multiple_field_names", None)
+    for index, row in enumerate(rows):
+        form = (
+            formset.forms[index] if index < len(formset.forms) else formset.empty_form
+        )
+        writable = set(form.fields) - {"DELETE", "ORDER"}
+        if row_field_names is not None:
+            writable &= set(row_field_names)
+        reject_non_writable_overrides(row, writable, scope, skip=special)
+        for name, field in form.fields.items():
+            if name not in writable:
+                continue
+            if name in row:
+                value = row[name]
+            elif index < initial_count:
+                value = form.initial.get(name)
+            else:
+                continue
+            write_widget_input(
+                qd,
+                f"{formset.prefix}-{index}-{name}",
+                field.widget,
+                value,
+            )
+        if row.get("_delete") and formset.can_delete:
+            qd[f"{formset.prefix}-{index}-DELETE"] = "on"
+        if "_order" in row and formset.can_order:
+            qd[f"{formset.prefix}-{index}-ORDER"] = row["_order"]
+
+
+def _is_blank_form_value(value) -> bool:
+    if value in (None, "", [], {}):
+        return True
+    if isinstance(value, dict) and "value" in value:
+        return value["value"] in (None, "")
+    return False
+
+
+def encode_inline_formset_operations(
+    formset: BaseFormSet,
+    qd: QueryDict,
+    operations: list[dict],
+    *,
+    scope: str,
+) -> None:
+    """Encode create/update/delete operations for a model-admin inline."""
+    sample_form = (
+        formset.initial_forms[0] if formset.initial_forms else formset.empty_form
+    )
+    writable = set(sample_form.fields)
+    transport_fields = frozenset({"id", "_delete"})
+    for operation in operations:
+        reject_non_writable_overrides(
+            operation,
+            writable,
+            scope,
+            skip=transport_fields,
+        )
+
+    operations_by_id = {
+        operation["id"]: operation for operation in operations if "id" in operation
+    }
+    new_operations = [operation for operation in operations if "id" not in operation]
+    for operation in new_operations:
+        meaningful = {
+            key: value
+            for key, value in operation.items()
+            if key not in transport_fields
+        }
+        if not meaningful or all(
+            _is_blank_form_value(value) for value in meaningful.values()
+        ):
+            raise ValueError(
+                f"{scope} new row {operation!r} has no field values; "
+                "provide the row's required fields, or omit it."
+            )
+
+    initial_forms = list(formset.initial_forms)
+    _write_formset_management(formset, qd, len(initial_forms) + len(new_operations))
+
+    for index, form in enumerate(initial_forms):
+        pk = form.instance.pk
+        operation = operations_by_id.pop(pk, None)
+        deleted = bool(operation and operation.get("_delete"))
+        for name, field in form.fields.items():
+            if name == "id":
+                value = pk
+            elif operation and not deleted and name in operation:
+                value = operation[name]
+            else:
+                value = form.initial.get(name)
+            write_widget_input(
+                qd,
+                f"{formset.prefix}-{index}-{name}",
+                field.widget,
+                value,
+            )
+        if deleted:
+            qd[f"{formset.prefix}-{index}-DELETE"] = "on"
+
+    if operations_by_id:
+        raise LookupError(
+            f"Inline rows {sorted(operations_by_id)} not found on "
+            f"{formset.prefix!r}; use ids from fetch_detail."
+        )
+
+    empty_form = formset.empty_form
+    for offset, operation in enumerate(new_operations):
+        index = len(initial_forms) + offset
+        for name, field in empty_form.fields.items():
+            if name == "id":
+                continue
+            write_widget_input(
+                qd,
+                f"{formset.prefix}-{index}-{name}",
+                field.widget,
+                operation.get(name),
+            )
+
+
+def normalize_querydict_values(qd: QueryDict) -> QueryDict:
+    """Normalize scalar values to the strings a browser would submit."""
+    for name in list(qd):
+        qd.setlist(
+            name,
+            [
+                (
+                    value
+                    if isinstance(value, (list, tuple, dict))
+                    else "" if value is None else str(value)
+                )
+                for value in qd.getlist(name)
+            ],
+        )
+    return qd
+
+
+def encode_mapping_values(values: dict) -> QueryDict:
+    """Encode a schema-dictionary action payload without widget metadata."""
+    if not isinstance(values, dict):
+        raise TypeError("field_values must be a dictionary.")
+    qd = QueryDict(mutable=True)
+    for name, value in values.items():
+        if isinstance(value, list):
+            qd.setlist(name, value)
+        else:
+            qd[name] = value
+    return normalize_querydict_values(qd)
+
+
+def encode_and_validate_form_values(form, values: dict) -> tuple[QueryDict, dict]:
+    """Encode values and validate them through the supplied form instance.
+
+    A shallow copy preserves request-aware constructor state while allowing a
+    normal ``full_clean`` (including ``Form.clean``) without mutating the
+    schema-provider's unbound form.
+    """
+    qd = normalize_querydict_values(encode_field_values(form, values))
+    bound_form = copy(form)
+    bound_form.data = qd
+    bound_form.files = MultiValueDict()
+    bound_form.is_bound = True
+    bound_form._errors = None
+    bound_form._bound_fields_cache = {}
+    bound_form.full_clean()
+    return qd, form_errors_dict(bound_form)
+
+
+def encode_field_values(
+    form, field_values: dict, *, qd: QueryDict | None = None
+) -> QueryDict:
     """Encode a flat ``{name: value}`` dict into a POST ``QueryDict`` using
     each field's widget for correct shape.
 
@@ -207,11 +462,18 @@ def encode_field_values(form, field_values: dict) -> QueryDict:
     submission where the agent supplies a discrete set of field values
     against a known form schema.
     """
-    qd = QueryDict(mutable=True)
+    if not isinstance(field_values, dict):
+        raise TypeError("field_values must be a dictionary.")
+    qd = qd if qd is not None else QueryDict(mutable=True)
     writable = set(form.fields)
     unknown = sorted(k for k in field_values if k not in writable)
     if unknown:
         raise LookupError(f"Unknown fields: {unknown}; available: {sorted(writable)}")
     for name, value in field_values.items():
-        write_widget_input(qd, name, form.fields[name].widget, value)
+        write_widget_input(
+            qd,
+            form.add_prefix(name),
+            form.fields[name].widget,
+            value,
+        )
     return qd

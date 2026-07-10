@@ -1532,6 +1532,54 @@ class DynamicFormTests(SimpleTestCase):
         )
         self.assertIn(widget_id, self.request.request_data.autocomplete_map)
 
+    def test_action_autocomplete_registration_includes_declared_formsets(self):
+        class FormsetActionModal(ActionModalView):
+            mcp_formset_getters = {"rows": "get_rows_formset"}
+
+            def get_rows_formset(self):
+                formset_class = forms.formset_factory(CompleteActionForm, extra=1)
+                return formset_class(
+                    prefix="rows",
+                    form_kwargs={
+                        "request": self.request,
+                        "view": self.view,
+                        "sbadmin_action_id": type(self).__name__,
+                        "source_name": "formset",
+                    },
+                )
+
+        view = CompleteParentActionView()
+        self.request.user = SimpleNamespace(is_anonymous=True)
+        self.request.request_data = CompleteActionRequestData(
+            view=view.get_id(),
+            action=Action.AUTOCOMPLETE.value,
+            modifier=(
+                f"{FormsetActionModal.__name__}"
+                f"{ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR}unused"
+            ),
+            object_id="42",
+            user=self.request.user,
+            request_meta=self.request.META,
+            request_get=self.request.GET,
+            request_post=self.request.POST,
+            configuration=CompleteActionConfiguration(),
+            autocomplete_map={},
+        )
+
+        view.register_action_autocomplete_views(
+            self.request,
+            [SimpleNamespace(target_view=FormsetActionModal)],
+        )
+
+        self.assertTrue(
+            any(
+                widget_id.startswith(
+                    FormsetActionModal.__name__ + ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR
+                )
+                for widget_id in self.request.request_data.autocomplete_map
+            )
+        )
+
     def test_actions_and_autocomplete_initialize_all_action_sources(self):
         parent_view = CompleteParentActionView()
         inline_view = CompleteInlineActionView()

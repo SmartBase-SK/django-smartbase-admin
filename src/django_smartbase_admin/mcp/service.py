@@ -41,143 +41,22 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_messages_storage,
     set_request_payload,
 )
-from django_smartbase_admin.mcp.field_schema import field_info
+from django_smartbase_admin.mcp.field_schema import (
+    field_info,
+    get_mcp_schema_from_formset,
+)
 from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.mcp.form_encoding import (
+    encode_initial_form_values,
+    encode_inline_formset_operations,
     form_errors_dict,
+    formset_errors_dict,
     get_form_from_response,
-    write_widget_input,
+    reject_non_writable_overrides,
 )
 from django_smartbase_admin.mcp.widgets import detail_widget_entries
 
 logger = logging.getLogger(__name__)
-
-
-_INLINE_OP_SKIP = frozenset({"id", "_delete"})
-
-
-def _is_blank_inline_value(value) -> bool:
-    """Whether an inline field value carries nothing usable.
-
-    Covers raw blanks (``None`` / ``""`` / ``[]`` / ``{}``) and the
-    ``{"value", "label"}`` envelope with an empty ``value``.
-    """
-    if value in (None, "", [], {}):
-        return True
-    if isinstance(value, dict) and "value" in value:
-        return value["value"] in (None, "")
-    return False
-
-
-def _reject_non_writable_overrides(
-    overrides: dict,
-    writable: set[str],
-    scope: str,
-    *,
-    skip: frozenset[str] = frozenset(),
-) -> None:
-    """Reject keys that are not on the bound form (readonly or unknown).
-
-    Readonly fields appear in ``fetch_detail`` but are omitted from
-    ``form.fields``, so they would otherwise be silently ignored by POST
-    encoding.
-    """
-    invalid = sorted(k for k in overrides if k not in writable and k not in skip)
-    if invalid:
-        raise LookupError(f"Cannot set {scope} {invalid}; writable: {sorted(writable)}")
-
-
-def _encode_form_native(form, qd: QueryDict, prefix: str, overrides: dict) -> None:
-    """Restate ``form``'s current initial values into ``qd`` as native Python.
-
-    Layered overrides win per field. Readonly fields aren't in
-    ``form.fields`` so they don't roundtrip — Django re-derives them on
-    POST.
-    """
-    for name, field in form.fields.items():
-        full_name = f"{prefix}-{name}" if prefix else name
-        value = overrides[name] if name in overrides else form.initial.get(name)
-        write_widget_input(qd, full_name, field.widget, value)
-
-
-def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
-    """Encode an inline formset into ``qd``, applying caller ops.
-
-    Existing rows always restate themselves (sparse POSTs would make
-    Django's formset machinery treat untouched fields as blank); update
-    ops override per-field, delete ops add ``DELETE=on``, and ``id``-less
-    ops become new rows appended after the initial-form block.
-    """
-    formset = iaf.formset
-    prefix = formset.prefix
-
-    sample_form = (
-        formset.initial_forms[0] if formset.initial_forms else formset.empty_form
-    )
-    writable = set(sample_form.fields.keys())
-    inline_scope = f"inline {type(iaf.opts).__name__!r} fields"
-    for op in ops:
-        _reject_non_writable_overrides(op, writable, inline_scope, skip=_INLINE_OP_SKIP)
-
-    ops_by_id = {op["id"]: op for op in ops if "id" in op}
-    new_ops = [op for op in ops if "id" not in op]
-
-    # A new row with no usable field value would be treated as a blank
-    # extra form and silently skipped by Django's formset (no save, no
-    # error). The caller explicitly asked to create it, so reject it
-    # instead of dropping it — otherwise the write "succeeds" with the
-    # row missing.
-    for op in new_ops:
-        meaningful = {k: v for k, v in op.items() if k not in _INLINE_OP_SKIP}
-        if not meaningful or all(
-            _is_blank_inline_value(v) for v in meaningful.values()
-        ):
-            raise ValueError(
-                f"Inline {type(iaf.opts).__name__!r} new row {op!r} has no "
-                "field values; it would be silently skipped. Provide the "
-                "row's required fields, or omit it."
-            )
-
-    initial_forms = list(formset.initial_forms)
-    total_forms = len(initial_forms) + len(new_ops)
-    # Management form keys must be strings — formset parses them with int().
-    qd[f"{prefix}-TOTAL_FORMS"] = str(total_forms)
-    qd[f"{prefix}-INITIAL_FORMS"] = str(len(initial_forms))
-    qd[f"{prefix}-MIN_NUM_FORMS"] = str(formset.min_num)
-    qd[f"{prefix}-MAX_NUM_FORMS"] = str(formset.max_num)
-
-    for i, form in enumerate(initial_forms):
-        pk = form.instance.pk
-        op = ops_by_id.pop(pk, None)
-        deleted = bool(op and op.get("_delete"))
-        for name, field in form.fields.items():
-            full_name = f"{prefix}-{i}-{name}"
-            if name == "id":
-                value = pk
-            elif op and not deleted and name in op:
-                value = op[name]
-            else:
-                value = form.initial.get(name)
-            write_widget_input(qd, full_name, field.widget, value)
-        if deleted:
-            qd[f"{prefix}-{i}-DELETE"] = "on"
-
-    if ops_by_id:
-        raise LookupError(
-            f"Inline rows {sorted(ops_by_id)} not found on {prefix!r}; "
-            "use ids from fetch_detail."
-        )
-
-    if not new_ops:
-        return
-    empty_form = formset.empty_form
-    for j, op in enumerate(new_ops):
-        i = len(initial_forms) + j
-        for name, field in empty_form.fields.items():
-            if name == "id":
-                continue
-            full_name = f"{prefix}-{i}-{name}"
-            write_widget_input(qd, full_name, field.widget, op.get(name))
 
 
 def _pk_from_redirect(url: str):
@@ -207,17 +86,9 @@ def _extract_form_errors(response) -> dict:
     inlines_out: dict = {}
     for iaf in response.context_data["inline_admin_formsets"]:
         formset = iaf.formset
-        rows = [
-            {"index": i, "errors": form_errors_dict(f)}
-            for i, f in enumerate(formset.forms)
-            if f.errors
-        ]
-        non_form = [str(e) for e in formset.non_form_errors()]
-        if rows or non_form:
-            inlines_out[type(iaf.opts).__name__] = {
-                "rows": rows,
-                "non_form": non_form,
-            }
+        errors = formset_errors_dict(formset)
+        if errors["rows"] or errors["non_form"]:
+            inlines_out[type(iaf.opts).__name__] = errors
     return {
         "fields": form_errors_dict(form) if form else {},
         "inlines": inlines_out,
@@ -378,6 +249,10 @@ class SBAdminMCPDetailService:
             paginator = getattr(iaf.formset, "paginator", None)
             truncated = bool(paginator and paginator.count > len(rows))
             inlines_out[type(inline).__name__] = {
+                "row_schema": get_mcp_schema_from_formset(
+                    iaf.formset,
+                    field_names=inline_fields,
+                ),
                 "rows": rows,
                 "truncated": truncated,
             }
@@ -528,18 +403,26 @@ class SBAdminMCPDetailService:
                 f"{sorted(unknown_inlines)}; available: {sorted(iafs_by_name)}"
             )
 
-        _reject_non_writable_overrides(
+        reject_non_writable_overrides(
             field_values,
             set(ctx["adminform"].form.fields.keys()),
             f"detail fields on admin {admin.get_id()!r}",
         )
 
         qd = QueryDict(mutable=True)
-        _encode_form_native(
-            ctx["adminform"].form, qd, prefix="", overrides=field_values
+        encode_initial_form_values(
+            ctx["adminform"].form,
+            qd,
+            field_values,
+            prefix="",
         )
         for inline_name, iaf in iafs_by_name.items():
-            _encode_inline_native(iaf, qd, inlines.get(inline_name) or [])
+            encode_inline_formset_operations(
+                iaf.formset,
+                qd,
+                inlines.get(inline_name) or [],
+                scope=f"inline {type(iaf.opts).__name__!r} fields",
+            )
         if obj is None:
             # Make ``response_add`` redirect to ``<...>_change/<pk>/``
             # instead of the changelist, so ``_pk_from_redirect`` can

@@ -97,6 +97,54 @@ class CreateFolderModalView(ActionModalView):
         return super().process_form_valid(request, form)
 
 
+class _BatchPrefixForm(forms.Form):
+    prefix_text = forms.CharField()
+
+
+class _BatchFolderRowForm(forms.Form):
+    name = forms.CharField()
+    fixed_echo = forms.CharField(required=False)
+
+
+_BatchFolderFormSet = forms.formset_factory(
+    _BatchFolderRowForm,
+    extra=0,
+    min_num=1,
+    validate_min=True,
+)
+
+
+class BatchCreateFolderModalView(ActionModalView):
+    """Custom modal composed of a prefixed fixed form and a formset."""
+
+    form_class = _BatchPrefixForm
+    modal_title = "Create child folders"
+
+    def get_fixed_form(self, data=None):
+        return _BatchPrefixForm(data=data, prefix="fixed")
+
+    def get_formset(self, data=None):
+        formset = _BatchFolderFormSet(data=data, prefix="rows")
+        formset.multiple_field_names = ("name",)
+        return formset
+
+    def post(self, request, *args, **kwargs):
+        fixed_form = self.get_fixed_form(request.POST)
+        formset = self.get_formset(request.POST)
+        if not fixed_form.is_valid() or not formset.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=fixed_form, formset=formset)
+            )
+
+        parent_id = request.request_data.object_id
+        for row_form in formset.forms:
+            Folder.objects.create(
+                name=f"{fixed_form.cleaned_data['prefix_text']}{row_form.cleaned_data['name']}",
+                parent_id=parent_id,
+            )
+        return self.build_success_response(request)
+
+
 class _InlineNoteForm(forms.Form):
     note = forms.CharField()
 
@@ -230,6 +278,18 @@ class FolderInvokeTestAdmin(SBAdmin):
                 action_id="action_archive",
             ),
         ]
+
+    def get_sbadmin_fieldsets(self, request, object_id=None):
+        fieldset_data = {"fields": ("name",)}
+        if object_id is not None:
+            fieldset_data["actions"] = [
+                SBAdminFormViewAction(
+                    target_view=BatchCreateFolderModalView,
+                    title="Create children",
+                    view=self,
+                )
+            ]
+        return (("Folder", fieldset_data),)
 
     def get_sbadmin_list_selection_actions(self, request):
         return [
@@ -446,6 +506,70 @@ class IntegrationTests(_Base):
         )
         self.assertEqual(result["status"], "ok")
         self.assertTrue(any("Archived d" in m["message"] for m in result["messages"]))
+
+    def test_object_fieldset_action_with_formset_round_trip(self):
+        parent = Folder.objects.create(name="parent")
+
+        global_entry = next(
+            entry
+            for entry in self._tools().list_admins()["admin_views"]
+            if entry["view_id"] == "filer_folder"
+        )
+        self.assertNotIn(
+            "Create children",
+            {action["title"] for action in global_entry["detail_actions"]},
+        )
+
+        detail = self._tools().fetch_detail("filer_folder", str(parent.pk))
+        action = next(
+            action
+            for action in detail["detail_actions"]
+            if action["title"] == "Create children"
+        )
+        self.assertEqual(action["fieldset"], "Folder")
+
+        schema = self._tools().fetch_action_form(
+            "filer_folder",
+            action["action_id"],
+            object_id=str(parent.pk),
+        )
+        self.assertEqual(list(schema["fields"]), ["prefix_text"])
+        self.assertEqual(list(schema["formsets"]["rows"]["fields"]), ["name"])
+
+        invalid = self._tools().invoke_detail_action(
+            "filer_folder",
+            action["action_id"],
+            object_id=str(parent.pk),
+            field_values={"prefix_text": "child-"},
+            formset_values={"rows": [{"name": ""}]},
+        )
+        self.assertEqual(invalid["status"], "invalid")
+        self.assertIn(
+            "name",
+            invalid["errors"]["formsets"]["rows"]["rows"][0]["errors"],
+        )
+
+        result = self._tools().invoke_detail_action(
+            "filer_folder",
+            action["action_id"],
+            object_id=str(parent.pk),
+            field_values={"prefix_text": "child-"},
+            formset_values={
+                "rows": [
+                    {"name": "one"},
+                    {"name": "two"},
+                ]
+            },
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertSetEqual(
+            set(
+                Folder.objects.filter(parent_id=parent.pk).values_list(
+                    "name", flat=True
+                )
+            ),
+            {"child-one", "child-two"},
+        )
 
     def test_inline_modal_acts_on_inline_row_via_inline_view_id(self):
         """Inline modal action operates on an INLINE row identified by the

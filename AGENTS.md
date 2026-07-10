@@ -6251,6 +6251,52 @@ No HTTPS is needed locally; only if you serve the page on a non-loopback host (L
 }
 ```
 
+### MCP action formsets
+
+`ActionModalView` exposes its normal `get_form()` result to MCP by default. For
+compound modals it automatically recognizes the conventional
+`get_fixed_form()` and `get_formset()` methods, using the live formset prefix as
+the MCP name:
+
+```python
+class AddPriceRowsView(ActionModalView):
+    form_class = PriceRowForm
+
+    def get_fixed_form(self, data=None):
+        return FixedPriceFieldsForm(data=data, prefix="fixed")
+
+    def get_formset(self, data=None):
+        return build_price_formset(data=data, prefix="rows")
+```
+
+For nonstandard method names, set `mcp_form_getter` and
+`mcp_formset_getters` explicitly. Set `mcp_formset_getters = {}` to disable
+automatic `get_formset()` exposure.
+
+`fetch_action_form` then returns the primary `fields` plus a `formsets` map.
+Use the same names when invoking the row/detail/list/selection action:
+
+```json
+{
+  "field_values": {"currency": "EUR"},
+  "formset_values": {
+    "rows": [
+      {"weight_from": 0, "weight_to": 5, "price": "3.50"},
+      {"weight_from": 5, "weight_to": 10, "price": "4.20"}
+    ]
+  }
+}
+```
+
+MCP derives prefixes and Django management-form fields from the live formset.
+Validation still runs through the modal's regular `post()` implementation;
+row errors are returned under `errors.formsets.<name>.rows` and formset-wide
+errors under `errors.formsets.<name>.non_form`.
+
+Object-dependent fieldset actions are discovered from `fetch_detail`, not the
+global `list_admins` response. Pass that object's id to `fetch_action_form` and
+`invoke_detail_action`.
+
 ### Verify
 
 ```bash

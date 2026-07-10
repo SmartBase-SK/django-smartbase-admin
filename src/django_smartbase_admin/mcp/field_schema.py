@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
 from django.forms.forms import BaseForm
+from django.forms.formsets import BaseFormSet
 
 from django_smartbase_admin.engine.filter_widgets import AutocompleteParseMixin
 
@@ -105,7 +106,9 @@ def field_info(field, value, *, readonly=False, label=None) -> dict:
     return info
 
 
-def get_mcp_schema_from_form(form: BaseForm) -> dict:
+def get_mcp_schema_from_form(
+    form: BaseForm, *, field_names: set[str] | None = None
+) -> dict:
     """Convert an unbound Django form into the MCP action-input schema.
 
     The field representation intentionally matches ``fetch_action_form`` so
@@ -114,9 +117,38 @@ def get_mcp_schema_from_form(form: BaseForm) -> dict:
     """
     fields: dict[str, dict] = {}
     for name, field in form.fields.items():
+        if field_names is not None and name not in field_names:
+            continue
         initial = (form.initial or {}).get(name)
         if initial is None:
             raw = field.initial
             initial = raw() if callable(raw) else raw
         fields[name] = field_info(field, initial, label=str(field.label or name))
     return {"kind": "form", "fields": fields}
+
+
+def get_mcp_schema_from_formset(
+    formset: BaseFormSet, *, field_names: set[str] | None = None
+) -> dict:
+    """Describe one row of a Django formset plus its cardinality controls."""
+    excluded_controls = {"DELETE", "ORDER"}
+    if field_names is None:
+        field_names = getattr(formset, "mcp_field_names", None)
+    if field_names is None:
+        # Compound bulk forms commonly expose fixed fields separately and
+        # identify the fields repeated per row with this attribute.
+        field_names = getattr(formset, "multiple_field_names", None)
+    selected = (
+        set(formset.empty_form.fields) - excluded_controls
+        if field_names is None
+        else set(field_names) - excluded_controls
+    )
+    schema = get_mcp_schema_from_form(formset.empty_form, field_names=selected)
+    return {
+        "kind": "formset",
+        "fields": schema["fields"],
+        "min_num": formset.min_num,
+        "max_num": formset.max_num,
+        "can_delete": bool(formset.can_delete),
+        "can_order": bool(formset.can_order),
+    }

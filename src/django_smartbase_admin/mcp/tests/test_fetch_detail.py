@@ -423,8 +423,9 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
 
         self.assertEqual(set(result), {"id", "fields", "inlines", "widgets"})
         inline = result["inlines"]["FolderPermissionInline"]
-        self.assertEqual(set(inline), {"rows", "truncated"})
+        self.assertEqual(set(inline), {"row_schema", "rows", "truncated"})
         self.assertFalse(inline["truncated"])
+        self.assertIn("type", inline["row_schema"]["fields"])
         self.assertEqual(len(inline["rows"]), 5)
 
         row = inline["rows"][0]

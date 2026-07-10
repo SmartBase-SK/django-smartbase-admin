@@ -94,6 +94,11 @@ class FetchAddFormTests(TestCase):
         inline = result["inlines"]["FolderPermissionInline"]
         self.assertEqual(inline["rows"], [])
         self.assertFalse(inline["truncated"])
+        self.assertEqual(
+            list(inline["row_schema"]["fields"]),
+            ["type", "everybody", "can_read"],
+        )
+        self.assertTrue(inline["row_schema"]["fields"]["type"]["required"])
 
     def test_field_subset_and_unknown_field_raises(self):
         result = self._fetch(fields=["name"])
