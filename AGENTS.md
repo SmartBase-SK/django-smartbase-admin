@@ -239,7 +239,7 @@ class MyAdmin(SBAdmin):
         definition["modules"].append("dataEditModule")
         return definition
 
-    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None):
         row_id = json.loads(request.POST.get("currentRowId", "null"))
         column = request.POST.get("columnFieldName", "")
@@ -285,11 +285,11 @@ Rules and gotchas:
   `per_cell_editable_field`.
 - **Needs the `dataEditModule`.** Both the `editable` gate (via `modifyTabulatorOptions`) and
   the save pipeline live in that module.
-- **Keep the built-in MCP schema on overrides.** An implementation that overrides
+- **Keep the built-in MCP components on overrides.** An implementation that overrides
   `action_table_data_edit` must use
-  `@sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")`. The inherited provider
-  returns the built-in `TableDataEditMCPForm`, with `columnFieldName` choices derived from
-  the request's fields that declare `tabulator_editor`.
+  `@sbadmin_action(mcp_components="get_table_data_edit_form_components")`. The inherited
+  provider returns `{"main": TableDataEditForm(...)}`, with `columnFieldName` choices
+  derived from the request's fields that declare `tabulator_editor`.
 - Editing an ungated cell still POSTs to `action_table_data_edit`; enforce real
   authorization/validation there too — the client gate is UX only.
 
@@ -5443,20 +5443,20 @@ Built-in read-only endpoints already carry `permission="view"`: `action_list`, `
 
 ### MCP-exposed method actions
 
-Add `mcp_schema` to explicitly expose a method under the view's `mcp_actions`
-discovery entry. The provider receives the current request and may return an
-unbound Django form, a schema dictionary, or `None` when the action is not
-available in that context. Invoke the discovered method with the MCP
-`invoke_action` tool; it encodes the form values and routes through
+Add `mcp_components` to explicitly expose a method under the view's
+`mcp_actions` discovery entry. The provider receives the current request and
+returns a named dictionary of Django forms/formsets, or `None` when unavailable.
+Invoke the discovered method with the MCP `invoke_action` tool; it encodes
+`component_values` and routes through
 `delegate_to_action`, which remains the permission boundary.
 
 ```python
-@sbadmin_action(mcp_schema="get_recalculate_mcp_schema")
+@sbadmin_action(mcp_components="get_recalculate_form_components")
 def action_recalculate(self, request, modifier, object_id=None):
     ...
 
-def get_recalculate_mcp_schema(self, request):
-    return RecalculateForm()
+def get_recalculate_form_components(self, request):
+    return {"main": RecalculateForm()}
 ```
 
 ### Usage
@@ -6251,12 +6251,10 @@ No HTTPS is needed locally; only if you serve the page on a non-loopback host (L
 }
 ```
 
-### MCP action formsets
+### MCP action form components
 
-`ActionModalView` exposes its normal `get_form()` result to MCP by default. For
-compound modals it automatically recognizes the conventional
-`get_fixed_form()` and `get_formset()` methods, using the live formset prefix as
-the MCP name:
+`ActionModalView` exposes its normal `get_form()` as the `main` component by
+default. Compound modals override `get_form_components()` explicitly:
 
 ```python
 class AddPriceRowsView(ActionModalView):
@@ -6267,19 +6265,21 @@ class AddPriceRowsView(ActionModalView):
 
     def get_formset(self, data=None):
         return build_price_formset(data=data, prefix="rows")
+
+    def get_form_components(self):
+        return {
+            "fixed": self.get_fixed_form(),
+            "rows": self.get_formset(),
+        }
 ```
 
-For nonstandard method names, set `mcp_form_getter` and
-`mcp_formset_getters` explicitly. Set `mcp_formset_getters = {}` to disable
-automatic `get_formset()` exposure.
-
-`fetch_action_form` then returns the primary `fields` plus a `formsets` map.
-Use the same names when invoking the row/detail/list/selection action:
+`fetch_action_form` returns the same names under `components`. Use those names
+under `component_values` when invoking the action:
 
 ```json
 {
-  "field_values": {"currency": "EUR"},
-  "formset_values": {
+  "component_values": {
+    "fixed": {"currency": "EUR"},
     "rows": [
       {"weight_from": 0, "weight_to": 5, "price": "3.50"},
       {"weight_from": 5, "weight_to": 10, "price": "4.20"}

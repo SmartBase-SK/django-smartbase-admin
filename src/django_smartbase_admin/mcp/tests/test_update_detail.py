@@ -108,16 +108,16 @@ class _UpdateDetailTestBase(TestCase):
             sb_admin_site._registry[Folder] = self._original_admin
         super().tearDown()
 
-    def _update(self, object_id, *, field_values=None, inlines=None, user=None):
+    def _update(self, object_id, *, main_values=None, component_values=None, user=None):
         # ``_changeform_view`` writes an ``admin.LogEntry`` on save and
         # the row's ``user`` FK must point at a real auth row; a
         # ``MagicMock`` would round-trip its mock pk through the insert.
         user = user or self.write_user
+        component_values = {"main": main_values or {}, **(component_values or {})}
         return SBAdminTools(request=build_mcp_request(user)).update_detail(
             "filer_folder",
             str(object_id),
-            field_values=field_values,
-            inlines=inlines,
+            component_values=component_values,
         )
 
 
@@ -133,11 +133,14 @@ class UpdateDetailFieldTests(_UpdateDetailTestBase):
 
         from django_smartbase_admin.audit.models import AdminAuditLog
 
-        result = self._update(self.child.pk, field_values={"name": "renamed"})
+        result = self._update(self.child.pk, main_values={"name": "renamed"})
 
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["id"], self.child.pk)
-        self.assertEqual(result["fields"]["name"]["value"], "renamed")
+        self.assertEqual(
+            result["components"]["main"]["fields"]["name"]["value"],
+            "renamed",
+        )
         self.assertEqual(Folder.objects.get(pk=self.child.pk).name, "renamed")
 
         # MCP bridge tags the active request — every audit row from this
@@ -156,33 +159,33 @@ class UpdateDetailFieldTests(_UpdateDetailTestBase):
         other = Folder.objects.create(name="other")
         result = self._update(
             self.child.pk,
-            field_values={"parent": {"value": other.pk, "label": str(other)}},
+            main_values={"parent": {"value": other.pk, "label": str(other)}},
         )
         self.assertEqual(result["status"], "ok")
         self.assertEqual(Folder.objects.get(pk=self.child.pk).parent_id, other.pk)
 
     def test_untouched_fields_keep_their_values(self):
-        """Sparse field_values must not blank out unspecified columns."""
-        self._update(self.child.pk, field_values={"name": "renamed"})
-        # ``parent`` was not in ``field_values`` — it should still point
+        """Sparse main component values must preserve unspecified columns."""
+        self._update(self.child.pk, main_values={"name": "renamed"})
+        # ``parent`` was not in the main component values, so it should still point
         # at the original parent rather than being cleared.
         self.assertEqual(Folder.objects.get(pk=self.child.pk).parent_id, self.parent.pk)
 
     def test_blank_required_field_returns_invalid_with_errors(self):
-        result = self._update(self.child.pk, field_values={"name": ""})
+        result = self._update(self.child.pk, main_values={"name": ""})
 
         self.assertEqual(result["status"], "invalid")
-        self.assertIn("name", result["errors"]["fields"])
+        self.assertIn("name", result["errors"]["components"]["main"])
         # No DB write on validation failure.
         self.assertEqual(Folder.objects.get(pk=self.child.pk).name, "child")
 
     def test_unknown_field_raises_lookup_error(self):
         with self.assertRaises(LookupError):
-            self._update(self.child.pk, field_values={"bogus": "x"})
+            self._update(self.child.pk, main_values={"bogus": "x"})
 
     def test_missing_object_raises_lookup_error(self):
         with self.assertRaises(LookupError):
-            self._update(99999, field_values={"name": "x"})
+            self._update(99999, main_values={"name": "x"})
 
     def test_no_change_permission_raises_permission_error(self):
         MCPToolTestConfig.view_permission_for = {"view"}
@@ -191,7 +194,7 @@ class UpdateDetailFieldTests(_UpdateDetailTestBase):
             with self.assertRaises((PermissionError, PermissionDenied)):
                 self._update(
                     self.child.pk,
-                    field_values={"name": "x"},
+                    main_values={"name": "x"},
                     user=denied_user,
                 )
         finally:
@@ -211,7 +214,7 @@ class UpdateDetailReadonlyFieldTests(_UpdateDetailTestBase):
         with self.assertRaises(LookupError) as ctx:
             self._update(
                 self.folder.pk,
-                field_values={"uploaded_at": "2099-01-01T00:00:00"},
+                main_values={"uploaded_at": "2099-01-01T00:00:00"},
             )
         self.assertIn("uploaded_at", str(ctx.exception))
         self.assertEqual(Folder.objects.get(pk=self.folder.pk).uploaded_at, original)
@@ -244,7 +247,7 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
         # ``FolderPermission`` (``None`` = inherit, 1 = allow, 0 = deny).
         result = self._update(
             self.folder.pk,
-            inlines={
+            component_values={
                 "FolderPermissionInline": [
                     {"id": self.perm_a.pk, "can_read": 1},
                 ]
@@ -260,7 +263,7 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
     def test_delete_existing_inline_row(self):
         result = self._update(
             self.folder.pk,
-            inlines={
+            component_values={
                 "FolderPermissionInline": [
                     {"id": self.perm_a.pk, "_delete": True},
                 ]
@@ -274,7 +277,7 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
     def test_create_new_inline_row(self):
         result = self._update(
             self.folder.pk,
-            inlines={
+            component_values={
                 "FolderPermissionInline": [
                     # type=1 + everybody=True satisfies the model's
                     # ``clean`` rules; the parent folder FK is wired
@@ -291,14 +294,14 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
         with self.assertRaises(LookupError):
             self._update(
                 self.folder.pk,
-                inlines={"DoesNotExistInline": []},
+                component_values={"DoesNotExistInline": []},
             )
 
     def test_unknown_inline_row_id_raises_lookup_error(self):
         with self.assertRaises(LookupError):
             self._update(
                 self.folder.pk,
-                inlines={
+                component_values={
                     "FolderPermissionInline": [
                         {"id": 99999, "everybody": True},
                     ]

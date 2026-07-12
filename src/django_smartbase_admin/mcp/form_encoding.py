@@ -18,11 +18,9 @@ write_widget_input(qd, key, widget, value)
     file), ``MultiWidget`` (``decompress`` into sub-keys), multi-select,
     SBAdmin autocomplete, and plain widgets.
 
-encode_field_values(form, field_values)
-    High-level helper for modal action submission: builds a fresh
-    ``QueryDict`` keyed by ``form.fields`` widgets, rejecting unknown
-    field names up-front so agents get a clear ``LookupError`` instead
-    of silently-dropped values.
+encode_form_components(components, component_values)
+    Encode named form patches and formset row operations through the same
+    widget-aware path for admin writes, modal actions, and method actions.
 """
 
 from __future__ import annotations
@@ -30,6 +28,8 @@ from __future__ import annotations
 from copy import copy
 
 from django.forms.formsets import BaseFormSet
+from django.forms.forms import BaseForm
+from django.forms.models import BaseModelFormSet
 from django.forms.widgets import (
     CheckboxSelectMultiple,
     ClearableFileInput,
@@ -166,26 +166,6 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
     qd[key] = value
 
 
-def get_form_from_response(response, key: str):
-    """Return the form attached to a ``TemplateResponse``'s context.
-
-    ``key`` is ``"form"`` for ``FormView``-style responses or
-    ``"adminform"`` for Django admin change-form responses (in which
-    case the ``AdminForm`` wrapper's ``.form`` is unwrapped). Returns
-    ``None`` when the response isn't a ``TemplateResponse`` or no form
-    is found.
-
-    Used in failure paths to surface errors that the dispatched view
-    attached to the form (including non-field errors added
-    programmatically by ``process_form_valid``).
-    """
-    ctx = getattr(response, "context_data", None)
-    if not ctx or key not in ctx:
-        return None
-    obj = ctx[key]
-    return getattr(obj, "form", obj)
-
-
 def form_errors_dict(form) -> dict:
     """Stringify ``form.errors`` into ``{field: [message, ...]}``.
 
@@ -213,6 +193,46 @@ def formset_errors_dict(formset: BaseFormSet) -> dict:
         "rows": rows,
         "non_form": [str(error) for error in formset.non_form_errors()],
     }
+
+
+def form_component_errors(
+    components: dict[str, BaseForm | BaseFormSet],
+) -> dict[str, dict]:
+    """Collect errors from named bound forms and formsets."""
+    errors = {}
+    for name, component in components.items():
+        if isinstance(component, BaseFormSet):
+            component_errors = formset_errors_dict(component)
+            if component_errors["rows"] or component_errors["non_form"]:
+                errors[name] = component_errors
+        else:
+            component_errors = form_errors_dict(component)
+            if component_errors:
+                errors[name] = component_errors
+    return errors
+
+
+def bind_form_components(
+    components: dict[str, BaseForm | BaseFormSet], data: QueryDict
+) -> dict[str, BaseForm | BaseFormSet]:
+    """Return bound copies of components for validation without side effects."""
+    bound_components = {}
+    for name, component in components.items():
+        bound = copy(component)
+        bound.data = data
+        bound.files = MultiValueDict()
+        bound.is_bound = True
+        if isinstance(bound, BaseFormSet):
+            for cached in ("forms", "management_form"):
+                bound.__dict__.pop(cached, None)
+            bound._errors = None
+            bound._non_form_errors = None
+        else:
+            bound._errors = None
+            bound._bound_fields_cache = {}
+        bound.full_clean()
+        bound_components[name] = bound
+    return bound_components
 
 
 def reject_non_writable_overrides(
@@ -420,60 +440,72 @@ def normalize_querydict_values(qd: QueryDict) -> QueryDict:
     return qd
 
 
-def encode_mapping_values(values: dict) -> QueryDict:
-    """Encode a schema-dictionary action payload without widget metadata."""
-    if not isinstance(values, dict):
-        raise TypeError("field_values must be a dictionary.")
-    qd = QueryDict(mutable=True)
-    for name, value in values.items():
-        if isinstance(value, list):
-            qd.setlist(name, value)
-        else:
-            qd[name] = value
-    return normalize_querydict_values(qd)
-
-
-def encode_and_validate_form_values(form, values: dict) -> tuple[QueryDict, dict]:
-    """Encode values and validate them through the supplied form instance.
-
-    A shallow copy preserves request-aware constructor state while allowing a
-    normal ``full_clean`` (including ``Form.clean``) without mutating the
-    schema-provider's unbound form.
-    """
-    qd = normalize_querydict_values(encode_field_values(form, values))
-    bound_form = copy(form)
-    bound_form.data = qd
-    bound_form.files = MultiValueDict()
-    bound_form.is_bound = True
-    bound_form._errors = None
-    bound_form._bound_fields_cache = {}
-    bound_form.full_clean()
-    return qd, form_errors_dict(bound_form)
-
-
-def encode_field_values(
-    form, field_values: dict, *, qd: QueryDict | None = None
+def encode_form_components(
+    components: dict[str, BaseForm | BaseFormSet],
+    component_values: dict | None,
+    *,
+    allow_existing_rows: bool = True,
 ) -> QueryDict:
-    """Encode a flat ``{name: value}`` dict into a POST ``QueryDict`` using
-    each field's widget for correct shape.
+    """Encode named form patches and formset row operations into one POST."""
+    from django_smartbase_admin.mcp.field_schema import validate_form_components
 
-    Unknown field names raise ``LookupError`` so agents see a clear
-    failure rather than silently-dropped values. Use for modal action
-    submission where the agent supplies a discrete set of field values
-    against a known form schema.
-    """
-    if not isinstance(field_values, dict):
-        raise TypeError("field_values must be a dictionary.")
-    qd = qd if qd is not None else QueryDict(mutable=True)
-    writable = set(form.fields)
-    unknown = sorted(k for k in field_values if k not in writable)
+    components = validate_form_components(components)
+    values = component_values or {}
+    if not isinstance(values, dict):
+        raise TypeError("component_values must be a dictionary.")
+    unknown = sorted(set(values) - set(components))
     if unknown:
-        raise LookupError(f"Unknown fields: {unknown}; available: {sorted(writable)}")
-    for name, value in field_values.items():
-        write_widget_input(
-            qd,
-            form.add_prefix(name),
-            form.fields[name].widget,
-            value,
+        raise LookupError(
+            f"Unknown form components: {unknown}; available: {sorted(components)}."
         )
-    return qd
+
+    prefixes = [component.prefix or "" for component in components.values()]
+    duplicates = sorted({prefix for prefix in prefixes if prefixes.count(prefix) > 1})
+    if duplicates:
+        raise ValueError(
+            "Form component prefixes must be unique; duplicated prefixes: "
+            f"{duplicates}."
+        )
+
+    qd = QueryDict(mutable=True)
+    for name, component in components.items():
+        supplied = values.get(name)
+        if isinstance(component, BaseFormSet):
+            rows = supplied
+            if rows is None:
+                rows = (
+                    []
+                    if isinstance(component, BaseModelFormSet)
+                    else [{} for _form in component.initial_forms]
+                )
+            if not isinstance(rows, list):
+                raise TypeError(f"Formset component {name!r} must be a list of rows.")
+            if not allow_existing_rows and any(
+                "id" in row or row.get("_delete") for row in rows
+            ):
+                raise LookupError(
+                    f"Formset component {name!r} cannot update or delete rows "
+                    "while creating an object."
+                )
+            if isinstance(component, BaseModelFormSet):
+                encode_inline_formset_operations(
+                    component,
+                    qd,
+                    rows,
+                    scope=f"formset component {name!r} fields",
+                )
+            else:
+                encode_formset_rows(
+                    component,
+                    qd,
+                    rows,
+                    scope=f"formset component {name!r} fields",
+                )
+            continue
+
+        supplied = supplied or {}
+        if not isinstance(supplied, dict):
+            raise TypeError(f"Form component {name!r} must be a field dictionary.")
+        encode_initial_form_values(component, qd, supplied)
+
+    return normalize_querydict_values(qd)

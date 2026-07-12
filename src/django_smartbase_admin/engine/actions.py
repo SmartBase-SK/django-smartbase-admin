@@ -18,16 +18,16 @@ def sbadmin_action(func=None, **kwargs):
       ``@sbadmin_action`` that does not declare a permission explicitly, so
       read-only endpoints (autocomplete, list_json, xlsx export, config, …)
       must opt in with ``permission="view"``.
-    - ``mcp_schema`` (str | callable | dict): Explicitly expose the method in
-      MCP discovery. A string names a bound provider method receiving
-      ``request``; a callable receives ``(view, request)``. The declaration
-      must resolve to an unbound Django form, a schema dictionary, or ``None``
-      when unavailable for the current request.
+    - ``mcp_components`` (str | callable): Explicitly expose the method in MCP
+      discovery. A string names a bound provider method receiving ``request``;
+      a callable receives ``(view, request)``. The provider must return a named
+      dictionary of Django forms/formsets, or ``None`` when unavailable for
+      the current request.
     - ``mcp_description`` (str): Optional description emitted with the MCP
       action schema.
 
     An overriding method replaces the base method's decorator metadata. It
-    must therefore redeclare ``mcp_schema`` when it should remain exposed.
+    must therefore redeclare ``mcp_components`` when it should remain exposed.
 
     Usage::
 
@@ -48,7 +48,7 @@ def sbadmin_action(func=None, **kwargs):
     return decorator
 
 
-class TableDataEditMCPForm(forms.Form):
+class TableDataEditForm(forms.Form):
     """MCP input contract for ``action_table_data_edit``.
 
     Field names match the existing browser POST payload so a generic MCP

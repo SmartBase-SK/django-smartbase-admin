@@ -57,7 +57,7 @@ class ChildFolderListWidget(SBAdminDashboardListWidget):
     search_fields = ("name",)
     path_to_parent_instance_id = "parent_id"
 
-    @sbadmin_action(mcp_schema="get_refresh_schema")
+    @sbadmin_action(mcp_components="get_refresh_form_components")
     def action_refresh_name(self, request, modifier, object_id=None):
         return JsonResponse(
             {
@@ -68,12 +68,12 @@ class ChildFolderListWidget(SBAdminDashboardListWidget):
             }
         )
 
-    def get_refresh_schema(self, request):
+    def get_refresh_form_components(self, request):
         class RefreshNameForm(forms.Form):
             row_id = forms.IntegerField()
             value = forms.CharField(required=False)
 
-        return RefreshNameForm()
+        return {"main": RefreshNameForm()}
 
 
 class FolderDetailWithWidgetAdmin(FolderDetailTestAdmin):
@@ -126,7 +126,7 @@ class FetchDetailTests(_FetchDetailTestBase):
         row = self._fetch(self.child_a.pk)
 
         self.assertEqual(row["id"], self.child_a.pk)
-        fields = row["fields"]
+        fields = row["components"]["main"]["fields"]
         self.assertEqual(list(fields), ["name", "parent", "uploaded_at", "child_count"])
 
         # Editable scalar — Folder.name has blank=False.
@@ -158,8 +158,9 @@ class FetchDetailTests(_FetchDetailTestBase):
 
         # Root row: null FK must skip label resolution cleanly.
         parent_row = self._fetch(self.parent.pk)
-        self.assertIsNone(parent_row["fields"]["parent"]["value"])
-        self.assertEqual(parent_row["fields"]["child_count"]["value"], 2)
+        parent_fields = parent_row["components"]["main"]["fields"]
+        self.assertIsNone(parent_fields["parent"]["value"])
+        self.assertEqual(parent_fields["child_count"]["value"], 2)
 
     def test_fetch_whoami_matches_fetch_detail_for_configured_target(self):
         user = MagicMock(
@@ -230,8 +231,9 @@ class FetchDetailTests(_FetchDetailTestBase):
     def test_field_subset_projection(self):
         row = self._fetch(self.child_a.pk, fields=["name"])
         self.assertEqual(row["id"], self.child_a.pk)
-        self.assertEqual(list(row["fields"]), ["name"])
-        self.assertEqual(row["fields"]["name"]["value"], "child_a")
+        fields = row["components"]["main"]["fields"]
+        self.assertEqual(list(fields), ["name"])
+        self.assertEqual(fields["name"]["value"], "child_a")
 
     def test_error_paths_surface_clear_exceptions(self):
         """Missing object, unknown field, unknown admin, denied admin —
@@ -292,7 +294,7 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
     def test_detail_surfaces_parent_scoped_list_widget(self):
         result = self._fetch(self.parent.pk)
 
-        self.assertEqual(list(result["fields"]), ["name"])
+        self.assertEqual(list(result["components"]["main"]["fields"]), ["name"])
         widget = result["widgets"][0]
         self.assertEqual(widget["view_id"], "filer_folder_child_folder_list_widget")
         self.assertEqual(widget["parent_view_id"], "filer_folder")
@@ -307,22 +309,24 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
                 {
                     "action_id": "action_refresh_name",
                     "kind": "method",
-                    "input_schema": {
-                        "kind": "form",
-                        "fields": {
-                            "row_id": {
-                                "value": None,
-                                "required": True,
-                                "widget": "NumberInput",
-                                "readonly": False,
-                                "label": "row_id",
-                            },
-                            "value": {
-                                "value": None,
-                                "required": False,
-                                "widget": "TextInput",
-                                "readonly": False,
-                                "label": "value",
+                    "components": {
+                        "main": {
+                            "type": "form",
+                            "fields": {
+                                "row_id": {
+                                    "value": None,
+                                    "required": True,
+                                    "widget": "NumberInput",
+                                    "readonly": False,
+                                    "label": "row_id",
+                                },
+                                "value": {
+                                    "value": None,
+                                    "required": False,
+                                    "widget": "TextInput",
+                                    "readonly": False,
+                                    "label": "value",
+                                },
                             },
                         },
                     },
@@ -353,7 +357,7 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
             widget["view_id"],
             "action_refresh_name",
             object_id=widget["parent_object_id"],
-            field_values={"row_id": self.child_a.pk, "value": "updated"},
+            component_values={"main": {"row_id": self.child_a.pk, "value": "updated"}},
         )
 
         self.assertEqual(result["status"], "ok")
@@ -421,11 +425,11 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
     def test_inlines_auto_hydrate_with_per_field_metadata(self):
         result = self._fetch(self.folder.pk, fields=["name"])
 
-        self.assertEqual(set(result), {"id", "fields", "inlines", "widgets"})
-        inline = result["inlines"]["FolderPermissionInline"]
-        self.assertEqual(set(inline), {"row_schema", "rows", "truncated"})
+        self.assertEqual(set(result), {"id", "components", "widgets"})
+        inline = result["components"]["FolderPermissionInline"]
+        self.assertEqual(inline["type"], "formset")
         self.assertFalse(inline["truncated"])
-        self.assertIn("type", inline["row_schema"]["fields"])
+        self.assertIn("type", inline["fields"])
         self.assertEqual(len(inline["rows"]), 5)
 
         row = inline["rows"][0]
@@ -452,7 +456,7 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
             sb_admin_site.register(Folder, self.admin_class)
             MCPToolTestConfig().init_view_map()
 
-        self.assertEqual(result["inlines"], {})
+        self.assertEqual(set(result["components"]), {"main"})
 
 
 @override_settings(
@@ -474,7 +478,7 @@ class FetchDetailPaginatedInlineTests(_FetchDetailTestBase):
 
     def test_paginated_inline_truncates_with_flag(self):
         result = self._fetch(self.folder.pk, fields=["name"])
-        inline = result["inlines"]["FolderPermissionPaginatedInline"]
+        inline = result["components"]["FolderPermissionPaginatedInline"]
         # FolderPermissionPaginatedInline.per_page = 2 against 5 rows.
         self.assertEqual(len(inline["rows"]), 2)
         self.assertTrue(inline["truncated"])
@@ -538,7 +542,9 @@ class FetchDetailHtmlSanitizeTests(_FetchDetailTestBase):
     def test_display_html_is_sanitized_keeping_structure(self):
         """One pass over the sanitize contract: structure + ``href`` kept,
         presentational/executable noise gone."""
-        value = self._fetch(self.folder.pk)["fields"]["rich"]["value"]
+        value = self._fetch(self.folder.pk)["components"]["main"]["fields"]["rich"][
+            "value"
+        ]
 
         # Structure preserved — div/span/table/link tags survive.
         self.assertIn("<table>", value)

@@ -366,50 +366,31 @@ class SBAdminTools(MCPToolset):
           - ``detail_fields``: detail-page field names, in display
             order. Pass to ``fetch_detail(fields=...)`` to project a
             subset; per-field metadata ships with the values.
-          - ``inlines``: related rows reachable from the detail page.
-            Each entry: ``inline_name`` (key for
-            ``fetch_detail.inlines`` and
-            ``list_rows(include_inlines=...)``), ``view_id`` (pass to
-            ``invoke_inline_action`` when invoking inline actions),
-            ``model`` (``"<app>.<Model>"``), ``verbose_name`` /
-            ``verbose_name_plural``, ``fields``, ``inline_actions``, and
-            ``relations`` — a ``{field: "<app>.<Model>"}`` map for the
-            inline's FK / M2M columns. ``include_inlines`` returns those
-            columns as bare pks (e.g. ``{"work": 443}``); ``relations``
-            names the target model so the agent can interpret the id and
-            pick the model to ``autocomplete`` against. (``fetch_detail``
-            instead resolves inline FKs to ``{"value", "label"}``
-            directly, the same as parent FKs.)
+          - ``inlines``: related formset components reachable from the
+            detail page. Each entry has ``inline_name`` (the key in
+            ``fetch_detail.components``), ``view_id`` (for
+            ``invoke_inline_action``), model metadata, fields, actions,
+            and relation targets. ``list_rows(include_inlines=...)`` returns
+            related ids as bare pks, while ``fetch_detail`` returns relation
+            values as ``{"value", "label"}`` envelopes.
 
-          Action lists — every entry is
-          ``{"title", "kind", "action_id",
-          "requires_confirmation"?}``. ``kind`` is ``"method"`` (calls
-          a server-side method) or ``"modal"`` (opens a form — fetch
-          the schema with ``fetch_action_form`` first). The MCP tool to
-          call is looked up in the top-level ``action_invokers`` legend
-          by action-list name (``row_actions`` →
-          ``invoke_row_action``, etc.). ``requires_confirmation: true``
-          means the first invoke returns ``needs_confirmation``; pass
-          ``confirmed=True`` on the second call to commit. Sub-actions
-          (visual dropdown groups in the UI) are flattened to siblings.
+        Action lists contain ``{"title", "kind", "action_id",
+        "requires_confirmation"?}``. ``kind`` is ``"method"`` or ``"modal"``;
+        fetch modal components with ``fetch_action_form`` before invocation.
+        The top-level ``action_invokers`` legend maps each action-list name to
+        its invoke tool. Sub-actions are flattened to siblings.
 
-          - ``row_actions``: per-row buttons on the list view.
-          - ``detail_actions``: buttons on the change / detail form. Actions
-            that only exist for a specific object are returned by
-            ``fetch_detail`` instead.
-          - ``list_actions``: global buttons above the list, no row
-            context (e.g. "Create…" modals, exports).
+          - ``row_actions``: per-row list buttons.
+          - ``detail_actions``: change/detail form buttons.
+          - ``list_actions``: global list buttons with no row context.
           - ``selection_actions``: bulk buttons over selected rows.
 
-          Methods explicitly decorated with ``mcp_schema=...`` are reported
-          separately under ``mcp_actions``. Their ``input_schema`` is resolved
-          for the current request; Django-form schemas use the same field
-          representation as ``fetch_action_form``.
+        Methods explicitly decorated with ``mcp_components=...`` are reported
+        separately under ``mcp_actions``. Their request-aware ``components`` use
+        the same representation as admin and modal forms.
 
-        When configured by the host project, the top-level
-        ``whoami`` entry points at the current user's own profile
-        detail target: ``{"view_id", "object_id"}``. Pass those to
-        ``fetch_detail`` / ``update_detail`` or call ``fetch_whoami``.
+        When configured by the host project, the top-level ``whoami`` entry
+        points at the current user's profile target: ``{"view_id", "object_id"}``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -815,10 +796,11 @@ class SBAdminTools(MCPToolset):
             ``LookupError``. Inline rows always come back with every
             field the inline declares.
 
-        Returns ``{"id": <id>, "fields": {<name>: <info>, ...},
-        "inlines": {<inline_name>: {"rows": [...], "truncated":
-        <bool>}, ...}}`` where ``<info>`` is ``{"value", "readonly",
-        "required", "widget"}``:
+        Returns ``{"id": <id>, "components": {<name>: <component>, ...}}``.
+        The ``main`` form component contains the admin fields; every inline is
+        a named formset component with ``fields``, ``rows``, cardinality
+        controls, and ``truncated``. Field metadata contains ``value``,
+        ``readonly``, ``required``, and ``widget``:
 
         * ``value`` — scalar, or ``{"value": <id>, "label": <display>}``
           (list of those for multi-select) for related selections.
@@ -830,11 +812,8 @@ class SBAdminTools(MCPToolset):
         * ``widget_id`` — present on autocomplete-backed fields; pass to
           ``autocomplete`` (never construct by hand).
 
-        Each inline includes ``row_schema`` describing a writable empty row;
-        this remains available when ``rows`` is empty. Existing ``rows``
-        entries mirror the parent ``{"id", "fields"}`` shape. ``truncated``
-        is ``True`` when a paginated inline has more rows than carried here —
-        drill in via ``list_rows`` on the inline's own admin.
+        Existing formset rows use ``{"id", "fields"}``; the component-level
+        ``fields`` describe a writable new row even when ``rows`` is empty.
 
         ``detail_actions`` contains the actions available for this specific
         object, including actions declared on object-dependent fieldsets.
@@ -949,11 +928,9 @@ class SBAdminTools(MCPToolset):
         Note: inline ``rows`` are empty on add; resolve FK ids via ``autocomplete``
         (often from another admin's filter with the same ``filter.target_model``).
 
-        Mirrors :meth:`fetch_detail` without ``id``: same ``fields`` /
-        ``inlines`` shape, same ``{"value", "readonly", "required",
-        "widget"[, "widget_id"]}`` per field. ``value`` carries the
-        form's default for that field. Inline ``rows`` come back
-        empty (no persisted rows exist yet).
+        Mirrors :meth:`fetch_detail` without ``id``: the ``main`` component
+        carries defaults and each inline is a formset component with empty
+        ``rows`` and a writable row field schema.
 
         Use before ``create_object`` to discover ``widget_id`` for
         autocomplete-backed fields (needed for the ``autocomplete``
@@ -987,12 +964,10 @@ class SBAdminTools(MCPToolset):
         the form is pre-populated with that row's current values. Omit
         for list-level / selection modals that have no single-row context.
 
-        Returns ``{"title": "…", "fields": {<name>: <info>, …},
-        "formsets": {<name>: {"fields": ..., ...}}}``. ``formsets`` is
-        present when the modal exposes action-owned formsets through the
-        conventional ``get_formset()`` method or ``mcp_formset_getters``; use
-        the same names in ``formset_values`` when invoking the action. Each
-        field ``<info>`` is:
+        Returns ``{"title": "…", "components": {<name>: <component>, …}}``.
+        The modal declares those names through ``get_form_components()`` and
+        invocation submits the same names under ``component_values``. Each
+        field entry contains:
 
           - ``label``        — human-readable field label.
           - ``value``        — initial / default value, or ``None``.
@@ -1031,38 +1006,25 @@ class SBAdminTools(MCPToolset):
     def create_object(
         self,
         view_id: str,
-        field_values: dict | None = None,
-        inlines: dict | None = None,
+        component_values: dict | None = None,
     ) -> dict:
         """Create one object — symmetric with ``update_detail``.
 
-        Note: ``inlines`` keys are ``inline_name`` values from ``list_admins``
-        (inline class names). New inline rows must not include ``id`` or ``_delete``.
-
         Same permission model and POST pipeline as the UI add page.
-        ``field_values`` supplies the parent row; ``inlines`` adds
-        related rows (creates only — ``id`` / ``_delete`` are rejected
-        because there's nothing to update yet).
+        ``component_values`` is keyed exactly like ``fetch_add_form.components``:
+        ``main`` receives a field dictionary and formsets receive row lists.
+        New formset rows must not include ``id`` or ``_delete``.
 
         Call ``fetch_add_form`` first to discover the field shape and
         ``widget_id`` values for autocomplete-backed fields.
 
         Args:
           view_id: handle from ``list_admins``.
-          field_values: ``{name: value}`` for the parent form. Accepts
-            either raw scalars/pks or the ``{"value", "label"}``
-            envelope ``fetch_detail`` returns. Unknown or readonly names
-            raise ``LookupError``; unspecified writable fields fall back
-            to the form's documented default.
-          inlines: ``{inline_name: [{...field values}, ...]}`` keyed by
-            the ``inline_name`` used by ``fetch_detail`` /
-            ``fetch_add_form``. Inlines not mentioned start empty.
-            Unknown inline names raise ``LookupError``.
+          component_values: named form patches and formset row lists. Values
+            accept raw scalars/pks or ``{"value", "label"}`` envelopes.
 
-        Returns ``{"status": "ok", "id": <new_pk>, "fields": ...,
-        "inlines": ...}`` mirroring ``fetch_detail`` after the save, or
-        ``{"status": "invalid", "errors": {"fields": {...}, "inlines":
-        {<inline_name>: {"rows": [...], "non_form": [...]}, ...}}}``
+        Returns ``{"status": "ok", "id": <new_pk>, "components": ...}``
+        mirroring ``fetch_detail`` after the save, or component-keyed errors
         when validation fails (no DB write happens — the agent can
         retry with corrected values).
 
@@ -1076,8 +1038,7 @@ class SBAdminTools(MCPToolset):
             return SBAdminMCPDetailService.create_object_data(
                 admin,
                 request,
-                field_values=field_values,
-                inlines=inlines,
+                component_values=component_values,
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
@@ -1087,26 +1048,19 @@ class SBAdminTools(MCPToolset):
         self,
         view_id: str,
         object_id: str,
-        field_values: dict | None = None,
-        inlines: dict | None = None,
+        component_values: dict | None = None,
     ) -> dict:
         """Write detail-page data for one object — symmetric with ``fetch_detail``.
 
         Same permission gates and row isolation as the UI change form,
-        and the same form/inline shape as ``fetch_detail`` returns —
-        unspecified fields keep their current values.
+        and the same component shape as ``fetch_detail`` returns. Unspecified
+        form fields and existing formset rows keep their current values.
 
         Args:
           view_id: handle from ``list_admins``.
           object_id: target row id (as a string).
-          field_values: ``{name: value}`` for the parent row. Values
-            accept either raw scalars/pks or the ``{"value", "label"}``
-            envelope ``fetch_detail`` returns, so an agent can echo a
-            fetched payload back. Unknown or readonly names raise
-            ``LookupError``.
-          inlines: ``{inline_name: [row_op, ...]}`` keyed by the same
-            ``inline_name`` used by ``fetch_detail``. Pass it as a real
-            JSON object/array — never a stringified one. Each op is:
+          component_values: keyed like ``fetch_detail.components``. Form
+            values are sparse patches. Formset values are row operations:
 
             * ``{"id": <pk>, ...overrides}`` — update an existing row.
             * ``{"id": <pk>, "_delete": true}`` — delete the row.
@@ -1118,10 +1072,8 @@ class SBAdminTools(MCPToolset):
             passed through unchanged. Unknown inline names or row ids raise
             ``LookupError``.
 
-        Returns ``{"status": "ok", "id": ..., "fields": ...,
-        "inlines": ...}`` mirroring ``fetch_detail`` after the save, or
-        ``{"status": "invalid", "errors": {"fields": {...}, "inlines":
-        {<inline_name>: {"rows": [...], "non_form": [...]}, ...}}}``
+        Returns ``{"status": "ok", "id": ..., "components": ...}``
+        mirroring ``fetch_detail`` after the save, or component-keyed errors
         when validation fails (no DB write happens — the agent can
         retry with corrected values).
 
@@ -1137,8 +1089,7 @@ class SBAdminTools(MCPToolset):
                 admin,
                 request,
                 object_id,
-                field_values=field_values,
-                inlines=inlines,
+                component_values=component_values,
             )
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
@@ -1254,15 +1205,15 @@ class SBAdminTools(MCPToolset):
         self,
         view_id: str,
         action_id: str,
-        field_values: dict | None = None,
+        component_values: dict | None = None,
         object_id: str | None = None,
         modifier: str | None = None,
     ) -> dict:
         """Invoke a method explicitly exposed through ``mcp_actions``.
 
-        The action's ``input_schema`` comes from its request-aware Django form
-        in ``list_admins`` or a detail widget's discovery entry. Supply those
-        fields in ``field_values``. Unknown fields and invalid form values are
+        The action's request-aware ``components`` come from ``list_admins`` or
+        a detail widget's discovery entry. Supply matching
+        ``component_values``; unknown components/fields and invalid values are
         rejected before dispatch.
 
         For a detail-mounted widget, pass its discovered
@@ -1271,7 +1222,7 @@ class SBAdminTools(MCPToolset):
 
         Execution always routes through ``delegate_to_action``, including the
         normal ``has_permission_for_action`` check. Only methods explicitly
-        decorated with ``mcp_schema`` are accepted.
+        decorated with ``mcp_components`` are accepted.
 
         Returns ``{"status": "ok", "messages": [...]}``, optionally with
         ``client_events`` when the action emits an ``HX-Trigger`` response, or
@@ -1294,7 +1245,7 @@ class SBAdminTools(MCPToolset):
             view,
             request,
             action_id=action_id,
-            field_values=field_values,
+            component_values=component_values,
             modifier=modifier,
             object_id=object_id,
         )
@@ -1305,8 +1256,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         action_id: str,
         object_id: str,
-        field_values: dict | None = None,
-        formset_values: dict[str, list[dict]] | None = None,
+        component_values: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke a row action against one object.
@@ -1324,10 +1274,8 @@ class SBAdminTools(MCPToolset):
           view_id: admin handle from ``list_admins``.
           action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
           object_id: target row id (as a string).
-          field_values: form submission for ``kind == "modal"``; absent
-            for ``kind == "method"``. Accepts raw scalars/pks or the
-            ``{"value", "label"}`` envelope.
-          formset_values: named row lists from ``fetch_action_form.formsets``.
+          component_values: named forms and formset rows returned by
+            ``fetch_action_form.components``; absent for method actions.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1337,15 +1285,13 @@ class SBAdminTools(MCPToolset):
         Cross-field / view-raised errors under ``"non_field"``.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
-        if the action / object isn't visible, ``ValueError`` if
-        ``field_values`` is supplied for a method action.
+        if the action / object isn't visible.
         """
         return self._invoke_per_object(
             view_id,
             action_id,
             object_id,
-            field_values,
-            formset_values,
+            component_values,
             confirmed,
         )
 
@@ -1355,8 +1301,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         action_id: str,
         object_id: str,
-        field_values: dict | None = None,
-        formset_values: dict[str, list[dict]] | None = None,
+        component_values: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke a detail-page action against one object.
@@ -1374,10 +1319,8 @@ class SBAdminTools(MCPToolset):
           view_id: admin handle from ``list_admins``.
           action_id: ``action_id`` from ``list_admins["admin_views"][].detail_actions``.
           object_id: target row id (as a string).
-          field_values: form submission for ``kind == "modal"``; absent
-            for ``kind == "method"``. Accepts raw scalars/pks or the
-            ``{"value", "label"}`` envelope.
-          formset_values: named row lists from ``fetch_action_form.formsets``.
+          component_values: named forms and formset rows returned by
+            ``fetch_action_form.components``; absent for method actions.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1387,15 +1330,13 @@ class SBAdminTools(MCPToolset):
         Cross-field / view-raised errors under ``"non_field"``.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
-        if the action / object isn't visible, ``ValueError`` if
-        ``field_values`` is supplied for a method action.
+        if the action / object isn't visible.
         """
         return self._invoke_per_object(
             view_id,
             action_id,
             object_id,
-            field_values,
-            formset_values,
+            component_values,
             confirmed,
         )
 
@@ -1405,8 +1346,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         action_id: str,
         object_id: str,
-        field_values: dict | None = None,
-        formset_values: dict[str, list[dict]] | None = None,
+        component_values: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
         """Invoke an inline-list action against one inline row.
@@ -1427,10 +1367,8 @@ class SBAdminTools(MCPToolset):
           action_id: ``action_id`` from
             ``list_admins[<parent>].inlines[].inline_actions``.
           object_id: inline row pk (as a string).
-          field_values: form submission for ``kind == "modal"``; absent
-            for ``kind == "method"``. Accepts raw scalars/pks or the
-            ``{"value", "label"}`` envelope.
-          formset_values: named row lists from ``fetch_action_form.formsets``.
+          component_values: named forms and formset rows returned by
+            ``fetch_action_form.components``; absent for method actions.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1440,15 +1378,13 @@ class SBAdminTools(MCPToolset):
         Cross-field / view-raised errors under ``"non_field"``.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
-        if the action / object isn't visible, ``ValueError`` if
-        ``field_values`` is supplied for a method action.
+        if the action / object isn't visible.
         """
         return self._invoke_per_object(
             view_id,
             action_id,
             object_id,
-            field_values,
-            formset_values,
+            component_values,
             confirmed,
         )
 
@@ -1457,8 +1393,7 @@ class SBAdminTools(MCPToolset):
         view_id,
         action_id,
         object_id,
-        field_values,
-        formset_values,
+        component_values,
         confirmed,
     ):
         request = self.request
@@ -1475,8 +1410,7 @@ class SBAdminTools(MCPToolset):
             request,
             action_id=action_id,
             object_id=object_id,
-            field_values=field_values,
-            formset_values=formset_values,
+            component_values=component_values,
             confirmed=confirmed,
         )
 
@@ -1486,8 +1420,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         action_id: str,
         object_ids: list,
-        field_values: dict | None = None,
-        formset_values: dict[str, list[dict]] | None = None,
+        component_values: dict | None = None,
         confirmed: bool = False,
         modifier: str | None = None,
     ) -> dict:
@@ -1514,9 +1447,8 @@ class SBAdminTools(MCPToolset):
           action_id: ``action_id`` from
             ``list_admins["admin_views"][].selection_actions``.
           object_ids: non-empty list of row ids (as strings).
-          field_values: form submission for ``kind == "modal"``; absent
-            for ``kind == "method"``.
-          formset_values: named row lists from ``fetch_action_form.formsets``.
+          component_values: named forms and formset rows returned by
+            ``fetch_action_form.components``; absent for method actions.
           confirmed: set to ``True`` on the second call after a
             ``needs_confirmation`` response.
 
@@ -1540,8 +1472,7 @@ class SBAdminTools(MCPToolset):
             request,
             action_id=action_id,
             object_ids=object_ids,
-            field_values=field_values,
-            formset_values=formset_values,
+            component_values=component_values,
             confirmed=confirmed,
             modifier=modifier,
         )
@@ -1551,8 +1482,7 @@ class SBAdminTools(MCPToolset):
         self,
         view_id: str,
         action_id: str,
-        field_values: dict | None = None,
-        formset_values: dict[str, list[dict]] | None = None,
+        component_values: dict | None = None,
         filter_data: dict | None = None,
         full_text_search: str | None = None,
         confirmed: bool = False,
@@ -1575,9 +1505,8 @@ class SBAdminTools(MCPToolset):
           view_id: handle from ``list_admins``.
           action_id: ``action_id`` from
             ``list_admins["admin_views"][].list_actions``.
-          field_values: form submission for ``kind == "modal"``; absent
-            for ``kind == "method"``.
-          formset_values: named row lists from ``fetch_action_form.formsets``.
+          component_values: named forms and formset rows returned by
+            ``fetch_action_form.components``; absent for method actions.
           filter_data, full_text_search: optional scope, same shapes as
             ``list_rows`` — only used by filter-aware actions.
           confirmed: set to ``True`` on the second call after a
@@ -1607,8 +1536,7 @@ class SBAdminTools(MCPToolset):
             admin,
             request,
             action_id=action_id,
-            field_values=field_values,
-            formset_values=formset_values,
+            component_values=component_values,
             filter_data=filter_data,
             full_text_search=full_text_search,
             confirmed=confirmed,
@@ -1636,7 +1564,7 @@ class SBAdminTools(MCPToolset):
           widget_id: opaque widget identifier from
             ``list_admins["admin_views"][].fields[].filter.widget_id`` (list filters)
             or ``fetch_detail`` / ``fetch_add_form`` →
-            ``fields.<name>.widget_id`` (parent form; inline FK fields on
+            ``components.<name>.fields.<field>.widget_id`` (inline FK fields on
             add usually lack ``widget_id`` — use another admin's filter
             with the same ``filter.target_model`` instead).
             Never construct by hand; unauthorised fields omit ``widget_id``.
@@ -1676,7 +1604,7 @@ class SBAdminTools(MCPToolset):
             raise LookupError(
                 f"No autocomplete widget {widget_id!r} on {view_id!r}. Copy "
                 "widget_id verbatim from list_admins fields[].filter.widget_id "
-                "or fetch_detail / fetch_add_form fields.<name>.widget_id."
+                "or fetch_detail / fetch_add_form component field metadata."
             )
         except PermissionDenied as exc:
             # The widget delegates to its target-model admin, which enforces

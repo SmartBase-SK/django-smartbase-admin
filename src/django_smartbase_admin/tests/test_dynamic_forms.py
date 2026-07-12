@@ -1534,8 +1534,6 @@ class DynamicFormTests(SimpleTestCase):
 
     def test_action_autocomplete_registration_includes_declared_formsets(self):
         class FormsetActionModal(ActionModalView):
-            mcp_formset_getters = {"rows": "get_rows_formset"}
-
             def get_rows_formset(self):
                 formset_class = forms.formset_factory(CompleteActionForm, extra=1)
                 return formset_class(
@@ -1547,6 +1545,9 @@ class DynamicFormTests(SimpleTestCase):
                         "source_name": "formset",
                     },
                 )
+
+            def get_form_components(self):
+                return {"rows": self.get_rows_formset()}
 
         view = CompleteParentActionView()
         self.request.user = SimpleNamespace(is_anonymous=True)

@@ -68,7 +68,7 @@ class FolderActionsTestAdmin(SBAdmin):
     )
     sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
 
-    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None):
         return JsonResponse(
             {
@@ -216,8 +216,8 @@ class ListRowsTests(_ToolTestBase):
         folder = next(entry for entry in admins if entry["view_id"] == "filer_folder")
         actions = {entry["action_id"]: entry for entry in folder["mcp_actions"]}
 
-        schema = actions[Action.TABLE_DATA_EDIT.value]["input_schema"]
-        self.assertEqual(schema["kind"], "form")
+        schema = actions[Action.TABLE_DATA_EDIT.value]["components"]["main"]
+        self.assertEqual(schema["type"], "form")
         self.assertEqual(
             list(schema["fields"]),
             ["currentRowId", "columnFieldName", "cellValue"],
@@ -230,10 +230,12 @@ class ListRowsTests(_ToolTestBase):
         result = SBAdminTools(request=build_mcp_request(user)).invoke_action(
             "filer_folder",
             Action.TABLE_DATA_EDIT.value,
-            field_values={
-                "currentRowId": 42,
-                "columnFieldName": "editable_name",
-                "cellValue": "updated",
+            component_values={
+                "main": {
+                    "currentRowId": 42,
+                    "columnFieldName": "editable_name",
+                    "cellValue": "updated",
+                }
             },
         )
         self.assertEqual(
@@ -249,14 +251,16 @@ class ListRowsTests(_ToolTestBase):
         invalid = SBAdminTools(request=build_mcp_request(user)).invoke_action(
             "filer_folder",
             Action.TABLE_DATA_EDIT.value,
-            field_values={
-                "currentRowId": 42,
-                "columnFieldName": "name",
-                "cellValue": "updated",
+            component_values={
+                "main": {
+                    "currentRowId": 42,
+                    "columnFieldName": "name",
+                    "cellValue": "updated",
+                }
             },
         )
         self.assertEqual(invalid["status"], "invalid")
-        self.assertIn("columnFieldName", invalid["errors"])
+        self.assertIn("columnFieldName", invalid["errors"]["components"]["main"])
 
         with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(
@@ -280,10 +284,12 @@ class ListRowsTests(_ToolTestBase):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(
                 "filer_folder",
                 Action.TABLE_DATA_EDIT.value,
-                field_values={
-                    "currentRowId": 42,
-                    "columnFieldName": "editable_name",
-                    "cellValue": "updated",
+                component_values={
+                    "main": {
+                        "currentRowId": 42,
+                        "columnFieldName": "editable_name",
+                        "cellValue": "updated",
+                    }
                 },
             )
 
@@ -308,7 +314,7 @@ class AutocompleteTests(_ToolTestBase):
     def _detail_widget_id(tools, view_id, object_id, field_name):
         """Pull a detail-form ``widget_id`` out of ``fetch_detail``."""
         detail = tools.fetch_detail(view_id, object_id)
-        return detail["fields"][field_name]["widget_id"]
+        return detail["components"]["main"]["fields"][field_name]["widget_id"]
 
     def test_search_returns_matching_options(self):
         """``autocomplete`` must run the widget's ``search`` against the

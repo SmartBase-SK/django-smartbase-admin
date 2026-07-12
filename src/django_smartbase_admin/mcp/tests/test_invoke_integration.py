@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 
 from django import forms
 from django.contrib import messages
+from django.http import HttpResponseRedirect
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import File, Folder
@@ -59,6 +60,18 @@ class RenameFolderModalView(RowActionModalView):
         return super().process_form_valid(request, form)
 
 
+class RedirectRenameFolderModalView(RowActionModalView):
+    form_class = _RenameForm
+    modal_title = "Rename Folder and Redirect"
+
+    def process_form_valid(self, request, form):
+        obj = self.get_object()
+        obj.name = form.cleaned_data["name"]
+        obj.save()
+        messages.success(request, f"Renamed to {obj.name}.")
+        return HttpResponseRedirect("/renamed/")
+
+
 class _BulkRenameForm(forms.Form):
     suffix = forms.CharField()
 
@@ -97,6 +110,40 @@ class CreateFolderModalView(ActionModalView):
         return super().process_form_valid(request, form)
 
 
+class _FolderNameForm(forms.Form):
+    name = forms.CharField()
+
+
+class _FolderSuffixForm(forms.Form):
+    suffix = forms.CharField()
+
+
+class MultiFormCreateFolderModalView(ActionModalView):
+    form_class = None
+    modal_title = "Create from multiple forms"
+
+    def get_form_components(self):
+        data = self.request.POST if self.request.method == "POST" else None
+        return {
+            "folder": _FolderNameForm(data=data, prefix="folder"),
+            "options": _FolderSuffixForm(data=data, prefix="options"),
+        }
+
+    def post(self, request, *args, **kwargs):
+        components = self.get_form_components()
+        if not all(component.is_valid() for component in components.values()):
+            return self.render_to_response(
+                self.get_context_data(form=components["folder"], **components)
+            )
+        Folder.objects.create(
+            name=(
+                components["folder"].cleaned_data["name"]
+                + components["options"].cleaned_data["suffix"]
+            )
+        )
+        return self.build_success_response(request)
+
+
 class _BatchPrefixForm(forms.Form):
     prefix_text = forms.CharField()
 
@@ -127,6 +174,12 @@ class BatchCreateFolderModalView(ActionModalView):
         formset = _BatchFolderFormSet(data=data, prefix="rows")
         formset.multiple_field_names = ("name",)
         return formset
+
+    def get_form_components(self):
+        return {
+            "fixed": self.get_fixed_form(),
+            "rows": self.get_formset(),
+        }
 
     def post(self, request, *args, **kwargs):
         fixed_form = self.get_fixed_form(request.POST)
@@ -237,7 +290,7 @@ class FolderInvokeTestAdmin(SBAdmin):
         return response
 
     @sbadmin_action(
-        mcp_schema="get_action_schema",
+        mcp_components="get_action_form_components",
         mcp_description="Edit one folder field.",
     )
     def action_schema_declared(self, request, modifier, object_id):
@@ -245,8 +298,8 @@ class FolderInvokeTestAdmin(SBAdmin):
 
         return HttpResponse("")
 
-    def get_action_schema(self, request):
-        return _MethodActionSchemaForm()
+    def get_action_form_components(self, request):
+        return {"main": _MethodActionSchemaForm()}
 
     def get_sbadmin_row_actions(self, request):
         return [
@@ -254,6 +307,12 @@ class FolderInvokeTestAdmin(SBAdmin):
                 title="Rename",
                 icon="Edit",
                 target_view=RenameFolderModalView,
+                view=self,
+            ),
+            SBAdminRowAction(
+                title="Rename and Redirect",
+                icon="Edit",
+                target_view=RedirectRenameFolderModalView,
                 view=self,
             ),
             SBAdminRowAction(
@@ -305,6 +364,11 @@ class FolderInvokeTestAdmin(SBAdmin):
             SBAdminFormViewAction(
                 target_view=CreateFolderModalView,
                 title="Create Folder",
+                view=self,
+            ),
+            SBAdminFormViewAction(
+                target_view=MultiFormCreateFolderModalView,
+                title="Create From Components",
                 view=self,
             ),
             SBAdminCustomAction(title="External", url="/external/"),
@@ -377,20 +441,21 @@ class IntegrationTests(_Base):
         declared = method_actions["action_schema_declared"]
         self.assertEqual(declared["kind"], "method")
         self.assertEqual(declared["description"], "Edit one folder field.")
-        self.assertEqual(declared["input_schema"]["kind"], "form")
+        schema = declared["components"]["main"]
+        self.assertEqual(schema["type"], "form")
         self.assertEqual(
-            list(declared["input_schema"]["fields"]),
+            list(schema["fields"]),
             ["row_id", "column", "value"],
         )
         self.assertEqual(
-            declared["input_schema"]["fields"]["column"]["choices"],
+            schema["fields"]["column"]["choices"],
             [{"value": "name", "label": "Name"}],
         )
         self.assertNotIn("action_touch", method_actions)
 
     def test_mcp_action_discovery_respects_method_override(self):
         class DeclaredBase:
-            @sbadmin_action(mcp_schema="get_schema")
+            @sbadmin_action(mcp_components="get_components")
             def action_example(self, request, modifier, object_id):
                 return None
 
@@ -401,9 +466,9 @@ class IntegrationTests(_Base):
 
         self.assertEqual(
             dict(get_declared_mcp_actions(DeclaredBase))["action_example"][
-                "mcp_schema"
+                "mcp_components"
             ],
-            "get_schema",
+            "get_components",
         )
         self.assertEqual(get_declared_mcp_actions(UndeclaredOverride), ())
 
@@ -415,17 +480,17 @@ class IntegrationTests(_Base):
         schema = self._tools().fetch_action_form(
             "filer_folder", "RenameFolderModalView", object_id=str(folder.pk)
         )
-        self.assertTrue(schema["fields"]["name"]["required"])
+        self.assertTrue(schema["components"]["main"]["fields"]["name"]["required"])
 
         bad = self._tools().invoke_row_action(
             "filer_folder",
             "RenameFolderModalView",
             object_id=str(folder.pk),
-            field_values={"name": ""},
+            component_values={"main": {"name": ""}},
         )
         self.assertEqual(bad["status"], "invalid")
-        self.assertIn("name", bad["errors"])
-        self.assertNotIn("__all__", bad["errors"])
+        self.assertIn("name", bad["errors"]["components"]["main"])
+        self.assertNotIn("__all__", bad["errors"]["components"]["main"])
         folder.refresh_from_db()
         self.assertEqual(folder.name, "original")
 
@@ -433,15 +498,31 @@ class IntegrationTests(_Base):
             "filer_folder",
             "RenameFolderModalView",
             object_id=str(folder.pk),
-            field_values={"name": "renamed"},
+            component_values={"main": {"name": "renamed"}},
         )
         self.assertEqual(ok["status"], "ok")
         folder.refresh_from_db()
         self.assertEqual(folder.name, "renamed")
         self.assertTrue(any("Renamed" in m["message"] for m in ok["messages"]))
 
-    def test_row_method_action_dispatches_and_rejects_field_values(self):
-        """Method-kind actions take no ``field_values`` and that's enforced."""
+    def test_redirecting_row_modal_is_reported_as_success(self):
+        folder = Folder.objects.create(name="original")
+
+        result = self._tools().invoke_row_action(
+            "filer_folder",
+            "RedirectRenameFolderModalView",
+            object_id=str(folder.pk),
+            component_values={"main": {"name": "redirected"}},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["redirect"], "/renamed/")
+        self.assertTrue(any("Renamed" in m["message"] for m in result["messages"]))
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "redirected")
+
+    def test_row_method_action_dispatches_and_rejects_component_values(self):
+        """Method actions without components reject supplied component values."""
         folder = Folder.objects.create(name="m")
         ok = self._tools().invoke_row_action(
             "filer_folder", "action_touch", object_id=str(folder.pk)
@@ -455,7 +536,7 @@ class IntegrationTests(_Base):
                 "filer_folder",
                 "action_touch",
                 object_id=str(folder.pk),
-                field_values={"x": "y"},
+                component_values={"main": {"x": "y"}},
             )
 
     def test_selection_modal_persists_and_surfaces_count_message(self):
@@ -467,7 +548,7 @@ class IntegrationTests(_Base):
             "filer_folder",
             "BulkRenameModalView",
             object_ids=[str(a.pk), str(b.pk)],
-            field_values={"suffix": "_x"},
+            component_values={"main": {"suffix": "_x"}},
         )
         self.assertEqual(result["status"], "ok")
         a.refresh_from_db()
@@ -482,7 +563,9 @@ class IntegrationTests(_Base):
         """First call returns ``needs_confirmation`` with structured data +
         formatted message and DOES NOT commit; ``confirmed=True`` commits."""
         first = self._tools().invoke_list_action(
-            "filer_folder", "CreateFolderModalView", field_values={"name": "x"}
+            "filer_folder",
+            "CreateFolderModalView",
+            component_values={"main": {"name": "x"}},
         )
         self.assertEqual(first["status"], "needs_confirmation")
         self.assertEqual(first["data"], {"name": "x"})
@@ -492,11 +575,36 @@ class IntegrationTests(_Base):
         second = self._tools().invoke_list_action(
             "filer_folder",
             "CreateFolderModalView",
-            field_values={"name": "x"},
+            component_values={"main": {"name": "x"}},
             confirmed=True,
         )
         self.assertEqual(second["status"], "ok")
         self.assertTrue(Folder.objects.filter(name="x").exists())
+
+    def test_modal_with_multiple_form_components(self):
+        schema = self._tools().fetch_action_form(
+            "filer_folder", "MultiFormCreateFolderModalView"
+        )
+        self.assertEqual(set(schema["components"]), {"folder", "options"})
+
+        invalid = self._tools().invoke_list_action(
+            "filer_folder",
+            "MultiFormCreateFolderModalView",
+            component_values={"folder": {"name": "multi"}},
+        )
+        self.assertEqual(invalid["status"], "invalid")
+        self.assertIn("suffix", invalid["errors"]["components"]["options"])
+
+        result = self._tools().invoke_list_action(
+            "filer_folder",
+            "MultiFormCreateFolderModalView",
+            component_values={
+                "folder": {"name": "multi"},
+                "options": {"suffix": "-form"},
+            },
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(Folder.objects.filter(name="multi-form").exists())
 
     def test_detail_action_routes_through_alias(self):
         """``invoke_detail_action`` is a thin alias over the row dispatch."""
@@ -533,32 +641,34 @@ class IntegrationTests(_Base):
             action["action_id"],
             object_id=str(parent.pk),
         )
-        self.assertEqual(list(schema["fields"]), ["prefix_text"])
-        self.assertEqual(list(schema["formsets"]["rows"]["fields"]), ["name"])
+        self.assertEqual(list(schema["components"]["fixed"]["fields"]), ["prefix_text"])
+        self.assertEqual(list(schema["components"]["rows"]["fields"]), ["name"])
 
         invalid = self._tools().invoke_detail_action(
             "filer_folder",
             action["action_id"],
             object_id=str(parent.pk),
-            field_values={"prefix_text": "child-"},
-            formset_values={"rows": [{"name": ""}]},
+            component_values={
+                "fixed": {"prefix_text": "child-"},
+                "rows": [{"name": ""}],
+            },
         )
         self.assertEqual(invalid["status"], "invalid")
         self.assertIn(
             "name",
-            invalid["errors"]["formsets"]["rows"]["rows"][0]["errors"],
+            invalid["errors"]["components"]["rows"]["rows"][0]["errors"],
         )
 
         result = self._tools().invoke_detail_action(
             "filer_folder",
             action["action_id"],
             object_id=str(parent.pk),
-            field_values={"prefix_text": "child-"},
-            formset_values={
+            component_values={
+                "fixed": {"prefix_text": "child-"},
                 "rows": [
                     {"name": "one"},
                     {"name": "two"},
-                ]
+                ],
             },
         )
         self.assertEqual(result["status"], "ok")
@@ -597,13 +707,13 @@ class IntegrationTests(_Base):
             "InlineRowRenameModalView",
             object_id=str(file_row.pk),
         )
-        self.assertIn("note", schema["fields"])
+        self.assertIn("note", schema["components"]["main"]["fields"])
 
         first = self._tools().invoke_inline_action(
             inline_view_id,
             "InlineRowRenameModalView",
             object_id=str(file_row.pk),
-            field_values={"note": "renamed.txt"},
+            component_values={"main": {"note": "renamed.txt"}},
         )
         self.assertEqual(first["status"], "needs_confirmation")
         # ``current`` only resolves if ``get_object()`` walked the inline's
@@ -615,7 +725,7 @@ class IntegrationTests(_Base):
             inline_view_id,
             "InlineRowRenameModalView",
             object_id=str(file_row.pk),
-            field_values={"note": "renamed.txt"},
+            component_values={"main": {"note": "renamed.txt"}},
             confirmed=True,
         )
         self.assertEqual(second["status"], "ok")

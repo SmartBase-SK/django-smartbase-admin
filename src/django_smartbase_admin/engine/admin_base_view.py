@@ -21,7 +21,7 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminRowAction,
-    TableDataEditMCPForm,
+    TableDataEditForm,
     sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
@@ -382,17 +382,22 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            if hasattr(action_view, "get_mcp_form") and hasattr(
-                action_view, "get_mcp_formsets"
-            ):
+            if hasattr(action_view, "get_form_components"):
                 saved_action = getattr(request_data, "action", None)
                 try:
                     request_data.action = action_id
-                    action_view.get_mcp_form()
-                    for formset in action_view.get_mcp_formsets().values():
-                        # Formsets construct forms lazily; touching empty_form
-                        # initializes row widgets and registers autocomplete ids.
-                        formset.empty_form
+                    from django.forms.formsets import BaseFormSet
+                    from django_smartbase_admin.mcp.field_schema import (
+                        validate_form_components,
+                    )
+
+                    components = validate_form_components(
+                        action_view.get_form_components()
+                    )
+                    for component in components.values():
+                        if isinstance(component, BaseFormSet):
+                            # Row forms are lazy; initialize their widgets too.
+                            component.empty_form
                 finally:
                     request_data.action = saved_action
                 continue
@@ -832,7 +837,7 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
-    def get_table_data_edit_mcp_schema(self, request):
+    def get_table_data_edit_form_components(self, request):
         try:
             editable_fields = [
                 field
@@ -843,9 +848,9 @@ class SBAdminBaseListView(SBAdminBaseView):
             return None
         if not editable_fields:
             return None
-        return TableDataEditMCPForm(editable_fields=editable_fields)
+        return {"main": TableDataEditForm(editable_fields=editable_fields)}
 
-    @sbadmin_action(mcp_schema="get_table_data_edit_mcp_schema")
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")

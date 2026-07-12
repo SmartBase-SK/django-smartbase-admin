@@ -135,37 +135,12 @@ class ActionModalView(SBAdminDynamicFormViewMixin, FormView):
     # ``get_confirmation_data``.
     confirmation_message: str | None = None
     CONFIRMATION_POST_KEY = "_confirmed"
-    # MCP auto-detects the conventional get_fixed_form/get_formset methods
-    # used by compound modals. Set these explicitly for nonstandard getters;
-    # use an empty mcp_formset_getters dict to disable formset auto-detection.
-    mcp_form_getter: str | None = None
-    mcp_formset_getters: dict[str, str] | None = None
 
-    def get_mcp_form(self):
-        """Return the modal's primary MCP form, or ``None`` for display-only views."""
-        getter_name = self.mcp_form_getter
-        if getter_name is None:
-            getter_name = (
-                "get_fixed_form"
-                if callable(getattr(self, "get_fixed_form", None))
-                else "get_form"
-            )
-        if getter_name == "get_form" and self.get_form_class() is None:
-            return None
-        return getattr(self, getter_name)()
-
-    def get_mcp_formsets(self):
-        """Return named formsets accepted through MCP action invocation."""
-        if self.mcp_formset_getters is not None:
-            return {
-                name: getattr(self, getter_name)()
-                for name, getter_name in self.mcp_formset_getters.items()
-            }
-        getter = getattr(self, "get_formset", None)
-        if not callable(getter):
+    def get_form_components(self):
+        """Return the named forms and formsets accepted by this modal."""
+        if self.get_form_class() is None:
             return {}
-        formset = getter()
-        return {formset.prefix: formset}
+        return {"main": self.get_form()}
 
     def build_success_response(self, request):
         content = (

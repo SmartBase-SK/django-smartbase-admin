@@ -28,8 +28,8 @@ What you can do:
 * Run actions on a row, a detail page, the whole list, a selection, or an
   inline row (``invoke_*_action``); inspect a modal action's form first with
   ``fetch_action_form``. Object-only fieldset actions are discovered from
-  ``fetch_detail.detail_actions``. Submit declared action formsets through
-  ``formset_values`` using the names returned by ``fetch_action_form``.
+  ``fetch_detail.detail_actions``. Submit forms and formsets through
+  ``component_values`` using the names returned under ``components``.
 * Export a list or selection to a file.
 
 Safety: deletes and impactful actions return ``needs_confirmation`` with a
@@ -42,8 +42,8 @@ labels → ``create_object`` or ``update_detail``.
 Rules: copy ``widget_id`` only from prior tool output (never invent it).
 ``list_rows`` requires non-empty ``fields``. Write results:
 ``{"status": "ok", ...}`` or ``{"status": "invalid", "errors": ...}`` (no DB change).
-Inline dict keys use ``inline_name`` from ``list_admins`` (inline class name).
-Send nested arguments (``inlines``, ``field_values``, ``formset_values``,
+Formset component keys use ``inline_name`` from ``list_admins`` when they
+represent admin inlines. Send nested arguments (``component_values``,
 ``object_ids``, ``filter_data``, ``sort``) as real JSON objects/arrays, never
 stringified JSON; pass ids as JSON numbers exactly as returned (e.g. ``174``,
 not ``"174"``) so rows match.
