@@ -91,6 +91,8 @@ row with ``id`` and ``_delete`` deletes it when deletion is allowed, and a
 row without ``id`` creates a new row.  Existing rows omitted from
 ``component_values`` remain unchanged.  Plain non-model formsets without a
 stable row id use their Django positional row order instead.
+Within a model-backed formset, ``id``, ``_delete``, and ``_order`` are reserved
+control keys; submitted existing-row ids must be unique.
 
 Multiple forms must use distinct prefixes so their encoded POST fields cannot
 collide.  Formset components retain their Django prefixes and management-form

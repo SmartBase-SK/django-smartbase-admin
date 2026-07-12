@@ -305,6 +305,10 @@ def encode_formset_rows(
     if row_field_names is None:
         row_field_names = getattr(formset, "multiple_field_names", None)
     for index, row in enumerate(rows):
+        if "_delete" in row and not formset.can_delete:
+            raise ValueError(f"Formset {formset.prefix!r} does not allow deletion.")
+        if "_order" in row and not formset.can_order:
+            raise ValueError(f"Formset {formset.prefix!r} does not allow ordering.")
         form = (
             formset.forms[index] if index < len(formset.forms) else formset.empty_form
         )
@@ -353,8 +357,20 @@ def encode_inline_formset_operations(
         formset.initial_forms[0] if formset.initial_forms else formset.empty_form
     )
     writable = set(sample_form.fields)
-    transport_fields = frozenset({"id", "_delete"})
+    transport_fields = frozenset({"id", "_delete", "_order"})
+    seen_ids = set()
     for operation in operations:
+        if "_delete" in operation and not formset.can_delete:
+            raise ValueError(f"Formset {formset.prefix!r} does not allow deletion.")
+        if "_order" in operation and not formset.can_order:
+            raise ValueError(f"Formset {formset.prefix!r} does not allow ordering.")
+        if "id" in operation:
+            if operation["id"] in seen_ids:
+                raise ValueError(
+                    f"Formset {formset.prefix!r} received duplicate row id "
+                    f"{operation['id']!r}."
+                )
+            seen_ids.add(operation["id"])
         reject_non_writable_overrides(
             operation,
             writable,
@@ -402,6 +418,8 @@ def encode_inline_formset_operations(
             )
         if deleted:
             qd[f"{formset.prefix}-{index}-DELETE"] = "on"
+        if operation and "_order" in operation:
+            qd[f"{formset.prefix}-{index}-ORDER"] = operation["_order"]
 
     if operations_by_id:
         raise LookupError(
@@ -421,6 +439,8 @@ def encode_inline_formset_operations(
                 field.widget,
                 operation.get(name),
             )
+        if "_order" in operation:
+            qd[f"{formset.prefix}-{index}-ORDER"] = operation["_order"]
 
 
 def normalize_querydict_values(qd: QueryDict) -> QueryDict:

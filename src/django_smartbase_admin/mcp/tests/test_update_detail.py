@@ -307,3 +307,15 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
                     ]
                 },
             )
+
+    def test_duplicate_inline_row_id_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "duplicate row id"):
+            self._update(
+                self.folder.pk,
+                component_values={
+                    "FolderPermissionInline": [
+                        {"id": self.perm_a.pk, "can_read": 1},
+                        {"id": self.perm_a.pk, "can_read": 0},
+                    ]
+                },
+            )
