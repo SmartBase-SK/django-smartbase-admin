@@ -9,10 +9,11 @@ double as a contract check on the wire shape: top-level ``id`` +
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from django import forms
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.urls import path
@@ -28,6 +29,7 @@ from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -119,6 +121,31 @@ class FetchDetailTests(_FetchDetailTestBase):
         cls.parent = Folder.objects.create(name="parent")
         cls.child_a = Folder.objects.create(name="child_a", parent=cls.parent)
         cls.child_b = Folder.objects.create(name="child_b", parent=cls.parent)
+
+    def test_duplicate_inline_component_names_raise_configuration_error(self):
+        class DuplicateInline:
+            pass
+
+        formset_class = forms.formset_factory(forms.Form, extra=0)
+        context = {
+            "adminform": SimpleNamespace(form=forms.Form()),
+            "inline_admin_formsets": [
+                SimpleNamespace(
+                    opts=DuplicateInline(),
+                    formset=formset_class(prefix="first"),
+                ),
+                SimpleNamespace(
+                    opts=DuplicateInline(),
+                    formset=formset_class(prefix="second"),
+                ),
+            ],
+        }
+
+        with self.assertRaisesRegex(
+            ImproperlyConfigured,
+            "Duplicate MCP form component name 'DuplicateInline'",
+        ):
+            SBAdminMCPDetailService._admin_form_components(context)
 
     def test_returns_values_with_per_field_metadata(self):
         """Covers every value shape: editable scalar, editable FK,

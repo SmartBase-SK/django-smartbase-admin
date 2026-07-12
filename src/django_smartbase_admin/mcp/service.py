@@ -19,7 +19,11 @@ from django.contrib.admin import helpers as admin_helpers
 from django.contrib.admin.utils import flatten_fieldsets, lookup_field
 from django.contrib.contenttypes.admin import GenericInlineModelAdmin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldDoesNotExist, PermissionDenied
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+    PermissionDenied,
+)
 from django.db.models import Window
 from django.db.models.functions import RowNumber
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
@@ -256,13 +260,17 @@ class SBAdminMCPDetailService:
     @staticmethod
     def _admin_form_components(ctx):
         """Adapt Django admin response context to named raw components."""
-        return {
-            "main": ctx["adminform"].form,
-            **{
-                type(inline_admin_formset.opts).__name__: inline_admin_formset.formset
-                for inline_admin_formset in ctx["inline_admin_formsets"]
-            },
-        }
+        components = {"main": ctx["adminform"].form}
+        for inline_admin_formset in ctx["inline_admin_formsets"]:
+            component_name = type(inline_admin_formset.opts).__name__
+            if component_name in components:
+                raise ImproperlyConfigured(
+                    f"Duplicate MCP form component name {component_name!r}. "
+                    "Admin inline component names use inline class names; "
+                    "configure distinct inline classes."
+                )
+            components[component_name] = inline_admin_formset.formset
+        return components
 
     @classmethod
     def update_detail_data(
