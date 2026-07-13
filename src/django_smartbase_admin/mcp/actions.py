@@ -90,7 +90,13 @@ def _resolve_mcp_action_components(view, request, declaration):
     return declaration
 
 
-def get_mcp_action_components(view, request, action_id: str):
+def get_mcp_action_components(
+    view,
+    request,
+    action_id: str,
+    *,
+    modifier: str | None = None,
+):
     """Resolve the named components for one MCP-exposed method."""
     declarations = dict(get_declared_mcp_actions(type(view)))
     attrs = declarations.get(action_id)
@@ -99,6 +105,14 @@ def get_mcp_action_components(view, request, action_id: str):
             f"Action {action_id!r} is not MCP-exposed on view {view.get_id()!r}. "
             "Use an action_id from the view's mcp_actions discovery entry."
         )
+    if not SBAdminViewService.has_action_permission(
+        request,
+        view,
+        action_id,
+        modifier=modifier,
+        action_attrs=attrs,
+    ):
+        raise PermissionDenied
     result = _resolve_mcp_action_components(view, request, attrs["mcp_components"])
     if result is None:
         raise LookupError(
@@ -117,6 +131,14 @@ def collect_mcp_method_action_entries(view, request) -> list[dict]:
     entries: list[dict] = []
     for action_id, attrs in get_declared_mcp_actions(type(view)):
         try:
+            if not SBAdminViewService.has_action_permission(
+                request,
+                view,
+                action_id,
+                modifier="template",
+                action_attrs=attrs,
+            ):
+                continue
             components = _resolve_mcp_action_components(
                 view, request, attrs["mcp_components"]
             )
@@ -575,7 +597,15 @@ class SBAdminMCPActionInvokeService:
         object_id: str | None = None,
     ) -> dict:
         """Invoke one method explicitly exposed through ``mcp_components``."""
-        components = get_mcp_action_components(view, request, action_id)
+        try:
+            components = get_mcp_action_components(
+                view,
+                request,
+                action_id,
+                modifier=modifier or "template",
+            )
+        except PermissionDenied as exc:
+            raise PermissionError(str(exc)) from exc
         post_qd = encode_form_components(components, component_values)
         bound_components = bind_form_components(components, post_qd)
         errors = form_component_errors(bound_components)

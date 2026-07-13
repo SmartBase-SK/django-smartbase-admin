@@ -270,8 +270,14 @@ class ListRowsTests(_ToolTestBase):
                 Action.LIST_JSON.value,
             )
 
-    def test_invoke_action_permission_is_enforced_by_dispatch(self):
+    def test_mcp_action_permission_is_checked_before_component_provider(self):
         class FolderTableEditDeniedAdmin(FolderActionsTestAdmin):
+            provider_calls = 0
+
+            def get_table_data_edit_form_components(self, request):
+                type(self).provider_calls += 1
+                return super().get_table_data_edit_form_components(request)
+
             def has_permission_for_action(self, request, action):
                 if action.action_id == Action.TABLE_DATA_EDIT.value:
                     return False
@@ -282,6 +288,13 @@ class ListRowsTests(_ToolTestBase):
         self._refresh_configuration_view_map()
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
+        folder = next(entry for entry in admins if entry["view_id"] == "filer_folder")
+        self.assertNotIn("mcp_actions", folder)
+        self.assertEqual(FolderTableEditDeniedAdmin.provider_calls, 0)
+
         with self.assertRaises(PermissionError):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(
                 "filer_folder",
@@ -294,6 +307,7 @@ class ListRowsTests(_ToolTestBase):
                     }
                 },
             )
+        self.assertEqual(FolderTableEditDeniedAdmin.provider_calls, 0)
 
 
 class AutocompleteTests(_ToolTestBase):
