@@ -47,6 +47,19 @@ def widget_entry(
 ) -> dict:
     """Return the MCP discovery payload for one rendered detail widget.
 
+    Result shape::
+
+        {
+            "view_id": str,
+            "name": str,
+            "model": "app_label.ModelName",       # optional
+            "parent_view_id": str,                 # optional
+            "parent_object_id": str,               # optional
+            "requires_parent_object_id": True,     # optional
+            "data_tool": "list_rows" | "fetch_widget_data",
+            # List widgets also include the keys from list_view_entry().
+        }
+
     Common keys identify the widget view and optional parent object context.
     List widgets also advertise table fields/search/actions and must be read
     with ``list_rows``. Other dashboard widgets advertise ``fetch_widget_data``.
