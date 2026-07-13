@@ -93,12 +93,12 @@ class _CreateObjectTestBase(TestCase):
             sb_admin_site._registry[Folder] = self._original_admin
         super().tearDown()
 
-    def _create(self, *, field_values=None, inlines=None, user=None):
+    def _create(self, *, main_values=None, component_values=None, user=None):
         user = user or self.write_user
+        component_values = {"main": main_values or {}, **(component_values or {})}
         return SBAdminTools(request=build_mcp_request(user)).create_object(
             "filer_folder",
-            field_values=field_values,
-            inlines=inlines,
+            component_values=component_values,
         )
 
 
@@ -109,7 +109,7 @@ class CreateObjectFieldTests(_CreateObjectTestBase):
         parent = Folder.objects.create(name="parent")
 
         result = self._create(
-            field_values={
+            main_values={
                 "name": "fresh",
                 # ``fetch_detail``-shaped envelope must round-trip as
                 # the raw pk for the form widget.
@@ -120,7 +120,10 @@ class CreateObjectFieldTests(_CreateObjectTestBase):
         self.assertEqual(result["status"], "ok")
         new_pk = result["id"]
         self.assertNotIn(new_pk, before_pks)
-        self.assertEqual(result["fields"]["name"]["value"], "fresh")
+        self.assertEqual(
+            result["components"]["main"]["fields"]["name"]["value"],
+            "fresh",
+        )
 
         new_folder = Folder.objects.get(pk=new_pk)
         self.assertEqual(new_folder.name, "fresh")
@@ -143,12 +146,16 @@ class CreateObjectFieldTests(_CreateObjectTestBase):
         """
         before_count = Folder.objects.count()
 
-        bad_field = self._create(field_values={"name": ""})
+        bad_field = self._create(main_values={"name": ""})
         self.assertEqual(bad_field["status"], "invalid")
-        self.assertIn("name", bad_field["errors"]["fields"])
+        self.assertEqual(bad_field["errors"]["global"], [])
+        main_errors = bad_field["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertEqual(main_errors["non_field"], [])
+        self.assertEqual(main_errors["fields"]["name"][0]["code"], "required")
 
         with self.assertRaises(LookupError):
-            self._create(field_values={"bogus": "x"})
+            self._create(main_values={"bogus": "x"})
 
         self.assertEqual(Folder.objects.count(), before_count)
 
@@ -157,7 +164,7 @@ class CreateObjectFieldTests(_CreateObjectTestBase):
         try:
             denied_user = MagicMock(is_authenticated=True, is_superuser=False)
             with self.assertRaises((PermissionError, PermissionDenied)):
-                self._create(field_values={"name": "x"}, user=denied_user)
+                self._create(main_values={"name": "x"}, user=denied_user)
         finally:
             MCPToolTestConfig.view_permission_for = None
 
@@ -171,8 +178,8 @@ class CreateObjectInlineTests(_CreateObjectTestBase):
 
     def test_create_with_new_inline_rows(self):
         result = self._create(
-            field_values={"name": "withperms"},
-            inlines={
+            main_values={"name": "withperms"},
+            component_values={
                 "FolderPermissionInline": [
                     # ``type=1`` + ``everybody=True`` satisfies the
                     # model's ``clean`` rules so the row validates.
@@ -194,10 +201,13 @@ class CreateObjectInlineTests(_CreateObjectTestBase):
             {"FolderPermissionInline": [{"_delete": True}]},
             {"DoesNotExistInline": [{"foo": "bar"}]},
         ]
-        for inlines in cases:
-            with self.subTest(inlines=inlines):
+        for component_values in cases:
+            with self.subTest(component_values=component_values):
                 with self.assertRaises(LookupError):
-                    self._create(field_values={"name": "x"}, inlines=inlines)
+                    self._create(
+                        main_values={"name": "x"},
+                        component_values=component_values,
+                    )
 
     def test_empty_new_inline_row_is_rejected_not_dropped(self):
         """A new inline row with no usable value would be a blank extra form
@@ -207,6 +217,6 @@ class CreateObjectInlineTests(_CreateObjectTestBase):
             with self.subTest(op=op):
                 with self.assertRaises(ValueError):
                     self._create(
-                        field_values={"name": "x"},
-                        inlines={"FolderPermissionInline": [op]},
+                        main_values={"name": "x"},
+                        component_values={"FolderPermissionInline": [op]},
                     )

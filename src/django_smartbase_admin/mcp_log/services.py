@@ -181,15 +181,22 @@ class SBAdminMCPLogService:
                     if isinstance(result.get(key), list):
                         meta["result_total"] = len(result[key])
                         break
-            if isinstance(result.get("fields"), dict):
-                meta["result_fields"] = len(result["fields"])
-            if isinstance(result.get("inlines"), dict):
-                inlines = result["inlines"]
-                meta["result_inlines"] = len(inlines)
+            if isinstance(result.get("components"), dict):
+                components = result["components"]
+                main = components.get("main", {})
+                if isinstance(main.get("fields"), dict):
+                    meta["result_fields"] = len(main["fields"])
+                formsets = [
+                    component
+                    for component in components.values()
+                    if isinstance(component, dict)
+                    and component.get("type") == "formset"
+                ]
+                meta["result_inlines"] = len(formsets)
                 meta["result_inline_rows"] = sum(
-                    len(v["rows"])
-                    for v in inlines.values()
-                    if isinstance(v, dict) and isinstance(v.get("rows"), list)
+                    len(component["rows"])
+                    for component in formsets
+                    if isinstance(component.get("rows"), list)
                 )
             # Single-object tools (update_detail / create_object / fetch_detail)
             # return one object keyed by ``id``.

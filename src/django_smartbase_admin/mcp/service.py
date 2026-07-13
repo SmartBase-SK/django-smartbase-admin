@@ -19,12 +19,15 @@ from django.contrib.admin import helpers as admin_helpers
 from django.contrib.admin.utils import flatten_fieldsets, lookup_field
 from django.contrib.contenttypes.admin import GenericInlineModelAdmin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldDoesNotExist, PermissionDenied
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+    PermissionDenied,
+)
 from django.db.models import Window
 from django.db.models.functions import RowNumber
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
 from django.forms.models import _get_foreign_key
-from django.http import QueryDict
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
 
@@ -36,146 +39,23 @@ from django_smartbase_admin.engine.fake_inline import (
 )
 from django_smartbase_admin.engine.inline_pagination import InlinePaginated
 from django_smartbase_admin.mcp.bridge import (
+    bind_sbadmin_request_data,
     captured_messages,
     ensure_messages_storage,
     set_request_payload,
 )
-from django_smartbase_admin.mcp.field_schema import field_info
+from django_smartbase_admin.mcp.field_schema import (
+    field_info,
+    serialize_form_components,
+)
 from django_smartbase_admin.mcp.html_sanitize import sanitize_html
 from django_smartbase_admin.mcp.form_encoding import (
-    form_errors_dict,
-    get_form_from_response,
-    write_widget_input,
+    encode_form_components,
+    form_component_errors,
 )
+from django_smartbase_admin.mcp.widgets import detail_widget_entries
 
 logger = logging.getLogger(__name__)
-
-
-_INLINE_OP_SKIP = frozenset({"id", "_delete"})
-
-
-def _is_blank_inline_value(value) -> bool:
-    """Whether an inline field value carries nothing usable.
-
-    Covers raw blanks (``None`` / ``""`` / ``[]`` / ``{}``) and the
-    ``{"value", "label"}`` envelope with an empty ``value``.
-    """
-    if value in (None, "", [], {}):
-        return True
-    if isinstance(value, dict) and "value" in value:
-        return value["value"] in (None, "")
-    return False
-
-
-def _reject_non_writable_overrides(
-    overrides: dict,
-    writable: set[str],
-    scope: str,
-    *,
-    skip: frozenset[str] = frozenset(),
-) -> None:
-    """Reject keys that are not on the bound form (readonly or unknown).
-
-    Readonly fields appear in ``fetch_detail`` but are omitted from
-    ``form.fields``, so they would otherwise be silently ignored by POST
-    encoding.
-    """
-    invalid = sorted(k for k in overrides if k not in writable and k not in skip)
-    if invalid:
-        raise LookupError(f"Cannot set {scope} {invalid}; writable: {sorted(writable)}")
-
-
-def _encode_form_native(form, qd: QueryDict, prefix: str, overrides: dict) -> None:
-    """Restate ``form``'s current initial values into ``qd`` as native Python.
-
-    Layered overrides win per field. Readonly fields aren't in
-    ``form.fields`` so they don't roundtrip — Django re-derives them on
-    POST.
-    """
-    for name, field in form.fields.items():
-        full_name = f"{prefix}-{name}" if prefix else name
-        value = overrides[name] if name in overrides else form.initial.get(name)
-        write_widget_input(qd, full_name, field.widget, value)
-
-
-def _encode_inline_native(iaf, qd: QueryDict, ops: list) -> None:
-    """Encode an inline formset into ``qd``, applying caller ops.
-
-    Existing rows always restate themselves (sparse POSTs would make
-    Django's formset machinery treat untouched fields as blank); update
-    ops override per-field, delete ops add ``DELETE=on``, and ``id``-less
-    ops become new rows appended after the initial-form block.
-    """
-    formset = iaf.formset
-    prefix = formset.prefix
-
-    sample_form = (
-        formset.initial_forms[0] if formset.initial_forms else formset.empty_form
-    )
-    writable = set(sample_form.fields.keys())
-    inline_scope = f"inline {type(iaf.opts).__name__!r} fields"
-    for op in ops:
-        _reject_non_writable_overrides(op, writable, inline_scope, skip=_INLINE_OP_SKIP)
-
-    ops_by_id = {op["id"]: op for op in ops if "id" in op}
-    new_ops = [op for op in ops if "id" not in op]
-
-    # A new row with no usable field value would be treated as a blank
-    # extra form and silently skipped by Django's formset (no save, no
-    # error). The caller explicitly asked to create it, so reject it
-    # instead of dropping it — otherwise the write "succeeds" with the
-    # row missing.
-    for op in new_ops:
-        meaningful = {k: v for k, v in op.items() if k not in _INLINE_OP_SKIP}
-        if not meaningful or all(
-            _is_blank_inline_value(v) for v in meaningful.values()
-        ):
-            raise ValueError(
-                f"Inline {type(iaf.opts).__name__!r} new row {op!r} has no "
-                "field values; it would be silently skipped. Provide the "
-                "row's required fields, or omit it."
-            )
-
-    initial_forms = list(formset.initial_forms)
-    total_forms = len(initial_forms) + len(new_ops)
-    # Management form keys must be strings — formset parses them with int().
-    qd[f"{prefix}-TOTAL_FORMS"] = str(total_forms)
-    qd[f"{prefix}-INITIAL_FORMS"] = str(len(initial_forms))
-    qd[f"{prefix}-MIN_NUM_FORMS"] = str(formset.min_num)
-    qd[f"{prefix}-MAX_NUM_FORMS"] = str(formset.max_num)
-
-    for i, form in enumerate(initial_forms):
-        pk = form.instance.pk
-        op = ops_by_id.pop(pk, None)
-        deleted = bool(op and op.get("_delete"))
-        for name, field in form.fields.items():
-            full_name = f"{prefix}-{i}-{name}"
-            if name == "id":
-                value = pk
-            elif op and not deleted and name in op:
-                value = op[name]
-            else:
-                value = form.initial.get(name)
-            write_widget_input(qd, full_name, field.widget, value)
-        if deleted:
-            qd[f"{prefix}-{i}-DELETE"] = "on"
-
-    if ops_by_id:
-        raise LookupError(
-            f"Inline rows {sorted(ops_by_id)} not found on {prefix!r}; "
-            "use ids from fetch_detail."
-        )
-
-    if not new_ops:
-        return
-    empty_form = formset.empty_form
-    for j, op in enumerate(new_ops):
-        i = len(initial_forms) + j
-        for name, field in empty_form.fields.items():
-            if name == "id":
-                continue
-            full_name = f"{prefix}-{i}-{name}"
-            write_widget_input(qd, full_name, field.widget, op.get(name))
 
 
 def _pk_from_redirect(url: str):
@@ -201,25 +81,8 @@ def _extract_form_errors(response) -> dict:
     """Pull ``form.errors`` / ``formset.errors`` out of a failed change-form
     response. The parent ``adminform`` lives under that key in context;
     inline formset errors come from ``inline_admin_formsets``."""
-    form = get_form_from_response(response, "adminform")
-    inlines_out: dict = {}
-    for iaf in response.context_data["inline_admin_formsets"]:
-        formset = iaf.formset
-        rows = [
-            {"index": i, "errors": form_errors_dict(f)}
-            for i, f in enumerate(formset.forms)
-            if f.errors
-        ]
-        non_form = [str(e) for e in formset.non_form_errors()]
-        if rows or non_form:
-            inlines_out[type(iaf.opts).__name__] = {
-                "rows": rows,
-                "non_form": non_form,
-            }
-    return {
-        "fields": form_errors_dict(form) if form else {},
-        "inlines": inlines_out,
-    }
+    components = SBAdminMCPDetailService._admin_form_components(response.context_data)
+    return form_component_errors(components)
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +110,9 @@ class SBAdminMCPDetailService:
         model field, not just the fieldset declarations.
         """
         fieldsets = admin.get_fieldsets(request, obj)
-        return [str(name) for name in flatten_fieldsets(fieldsets)]
+        return [
+            str(name) for name in flatten_fieldsets(fieldsets) if isinstance(name, str)
+        ]
 
     @classmethod
     def get_detail_data(
@@ -259,9 +124,9 @@ class SBAdminMCPDetailService:
     ) -> dict:
         """Read one object as the detail page would render it.
 
-        Returns ``{"id": pk, "fields": {<name>: {"value", "readonly",
-        "required", "widget"}, ...}, "inlines": {<inline_name>:
-        {"rows": [...], "truncated": <bool>}, ...}}``. Related
+        Returns ``{"id": pk, "components": {"main": {"type": "form",
+        "fields": ...}, <inline_name>: {"type": "formset", "fields": ...,
+        "rows": [...], "truncated": <bool>}}}``. Related
         selections come back as ``{"value": <id>, "label": <display>}``
         (or a list of those for multi-select). Readonly fields always
         report ``required=False``.
@@ -289,9 +154,9 @@ class SBAdminMCPDetailService:
     ) -> dict:
         """Read the add page's empty bound form — schema for ``create_object``.
 
-        Mirrors :meth:`get_detail_data` shape minus ``id``: same
-        ``fields`` and ``inlines`` keys, same ``{value, readonly,
-        required, widget[, widget_id]}`` per field. Inline ``rows``
+        Mirrors :meth:`get_detail_data` shape minus ``id``: the same named
+        ``components`` and ``{value, readonly, required, widget[, widget_id]}``
+        per field. Formset ``rows``
         come back empty (the add page renders blank extra rows that
         carry no persisted id).
 
@@ -328,7 +193,7 @@ class SBAdminMCPDetailService:
         obj,
         fields: list[str] | None,
     ) -> dict:
-        """Shared ``{"fields", "inlines"}`` extraction from a GET context."""
+        """Serialize and admin-enrich named components from a GET context."""
         available = cls.get_detail_fields(admin, request, obj)
         if fields is None:
             selected_set = set(available)
@@ -341,13 +206,14 @@ class SBAdminMCPDetailService:
                 )
             selected_set = set(fields)
 
-        field_data = cls._extract_detail_row(
+        components = serialize_form_components(cls._admin_form_components(ctx))
+        components["main"]["fields"] = cls._extract_detail_row(
             ctx["adminform"], obj, admin, selected_set, request
         )
 
-        inlines_out: dict = {}
         for iaf in ctx["inline_admin_formsets"]:
             inline = iaf.opts
+            component_name = type(inline).__name__
             # ROW_CLASS_FIELD is a UI-only readonly row-CSS hook every
             # SBAdmin inline injects; strip it from the wire payload.
             inline_fields = {
@@ -373,12 +239,38 @@ class SBAdminMCPDetailService:
             # inlines have no paginator attribute (truncated=False).
             paginator = getattr(iaf.formset, "paginator", None)
             truncated = bool(paginator and paginator.count > len(rows))
-            inlines_out[type(inline).__name__] = {
-                "rows": rows,
-                "truncated": truncated,
+            component = components[component_name]
+            component["fields"] = {
+                name: info
+                for name, info in component["fields"].items()
+                if name in inline_fields
             }
+            component["rows"] = rows
+            component["truncated"] = truncated
 
-        return {"fields": field_data, "inlines": inlines_out}
+        payload = {
+            "components": components,
+        }
+        if obj is not None:
+            payload["widgets"] = detail_widget_entries(
+                admin, request, ctx["adminform"], obj
+            )
+        return payload
+
+    @staticmethod
+    def _admin_form_components(ctx):
+        """Adapt Django admin response context to named raw components."""
+        components = {"main": ctx["adminform"].form}
+        for inline_admin_formset in ctx["inline_admin_formsets"]:
+            component_name = type(inline_admin_formset.opts).__name__
+            if component_name in components:
+                raise ImproperlyConfigured(
+                    f"Duplicate MCP form component name {component_name!r}. "
+                    "Admin inline component names use inline class names; "
+                    "configure distinct inline classes."
+                )
+            components[component_name] = inline_admin_formset.formset
+        return components
 
     @classmethod
     def update_detail_data(
@@ -386,8 +278,7 @@ class SBAdminMCPDetailService:
         admin,
         request,
         object_id,
-        field_values: dict | None = None,
-        inlines: dict | None = None,
+        component_values: dict | None = None,
     ) -> dict:
         """Write one object through ``_changeform_view``.
 
@@ -397,12 +288,10 @@ class SBAdminMCPDetailService:
         so untouched fields restate their current values and Django's
         formset machinery sees a complete payload.
 
-        ``field_values`` is a flat ``{name: value}`` for the parent
-        form. ``inlines`` is keyed by the same ``inline_name`` as
-        :meth:`get_detail_data` returns; each value is a list of row
-        ops: ``{"id": <pk>, ...overrides}`` to update, ``{"id": <pk>,
-        "_delete": True}`` to delete, or ``{...fields}`` (no ``id``) to
-        create. Inlines not mentioned are passed through unchanged.
+        ``component_values`` uses the same names as
+        :meth:`get_detail_data`. Forms receive sparse field patches;
+        formsets receive id-based update/delete operations or new rows.
+        Components not mentioned retain their initial state.
 
         Values accept either raw scalars/pks or the
         ``{"value", "label"}`` envelope produced by
@@ -426,8 +315,7 @@ class SBAdminMCPDetailService:
             request,
             ctx=response.context_data,
             obj=obj,
-            field_values=field_values or {},
-            inlines=inlines or {},
+            component_values=component_values or {},
         )
 
     @classmethod
@@ -435,8 +323,7 @@ class SBAdminMCPDetailService:
         cls,
         admin,
         request,
-        field_values: dict | None = None,
-        inlines: dict | None = None,
+        component_values: dict | None = None,
     ) -> dict:
         """Create one object through ``_changeform_view``'s add flow.
 
@@ -445,12 +332,10 @@ class SBAdminMCPDetailService:
         supplies field defaults so unspecified columns POST their
         documented default rather than blank.
 
-        ``field_values`` is a flat ``{name: value}`` for the parent
-        form; unknown names raise ``LookupError``. ``inlines`` is keyed
-        by the same ``inline_name`` :meth:`get_detail_data` returns;
-        each entry is a list of ``{...fields}`` dicts that become new
-        rows. ``id`` / ``_delete`` ops are rejected here — there is
-        nothing to update yet.
+        ``component_values`` uses the names returned by
+        :meth:`get_add_form_data`. Forms receive sparse field patches and
+        formsets receive new row dictionaries. Existing-row operations are
+        rejected because there is nothing to update yet.
 
         Values accept the same envelope as the update path
         (``{"value", "label"}`` or raw scalars/pks).
@@ -462,24 +347,13 @@ class SBAdminMCPDetailService:
         permission on the admin, ``LookupError`` for unknown field /
         inline names or for inline ops that carry ``id`` / ``_delete``.
         """
-        inlines = inlines or {}
-
-        for inline_name, ops in inlines.items():
-            for op in ops or []:
-                if "id" in op or op.get("_delete"):
-                    raise LookupError(
-                        f"Inline {inline_name!r} ops must not carry 'id' or "
-                        "'_delete' on create — pass new row field maps only."
-                    )
-
         response = cls._run_add_view(admin, request)
         return cls._write_through_changeform(
             admin,
             request,
             ctx=response.context_data,
             obj=None,
-            field_values=field_values or {},
-            inlines=inlines,
+            component_values=component_values or {},
         )
 
     @classmethod
@@ -490,44 +364,18 @@ class SBAdminMCPDetailService:
         *,
         ctx,
         obj,
-        field_values: dict,
-        inlines: dict,
+        component_values: dict,
     ) -> dict:
         """Shared POST encode + dispatch + result shaping.
 
         ``obj`` is ``None`` for add flows; ``ctx`` is the GET-rendered
-        change-form context that drives POST encoding.
+        change-form context adapted into the shared component encoder.
         """
-        available_fields = set(cls.get_detail_fields(admin, request, obj))
-        unknown_fields = [n for n in field_values if n not in available_fields]
-        if unknown_fields:
-            raise LookupError(
-                f"Admin {admin.get_id()!r} has no detail fields "
-                f"{unknown_fields}; available: {sorted(available_fields)}"
-            )
-
-        iafs_by_name = {
-            type(iaf.opts).__name__: iaf for iaf in ctx["inline_admin_formsets"]
-        }
-        unknown_inlines = set(inlines) - set(iafs_by_name)
-        if unknown_inlines:
-            raise LookupError(
-                f"Admin {admin.get_id()!r} has no inlines "
-                f"{sorted(unknown_inlines)}; available: {sorted(iafs_by_name)}"
-            )
-
-        _reject_non_writable_overrides(
-            field_values,
-            set(ctx["adminform"].form.fields.keys()),
-            f"detail fields on admin {admin.get_id()!r}",
+        qd = encode_form_components(
+            cls._admin_form_components(ctx),
+            component_values,
+            allow_existing_rows=obj is not None,
         )
-
-        qd = QueryDict(mutable=True)
-        _encode_form_native(
-            ctx["adminform"].form, qd, prefix="", overrides=field_values
-        )
-        for inline_name, iaf in iafs_by_name.items():
-            _encode_inline_native(iaf, qd, inlines.get(inline_name) or [])
         if obj is None:
             # Make ``response_add`` redirect to ``<...>_change/<pk>/``
             # instead of the changelist, so ``_pk_from_redirect`` can
@@ -555,7 +403,12 @@ class SBAdminMCPDetailService:
                     f"Admin {admin.get_id()!r} returned a success redirect "
                     f"without a resolvable object pk: {response.url!r}."
                 )
-            set_request_payload(request, method="GET")
+            bind_sbadmin_request_data(
+                request,
+                view=admin.get_id(),
+                object_id=str(refetch_pk),
+                method="GET",
+            )
             result = {
                 "status": "ok",
                 **cls.get_detail_data(admin, request, refetch_pk),

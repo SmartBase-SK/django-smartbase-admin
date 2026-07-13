@@ -9,9 +9,12 @@ double as a contract check on the wire shape: top-level ``id`` +
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from django.core.exceptions import PermissionDenied
+from django import forms
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
@@ -23,7 +26,13 @@ from django_smartbase_admin.admin.admin_base import (
 )
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
+from django_smartbase_admin.engine.actions import sbadmin_action
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardListWidget,
+    SBAdminDashboardWidget,
+)
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -44,6 +53,68 @@ class FolderDetailTestAdmin(SBAdmin):
 
     def child_count(self, obj):
         return obj.children.count() if obj else 0
+
+
+class ChildFolderListWidget(SBAdminDashboardListWidget):
+    widget_id = "child_folder_list_widget"
+    model = Folder
+    list_display = ("id", "name")
+    search_fields = ("name",)
+    path_to_parent_instance_id = "parent_id"
+
+    @sbadmin_action(mcp_components="get_refresh_form_components")
+    def action_refresh_name(self, request, modifier, object_id=None):
+        return JsonResponse(
+            {
+                "object_id": object_id,
+                "parent_id": self.get_parent_instance_id(request),
+                "row_id": request.POST["row_id"],
+                "value": request.POST["value"],
+            }
+        )
+
+    def get_refresh_form_components(self, request):
+        class RefreshNameForm(forms.Form):
+            row_id = forms.IntegerField()
+            value = forms.CharField(required=False)
+
+        return {"main": RefreshNameForm()}
+
+
+class FolderDetailWithWidgetAdmin(FolderDetailTestAdmin):
+    widgets = [ChildFolderListWidget]
+    fieldsets = ((None, {"fields": ("name", ChildFolderListWidget)}),)
+
+
+class ChildFolderDataWidget(SBAdminDashboardWidget):
+    widget_id = "child_folder_data_widget"
+    model = Folder
+    path_to_parent_instance_id = "parent_id"
+    action_calls = 0
+    deny_data_action = False
+
+    def get_data(self, request):
+        return {"source": "get_data"}
+
+    def has_permission_for_action(self, request, action):
+        if self.deny_data_action and action.action_id == "action_get_data":
+            return False
+        return super().has_permission_for_action(request, action)
+
+    @sbadmin_action(permission="view")
+    def action_get_data(self, request, modifier, object_id=None):
+        type(self).action_calls += 1
+        return JsonResponse(
+            {
+                "source": "action_get_data",
+                "parent_object_id": object_id,
+            }
+        )
+
+
+class FolderDetailWithDataWidgetAdmin(FolderDetailTestAdmin):
+    widgets = [ChildFolderDataWidget]
+    fieldsets = ((None, {"fields": ("name", ChildFolderDataWidget)}),)
 
 
 @override_settings(
@@ -85,13 +156,38 @@ class FetchDetailTests(_FetchDetailTestBase):
         cls.child_a = Folder.objects.create(name="child_a", parent=cls.parent)
         cls.child_b = Folder.objects.create(name="child_b", parent=cls.parent)
 
+    def test_duplicate_inline_component_names_raise_configuration_error(self):
+        class DuplicateInline:
+            pass
+
+        formset_class = forms.formset_factory(forms.Form, extra=0)
+        context = {
+            "adminform": SimpleNamespace(form=forms.Form()),
+            "inline_admin_formsets": [
+                SimpleNamespace(
+                    opts=DuplicateInline(),
+                    formset=formset_class(prefix="first"),
+                ),
+                SimpleNamespace(
+                    opts=DuplicateInline(),
+                    formset=formset_class(prefix="second"),
+                ),
+            ],
+        }
+
+        with self.assertRaisesRegex(
+            ImproperlyConfigured,
+            "Duplicate MCP form component name 'DuplicateInline'",
+        ):
+            SBAdminMCPDetailService._admin_form_components(context)
+
     def test_returns_values_with_per_field_metadata(self):
         """Covers every value shape: editable scalar, editable FK,
         readonly scalar, readonly callable."""
         row = self._fetch(self.child_a.pk)
 
         self.assertEqual(row["id"], self.child_a.pk)
-        fields = row["fields"]
+        fields = row["components"]["main"]["fields"]
         self.assertEqual(list(fields), ["name", "parent", "uploaded_at", "child_count"])
 
         # Editable scalar — Folder.name has blank=False.
@@ -123,8 +219,9 @@ class FetchDetailTests(_FetchDetailTestBase):
 
         # Root row: null FK must skip label resolution cleanly.
         parent_row = self._fetch(self.parent.pk)
-        self.assertIsNone(parent_row["fields"]["parent"]["value"])
-        self.assertEqual(parent_row["fields"]["child_count"]["value"], 2)
+        parent_fields = parent_row["components"]["main"]["fields"]
+        self.assertIsNone(parent_fields["parent"]["value"])
+        self.assertEqual(parent_fields["child_count"]["value"], 2)
 
     def test_fetch_whoami_matches_fetch_detail_for_configured_target(self):
         user = MagicMock(
@@ -195,8 +292,9 @@ class FetchDetailTests(_FetchDetailTestBase):
     def test_field_subset_projection(self):
         row = self._fetch(self.child_a.pk, fields=["name"])
         self.assertEqual(row["id"], self.child_a.pk)
-        self.assertEqual(list(row["fields"]), ["name"])
-        self.assertEqual(row["fields"]["name"]["value"], "child_a")
+        fields = row["components"]["main"]["fields"]
+        self.assertEqual(list(fields), ["name"])
+        self.assertEqual(fields["name"]["value"], "child_a")
 
     def test_error_paths_surface_clear_exceptions(self):
         """Missing object, unknown field, unknown admin, denied admin —
@@ -235,6 +333,174 @@ class FetchDetailTests(_FetchDetailTestBase):
             self._fetch(self.parent.pk)  # sanity: un-filtered still resolves
         finally:
             MCPToolTestConfig.restrict_qs = None
+
+
+class FetchDetailWidgetTests(_FetchDetailTestBase):
+    admin_class = FolderDetailWithWidgetAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+        cls.child_a = Folder.objects.create(name="child_a", parent=cls.parent)
+        cls.child_b = Folder.objects.create(name="child_b", parent=cls.parent)
+        cls.other_parent = Folder.objects.create(name="other_parent")
+        cls.other_child = Folder.objects.create(
+            name="other_child", parent=cls.other_parent
+        )
+
+    def setUp(self):
+        super().setUp()
+        MCPToolTestConfig().init_configuration_static()
+
+    def test_detail_surfaces_parent_scoped_list_widget(self):
+        result = self._fetch(self.parent.pk)
+
+        self.assertEqual(list(result["components"]["main"]["fields"]), ["name"])
+        widget = result["widgets"][0]
+        self.assertEqual(widget["view_id"], "filer_folder_child_folder_list_widget")
+        self.assertEqual(widget["parent_view_id"], "filer_folder")
+        self.assertEqual(widget["parent_object_id"], str(self.parent.pk))
+        self.assertTrue(widget["requires_parent_object_id"])
+        self.assertEqual(widget["data_tool"], "list_rows")
+        self.assertEqual([field["name"] for field in widget["fields"]], ["id", "name"])
+        self.assertEqual(widget["search_fields"], ["name"])
+        self.assertEqual(
+            widget["mcp_actions"],
+            [
+                {
+                    "action_id": "action_refresh_name",
+                    "kind": "method",
+                    "components": {
+                        "main": {
+                            "type": "form",
+                            "fields": {
+                                "row_id": {
+                                    "value": None,
+                                    "value_available": True,
+                                    "write_only": False,
+                                    "required": True,
+                                    "widget": "NumberInput",
+                                    "readonly": False,
+                                    "label": "row_id",
+                                },
+                                "value": {
+                                    "value": None,
+                                    "value_available": True,
+                                    "write_only": False,
+                                    "required": False,
+                                    "widget": "TextInput",
+                                    "readonly": False,
+                                    "label": "value",
+                                },
+                            },
+                        },
+                    },
+                }
+            ],
+        )
+
+    def test_list_rows_can_read_parent_scoped_widget_rows(self):
+        detail = self._fetch(self.parent.pk)
+        widget = detail["widgets"][0]
+
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+        rows = SBAdminTools(request=request).list_rows(
+            widget["view_id"],
+            fields=["id", "name"],
+            parent_object_id=widget["parent_object_id"],
+            page_size=10,
+        )["data"]
+
+        self.assertEqual({row["name"] for row in rows}, {"child_a", "child_b"})
+        self.assertNotIn("other_child", {row["name"] for row in rows})
+
+    def test_invoke_action_binds_parent_scoped_widget_context(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        result = SBAdminTools(request=request).invoke_action(
+            widget["view_id"],
+            "action_refresh_name",
+            object_id=widget["parent_object_id"],
+            component_values={"main": {"row_id": self.child_a.pk, "value": "updated"}},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["object_id"], str(self.parent.pk))
+        self.assertEqual(result["parent_id"], str(self.parent.pk))
+        self.assertEqual(result["row_id"], str(self.child_a.pk))
+        self.assertEqual(result["value"], "updated")
+
+    def test_list_rows_requires_parent_for_parent_scoped_widget(self):
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        with self.assertRaises(ValueError):
+            SBAdminTools(request=request).list_rows(
+                "filer_folder_child_folder_list_widget",
+                fields=["id", "name"],
+                page_size=10,
+            )
+
+    def test_fetch_widget_data_rejects_non_widget_view(self):
+        request = build_mcp_request(MagicMock(is_authenticated=True, is_superuser=True))
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=request).fetch_widget_data("filer_folder")
+
+
+class FetchWidgetDataTests(_FetchDetailTestBase):
+    admin_class = FolderDetailWithDataWidgetAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+
+    def setUp(self):
+        super().setUp()
+        MCPToolTestConfig().init_configuration_static()
+        ChildFolderDataWidget.action_calls = 0
+        ChildFolderDataWidget.deny_data_action = False
+
+    def tearDown(self):
+        ChildFolderDataWidget.deny_data_action = False
+        super().tearDown()
+
+    def test_fetch_widget_data_dispatches_through_action_override(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+
+        result = SBAdminTools(
+            request=build_mcp_request(
+                MagicMock(is_authenticated=True, is_superuser=True)
+            )
+        ).fetch_widget_data(
+            widget["view_id"],
+            parent_object_id=widget["parent_object_id"],
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "source": "action_get_data",
+                "parent_object_id": str(self.parent.pk),
+            },
+        )
+        self.assertEqual(ChildFolderDataWidget.action_calls, 1)
+
+    def test_fetch_widget_data_respects_action_permission(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+        ChildFolderDataWidget.deny_data_action = True
+
+        with self.assertRaises(PermissionError):
+            SBAdminTools(
+                request=build_mcp_request(
+                    MagicMock(is_authenticated=True, is_superuser=True)
+                )
+            ).fetch_widget_data(
+                widget["view_id"],
+                parent_object_id=widget["parent_object_id"],
+            )
+
+        self.assertEqual(ChildFolderDataWidget.action_calls, 0)
 
 
 class FolderPermissionInline(SBAdminTableInline):
@@ -279,10 +545,11 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
     def test_inlines_auto_hydrate_with_per_field_metadata(self):
         result = self._fetch(self.folder.pk, fields=["name"])
 
-        self.assertEqual(set(result), {"id", "fields", "inlines"})
-        inline = result["inlines"]["FolderPermissionInline"]
-        self.assertEqual(set(inline), {"rows", "truncated"})
+        self.assertEqual(set(result), {"id", "components", "widgets"})
+        inline = result["components"]["FolderPermissionInline"]
+        self.assertEqual(inline["type"], "formset")
         self.assertFalse(inline["truncated"])
+        self.assertIn("type", inline["fields"])
         self.assertEqual(len(inline["rows"]), 5)
 
         row = inline["rows"][0]
@@ -309,7 +576,7 @@ class FetchDetailInlinesTests(_FetchDetailTestBase):
             sb_admin_site.register(Folder, self.admin_class)
             MCPToolTestConfig().init_view_map()
 
-        self.assertEqual(result["inlines"], {})
+        self.assertEqual(set(result["components"]), {"main"})
 
 
 @override_settings(
@@ -331,7 +598,7 @@ class FetchDetailPaginatedInlineTests(_FetchDetailTestBase):
 
     def test_paginated_inline_truncates_with_flag(self):
         result = self._fetch(self.folder.pk, fields=["name"])
-        inline = result["inlines"]["FolderPermissionPaginatedInline"]
+        inline = result["components"]["FolderPermissionPaginatedInline"]
         # FolderPermissionPaginatedInline.per_page = 2 against 5 rows.
         self.assertEqual(len(inline["rows"]), 2)
         self.assertTrue(inline["truncated"])
@@ -395,7 +662,9 @@ class FetchDetailHtmlSanitizeTests(_FetchDetailTestBase):
     def test_display_html_is_sanitized_keeping_structure(self):
         """One pass over the sanitize contract: structure + ``href`` kept,
         presentational/executable noise gone."""
-        value = self._fetch(self.folder.pk)["fields"]["rich"]["value"]
+        value = self._fetch(self.folder.pk)["components"]["main"]["fields"]["rich"][
+            "value"
+        ]
 
         # Structure preserved — div/span/table/link tags survive.
         self.assertIn("<table>", value)

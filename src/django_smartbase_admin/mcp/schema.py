@@ -26,7 +26,10 @@ from django_smartbase_admin.engine.filter_widgets import (
     NumberRangeFilterWidget,
     PrimaryKeyFilterWidget,
 )
-from django_smartbase_admin.mcp.actions import collect_action_entries
+from django_smartbase_admin.mcp.actions import (
+    collect_action_entries,
+    collect_mcp_method_action_entries,
+)
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 
 logger = logging.getLogger(__name__)
@@ -292,13 +295,13 @@ def _inline_entries(admin, request) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _fieldset_action_entries(admin, request) -> list[dict]:
+def _fieldset_action_entries(admin, request, object_id=None) -> list[dict]:
     """Per-fieldset actions, tagged with ``fieldset`` so they merge
     cleanly into ``detail_actions`` (invoked via ``invoke_detail_action``
     per the top-level ``action_invokers`` legend).
     """
     try:
-        fieldsets = admin.get_sbadmin_fieldsets(request, None) or []
+        fieldsets = admin.get_sbadmin_fieldsets(request, object_id) or []
     except Exception:
         return []
 
@@ -310,11 +313,24 @@ def _fieldset_action_entries(admin, request) -> list[dict]:
             request,
             fieldset=fieldset,
             fieldset_data=fieldset_data,
-            object_id=None,
+            object_id=object_id,
         ):
             entry["fieldset"] = str(fieldset) if fieldset is not None else None
             entries.append(entry)
     return entries
+
+
+def detail_action_entries(admin, request, object_id=None) -> list[dict]:
+    """Detail and fieldset actions available in the given object context."""
+    return [
+        *collect_action_entries(
+            admin,
+            "get_sbadmin_detail_actions_processed",
+            request,
+            object_id=object_id,
+        ),
+        *_fieldset_action_entries(admin, request, object_id=object_id),
+    ]
 
 
 def _detail_field_entries(admin, request) -> list[str]:
@@ -409,64 +425,73 @@ def admin_entry(admin, request) -> dict:
     model = admin.model
     opts = model._meta
 
-    try:
-        fields = [_field_entry(f) for f in admin.get_field_map(request).values()]
-    except Exception:
-        # Surface the admin even if field init trips — at least the
-        # agent learns it exists.
-        logger.warning(
-            "MCP schema: field init failed for admin %s; "
-            "falling back to bare name list",
-            admin.__class__.__name__,
-            exc_info=True,
-        )
-        fields = [
-            {"name": getattr(f, "name", str(f))}
-            for f in admin.get_sbadmin_list_display(request)
-        ]
-
     entry: dict = {
         "view_id": admin.get_id(),
         "app_label": opts.app_label,
         "model": opts.object_name,
         "verbose_name": str(opts.verbose_name),
         "verbose_name_plural": str(opts.verbose_name_plural),
-        "fields": fields,
-        "search_fields": list(admin.get_search_fields(request) or []),
         "detail_fields": _detail_field_entries(admin, request),
         "inlines": _inline_entries(admin, request),
         "filter_presets": _filter_preset_entries(admin, request),
+        **list_view_entry(admin, request),
     }
     if admin.mcp_description:
         entry["description"] = str(admin.mcp_description)
-    # --- actions (all four admin-level types) ---
-    # row_actions:       per-row icon buttons on the list view.
-    # detail_actions:    buttons on the change/detail form.
-    # list_actions:      global top buttons above the list (no row context).
-    # selection_actions: bulk buttons shown when rows are selected.
-    # Processed getters run ``process_actions_permissions`` — same
-    # filter the UI uses, so actions the caller can't invoke don't
-    # appear in discovery (and the invoke path's permission gate has
-    # nothing left to surprise the agent with). Empty action arrays are
-    # omitted to keep the discovery payload compact.
+    detail_actions = detail_action_entries(admin, request)
+    if detail_actions:
+        entry["detail_actions"] = detail_actions
+    return entry
+
+
+def list_view_entry(view, request) -> dict:
+    """Return MCP schema shared by regular list views and list widgets."""
+    entry = {
+        "fields": list_field_entries(view, request),
+        "search_fields": list(view.get_search_fields(request) or []),
+        **list_action_entries(view, request),
+    }
+    mcp_actions = collect_mcp_method_action_entries(view, request)
+    if mcp_actions:
+        entry["mcp_actions"] = mcp_actions
+    return entry
+
+
+def list_field_entries(view, request) -> list[dict]:
+    """Return MCP field entries for a list view, with a fail-soft fallback."""
+    try:
+        return [_field_entry(f) for f in view.get_field_map(request).values()]
+    except Exception:
+        # Surface the list view even if field init trips — at least the agent
+        # learns it exists.
+        logger.warning(
+            "MCP schema: field init failed for list view %s; "
+            "falling back to bare name list",
+            view.__class__.__name__,
+            exc_info=True,
+        )
+        return [
+            {"name": getattr(f, "name", str(f))}
+            for f in view.get_sbadmin_list_display(request)
+        ]
+
+
+def list_action_entries(view, request) -> dict:
+    """Return MCP action entries shared by regular lists and list widgets.
+
+    Processed getters run ``process_actions_permissions`` — same filter the UI
+    uses, so actions the caller cannot invoke do not appear in discovery. Empty
+    action arrays are omitted to keep the payload compact.
+    """
     action_groups = {
         "row_actions": collect_action_entries(
-            admin, "get_sbadmin_row_actions_processed", request
+            view, "get_sbadmin_row_actions_processed", request
         ),
-        "detail_actions": [
-            *collect_action_entries(
-                admin, "get_sbadmin_detail_actions_processed", request
-            ),
-            *_fieldset_action_entries(admin, request),
-        ],
         "list_actions": collect_action_entries(
-            admin, "get_sbadmin_list_actions_processed", request
+            view, "get_sbadmin_list_actions_processed", request
         ),
         "selection_actions": collect_action_entries(
-            admin, "get_sbadmin_list_selection_actions_processed", request
+            view, "get_sbadmin_list_selection_actions_processed", request
         ),
     }
-    for key, value in action_groups.items():
-        if value:
-            entry[key] = value
-    return entry
+    return {key: value for key, value in action_groups.items() if value}

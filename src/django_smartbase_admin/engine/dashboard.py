@@ -642,7 +642,7 @@ class SBAdminDashboardChartWidgetByDate(SBAdminDashboardChartWidget):
                 return label.strftime("%-W/%y")
             if resolution == self.DateResolutionsOptions.DATE_RESOLUTION_DAY:
                 return label.strftime("%x")
-        except:
+        except Exception:
             return "<empty>"
 
     def process_data(self, request_data, label, data, labels, dataset_data):

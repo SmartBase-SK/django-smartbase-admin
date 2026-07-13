@@ -91,6 +91,7 @@ class SBAdminFakeInlineMixin:
                             "Meta",
                             (),
                             {
+                                "app_label": proxy_app_label,
                                 "proxy": True,
                                 "verbose_name": self.model._meta.verbose_name,
                                 "verbose_name_plural": self.model._meta.verbose_name_plural,

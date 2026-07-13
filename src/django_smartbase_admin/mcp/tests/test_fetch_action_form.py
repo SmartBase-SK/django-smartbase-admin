@@ -164,7 +164,7 @@ class FetchActionFormHtmlTests(TestCase):
         form = tools.fetch_action_form(
             "filer_folder", "ReparentModalView", object_id=str(self.folder.pk)
         )
-        widget_id = form["fields"]["parent"]["widget_id"]
+        widget_id = form["components"]["main"]["fields"]["parent"]["widget_id"]
         self.assertTrue(
             widget_id.startswith(
                 "ReparentModalView" + ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR

@@ -8,16 +8,19 @@ full list-action / autocomplete-search code paths end to end.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
+from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import Action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
@@ -55,8 +58,25 @@ class FolderActionsTestAdmin(SBAdmin):
             filter_field="parent",
             filter_widget=AutocompleteFilterWidget(model=Folder, multiselect=False),
         ),
+        SBAdminField(
+            name="editable_name",
+            title="Editable name",
+            annotate=F("name"),
+            tabulator_editor="input",
+            filter_disabled=True,
+        ),
     )
     sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
+
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
+    def action_table_data_edit(self, request, modifier, object_id=None):
+        return JsonResponse(
+            {
+                "row_id": json.loads(request.POST["currentRowId"]),
+                "column": request.POST["columnFieldName"],
+                "value": request.POST["cellValue"],
+            }
+        )
 
 
 @override_settings(
@@ -188,6 +208,107 @@ class ListRowsTests(_ToolTestBase):
                 "filer_folder", fields=["name"]
             )
 
+    def test_table_data_edit_has_builtin_mcp_form_schema(self):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
+        folder = next(entry for entry in admins if entry["view_id"] == "filer_folder")
+        actions = {entry["action_id"]: entry for entry in folder["mcp_actions"]}
+
+        schema = actions[Action.TABLE_DATA_EDIT.value]["components"]["main"]
+        self.assertEqual(schema["type"], "form")
+        self.assertEqual(
+            list(schema["fields"]),
+            ["currentRowId", "columnFieldName", "cellValue"],
+        )
+        self.assertEqual(
+            schema["fields"]["columnFieldName"]["choices"],
+            [{"value": "editable_name", "label": "Editable name"}],
+        )
+
+        result = SBAdminTools(request=build_mcp_request(user)).invoke_action(
+            "filer_folder",
+            Action.TABLE_DATA_EDIT.value,
+            component_values={
+                "main": {
+                    "currentRowId": 42,
+                    "columnFieldName": "editable_name",
+                    "cellValue": "updated",
+                }
+            },
+        )
+        self.assertEqual(
+            result,
+            {
+                "status": "ok",
+                "row_id": 42,
+                "column": "editable_name",
+                "value": "updated",
+            },
+        )
+
+        invalid = SBAdminTools(request=build_mcp_request(user)).invoke_action(
+            "filer_folder",
+            Action.TABLE_DATA_EDIT.value,
+            component_values={
+                "main": {
+                    "currentRowId": 42,
+                    "columnFieldName": "name",
+                    "cellValue": "updated",
+                }
+            },
+        )
+        self.assertEqual(invalid["status"], "invalid")
+        main_errors = invalid["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertIn("columnFieldName", main_errors["fields"])
+
+        with self.assertRaises(LookupError):
+            SBAdminTools(request=build_mcp_request(user)).invoke_action(
+                "filer_folder",
+                Action.LIST_JSON.value,
+            )
+
+    def test_mcp_action_permission_is_checked_before_component_provider(self):
+        class FolderTableEditDeniedAdmin(FolderActionsTestAdmin):
+            provider_calls = 0
+
+            def get_table_data_edit_form_components(self, request):
+                type(self).provider_calls += 1
+                return super().get_table_data_edit_form_components(request)
+
+            def has_permission_for_action(self, request, action):
+                if action.action_id == Action.TABLE_DATA_EDIT.value:
+                    return False
+                return super().has_permission_for_action(request, action)
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderTableEditDeniedAdmin)
+        self._refresh_configuration_view_map()
+
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(user)).list_admins()[
+            "admin_views"
+        ]
+        folder = next(entry for entry in admins if entry["view_id"] == "filer_folder")
+        self.assertNotIn("mcp_actions", folder)
+        self.assertEqual(FolderTableEditDeniedAdmin.provider_calls, 0)
+
+        with self.assertRaises(PermissionError):
+            SBAdminTools(request=build_mcp_request(user)).invoke_action(
+                "filer_folder",
+                Action.TABLE_DATA_EDIT.value,
+                component_values={
+                    "main": {
+                        "currentRowId": 42,
+                        "columnFieldName": "editable_name",
+                        "cellValue": "updated",
+                    }
+                },
+            )
+        self.assertEqual(FolderTableEditDeniedAdmin.provider_calls, 0)
+
 
 class AutocompleteTests(_ToolTestBase):
     @classmethod
@@ -209,7 +330,7 @@ class AutocompleteTests(_ToolTestBase):
     def _detail_widget_id(tools, view_id, object_id, field_name):
         """Pull a detail-form ``widget_id`` out of ``fetch_detail``."""
         detail = tools.fetch_detail(view_id, object_id)
-        return detail["fields"][field_name]["widget_id"]
+        return detail["components"]["main"]["fields"][field_name]["widget_id"]
 
     def test_search_returns_matching_options(self):
         """``autocomplete`` must run the widget's ``search`` against the

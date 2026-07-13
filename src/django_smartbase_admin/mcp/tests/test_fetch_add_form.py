@@ -76,28 +76,36 @@ class FetchAddFormTests(TestCase):
         result = self._fetch()
 
         self.assertNotIn("id", result)
-        self.assertEqual(set(result), {"fields", "inlines"})
-        self.assertEqual(list(result["fields"]), ["name", "parent"])
+        self.assertEqual(set(result), {"components"})
+        main = result["components"]["main"]
+        self.assertEqual(main["type"], "form")
+        self.assertEqual(list(main["fields"]), ["name", "parent"])
 
-        name = result["fields"]["name"]
+        name = main["fields"]["name"]
         self.assertFalse(name["readonly"])
         self.assertTrue(name["required"])
         self.assertIsNotNone(name["widget"])
 
-        parent = result["fields"]["parent"]
+        parent = main["fields"]["parent"]
         self.assertFalse(parent["readonly"])
         self.assertIsNotNone(parent["widget"])
         # Autocomplete-backed FK must carry widget_id for the
         # autocomplete tool to dispatch against.
         self.assertIn("widget_id", parent)
 
-        inline = result["inlines"]["FolderPermissionInline"]
+        inline = result["components"]["FolderPermissionInline"]
+        self.assertEqual(inline["type"], "formset")
         self.assertEqual(inline["rows"], [])
         self.assertFalse(inline["truncated"])
+        self.assertEqual(
+            list(inline["fields"]),
+            ["type", "everybody", "can_read"],
+        )
+        self.assertTrue(inline["fields"]["type"]["required"])
 
     def test_field_subset_and_unknown_field_raises(self):
         result = self._fetch(fields=["name"])
-        self.assertEqual(list(result["fields"]), ["name"])
+        self.assertEqual(list(result["components"]["main"]["fields"]), ["name"])
 
         with self.assertRaises(LookupError):
             self._fetch(fields=["bogus"])
@@ -162,9 +170,10 @@ class FetchAddFormReadonlyFieldTests(TestCase):
             "filer_folder"
         )
 
-        summary = result["fields"]["computed_summary"]
+        fields = result["components"]["main"]["fields"]
+        summary = fields["computed_summary"]
         self.assertTrue(summary["readonly"])
         # Add page has no instance, so the computed readonly value is empty.
         self.assertIsNone(summary["value"])
         # The writable field is still present and editable.
-        self.assertFalse(result["fields"]["name"]["readonly"])
+        self.assertFalse(fields["name"]["readonly"])

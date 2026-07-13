@@ -239,7 +239,7 @@ class MyAdmin(SBAdmin):
         definition["modules"].append("dataEditModule")
         return definition
 
-    @sbadmin_action
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None):
         row_id = json.loads(request.POST.get("currentRowId", "null"))
         column = request.POST.get("columnFieldName", "")
@@ -285,6 +285,11 @@ Rules and gotchas:
   `per_cell_editable_field`.
 - **Needs the `dataEditModule`.** Both the `editable` gate (via `modifyTabulatorOptions`) and
   the save pipeline live in that module.
+- **Keep the built-in MCP components on overrides.** An implementation that overrides
+  `action_table_data_edit` must use
+  `@sbadmin_action(mcp_components="get_table_data_edit_form_components")`. The inherited
+  provider returns `{"main": TableDataEditForm(...)}`, with `columnFieldName` choices
+  derived from the request's fields that declare `tabulator_editor`.
 - Editing an ungated cell still POSTs to `action_table_data_edit`; enforce real
   authorization/validation there too — the client gate is UX only.
 
@@ -5436,6 +5441,24 @@ The permission value is propagated end-to-end: `delegate_to_action` reads `_sbad
 
 Built-in read-only endpoints already carry `permission="view"`: `action_list`, `action_list_json`, `action_autocomplete` (on admins, filter widgets, and the tree widget), `action_xlsx_export`, `action_config`, dashboard widget `action_get_data`, audit log `action_list_json`, translations `list`. The reorder family (`action_table_reorder`, `action_table_data_edit`, `action_list_json_reorder`, `action_enter_reorder`) is intentionally left at the default — entering reorder mode is treated as a mutation.
 
+### MCP-exposed method actions
+
+Add `mcp_components` to explicitly expose a method under the view's
+`mcp_actions` discovery entry. The provider receives the current request and
+returns a named dictionary of Django forms/formsets, or `None` when unavailable.
+Invoke the discovered method with the MCP `invoke_action` tool; it encodes
+`component_values` and routes through
+`delegate_to_action`, which remains the permission boundary.
+
+```python
+@sbadmin_action(mcp_components="get_recalculate_form_components")
+def action_recalculate(self, request, modifier, object_id=None):
+    ...
+
+def get_recalculate_form_components(self, request):
+    return {"main": RecalculateForm()}
+```
+
 ### Usage
 
 ```python
@@ -6227,6 +6250,79 @@ No HTTPS is needed locally; only if you serve the page on a non-loopback host (L
   }
 }
 ```
+
+### MCP action form components
+
+`ActionModalView` exposes its normal `get_form()` as the `main` component by
+default. Compound modals override `get_form_components()` explicitly:
+
+```python
+class AddPriceRowsView(ActionModalView):
+    form_class = PriceRowForm
+
+    def get_fixed_form(self, data=None):
+        return FixedPriceFieldsForm(data=data, prefix="fixed")
+
+    def get_formset(self, data=None):
+        return build_price_formset(data=data, prefix="rows")
+
+    def get_form_components(self):
+        return {
+            "fixed": self.get_fixed_form(),
+            "rows": self.get_formset(),
+        }
+```
+
+`fetch_action_form` returns the same names under `components`. Use those names
+under `component_values` when invoking the action:
+
+```json
+{
+  "component_values": {
+    "fixed": {"currency": "EUR"},
+    "rows": [
+      {"weight_from": 0, "weight_to": 5, "price": "3.50"},
+      {"weight_from": 5, "weight_to": 10, "price": "4.20"}
+    ]
+  }
+}
+```
+
+MCP derives prefixes and Django management-form fields from the live formset.
+Validation still runs through the modal's regular `post()` implementation;
+row errors are returned under `errors.formsets.<name>.rows` and formset-wide
+errors under `errors.formsets.<name>.non_form`.
+
+`get_form_components()` is an MCP adapter; normal autocomplete dispatch does
+not inspect it. `ActionModalView` initializes autocomplete widgets from its
+main form by default. A custom modal that places additional forms or formsets
+in its context must initialize those widgets explicitly:
+
+```python
+class AddPriceRowsView(ActionModalView):
+    ...
+
+    def initialize_autocomplete_views(self, action_id):
+        common_form_kwargs = {
+            "request": self.request,
+            "view": self.view,
+            "sbadmin_action_id": action_id,
+        }
+        FixedPriceFieldsForm(prefix="fixed", **common_form_kwargs)
+        formset = build_price_formset(
+            prefix="rows",
+            form_kwargs=common_form_kwargs,
+        )
+        # Django constructs formset row forms lazily.
+        formset.empty_form
+```
+
+The hook is procedural intentionally: custom action modals may build and
+process arbitrary context rather than following the MCP component contract.
+
+Object-dependent fieldset actions are discovered from `fetch_detail`, not the
+global `list_admins` response. Pass that object's id to `fetch_action_form` and
+`invoke_detail_action`.
 
 ### Verify
 

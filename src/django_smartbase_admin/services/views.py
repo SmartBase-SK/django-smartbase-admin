@@ -172,6 +172,43 @@ class SBAdminViewService(object):
         return f"{model._meta.app_label}_{model._meta.model_name}"
 
     @classmethod
+    def build_action_permission_object(
+        cls,
+        view,
+        action_name,
+        *,
+        modifier=None,
+        action_attrs=None,
+    ):
+        """Build the action descriptor used by permission checks."""
+        action_attrs = action_attrs or {}
+        return SBAdminCustomAction(
+            title=action_name,
+            view=view,
+            action_id=action_name,
+            action_modifier=modifier,
+            permission=action_attrs.get("permission"),
+        )
+
+    @classmethod
+    def has_action_permission(
+        cls,
+        request,
+        view,
+        action_name,
+        *,
+        modifier=None,
+        action_attrs=None,
+    ):
+        action_obj = cls.build_action_permission_object(
+            view,
+            action_name,
+            modifier=modifier,
+            action_attrs=action_attrs,
+        )
+        return view.has_permission_for_action(request, action_obj)
+
+    @classmethod
     def delegate_to_action(cls, request, *args, **kwargs):
         request_data = SBAdminViewRequestData.from_request_and_kwargs(request, **kwargs)
         request_data.selected_view.init_view_dynamic(request, request_data, **kwargs)
@@ -188,14 +225,13 @@ class SBAdminViewService(object):
             raise Http404
 
         action_attrs = getattr(action_function, "_sbadmin_action_attrs", {}) or {}
-        action_obj = SBAdminCustomAction(
-            title=action_name,
-            view=view,
-            action_id=action_name,
-            action_modifier=request_data.modifier,
-            permission=action_attrs.get("permission"),
-        )
-        if not view.has_permission_for_action(request, action_obj):
+        if not cls.has_action_permission(
+            request,
+            view,
+            action_name,
+            modifier=request_data.modifier,
+            action_attrs=action_attrs,
+        ):
             raise PermissionDenied
 
         return action_function(

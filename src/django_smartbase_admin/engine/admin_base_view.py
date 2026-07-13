@@ -21,6 +21,7 @@ from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
     SBAdminCustomAction,
     SBAdminRowAction,
+    TableDataEditForm,
     sbadmin_action,
 )
 from django_smartbase_admin.engine.const import (
@@ -381,24 +382,9 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            form_class = (
-                action_view.get_form_class()
-                if hasattr(action_view, "get_form_class")
-                else getattr(target_view, "form_class", None)
-            )
-            if not form_class:
-                continue
-            form_kwargs = (
-                action_view.get_unbound_form_kwargs()
-                if hasattr(action_view, "get_unbound_form_kwargs")
-                else {"view": self}
-            )
-            from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
-
-            if issubclass(form_class, SBAdminBaseFormInit):
-                form_kwargs.setdefault("view", self)
-                form_kwargs["sbadmin_action_id"] = action_id
-            form_class(**form_kwargs)
+            initializer = getattr(action_view, "initialize_autocomplete_views", None)
+            if callable(initializer):
+                initializer(action_id)
 
     @staticmethod
     def split_action_autocomplete_modifier(modifier):
@@ -817,7 +803,20 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
-    @sbadmin_action
+    def get_table_data_edit_form_components(self, request):
+        try:
+            editable_fields = [
+                field
+                for field in self.get_field_map(request).values()
+                if field.tabulator_editor
+            ]
+        except ImproperlyConfigured:
+            return None
+        if not editable_fields:
+            return None
+        return {"main": TableDataEditForm(editable_fields=editable_fields)}
+
+    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None) -> HttpResponse:
         current_row_id = json.loads(request.POST.get("currentRowId", ""))
         column_field_name = request.POST.get("columnFieldName", "")
