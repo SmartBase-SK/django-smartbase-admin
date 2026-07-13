@@ -382,27 +382,9 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            if hasattr(action_view, "initialize_autocomplete_views"):
-                action_view.initialize_autocomplete_views(action_id)
-                continue
-            form_class = (
-                action_view.get_form_class()
-                if hasattr(action_view, "get_form_class")
-                else getattr(target_view, "form_class", None)
-            )
-            if not form_class:
-                continue
-            form_kwargs = (
-                action_view.get_unbound_form_kwargs()
-                if hasattr(action_view, "get_unbound_form_kwargs")
-                else {"view": self}
-            )
-            from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
-
-            if issubclass(form_class, SBAdminBaseFormInit):
-                form_kwargs.setdefault("view", self)
-                form_kwargs["sbadmin_action_id"] = action_id
-            form_class(**form_kwargs)
+            initializer = getattr(action_view, "initialize_autocomplete_views", None)
+            if callable(initializer):
+                initializer(action_id)
 
     @staticmethod
     def split_action_autocomplete_modifier(modifier):
