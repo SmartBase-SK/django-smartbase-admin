@@ -27,12 +27,16 @@ wire representation adds the component type and serialized field metadata::
                 "fields": {
                     "name": {
                         "value": "Article",
+                        "value_available": True,
+                        "write_only": False,
                         "readonly": False,
                         "required": True,
                         "widget": "TextInput",
                     },
                     "created_by_display": {
                         "value": "John",
+                        "value_available": True,
+                        "write_only": False,
                         "readonly": True,
                         "required": False,
                         "widget": None,
@@ -44,6 +48,8 @@ wire representation adds the component type and serialized field metadata::
                 "fields": {
                     "text": {
                         "value": None,
+                        "value_available": True,
+                        "write_only": False,
                         "readonly": False,
                         "required": True,
                         "widget": "Textarea",
@@ -54,8 +60,10 @@ wire representation adds the component type and serialized field metadata::
                         "id": 7,
                         "fields": {
                             "text": {
-                                "value": "Existing comment",
-                                "readonly": False,
+                                    "value": "Existing comment",
+                                    "value_available": True,
+                                    "write_only": False,
+                                    "readonly": False,
                                 "required": True,
                                 "widget": "Textarea",
                             },
@@ -71,6 +79,18 @@ wire representation adds the component type and serialized field metadata::
         },
         "widgets": [],
     }
+
+Every serialized field includes ``value_available`` and ``write_only``.
+``value=None, value_available=True`` is a disclosed null value. Sensitive
+fields use ``value=None, value_available=False``; clients must not interpret
+that null as the stored value. Writable password inputs additionally report
+``write_only=True``. Disabled password-hash displays report ``readonly=True``
+and ``write_only=False``. The serializer always emits ``value``; if a future
+producer omits it, clients must treat the value as unavailable rather than null.
+
+Custom form fields or widgets can declare ``mcp_write_only=True``. Sensitive
+display widgets that must not disclose their backing value can declare
+``mcp_value_available=False``.
 
 Invocation uses the same component names.  A form receives a field mapping;
 a formset receives a list of row mappings::
@@ -248,7 +268,7 @@ Its call graph is::
 
 from __future__ import annotations
 
-from django.forms import ModelChoiceField, ModelMultipleChoiceField
+from django.forms import ModelChoiceField, ModelMultipleChoiceField, PasswordInput
 from django.forms.forms import BaseForm
 from django.forms.formsets import BaseFormSet
 
@@ -303,26 +323,53 @@ def field_info(field, value, *, readonly=False, label=None) -> dict:
     """Per-field schema dict shared by detail and modal form discovery.
 
     For readonly cells pass ``field=None`` (or any field with
-    ``readonly=True``); the result carries ``widget=None`` and
-    ``required=False`` per the readonly contract used by ``fetch_detail``.
+    ``readonly=True``); disabled Django fields are also treated as readonly.
+    Password inputs and fields/widgets declaring ``mcp_write_only=True`` are
+    writable without disclosing their current value. A field/widget can set
+    ``mcp_value_available=False`` to suppress a sensitive display value.
 
-    Always present: ``value``, ``required``, ``widget``, ``readonly``.
+    Always present: ``value``, ``value_available``, ``write_only``,
+    ``required``, ``widget``, ``readonly``.
     Added when applicable: ``widget_id`` (autocomplete-backed widget),
     ``target_model`` (relational field), ``choices`` (flat-choice field),
     ``label`` (when passed explicitly — modal forms ship one, detail
     fields rely on admin-side labels).
     """
-    if readonly or field is None:
+    widget = field.widget if field is not None else None
+    readonly = bool(readonly or field is None or getattr(field, "disabled", False))
+    write_only = bool(
+        not readonly
+        and field is not None
+        and (
+            getattr(field, "mcp_write_only", False)
+            or getattr(widget, "mcp_write_only", False)
+            or isinstance(widget, PasswordInput)
+        )
+    )
+    value_available = bool(
+        not write_only
+        and getattr(
+            field,
+            "mcp_value_available",
+            getattr(widget, "mcp_value_available", True),
+        )
+    )
+    serialized_value = value if value_available else None
+
+    if readonly:
         info: dict = {
-            "value": value,
+            "value": serialized_value,
+            "value_available": value_available,
+            "write_only": False,
             "required": False,
             "widget": None,
             "readonly": True,
         }
     else:
-        widget = field.widget
         info = {
-            "value": value,
+            "value": serialized_value,
+            "value_available": value_available,
+            "write_only": write_only,
             "required": bool(field.required),
             "widget": widget.__class__.__name__,
             "readonly": False,

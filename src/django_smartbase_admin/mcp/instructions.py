@@ -42,6 +42,9 @@ labels → ``create_object`` or ``update_detail``.
 Rules: copy ``widget_id`` only from prior tool output (never invent it).
 ``list_rows`` requires non-empty ``fields``. Write results:
 ``{"status": "ok", ...}`` or ``{"status": "invalid", "errors": ...}`` (no DB change).
+Form fields with ``value_available=false`` have intentionally redacted values;
+``write_only=true`` means callers may submit a replacement but must not infer
+the stored value from the returned ``null``.
 Formset component keys use ``inline_name`` from ``list_admins`` when they
 represent admin inlines. Send nested arguments (``component_values``,
 ``object_ids``, ``filter_data``, ``sort``) as real JSON objects/arrays, never

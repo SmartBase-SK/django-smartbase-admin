@@ -271,13 +271,12 @@ def encode_initial_form_values(
     form, qd: QueryDict, overrides: dict, *, prefix: str | None = None
 ) -> None:
     """Encode a form's initial state with caller-provided overrides layered on."""
-    reject_non_writable_overrides(
-        overrides,
-        set(form.fields),
-        "form fields",
-    )
+    writable = {name for name, field in form.fields.items() if not field.disabled}
+    reject_non_writable_overrides(overrides, writable, "form fields")
     prefix = form.prefix if prefix is None else prefix
     for name, field in form.fields.items():
+        if field.disabled:
+            continue
         full_name = f"{prefix}-{name}" if prefix else name
         value = overrides[name] if name in overrides else form.initial.get(name)
         write_widget_input(qd, full_name, field.widget, value)
@@ -329,7 +328,11 @@ def encode_formset_rows(
         form = (
             formset.forms[index] if index < len(formset.forms) else formset.empty_form
         )
-        writable = set(form.fields) - {"DELETE", "ORDER"}
+        writable = {
+            name
+            for name, field in form.fields.items()
+            if not field.disabled and name not in {"DELETE", "ORDER"}
+        }
         if row_field_names is not None:
             writable &= set(row_field_names)
         reject_non_writable_overrides(row, writable, scope, skip=special)
@@ -373,7 +376,9 @@ def encode_inline_formset_operations(
     sample_form = (
         formset.initial_forms[0] if formset.initial_forms else formset.empty_form
     )
-    writable = set(sample_form.fields)
+    writable = {
+        name for name, field in sample_form.fields.items() if not field.disabled
+    }
     transport_fields = frozenset({"id", "_delete", "_order"})
     seen_ids = set()
     for operation in operations:
@@ -421,6 +426,8 @@ def encode_inline_formset_operations(
         operation = operations_by_id.pop(pk, None)
         deleted = bool(operation and operation.get("_delete"))
         for name, field in form.fields.items():
+            if field.disabled:
+                continue
             if name == "id":
                 value = pk
             elif operation and not deleted and name in operation:
@@ -448,6 +455,8 @@ def encode_inline_formset_operations(
     for offset, operation in enumerate(new_operations):
         index = len(initial_forms) + offset
         for name, field in empty_form.fields.items():
+            if field.disabled:
+                continue
             if name == "id":
                 continue
             write_widget_input(

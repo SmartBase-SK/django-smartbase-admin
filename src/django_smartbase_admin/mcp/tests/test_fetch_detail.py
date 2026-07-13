@@ -342,6 +342,8 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
                             "fields": {
                                 "row_id": {
                                     "value": None,
+                                    "value_available": True,
+                                    "write_only": False,
                                     "required": True,
                                     "widget": "NumberInput",
                                     "readonly": False,
@@ -349,6 +351,8 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
                                 },
                                 "value": {
                                     "value": None,
+                                    "value_available": True,
+                                    "write_only": False,
                                     "required": False,
                                     "widget": "TextInput",
                                     "readonly": False,

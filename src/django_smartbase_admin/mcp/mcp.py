@@ -802,10 +802,15 @@ class SBAdminTools(MCPToolset):
         The ``main`` form component contains the admin fields; every inline is
         a named formset component with ``fields``, ``rows``, cardinality
         controls, and ``truncated``. Field metadata contains ``value``,
-        ``readonly``, ``required``, and ``widget``:
+        ``value_available``, ``write_only``, ``readonly``, ``required``, and
+        ``widget``:
 
         * ``value`` — scalar, or ``{"value": <id>, "label": <display>}``
           (list of those for multi-select) for related selections.
+        * ``value_available`` — distinguishes a disclosed null value from a
+          sensitive value that was intentionally not returned.
+        * ``write_only`` — the field accepts a new value but never discloses
+          its current value. Such fields have ``value_available=False``.
         * ``readonly`` — ``True`` for static fields.
         * ``required`` — would the form reject a blank submission.
           Always ``False`` for readonly fields.
@@ -972,7 +977,10 @@ class SBAdminTools(MCPToolset):
         field entry contains:
 
           - ``label``        — human-readable field label.
-          - ``value``        — initial / default value, or ``None``.
+          - ``value``        — initial/default value, or ``None`` when null or
+            intentionally unavailable; inspect ``value_available``.
+          - ``value_available`` — ``False`` when a sensitive value is redacted.
+          - ``write_only``   — accepts input without disclosing stored values.
           - ``required``     — whether a blank submission is rejected.
           - ``widget``       — widget class name hint.
           - ``target_model`` — present on relational fields

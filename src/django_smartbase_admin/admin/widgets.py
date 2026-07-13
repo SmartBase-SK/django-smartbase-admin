@@ -1520,6 +1520,7 @@ class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
 
 class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashWidget):
     template_name = "sb_admin/widgets/read_only_password_hash.html"
+    mcp_value_available = False
 
 
 class SBAdminHiddenWidget(SBAdminBaseWidget, forms.HiddenInput):
