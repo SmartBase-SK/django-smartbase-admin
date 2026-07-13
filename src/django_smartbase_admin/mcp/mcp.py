@@ -879,7 +879,7 @@ class SBAdminTools(MCPToolset):
         view_id: str,
         parent_object_id: str | None = None,
         params: dict | None = None,
-    ) -> dict:
+    ):
         """Fetch data for a non-list detail/dashboard widget.
 
         For widgets with ``data_tool == "list_rows"`` use ``list_rows`` instead; table
@@ -891,7 +891,7 @@ class SBAdminTools(MCPToolset):
             ``requires_parent_object_id`` is true.
           params: optional widget filter/settings query params.
 
-        Returns ``{"data": ...}`` from the widget's regular AJAX data path.
+        Returns the JSON payload from the widget's regular AJAX data path.
         """
         from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
 
@@ -918,9 +918,14 @@ class SBAdminTools(MCPToolset):
                     "List widgets are read with list_rows(..., "
                     "parent_object_id=...), not fetch_widget_data."
                 )
-            if not widget.has_view_or_change_permission(request):
-                raise PermissionDenied
-            return {"data": widget.get_cached_data(request)}
+            response = SBAdminViewService.delegate_to_action(
+                request,
+                view=widget.get_id(),
+                action="action_get_data",
+                modifier="template",
+                object_id=parent_object_id,
+            )
+            return json.loads(response.content.decode())
         except PermissionDenied as exc:
             raise PermissionError(str(exc)) from exc
 

@@ -27,7 +27,10 @@ from django_smartbase_admin.admin.admin_base import (
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminWhoamiConfig
 from django_smartbase_admin.engine.actions import sbadmin_action
-from django_smartbase_admin.engine.dashboard import SBAdminDashboardListWidget
+from django_smartbase_admin.engine.dashboard import (
+    SBAdminDashboardListWidget,
+    SBAdminDashboardWidget,
+)
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.tests._common import (
@@ -81,6 +84,37 @@ class ChildFolderListWidget(SBAdminDashboardListWidget):
 class FolderDetailWithWidgetAdmin(FolderDetailTestAdmin):
     widgets = [ChildFolderListWidget]
     fieldsets = ((None, {"fields": ("name", ChildFolderListWidget)}),)
+
+
+class ChildFolderDataWidget(SBAdminDashboardWidget):
+    widget_id = "child_folder_data_widget"
+    model = Folder
+    path_to_parent_instance_id = "parent_id"
+    action_calls = 0
+    deny_data_action = False
+
+    def get_data(self, request):
+        return {"source": "get_data"}
+
+    def has_permission_for_action(self, request, action):
+        if self.deny_data_action and action.action_id == "action_get_data":
+            return False
+        return super().has_permission_for_action(request, action)
+
+    @sbadmin_action(permission="view")
+    def action_get_data(self, request, modifier, object_id=None):
+        type(self).action_calls += 1
+        return JsonResponse(
+            {
+                "source": "action_get_data",
+                "parent_object_id": object_id,
+            }
+        )
+
+
+class FolderDetailWithDataWidgetAdmin(FolderDetailTestAdmin):
+    widgets = [ChildFolderDataWidget]
+    fieldsets = ((None, {"fields": ("name", ChildFolderDataWidget)}),)
 
 
 @override_settings(
@@ -412,6 +446,61 @@ class FetchDetailWidgetTests(_FetchDetailTestBase):
 
         with self.assertRaises(LookupError):
             SBAdminTools(request=request).fetch_widget_data("filer_folder")
+
+
+class FetchWidgetDataTests(_FetchDetailTestBase):
+    admin_class = FolderDetailWithDataWidgetAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.parent = Folder.objects.create(name="parent")
+
+    def setUp(self):
+        super().setUp()
+        MCPToolTestConfig().init_configuration_static()
+        ChildFolderDataWidget.action_calls = 0
+        ChildFolderDataWidget.deny_data_action = False
+
+    def tearDown(self):
+        ChildFolderDataWidget.deny_data_action = False
+        super().tearDown()
+
+    def test_fetch_widget_data_dispatches_through_action_override(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+
+        result = SBAdminTools(
+            request=build_mcp_request(
+                MagicMock(is_authenticated=True, is_superuser=True)
+            )
+        ).fetch_widget_data(
+            widget["view_id"],
+            parent_object_id=widget["parent_object_id"],
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "source": "action_get_data",
+                "parent_object_id": str(self.parent.pk),
+            },
+        )
+        self.assertEqual(ChildFolderDataWidget.action_calls, 1)
+
+    def test_fetch_widget_data_respects_action_permission(self):
+        widget = self._fetch(self.parent.pk)["widgets"][0]
+        ChildFolderDataWidget.deny_data_action = True
+
+        with self.assertRaises(PermissionError):
+            SBAdminTools(
+                request=build_mcp_request(
+                    MagicMock(is_authenticated=True, is_superuser=True)
+                )
+            ).fetch_widget_data(
+                widget["view_id"],
+                parent_object_id=widget["parent_object_id"],
+            )
+
+        self.assertEqual(ChildFolderDataWidget.action_calls, 0)
 
 
 class FolderPermissionInline(SBAdminTableInline):
