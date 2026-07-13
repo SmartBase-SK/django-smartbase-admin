@@ -382,24 +382,8 @@ class SBAdminBaseView(object):
                 modifier=request_modifier,
                 object_id=getattr(request_data, "object_id", None),
             )
-            if hasattr(action_view, "get_form_components"):
-                saved_action = getattr(request_data, "action", None)
-                try:
-                    request_data.action = action_id
-                    from django.forms.formsets import BaseFormSet
-                    from django_smartbase_admin.mcp.field_schema import (
-                        validate_form_components,
-                    )
-
-                    components = validate_form_components(
-                        action_view.get_form_components()
-                    )
-                    for component in components.values():
-                        if isinstance(component, BaseFormSet):
-                            # Row forms are lazy; initialize their widgets too.
-                            component.empty_form
-                finally:
-                    request_data.action = saved_action
+            if hasattr(action_view, "initialize_autocomplete_views"):
+                action_view.initialize_autocomplete_views(action_id)
                 continue
             form_class = (
                 action_view.get_form_class()

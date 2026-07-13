@@ -1532,22 +1532,27 @@ class DynamicFormTests(SimpleTestCase):
         )
         self.assertIn(widget_id, self.request.request_data.autocomplete_map)
 
-    def test_action_autocomplete_registration_includes_declared_formsets(self):
+    def test_action_autocomplete_registration_supports_custom_formset_hook(self):
         class FormsetActionModal(ActionModalView):
-            def get_rows_formset(self):
+            def get_rows_formset(self, action_id):
                 formset_class = forms.formset_factory(CompleteActionForm, extra=1)
                 return formset_class(
                     prefix="rows",
                     form_kwargs={
                         "request": self.request,
                         "view": self.view,
-                        "sbadmin_action_id": type(self).__name__,
+                        "sbadmin_action_id": action_id,
                         "source_name": "formset",
                     },
                 )
 
             def get_form_components(self):
-                return {"rows": self.get_rows_formset()}
+                raise AssertionError(
+                    "Normal autocomplete registration must not inspect MCP components"
+                )
+
+            def initialize_autocomplete_views(self, action_id):
+                self.get_rows_formset(action_id).empty_form
 
         view = CompleteParentActionView()
         self.request.user = SimpleNamespace(is_anonymous=True)

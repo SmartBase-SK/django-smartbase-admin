@@ -6293,6 +6293,33 @@ Validation still runs through the modal's regular `post()` implementation;
 row errors are returned under `errors.formsets.<name>.rows` and formset-wide
 errors under `errors.formsets.<name>.non_form`.
 
+`get_form_components()` is an MCP adapter; normal autocomplete dispatch does
+not inspect it. `ActionModalView` initializes autocomplete widgets from its
+main form by default. A custom modal that places additional forms or formsets
+in its context must initialize those widgets explicitly:
+
+```python
+class AddPriceRowsView(ActionModalView):
+    ...
+
+    def initialize_autocomplete_views(self, action_id):
+        common_form_kwargs = {
+            "request": self.request,
+            "view": self.view,
+            "sbadmin_action_id": action_id,
+        }
+        FixedPriceFieldsForm(prefix="fixed", **common_form_kwargs)
+        formset = build_price_formset(
+            prefix="rows",
+            form_kwargs=common_form_kwargs,
+        )
+        # Django constructs formset row forms lazily.
+        formset.empty_form
+```
+
+The hook is procedural intentionally: custom action modals may build and
+process arbitrary context rather than following the MCP component contract.
+
 Object-dependent fieldset actions are discovered from `fetch_detail`, not the
 global `list_admins` response. Pass that object's id to `fetch_action_form` and
 `invoke_detail_action`.

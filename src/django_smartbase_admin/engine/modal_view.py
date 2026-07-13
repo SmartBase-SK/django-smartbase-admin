@@ -137,10 +137,24 @@ class ActionModalView(SBAdminDynamicFormViewMixin, FormView):
     CONFIRMATION_POST_KEY = "_confirmed"
 
     def get_form_components(self):
-        """Return the named forms and formsets accepted by this modal."""
+        """Return the named forms and formsets exposed through MCP."""
         if self.get_form_class() is None:
             return {}
         return {"main": self.get_form()}
+
+    def initialize_autocomplete_views(self, action_id):
+        """Initialize autocomplete widgets used by this action's main form."""
+        form_class = self.get_form_class()
+        if form_class is None:
+            return
+
+        form_kwargs = self.get_unbound_form_kwargs()
+        from django_smartbase_admin.admin.admin_base import SBAdminBaseFormInit
+
+        if issubclass(form_class, SBAdminBaseFormInit):
+            form_kwargs.setdefault("view", self.view)
+            form_kwargs["sbadmin_action_id"] = action_id
+        form_class(**form_kwargs)
 
     def build_success_response(self, request):
         content = (
