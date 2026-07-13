@@ -326,9 +326,11 @@ class SBAdminTools(MCPToolset):
       5. ``invoke_action`` for methods explicitly exposed under a view's
          ``mcp_actions`` entry.
 
-    Validation failures come back as ``{"status": "invalid",
-    "errors": ...}`` with no DB change; permission denials raise
-    ``PermissionError``; invisible objects raise ``LookupError``.
+    Validation failures return ``{"status": "invalid", "errors":
+    {"global": [...], "components": {...}}}`` with no DB change. Component
+    entries distinguish form fields, form-wide errors, formset-wide errors,
+    and row errors; each error is ``{"code", "message"}``. Permission denials
+    raise ``PermissionError``; invisible objects raise ``LookupError``.
     """
 
     @_guarded_tool_call
@@ -1183,8 +1185,8 @@ class SBAdminTools(MCPToolset):
 
         Returns ``{"status": "ok", "messages": [...]}`` after delete,
         ``{"status": "needs_confirmation", ...}`` on the first call, or
-        ``{"status": "invalid", "errors": {"non_field": [...]}}`` if a
-        protected ForeignKey blocks the delete.
+        ``{"status": "invalid", "errors": {"global": [...],
+        "components": {}}}`` if a protected ForeignKey blocks the delete.
 
         Raises ``ValueError`` if ``object_ids`` is empty,
         ``PermissionError`` if delete permission is missing.
@@ -1282,7 +1284,7 @@ class SBAdminTools(MCPToolset):
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
         ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
-        Cross-field / view-raised errors under ``"non_field"``.
+        Form-wide errors appear under the component's ``non_field`` list.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
         if the action / object isn't visible.
@@ -1327,7 +1329,7 @@ class SBAdminTools(MCPToolset):
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
         ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
-        Cross-field / view-raised errors under ``"non_field"``.
+        Form-wide errors appear under the component's ``non_field`` list.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
         if the action / object isn't visible.
@@ -1375,7 +1377,7 @@ class SBAdminTools(MCPToolset):
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
         ``{"status": "needs_confirmation", "message": "...", "data": {...}}``.
-        Cross-field / view-raised errors under ``"non_field"``.
+        Form-wide errors appear under the component's ``non_field`` list.
 
         Raises ``PermissionError`` if access is denied, ``LookupError``
         if the action / object isn't visible.
@@ -1457,8 +1459,8 @@ class SBAdminTools(MCPToolset):
         view), ``{"status": "invalid", "errors": {...}}`` on modal
         validation failure, or ``{"status": "needs_confirmation",
         "message": "...", "data": {...}}`` when the action wants explicit
-        confirmation. Cross-field / view-raised errors appear under the
-        key ``"non_field"``.
+        confirmation. Form-wide errors appear under the component's
+        ``non_field`` list.
 
         Raises ``ValueError`` if ``object_ids`` is empty,
         ``PermissionError`` if access is denied.
@@ -1516,8 +1518,7 @@ class SBAdminTools(MCPToolset):
         ``{"status": "invalid", "errors": {...}}`` on modal validation
         failure, or ``{"status": "needs_confirmation", "message": "...",
         "data": {...}}`` when the action wants explicit confirmation.
-        Cross-field / view-raised errors appear under the key
-        ``"non_field"``.
+        Form-wide errors appear under the component's ``non_field`` list.
 
         Raises ``PermissionError`` if access is denied.
         """

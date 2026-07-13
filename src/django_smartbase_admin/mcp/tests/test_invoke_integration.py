@@ -489,8 +489,10 @@ class IntegrationTests(_Base):
             component_values={"main": {"name": ""}},
         )
         self.assertEqual(bad["status"], "invalid")
-        self.assertIn("name", bad["errors"]["components"]["main"])
-        self.assertNotIn("__all__", bad["errors"]["components"]["main"])
+        main_errors = bad["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertIn("name", main_errors["fields"])
+        self.assertEqual(main_errors["non_field"], [])
         folder.refresh_from_db()
         self.assertEqual(folder.name, "original")
 
@@ -593,7 +595,9 @@ class IntegrationTests(_Base):
             component_values={"folder": {"name": "multi"}},
         )
         self.assertEqual(invalid["status"], "invalid")
-        self.assertIn("suffix", invalid["errors"]["components"]["options"])
+        options_errors = invalid["errors"]["components"]["options"]
+        self.assertEqual(options_errors["type"], "form")
+        self.assertIn("suffix", options_errors["fields"])
 
         result = self._tools().invoke_list_action(
             "filer_folder",
@@ -654,9 +658,15 @@ class IntegrationTests(_Base):
             },
         )
         self.assertEqual(invalid["status"], "invalid")
-        self.assertIn(
-            "name",
-            invalid["errors"]["components"]["rows"]["rows"][0]["errors"],
+        rows_errors = invalid["errors"]["components"]["rows"]
+        self.assertEqual(rows_errors["type"], "formset")
+        self.assertEqual(rows_errors["non_form"][0]["code"], "too_few_forms")
+        self.assertEqual(rows_errors["rows"][0]["index"], 0)
+        self.assertNotIn("id", rows_errors["rows"][0])
+        self.assertEqual(rows_errors["rows"][0]["non_field"], [])
+        self.assertEqual(
+            rows_errors["rows"][0]["fields"]["name"][0]["code"],
+            "required",
         )
 
         result = self._tools().invoke_detail_action(

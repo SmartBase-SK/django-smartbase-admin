@@ -94,6 +94,55 @@ stable row id use their Django positional row order instead.
 Within a model-backed formset, ``id``, ``_delete``, and ``_order`` are reserved
 control keys; submitted existing-row ids must be unique.
 
+Validation errors use the same component names and distinguish global,
+component-wide, row-wide, and field errors::
+
+    {
+        "status": "invalid",
+        "errors": {
+            "global": [],
+            "components": {
+                "settings": {
+                    "type": "form",
+                    "non_field": [],
+                    "fields": {
+                        "mode": [
+                            {
+                                "code": "invalid_choice",
+                                "message": "Select a valid choice.",
+                            },
+                        ],
+                    },
+                },
+                "rows": {
+                    "type": "formset",
+                    "non_form": [],
+                    "rows": [
+                        {
+                            "index": 0,
+                            "id": 7,
+                            "non_field": [],
+                            "fields": {
+                                "name": [
+                                    {
+                                        "code": "required",
+                                        "message": "This field is required.",
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+    }
+
+Only failing components, rows, and fields are included. Existing model-formset
+rows carry both their bound formset ``index`` and normalized ``id``; new and
+plain-formset rows carry ``index`` only. Django errors without a code use
+``null``. Unknown components, fields, and row ids remain tool errors rather
+than validation errors.
+
 Multiple forms must use distinct prefixes so their encoded POST fields cannot
 collide.  Formset components retain their Django prefixes and management-form
 fields.  Component names are stable public handles; prefixes remain an

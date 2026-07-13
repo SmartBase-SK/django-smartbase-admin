@@ -166,50 +166,67 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
     qd[key] = value
 
 
-def form_errors_dict(form) -> dict:
-    """Stringify ``form.errors`` into ``{field: [message, ...]}``.
+def validation_error_entries(errors) -> list[dict]:
+    """Serialize Django ``ValidationError`` objects with stable codes."""
+    entries = []
+    for error in errors:
+        code = str(error.code) if error.code is not None else None
+        entries.extend(
+            {"code": code, "message": str(message)} for message in error.messages
+        )
+    return entries
 
-    Non-field errors (cross-field validation, view-raised errors via
-    ``form.add_error(None, ...)``) appear under the key ``"non_field"``
-    instead of Django's internal ``__all__`` sentinel — the renamed key
-    is agent-friendly and explicit about what it represents.
-    """
+
+def form_errors_dict(form) -> dict:
+    """Return field and form-wide validation errors for one bound form."""
     from django.core.exceptions import NON_FIELD_ERRORS
 
+    errors = form.errors.as_data()
     return {
-        ("non_field" if name == NON_FIELD_ERRORS else name): [str(e) for e in errors]
-        for name, errors in form.errors.items()
+        "non_field": validation_error_entries(errors.get(NON_FIELD_ERRORS, [])),
+        "fields": {
+            name: validation_error_entries(field_errors)
+            for name, field_errors in errors.items()
+            if name != NON_FIELD_ERRORS
+        },
     }
 
 
 def formset_errors_dict(formset: BaseFormSet) -> dict:
     """Return row and formset-wide validation errors in MCP shape."""
-    rows = [
-        {"index": index, "errors": form_errors_dict(form)}
-        for index, form in enumerate(formset.forms)
-        if form.errors
-    ]
+    rows = []
+    for index, form in enumerate(formset.forms):
+        row_errors = form_errors_dict(form)
+        if not row_errors["non_field"] and not row_errors["fields"]:
+            continue
+        row = {"index": index, **row_errors}
+        if isinstance(formset, BaseModelFormSet):
+            object_id = getattr(form.instance, "pk", None)
+            if object_id is not None:
+                row["id"] = object_id
+        rows.append(row)
     return {
+        "type": "formset",
+        "non_form": validation_error_entries(formset.non_form_errors().as_data()),
         "rows": rows,
-        "non_form": [str(error) for error in formset.non_form_errors()],
     }
 
 
 def form_component_errors(
     components: dict[str, BaseForm | BaseFormSet],
-) -> dict[str, dict]:
-    """Collect errors from named bound forms and formsets."""
-    errors = {}
+) -> dict:
+    """Collect errors using the shared global/component/field hierarchy."""
+    component_errors = {}
     for name, component in components.items():
         if isinstance(component, BaseFormSet):
-            component_errors = formset_errors_dict(component)
-            if component_errors["rows"] or component_errors["non_form"]:
-                errors[name] = component_errors
+            errors = formset_errors_dict(component)
+            if errors["rows"] or errors["non_form"]:
+                component_errors[name] = errors
         else:
-            component_errors = form_errors_dict(component)
-            if component_errors:
-                errors[name] = component_errors
-    return errors
+            errors = form_errors_dict(component)
+            if errors["non_field"] or errors["fields"]:
+                component_errors[name] = {"type": "form", **errors}
+    return {"global": [], "components": component_errors}
 
 
 def bind_form_components(

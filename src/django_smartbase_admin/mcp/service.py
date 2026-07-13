@@ -82,7 +82,7 @@ def _extract_form_errors(response) -> dict:
     response. The parent ``adminform`` lives under that key in context;
     inline formset errors come from ``inline_admin_formsets``."""
     components = SBAdminMCPDetailService._admin_form_components(response.context_data)
-    return {"components": form_component_errors(components)}
+    return form_component_errors(components)
 
 
 # ---------------------------------------------------------------------------

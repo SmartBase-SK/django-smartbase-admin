@@ -579,8 +579,8 @@ class SBAdminMCPActionInvokeService:
         post_qd = encode_form_components(components, component_values)
         bound_components = bind_form_components(components, post_qd)
         errors = form_component_errors(bound_components)
-        if errors:
-            return {"status": "invalid", "errors": {"components": errors}}
+        if errors["global"] or errors["components"]:
+            return {"status": "invalid", "errors": errors}
 
         set_request_payload(request, post=post_qd, method="POST")
         ensure_messages_storage(request)
@@ -656,9 +656,14 @@ class SBAdminMCPActionInvokeService:
             return {
                 "status": "invalid",
                 "errors": {
-                    "non_field": [
-                        f"Cannot delete — protected by: {p}" for p in protected
-                    ]
+                    "global": [
+                        {
+                            "code": "protected",
+                            "message": f"Cannot delete — protected by: {item}",
+                        }
+                        for item in protected
+                    ],
+                    "components": {},
                 },
             }
 
@@ -1064,8 +1069,8 @@ class SBAdminMCPActionInvokeService:
             response, action_components or {}
         )
         errors = form_component_errors(response_components)
-        if errors:
-            return {"status": "invalid", "errors": {"components": errors}}
+        if errors["global"] or errors["components"]:
+            return {"status": "invalid", "errors": errors}
 
         # Fallback: response wasn't a TemplateResponse with a form in
         # context. Rebuild the form to surface whatever validation errors
@@ -1080,7 +1085,7 @@ class SBAdminMCPActionInvokeService:
             component.is_valid()
         errors = form_component_errors(components)
         set_request_payload(request, method="GET")
-        return {"status": "invalid", "errors": {"components": errors}}
+        return {"status": "invalid", "errors": errors}
 
     @staticmethod
     def _components_from_response(response, expected_components) -> dict:

@@ -148,7 +148,11 @@ class CreateObjectFieldTests(_CreateObjectTestBase):
 
         bad_field = self._create(main_values={"name": ""})
         self.assertEqual(bad_field["status"], "invalid")
-        self.assertIn("name", bad_field["errors"]["components"]["main"])
+        self.assertEqual(bad_field["errors"]["global"], [])
+        main_errors = bad_field["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertEqual(main_errors["non_field"], [])
+        self.assertEqual(main_errors["fields"]["name"][0]["code"], "required")
 
         with self.assertRaises(LookupError):
             self._create(main_values={"bogus": "x"})

@@ -260,7 +260,9 @@ class ListRowsTests(_ToolTestBase):
             },
         )
         self.assertEqual(invalid["status"], "invalid")
-        self.assertIn("columnFieldName", invalid["errors"]["components"]["main"])
+        main_errors = invalid["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertIn("columnFieldName", main_errors["fields"])
 
         with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(

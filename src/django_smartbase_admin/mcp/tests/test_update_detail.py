@@ -175,7 +175,9 @@ class UpdateDetailFieldTests(_UpdateDetailTestBase):
         result = self._update(self.child.pk, main_values={"name": ""})
 
         self.assertEqual(result["status"], "invalid")
-        self.assertIn("name", result["errors"]["components"]["main"])
+        main_errors = result["errors"]["components"]["main"]
+        self.assertEqual(main_errors["type"], "form")
+        self.assertEqual(main_errors["fields"]["name"][0]["code"], "required")
         # No DB write on validation failure.
         self.assertEqual(Folder.objects.get(pk=self.child.pk).name, "child")
 
@@ -319,3 +321,21 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
                     ]
                 },
             )
+
+    def test_existing_inline_validation_error_includes_row_id(self):
+        result = self._update(
+            self.folder.pk,
+            component_values={
+                "FolderPermissionInline": [
+                    {"id": self.perm_a.pk, "type": 0},
+                ]
+            },
+        )
+
+        self.assertEqual(result["status"], "invalid")
+        component_errors = result["errors"]["components"]["FolderPermissionInline"]
+        self.assertEqual(component_errors["type"], "formset")
+        row_errors = component_errors["rows"][0]
+        self.assertEqual(row_errors["id"], self.perm_a.pk)
+        self.assertIsInstance(row_errors["index"], int)
+        self.assertTrue(row_errors["non_field"] or row_errors["fields"])
