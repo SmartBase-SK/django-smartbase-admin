@@ -496,9 +496,12 @@ def encode_form_components(
     from django_smartbase_admin.mcp.field_schema import validate_form_components
 
     components = validate_form_components(components)
-    values = component_values or {}
-    if not isinstance(values, dict):
+    if component_values is None:
+        values = {}
+    elif not isinstance(component_values, dict):
         raise TypeError("component_values must be a dictionary.")
+    else:
+        values = component_values
     unknown = sorted(set(values) - set(components))
     if unknown:
         raise LookupError(
@@ -549,8 +552,9 @@ def encode_form_components(
                 )
             continue
 
-        supplied = supplied or {}
-        if not isinstance(supplied, dict):
+        if supplied is None:
+            supplied = {}
+        elif not isinstance(supplied, dict):
             raise TypeError(f"Form component {name!r} must be a field dictionary.")
         encode_initial_form_values(component, qd, supplied)
 

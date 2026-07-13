@@ -68,3 +68,33 @@ class SecretFieldSchemaTests(SimpleTestCase):
                 {"main": DisabledFieldForm(initial={"secret": "hidden"})},
                 {"main": {"secret": "replacement"}},
             )
+
+
+class FormComponentEncodingTests(SimpleTestCase):
+    def test_falsey_non_dictionary_component_values_are_rejected(self):
+        components = {"main": forms.Form()}
+
+        for invalid in (False, 0, "", []):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(
+                    TypeError, "component_values must be a dictionary"
+                ):
+                    encode_form_components(components, invalid)
+
+    def test_falsey_non_dictionary_form_component_is_rejected(self):
+        components = {"main": forms.Form()}
+
+        for invalid in (False, 0, "", []):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(
+                    TypeError, "Form component 'main' must be a field dictionary"
+                ):
+                    encode_form_components(components, {"main": invalid})
+
+    def test_none_still_means_no_values_supplied(self):
+        component = forms.Form()
+
+        self.assertEqual(encode_form_components({"main": component}, None), {})
+        self.assertEqual(
+            encode_form_components({"main": component}, {"main": None}), {}
+        )
