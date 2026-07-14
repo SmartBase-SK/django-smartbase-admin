@@ -1,5 +1,7 @@
+import json
+
 from django import forms
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils.translation import gettext_lazy as _
 
 
@@ -68,6 +70,12 @@ class TableDataEditForm(forms.Form):
             )
             for field in editable_fields
         ]
+
+    def clean_currentRowId(self):
+        try:
+            return json.loads(self.cleaned_data["currentRowId"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValidationError(_("Enter a valid row ID.")) from exc
 
 
 class SBAdminCustomAction(object):

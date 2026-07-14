@@ -83,9 +83,9 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "instructions": SBADMIN_MCP_SERVER_INSTRUCTIONS,
     "stateless": True,
 }
-# Trailing slash so the endpoint matches our discovery metadata
-# (which advertises `<base>/mcp/`).
-DJANGO_MCP_ENDPOINT = "mcp/"
+# Keep this slashless: remote clients such as Claude canonicalize the resource
+# to `/mcp` and do not replay protocol POSTs across Django's slash redirect.
+DJANGO_MCP_ENDPOINT = "mcp"
 
 ALLOWED_HOSTS = ["*"]
 DEBUG = True

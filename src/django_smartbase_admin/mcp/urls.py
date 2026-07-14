@@ -18,7 +18,7 @@ from django.urls import include, path
 
 from django_smartbase_admin.mcp.rest import SBAdminMCPToolAPIView
 
-_mcp_endpoint = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp/")
+_mcp_endpoint = getattr(settings, "DJANGO_MCP_ENDPOINT", "mcp")
 _mcp_endpoint = _mcp_endpoint.strip("/")
 _rest_list_rows_path = (
     f"{_mcp_endpoint}/rest/tools/list_rows/"
@@ -27,9 +27,9 @@ _rest_list_rows_path = (
 )
 
 urlpatterns = [
-    # MCP JSON-RPC endpoint. Path is controlled by ``DJANGO_MCP_ENDPOINT``
-    # (default ``"mcp"``; we set ``"mcp/"`` so it matches our discovery
-    # metadata's trailing slash).
+    # Delegate the complete transport wiring to django-mcp-server. Keep
+    # DJANGO_MCP_ENDPOINT slashless: remote clients such as Claude canonicalize
+    # the MCP resource to /mcp and do not replay the POST across a 301.
     path("", include("mcp_server.urls")),
     path(
         _rest_list_rows_path,

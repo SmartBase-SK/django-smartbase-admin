@@ -83,8 +83,21 @@ class MCPOAuthSmokeTests(TestCase):
         r = self.client.get("/.well-known/oauth-protected-resource")
         self.assertEqual(r.status_code, 200, r.content)
         data = r.json()
-        self.assertTrue(data["resource"].endswith("/mcp/"), data)
+        self.assertTrue(data["resource"].endswith("/mcp"), data)
         self.assertEqual(data["bearer_methods_supported"], ["header"])
+
+    def test_canonical_mcp_endpoint_does_not_redirect(self):
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+
+        response = self.client.post(
+            "/mcp",
+            data=body,
+            content_type="application/json",
+            HTTP_ACCEPT="application/json, text/event-stream",
+        )
+
+        self.assertIn(response.status_code, (401, 403), response.content)
+        self.assertNotIn(response.status_code, (301, 302, 307, 308))
 
     def test_dynamic_client_registration_minimal(self):
         client_data = self._register_client()
@@ -253,7 +266,7 @@ class MCPOAuthSmokeTests(TestCase):
         if token:
             headers["HTTP_AUTHORIZATION"] = f"Bearer {token}"
         return self.client.post(
-            "/mcp/",
+            "/mcp",
             data=json.dumps(body),
             content_type="application/json",
             **headers,
