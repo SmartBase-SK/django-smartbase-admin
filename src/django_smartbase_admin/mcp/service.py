@@ -200,9 +200,20 @@ class SBAdminMCPDetailService:
         else:
             unknown = [f for f in fields if f not in available]
             if unknown:
+                if obj is None:
+                    raise LookupError(
+                        f"Requested add-form fields {unknown} are not available in "
+                        f"admin {admin.get_id()!r}. Available add-form fields: "
+                        f"{available}. Retry fetch_add_form with fields chosen from "
+                        "this list, or omit fields to fetch all available add-form "
+                        "fields."
+                    )
                 raise LookupError(
-                    f"Admin {admin.get_id()!r} has no detail fields {unknown}; "
-                    f"available: {available}"
+                    f"Requested detail fields {unknown} are not available for object "
+                    f"{str(obj.pk)!r} in admin {admin.get_id()!r}. "
+                    f"Available detail fields for this object: {available}. "
+                    "Retry fetch_detail with fields chosen from this list, or omit "
+                    "fields to fetch all available detail fields."
                 )
             selected_set = set(fields)
 
