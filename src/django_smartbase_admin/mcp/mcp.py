@@ -767,7 +767,11 @@ class SBAdminTools(MCPToolset):
                 result["detail_actions"] = actions
             return result
         except PermissionDenied as exc:
-            raise PermissionError(str(exc)) from exc
+            message = str(exc).strip() or (
+                f"User has no view permission on object pk={object_id!r} "
+                f"in admin {admin.get_id()!r}."
+            )
+            raise PermissionError(message) from exc
 
     @_guarded_tool_call
     def fetch_detail(

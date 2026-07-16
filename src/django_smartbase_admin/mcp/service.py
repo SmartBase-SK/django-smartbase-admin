@@ -451,7 +451,15 @@ class SBAdminMCPDetailService:
             raise PermissionDenied(
                 f"User has no view permission on admin {type(admin).__name__}."
             )
-        obj = admin.get_object(request, object_id)
+        try:
+            obj = admin.get_object(request, object_id)
+        except PermissionDenied as exc:
+            if str(exc).strip():
+                raise
+            raise PermissionDenied(
+                f"User has no view permission on object pk={object_id!r} "
+                f"in admin {admin.get_id()!r}."
+            ) from exc
         if obj is None:
             raise LookupError(
                 f"Object pk={object_id!r} not found in admin {admin.get_id()!r}."
