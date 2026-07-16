@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from copy import copy
 
+from django.core.exceptions import ValidationError
 from django.forms.formsets import BaseFormSet
 from django.forms.forms import BaseForm
 from django.forms.models import BaseModelFormSet
@@ -167,9 +168,17 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
 
 
 def validation_error_entries(errors) -> list[dict]:
-    """Serialize Django ``ValidationError`` objects with stable codes."""
+    """Serialize Django or plain error lists with stable codes."""
+    as_data = getattr(errors, "as_data", None)
+    if callable(as_data):
+        errors = as_data()
+    elif isinstance(errors, (str, ValidationError)):
+        errors = [errors]
+
     entries = []
     for error in errors:
+        if not isinstance(error, ValidationError):
+            error = ValidationError(error)
         code = str(error.code) if error.code is not None else None
         entries.extend(
             {"code": code, "message": str(message)} for message in error.messages
@@ -181,7 +190,10 @@ def form_errors_dict(form) -> dict:
     """Return field and form-wide validation errors for one bound form."""
     from django.core.exceptions import NON_FIELD_ERRORS
 
-    errors = form.errors.as_data()
+    # Custom forms can expose a plain mapping instead of Django's ErrorDict.
+    # Normalize each value below so MCP reports the validation failure rather
+    # than masking it with an AttributeError from ErrorDict.as_data().
+    errors = form.errors
     return {
         "non_field": validation_error_entries(errors.get(NON_FIELD_ERRORS, [])),
         "fields": {
@@ -207,7 +219,7 @@ def formset_errors_dict(formset: BaseFormSet) -> dict:
         rows.append(row)
     return {
         "type": "formset",
-        "non_form": validation_error_entries(formset.non_form_errors().as_data()),
+        "non_form": validation_error_entries(formset.non_form_errors()),
         "rows": rows,
     }
 
