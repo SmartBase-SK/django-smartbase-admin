@@ -72,10 +72,11 @@ class TableDataEditForm(forms.Form):
         ]
 
     def clean_currentRowId(self):
+        row_id = self.cleaned_data["currentRowId"]
         try:
-            return json.loads(self.cleaned_data["currentRowId"])
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise ValidationError(_("Enter a valid row ID.")) from exc
+            return json.loads(row_id)
+        except (TypeError, json.JSONDecodeError):
+            return row_id
 
 
 class SBAdminCustomAction(object):

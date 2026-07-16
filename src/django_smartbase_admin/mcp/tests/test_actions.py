@@ -261,20 +261,26 @@ class ListRowsTests(_ToolTestBase):
         self.assertEqual(main_errors["type"], "form")
         self.assertIn("columnFieldName", main_errors["fields"])
 
-        invalid_row_id = SBAdminTools(request=build_mcp_request(user)).invoke_action(
-            "filer_folder",
-            Action.TABLE_DATA_EDIT.value,
-            component_values={
-                "main": {
-                    "currentRowId": "not-json",
-                    "columnFieldName": "editable_name",
-                    "cellValue": "updated",
-                }
-            },
-        )
-        self.assertEqual(invalid_row_id["status"], "invalid")
-        row_id_errors = invalid_row_id["errors"]["components"]["main"]
-        self.assertIn("currentRowId", row_id_errors["fields"])
+        for row_id in (
+            "3b6f49fe-51eb-4f01-9a36-cf1518279c6a",
+            "folder-root",
+        ):
+            with self.subTest(row_id=row_id):
+                string_id_result = SBAdminTools(
+                    request=build_mcp_request(user)
+                ).invoke_action(
+                    "filer_folder",
+                    Action.TABLE_DATA_EDIT.value,
+                    component_values={
+                        "main": {
+                            "currentRowId": row_id,
+                            "columnFieldName": "editable_name",
+                            "cellValue": "updated",
+                        }
+                    },
+                )
+                self.assertEqual(string_id_result["status"], "ok")
+                self.assertEqual(string_id_result["row_id"], row_id)
 
         with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(

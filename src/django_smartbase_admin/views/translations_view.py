@@ -13,7 +13,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
-from django_smartbase_admin.admin.admin_base import SBAdminInlineAndAdminCommon
+from django_smartbase_admin.admin.admin_base import SBAdminFormFieldWidgetsMixin
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
@@ -31,7 +31,11 @@ from django_smartbase_admin.utils import is_htmx_request, querydict_to_dict
 from urllib.parse import quote as urlquote
 
 
-class ModelTranslationView(SBAdminView, SBAdminBaseListView):
+class ModelTranslationView(
+    SBAdminFormFieldWidgetsMixin,
+    SBAdminView,
+    SBAdminBaseListView,
+):
     translated_fields = None
     list_template_name = "sb_admin/actions/translations-list.html"
     FORM_BASE_ID = "translation-form-"
@@ -321,16 +325,12 @@ class ModelTranslationView(SBAdminView, SBAdminBaseListView):
                 if translation_form_widgets.get(field_name):
                     continue
 
-                widget = SBAdminInlineAndAdminCommon.formfield_widgets.get(
-                    field.__class__
+                db_field = translated_model._meta.get_field(field_name)
+                self.assign_widget_to_form_field(
+                    field,
+                    db_field=db_field,
+                    request=request,
                 )
-                if not widget:
-                    continue
-                choices = getattr(field, "choices", None)
-                if choices:
-                    field.widget = widget(form_field=field, choices=choices)
-                    continue
-                field.widget = widget(form_field=field)
 
             for language_code in self.get_display_language_codes(
                 request, include_main=True
