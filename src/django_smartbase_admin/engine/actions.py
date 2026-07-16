@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy as _
@@ -68,6 +70,13 @@ class TableDataEditForm(forms.Form):
             )
             for field in editable_fields
         ]
+
+    def clean_currentRowId(self):
+        row_id = self.cleaned_data["currentRowId"]
+        try:
+            return json.loads(row_id)
+        except (TypeError, json.JSONDecodeError):
+            return row_id
 
 
 class SBAdminCustomAction(object):

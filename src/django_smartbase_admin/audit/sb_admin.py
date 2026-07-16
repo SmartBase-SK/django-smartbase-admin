@@ -3,7 +3,6 @@ SBAdmin registration for AdminAuditLog.
 Provides rich filtering and history browsing.
 """
 
-import json
 from pprint import pformat
 
 from django.contrib.auth import get_user_model
@@ -652,13 +651,14 @@ class AdminAuditLogAdmin(SBAdmin):
     @sbadmin_action(permission="view")
     def action_list_json(self, request, modifier, object_id=None, page_size=None):
         """Override to ensure object_history filter is cached before processing rows."""
-        from django.http import JsonResponse
-
         # Ensure filter is parsed and cached (may already be done by get_queryset)
         self._parse_and_cache_object_history_filter(request)
-        action = self.sbadmin_list_action_class(self, request, page_size=page_size)
-        data = action.get_json_data()
-        return JsonResponse(data=data, safe=False)
+        return super().action_list_json(
+            request,
+            modifier,
+            object_id=object_id,
+            page_size=page_size,
+        )
 
     def _get_object_history_widget(self):
         """Get the ObjectHistoryFilterWidget instance from sbadmin_list_display."""
@@ -717,7 +717,7 @@ class AdminAuditLogAdmin(SBAdmin):
         subject = "" if hide_obj else f'{model} "{obj_repr}" '
 
         if is_bulk:
-            msg = f'{action.replace("_", " ").title()} {bulk_count} {model}{"s" if bulk_count != 1 else ""}.'
+            msg = f"{action.replace('_', ' ').title()} {bulk_count} {model}{'s' if bulk_count != 1 else ''}."
         elif action == "create":
             msg = f"Added {subject.strip()}."
         elif action == "delete":

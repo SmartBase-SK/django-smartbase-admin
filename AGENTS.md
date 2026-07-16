@@ -220,15 +220,19 @@ change form. The pieces:
 
    The module does two things: installs the per-cell `editable` gate (see below) and wires
    `cellEdited → POST` to the `action_table_data_edit` action.
-3. **Implement `action_table_data_edit`** on the view (the base is a stub that returns
-   "Not Implemented"). It must be decorated with `@sbadmin_action`; it receives
-   `currentRowId`, `columnFieldName`, and `cellValue` in `request.POST` and is responsible
-   for persisting the change. Return `render_notifications(request)` (optionally with an
+3. **Implement `table_data_edit_form_valid`** on the view. The inherited
+   `action_table_data_edit` validates the request with `TableDataEditForm` and calls this
+   hook with the bound form. Its `cleaned_data` contains `currentRowId` (already decoded
+   from JSON), `columnFieldName`, and `cellValue`. Persist the change and return an
+   `HttpResponse`, commonly with `render_notifications(request)` (optionally with an
    `HX-Trigger: SBAdminReloadTableData` header via `trigger_client_event` to refresh the
-   table after the edit).
+   table after the edit). Override
+   `table_data_edit_form_invalid(request, form, object_id)` to customize the default HTTP
+   400 response.
 
 ```python
-from django_smartbase_admin.engine.actions import sbadmin_action
+from django.http import HttpResponse
+
 from django_smartbase_admin.utils import render_notifications
 
 class MyAdmin(SBAdmin):
@@ -239,12 +243,11 @@ class MyAdmin(SBAdmin):
         definition["modules"].append("dataEditModule")
         return definition
 
-    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
-    def action_table_data_edit(self, request, modifier, object_id=None):
-        row_id = json.loads(request.POST.get("currentRowId", "null"))
-        column = request.POST.get("columnFieldName", "")
-        value = request.POST.get("cellValue", "")
-        ...  # validate + persist
+    def table_data_edit_form_valid(self, request, form, object_id):
+        row_id = form.cleaned_data["currentRowId"]
+        column = form.cleaned_data["columnFieldName"]
+        value = form.cleaned_data["cellValue"]
+        ...  # authorize + persist
         return HttpResponse(status=200, content=render_notifications(request))
 ```
 
@@ -285,11 +288,11 @@ Rules and gotchas:
   `per_cell_editable_field`.
 - **Needs the `dataEditModule`.** Both the `editable` gate (via `modifyTabulatorOptions`) and
   the save pipeline live in that module.
-- **Keep the built-in MCP components on overrides.** An implementation that overrides
-  `action_table_data_edit` must use
-  `@sbadmin_action(mcp_components="get_table_data_edit_form_components")`. The inherited
-  provider returns `{"main": TableDataEditForm(...)}`, with `columnFieldName` choices
-  derived from the request's fields that declare `tabulator_editor`.
+- **Override `table_data_edit_form_valid`, not the action.** This keeps the inherited form
+  validation and MCP component metadata. The form restricts `columnFieldName` to fields
+  that declare `tabulator_editor`.
+- **Customize form responses through the dedicated hooks.** Override
+  `table_data_edit_form_invalid` when the default HTTP 400 response is not suitable.
 - Editing an ungated cell still POSTs to `action_table_data_edit`; enforce real
   authorization/validation there too — the client gate is UX only.
 
@@ -6022,8 +6025,8 @@ urlpatterns = [
 
 Exposed endpoints:
 
-- MCP JSON-RPC: `{SITE_ROOT}mcp/` (trailing slash). Set `DJANGO_MCP_ENDPOINT = "mcp/"`.
-- Optional REST `list_rows`: `{SITE_ROOT}{DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` (for `DJANGO_MCP_ENDPOINT = "mcp/"`, this is `{SITE_ROOT}mcp/rest/tools/list_rows/`). This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
+- MCP JSON-RPC: `{SITE_ROOT}mcp`. Set `DJANGO_MCP_ENDPOINT = "mcp"` without a trailing slash; remote clients such as Claude canonicalize the URL to `/mcp` and do not replay protocol POSTs across Django's slash redirect.
+- Optional REST `list_rows`: `{SITE_ROOT}{DJANGO_MCP_ENDPOINT}/rest/tools/list_rows/` (for `DJANGO_MCP_ENDPOINT = "mcp"`, this is `{SITE_ROOT}mcp/rest/tools/list_rows/`). This route exists in `django_smartbase_admin.mcp.urls`, but only works when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured.
 
 ### MCP Settings
 
@@ -6042,7 +6045,7 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
     "instructions": SBADMIN_MCP_SERVER_INSTRUCTIONS,  # optional: + deployment appendix
     "stateless": True,
 }
-DJANGO_MCP_ENDPOINT = "mcp/"
+DJANGO_MCP_ENDPOINT = "mcp"
 ```
 
 This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
@@ -6239,13 +6242,13 @@ No HTTPS is needed locally; only if you serve the page on a non-loopback host (L
 
 ### Cursor — `.cursor/mcp.json`
 
-`.cursor/mcp.json` or `~/.cursor/mcp.json` — streamable HTTP `url` only (match `DJANGO_MCP_ENDPOINT`, trailing slash). Prod: **HTTPS** origin; oauthlib enforces TLS (no `OAUTHLIB_INSECURE_TRANSPORT`). Local `http://` only: set that env on Django. Cursor **Connect** for bundled OAuth (PKCE + DCR).
+`.cursor/mcp.json` or `~/.cursor/mcp.json` — streamable HTTP `url` only (use the canonical slashless URL). Prod: **HTTPS** origin; oauthlib enforces TLS (no `OAUTHLIB_INSECURE_TRANSPORT`). Local `http://` only: set that env on Django. Cursor **Connect** for bundled OAuth (PKCE + DCR).
 
 ```json
 {
   "mcpServers": {
     "sbadmin": {
-      "url": "https://admin.example.com/mcp/"
+      "url": "https://admin.example.com/mcp"
     }
   }
 }

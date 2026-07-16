@@ -55,6 +55,16 @@ class FolderDetailTestAdmin(SBAdmin):
         return obj.children.count() if obj else 0
 
 
+class SelfOnlyFolderDetailAdmin(FolderDetailTestAdmin):
+    """Mirror profile admins that hide every object except request.user."""
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field=from_field)
+        if obj is not None and obj.pk != request.user.pk:
+            raise PermissionDenied
+        return obj
+
+
 class ChildFolderListWidget(SBAdminDashboardListWidget):
     widget_id = "child_folder_list_widget"
     model = Folder
@@ -314,7 +324,11 @@ class FetchDetailTests(_FetchDetailTestBase):
 
         denied_user = MagicMock(is_authenticated=True, is_superuser=False)
         MCPToolTestConfig.view_permission_for = set()
-        with self.assertRaises((PermissionError, PermissionDenied)):
+        with self.assertRaisesRegex(
+            PermissionError,
+            rf"User has no view permission on object pk='{self.parent.pk}' "
+            r"in admin 'filer_folder'\.",
+        ):
             self._fetch(self.parent.pk, user=denied_user)
 
     def test_restrict_queryset_hides_object(self):
@@ -333,6 +347,30 @@ class FetchDetailTests(_FetchDetailTestBase):
             self._fetch(self.parent.pk)  # sanity: un-filtered still resolves
         finally:
             MCPToolTestConfig.restrict_qs = None
+
+
+class FetchSelfOnlyDetailTests(_FetchDetailTestBase):
+    admin_class = SelfOnlyFolderDetailAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.own_folder = Folder.objects.create(name="own")
+        cls.foreign_folder = Folder.objects.create(name="foreign")
+
+    def test_bare_permission_denied_reports_object_and_admin(self):
+        user = MagicMock(
+            pk=self.own_folder.pk,
+            id=self.own_folder.pk,
+            is_authenticated=True,
+            is_superuser=True,
+        )
+
+        with self.assertRaisesRegex(
+            PermissionError,
+            rf"User has no view permission on object pk='{self.foreign_folder.pk}' "
+            r"in admin 'filer_folder'\.",
+        ):
+            self._fetch(self.foreign_folder.pk, user=user)
 
 
 class FetchDetailWidgetTests(_FetchDetailTestBase):

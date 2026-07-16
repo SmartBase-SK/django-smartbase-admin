@@ -803,26 +803,36 @@ class SBAdminBaseListView(SBAdminBaseView):
             )
         return JsonResponse({"message": request.POST})
 
+    def get_table_data_edit_form(self, request, data=None):
+        editable_fields = [
+            field
+            for field in self.get_field_map(request).values()
+            if field.tabulator_editor
+        ]
+        return TableDataEditForm(data=data, editable_fields=editable_fields)
+
     def get_table_data_edit_form_components(self, request):
         try:
-            editable_fields = [
-                field
-                for field in self.get_field_map(request).values()
-                if field.tabulator_editor
-            ]
+            form = self.get_table_data_edit_form(request)
         except ImproperlyConfigured:
             return None
-        if not editable_fields:
+        if not form.fields["columnFieldName"].choices:
             return None
-        return {"main": TableDataEditForm(editable_fields=editable_fields)}
+        return {"main": form}
+
+    def table_data_edit_form_valid(self, request, form, object_id) -> HttpResponse:
+        messages.add_message(request, messages.ERROR, _("Not Implemented"))
+        return HttpResponse(status=200, content=render_notifications(request))
+
+    def table_data_edit_form_invalid(self, request, form, object_id) -> HttpResponse:
+        return HttpResponse(status=400, content=render_notifications(request))
 
     @sbadmin_action(mcp_components="get_table_data_edit_form_components")
     def action_table_data_edit(self, request, modifier, object_id=None) -> HttpResponse:
-        current_row_id = json.loads(request.POST.get("currentRowId", ""))
-        column_field_name = request.POST.get("columnFieldName", "")
-        cell_value = request.POST.get("cellValue", "")
-        messages.add_message(request, messages.ERROR, "Not Implemented")
-        return HttpResponse(status=200, content=render_notifications(request))
+        form = self.get_table_data_edit_form(request, data=request.POST)
+        if form.is_valid():
+            return self.table_data_edit_form_valid(request, form, object_id)
+        return self.table_data_edit_form_invalid(request, form, object_id)
 
     def init_actions(self, request) -> None:
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)

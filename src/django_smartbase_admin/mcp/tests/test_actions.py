@@ -8,7 +8,6 @@ full list-action / autocomplete-search code paths end to end.
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 from django.core.exceptions import PermissionDenied
@@ -20,7 +19,6 @@ from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import Action
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
@@ -68,13 +66,12 @@ class FolderActionsTestAdmin(SBAdmin):
     )
     sbadmin_fieldsets = ((None, {"fields": ("name", "parent")}),)
 
-    @sbadmin_action(mcp_components="get_table_data_edit_form_components")
-    def action_table_data_edit(self, request, modifier, object_id=None):
+    def table_data_edit_form_valid(self, request, form, object_id):
         return JsonResponse(
             {
-                "row_id": json.loads(request.POST["currentRowId"]),
-                "column": request.POST["columnFieldName"],
-                "value": request.POST["cellValue"],
+                "row_id": form.cleaned_data["currentRowId"],
+                "column": form.cleaned_data["columnFieldName"],
+                "value": form.cleaned_data["cellValue"],
             }
         )
 
@@ -264,11 +261,49 @@ class ListRowsTests(_ToolTestBase):
         self.assertEqual(main_errors["type"], "form")
         self.assertIn("columnFieldName", main_errors["fields"])
 
+        for row_id in (
+            "3b6f49fe-51eb-4f01-9a36-cf1518279c6a",
+            "folder-root",
+        ):
+            with self.subTest(row_id=row_id):
+                string_id_result = SBAdminTools(
+                    request=build_mcp_request(user)
+                ).invoke_action(
+                    "filer_folder",
+                    Action.TABLE_DATA_EDIT.value,
+                    component_values={
+                        "main": {
+                            "currentRowId": row_id,
+                            "columnFieldName": "editable_name",
+                            "cellValue": "updated",
+                        }
+                    },
+                )
+                self.assertEqual(string_id_result["status"], "ok")
+                self.assertEqual(string_id_result["row_id"], row_id)
+
         with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(user)).invoke_action(
                 "filer_folder",
                 Action.LIST_JSON.value,
             )
+
+    def test_table_data_edit_invalid_form_response_is_overridable(self):
+        admin_view = sb_admin_site._registry[Folder]
+        form = MagicMock()
+        form.is_valid.return_value = False
+        admin_view.get_table_data_edit_form = MagicMock(return_value=form)
+        admin_view.table_data_edit_form_invalid = MagicMock(
+            return_value=JsonResponse({"status": "custom-invalid"}, status=422)
+        )
+
+        request = MagicMock(POST={})
+        response = admin_view.action_table_data_edit(request, modifier=None)
+
+        self.assertEqual(response.status_code, 422)
+        admin_view.table_data_edit_form_invalid.assert_called_once_with(
+            request, form, None
+        )
 
     def test_mcp_action_permission_is_checked_before_component_provider(self):
         class FolderTableEditDeniedAdmin(FolderActionsTestAdmin):
