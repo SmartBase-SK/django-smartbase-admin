@@ -262,6 +262,12 @@ class FolderInvokeTestAdmin(SBAdmin):
 
     @sbadmin_action
     def action_touch(self, request, modifier, object_id):
+        # Mirrors admin actions that prepare POST before delegating to a
+        # regular Django view, such as Neoship's impersonation action.
+        post_data = request.POST.copy()
+        post_data["object_id"] = str(object_id)
+        request.POST = post_data
+
         obj = self.get_queryset(request).get(pk=object_id)
         obj.name = f"{obj.name}!"
         obj.save()

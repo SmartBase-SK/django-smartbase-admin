@@ -244,17 +244,17 @@ class ListAdminsTests(TestCase):
         finally:
             sb_admin_site._registry.pop(FolderProxy, None)
 
-    def test_bridge_is_a_no_op_when_request_data_already_set(self):
-        """``_ensure_sbadmin_request_data`` must respect a pre-bridged
-        request — otherwise tests with mocked configurations would have
-        their fixture clobbered by ``SBAdminConfigurationService``."""
+    def test_toolset_unwraps_drf_request_and_preserves_request_data(self):
+        """SBAdmin receives Django's request without losing MCP context."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
         request = build_mcp_request(user)
         original_config = request.request_data.configuration
+        tools = SBAdminTools(request=request)
 
-        SBAdminTools(request=request).list_admins()["admin_views"]
+        tools.list_admins()["admin_views"]
 
-        self.assertIs(request.request_data.configuration, original_config)
+        self.assertIs(tools.request, request._request)
+        self.assertIs(tools.request.request_data.configuration, original_config)
 
     def test_search_fields_surface_when_admin_declares_them(self):
         """``search_fields`` must mirror what the admin would actually

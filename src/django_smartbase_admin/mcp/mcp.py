@@ -5,12 +5,12 @@ each public method on an ``MCPToolset`` subclass becomes one MCP tool.
 
 Tool methods stay thin — orchestration only — and delegate to:
 
-* ``bridge``    — DRF/MCP request <-> SBAdmin pipeline.
+* ``bridge``    — MCP transport request <-> SBAdmin pipeline.
 * ``resolvers`` — agent identifier -> SBAdmin object.
 * ``schema``    — ``list_admins`` discovery payload.
 
-``self.request`` is the live DRF request; ``self.request.user`` is
-whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
+``self.request`` is the underlying Django request; ``self.request.user``
+is whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_sbadmin_request_data,
     set_request_payload,
     strip_html_cells,
+    unwrap_drf_request,
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
@@ -332,6 +333,9 @@ class SBAdminTools(MCPToolset):
     and row errors; each error is ``{"code", "message"}``. Permission denials
     raise ``PermissionError``; invisible objects raise ``LookupError``.
     """
+
+    def __init__(self, context=None, request=None):
+        super().__init__(context=context, request=unwrap_drf_request(request))
 
     @_guarded_tool_call
     def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
