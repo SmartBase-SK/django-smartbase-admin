@@ -22,6 +22,7 @@ from urllib.parse import unquote
 
 from django.contrib import messages as django_messages
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.forms.forms import BaseForm
 from django.forms.formsets import BaseFormSet
 from django.http import Http404, QueryDict
@@ -60,6 +61,15 @@ logger = logging.getLogger(__name__)
 # exports / small PDFs. Larger downloads fail loud rather than silently
 # truncating.
 MAX_INLINE_DOWNLOAD_BYTES = 5 * 1024 * 1024
+
+
+class ActionInvoker(models.TextChoices):
+    ROW = "invoke_row_action"
+    DETAIL = "invoke_detail_action"
+    INLINE = "invoke_inline_action"
+    LIST = "invoke_list_action"
+    SELECTION = "invoke_selection_action"
+    MCP = "invoke_action"
 
 
 @cache
@@ -269,23 +279,33 @@ def action_entries_for(action) -> list[dict]:
 # name, e.g. ``row_actions`` → ``invoke_row_action``) so individual
 # action entries don't need to repeat ``invoke_with`` ~30 times per
 # response.
-_INVOKE_TOOL_BY_GETTER = {
-    "get_sbadmin_row_actions_processed": "invoke_row_action",
-    "get_sbadmin_detail_actions_processed": "invoke_detail_action",
-    "get_sbadmin_inline_list_actions_processed": "invoke_inline_action",
-    "get_sbadmin_list_actions_processed": "invoke_list_action",
-    "get_sbadmin_list_selection_actions_processed": "invoke_selection_action",
+_INVOKE_TOOL_BY_GETTER: dict[str, ActionInvoker] = {
+    "get_sbadmin_row_actions_processed": ActionInvoker.ROW,
+    "get_sbadmin_detail_actions_processed": ActionInvoker.DETAIL,
+    "get_sbadmin_fieldsets_actions_processed": ActionInvoker.DETAIL,
+    "get_sbadmin_inline_list_actions_processed": ActionInvoker.INLINE,
+    "get_sbadmin_list_actions_processed": ActionInvoker.LIST,
+    "get_sbadmin_list_selection_actions_processed": ActionInvoker.SELECTION,
+}
+
+_ACTION_GETTERS_BY_INVOKER: dict[ActionInvoker, tuple[str, ...]] = {
+    invoker: tuple(
+        getter
+        for getter, mapped_invoker in _INVOKE_TOOL_BY_GETTER.items()
+        if mapped_invoker == invoker
+    )
+    for invoker in dict.fromkeys(_INVOKE_TOOL_BY_GETTER.values())
 }
 
 # Top-level legend: action-list field name → MCP tool to invoke entries
 # in that list. ``fieldset_actions`` are merged into ``detail_actions``.
-ACTION_INVOKERS: dict[str, str] = {
-    "row_actions": "invoke_row_action",
-    "detail_actions": "invoke_detail_action",
-    "list_actions": "invoke_list_action",
-    "selection_actions": "invoke_selection_action",
-    "inline_actions": "invoke_inline_action",
-    "mcp_actions": "invoke_action",
+ACTION_INVOKERS: dict[str, ActionInvoker] = {
+    "row_actions": ActionInvoker.ROW,
+    "detail_actions": ActionInvoker.DETAIL,
+    "list_actions": ActionInvoker.LIST,
+    "selection_actions": ActionInvoker.SELECTION,
+    "inline_actions": ActionInvoker.INLINE,
+    "mcp_actions": ActionInvoker.MCP,
 }
 
 
@@ -316,8 +336,8 @@ def collect_action_entries(
     # Strip it from entries whose invoke tool would ignore it so the
     # agent doesn't see a value it can't use.
     surface_modifier = invoke_with in {
-        "invoke_list_action",
-        "invoke_selection_action",
+        ActionInvoker.LIST,
+        ActionInvoker.SELECTION,
     }
     entries: list[dict] = []
     for action in actions:
@@ -334,6 +354,82 @@ def collect_action_entries(
                 exc_info=True,
             )
     return entries
+
+
+def validate_ui_action_invoker(
+    source,
+    request,
+    *,
+    action_id: str,
+    expected_invoker: ActionInvoker,
+    object_id: str | None = None,
+) -> None:
+    """Validate that a UI action is published for ``expected_invoker``.
+
+    Processed action getters are the source of truth, matching discovery and
+    its permission filtering. An explicitly MCP-exposed method is a separate
+    family invoked through ``invoke_action``; a bare ``@sbadmin_action`` method
+    belongs to no MCP family unless an action list publishes it.
+    """
+    if expected_invoker not in _ACTION_GETTERS_BY_INVOKER:
+        raise ValueError(f"Unknown MCP action invoker {expected_invoker!r}.")
+
+    entries_by_invoker: dict[ActionInvoker, list[dict]] = {}
+
+    def entries_for(invoker: ActionInvoker) -> list[dict]:
+        if invoker in entries_by_invoker:
+            return entries_by_invoker[invoker]
+
+        entries: list[dict] = []
+        for getter_name in _ACTION_GETTERS_BY_INVOKER[invoker]:
+            if not hasattr(source, getter_name):
+                continue
+            getter_kwargs = {}
+            if getter_name in {
+                "get_sbadmin_detail_actions_processed",
+                "get_sbadmin_fieldsets_actions_processed",
+            }:
+                getter_kwargs["object_id"] = object_id
+            entries.extend(
+                collect_action_entries(
+                    source,
+                    getter_name,
+                    request,
+                    **getter_kwargs,
+                )
+            )
+        entries_by_invoker[invoker] = entries
+        return entries
+
+    if any(
+        entry.get("action_id") == action_id for entry in entries_for(expected_invoker)
+    ):
+        return
+
+    actual_invokers = [
+        invoker
+        for invoker in _ACTION_GETTERS_BY_INVOKER
+        if invoker != expected_invoker
+        and any(entry.get("action_id") == action_id for entry in entries_for(invoker))
+    ]
+    if any(
+        entry.get("action_id") == action_id
+        for entry in collect_mcp_method_action_entries(source, request)
+    ):
+        actual_invokers.append(ActionInvoker.MCP)
+
+    view_id = source.get_id()
+    if actual_invokers:
+        allowed = ", ".join(actual_invokers)
+        raise LookupError(
+            f"Action {action_id!r} on view {view_id!r} cannot be invoked with "
+            f"{expected_invoker}; use {allowed}."
+        )
+    raise LookupError(
+        f"Action {action_id!r} is not available through {expected_invoker} "
+        f"on view {view_id!r}. Copy action_id from the matching action list "
+        "in list_admins() or fetch_detail()."
+    )
 
 
 def resolve_action_modifier(admin, request, getter_name, action_id):
