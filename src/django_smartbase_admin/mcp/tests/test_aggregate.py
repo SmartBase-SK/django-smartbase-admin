@@ -5,17 +5,21 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.db.models import F
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
+from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
 )
+from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
 
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
@@ -25,7 +29,16 @@ class _Admin(SBAdmin):
     search_fields = ("name",)
     # ``children`` is the reverse of the self-FK ``parent`` → a one-to-many
     # (multi-valued) field, used to exercise the join fan-out path.
-    sbadmin_list_display = ("id", "name", "id_alias", "count", "parent", "children")
+    sbadmin_list_display = (
+        "id",
+        "name",
+        "id_alias",
+        SBAdminField(name="user_display", annotate=F("owner__username")),
+        "count",
+        "parent",
+        "children",
+    )
+    sbadmin_nested = {"parent_field": "parent"}
 
     # A method field with ``admin_order_field`` → backed by the ``id``
     # column via an annotation, so its ORM identifier is suffixed
@@ -59,9 +72,13 @@ class AggregateTests(TestCase):
             sb_admin_site._registry[Folder] = self._original
         super().tearDown()
 
-    def _tools(self):
+    def _tools(self, *, nested=False):
         user = MagicMock(is_authenticated=True, is_superuser=True)
-        return SBAdminTools(request=build_mcp_request(user))
+        request = build_mcp_request(user)
+        request.request_data.configuration.plugins = (
+            [TabulatorNestedPlugin] if nested else []
+        )
+        return SBAdminTools(request=request)
 
     def test_aggregates_span_full_filtered_set_not_the_page(self):
         ids = [Folder.objects.create(name=n).pk for n in ("a", "b", "c")]
@@ -171,6 +188,51 @@ class AggregateTests(TestCase):
             result["groups"],
             [{"group": {"id_alias": pk}, "aggregates": {"count": 1}} for pk in ids],
         )
+
+    def test_group_by_annotated_field_with_nested_plugin(self):
+        user_model = get_user_model()
+        user_a = user_model.objects.create_user(username="a-user")
+        user_b = user_model.objects.create_user(username="b-user")
+        a = Folder.objects.create(name="a", owner=user_a)
+        Folder.objects.create(name="a-child", parent=a, owner=user_a)
+        Folder.objects.create(name="b", owner=user_b)
+
+        result = self._tools(nested=True).list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            group_by=["user_display"],
+            aggregate=[{"fn": "count"}],
+        )
+
+        self.assertEqual(
+            result["groups"],
+            [
+                {
+                    "group": {"user_display": "a-user"},
+                    "aggregates": {"count": 1},
+                },
+                {
+                    "group": {"user_display": "b-user"},
+                    "aggregates": {"count": 1},
+                },
+            ],
+        )
+
+    def test_aggregate_annotated_field_with_nested_plugin(self):
+        user_model = get_user_model()
+        user_a = user_model.objects.create_user(username="a-user")
+        user_b = user_model.objects.create_user(username="b-user")
+        a = Folder.objects.create(name="a", owner=user_a)
+        Folder.objects.create(name="a-child", parent=a, owner=user_a)
+        Folder.objects.create(name="b", owner=user_b)
+
+        result = self._tools(nested=True).list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            aggregate=[{"fn": "count", "field": "user_display"}],
+        )
+
+        self.assertEqual(result["aggregates"], {"count_user_display": 2})
 
     def test_group_key_equal_to_aggregate_alias_does_not_collide(self):
         # ``count`` is a method field whose public name equals the derived

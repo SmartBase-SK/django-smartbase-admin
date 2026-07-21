@@ -936,7 +936,11 @@ class SBAdminListAction(SBAdminAction):
         queryset = self.search_in_queryset(queryset)
         request = self.threadsafe_request
         for plugin in request.request_data.configuration.plugins:
-            queryset = plugin.modify_count_queryset(self, request=request, qs=queryset)
+            queryset = plugin.modify_aggregate_queryset(
+                self,
+                request=request,
+                qs=queryset,
+            )
 
         # GROUP BY: no group_by → a single constant group, so the scalar
         # case falls out of the same path.
