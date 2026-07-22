@@ -45,6 +45,7 @@ from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db.models import F, OuterRef, Subquery
 
 from django_smartbase_admin.plugins.base import SBAdminPlugin
+from django_smartbase_admin.services.views import SBAdminViewService
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -167,9 +168,43 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         nested = resolve_nested(action.view, request)
         if nested is None:
             return qs
-        # Count needs distinct parent groups only.
         return cls._build_parent_group_qs(
             action, qs, nested, include_sort_columns=False
+        )
+
+    @classmethod
+    def modify_aggregate_queryset(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        qs: "QuerySet",
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """Retain parent grouping on a queryset that can be aggregated.
+
+        Django cannot add the annotations required by aggregation after the
+        ``UNION`` returned by :meth:`modify_count_queryset`. Re-wrap those
+        parent ids in a ``pk__in`` subquery so annotations remain selectable.
+        The extra query layer can be slower than counting the plain union,
+        which is why it is used only for aggregates and not pagination counts.
+        """
+        nested = resolve_nested(action.view, request)
+        if nested is None:
+            return qs
+        parent_ids = cls._build_parent_group_qs(
+            action, qs, nested, include_sort_columns=False
+        )
+        annotation_names = list(qs.query.annotation_select)
+        annotations = SBAdminViewService.get_annotates(
+            action.view.model,
+            annotation_names,
+            action.column_fields,
+        )
+        queryset = action.get_data_queryset(visible_fields=[])
+        if annotations:
+            queryset = queryset.annotate(**annotations)
+        return queryset.filter(
+            **{f"{action.get_pk_field().name}__in": Subquery(parent_ids)}
         )
 
     @classmethod

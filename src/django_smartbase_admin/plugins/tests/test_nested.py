@@ -25,6 +25,7 @@ from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminRowAction
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
+from django_smartbase_admin.plugins.base import SBAdminPlugin
 from django_smartbase_admin.plugins.nested import (
     LAST_CHILD_FIELD,
     TabulatorNestedPlugin,
@@ -203,6 +204,28 @@ class TabulatorNestedPluginTests(TestCase):
         self.assertTrue(parent_group_queries)
         self.assertTrue(any("UNION" in query for query in parent_group_queries))
         self.assertFalse(any("COALESCE" in query for query in parent_group_queries))
+
+    def test_count_queryset_keeps_union_as_top_level_query(self):
+        view, request = self._make_view_and_request()
+        action = view.sbadmin_list_action_class(view, request)
+
+        queryset = action.build_final_data_count_queryset()
+
+        self.assertEqual(queryset.query.combinator, "union")
+
+    def test_aggregate_hook_defaults_to_count_hook(self):
+        class CountOnlyPlugin(SBAdminPlugin):
+            @classmethod
+            def modify_count_queryset(cls, action, request, qs, **kwargs):
+                return qs.filter(name="root_a")
+
+        queryset = CountOnlyPlugin.modify_aggregate_queryset(
+            action=None,
+            request=None,
+            qs=Folder.objects.all(),
+        )
+
+        self.assertEqual(list(queryset.values_list("name", flat=True)), ["root_a"])
 
     def test_action_list_json_respects_restrict_queryset_on_fk_parent(self):
         """``restrict_queryset`` must gate what can act as a parent,

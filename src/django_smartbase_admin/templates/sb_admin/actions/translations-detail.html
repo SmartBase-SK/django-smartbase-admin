@@ -24,17 +24,17 @@
                 </div>
             </div>
             <hr class="-mx-24 mb-24">
+            {% for language_code, form_list in translation_forms.items %}
+                {% for form in form_list %}
+                    {% if form.errors %}
+                        {% include "sb_admin/includes/form_error_alert.html" with errors_count=form.errors.items|length non_field_errors=form.non_field_errors %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
             <div class="flex flex-wrap -mx-32">
                 {% for language_code, form_list in translation_forms.items %}
                     {% with first_lang=forloop.first %}
                         {% for form in form_list %}
-                            {% if form.non_field_errors %}
-                                <ul class="error__list">
-                                    {% for error in form.non_field_errors %}
-                                        <li class="error__item">{{ error }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
                             <form action="" method="post" class="translation-form" id="{{ FORM_BASE_ID }}{{ language_code }}">
                                 {% csrf_token %}
                                 {% if back_url %}

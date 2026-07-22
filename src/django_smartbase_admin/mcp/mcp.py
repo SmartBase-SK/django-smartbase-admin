@@ -5,12 +5,12 @@ each public method on an ``MCPToolset`` subclass becomes one MCP tool.
 
 Tool methods stay thin — orchestration only — and delegate to:
 
-* ``bridge``    — DRF/MCP request <-> SBAdmin pipeline.
+* ``bridge``    — MCP transport request <-> SBAdmin pipeline.
 * ``resolvers`` — agent identifier -> SBAdmin object.
 * ``schema``    — ``list_admins`` discovery payload.
 
-``self.request`` is the live DRF request; ``self.request.user`` is
-whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
+``self.request`` is the underlying Django request; ``self.request.user``
+is whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
 """
 
 from __future__ import annotations
@@ -42,8 +42,10 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SORT_NAME,
 )
 from django_smartbase_admin.mcp.actions import (
+    ActionInvoker,
     SBAdminMCPActionFormService,
     SBAdminMCPActionInvokeService,
+    validate_ui_action_invoker,
 )
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.bridge import (
@@ -52,6 +54,7 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_sbadmin_request_data,
     set_request_payload,
     strip_html_cells,
+    unwrap_drf_request,
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
@@ -332,6 +335,9 @@ class SBAdminTools(MCPToolset):
     and row errors; each error is ``{"code", "message"}``. Permission denials
     raise ``PermissionError``; invisible objects raise ``LookupError``.
     """
+
+    def __init__(self, context=None, request=None):
+        super().__init__(context=context, request=unwrap_drf_request(request))
 
     @_guarded_tool_call
     def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
@@ -1312,6 +1318,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.ROW,
         )
 
     @_guarded_tool_call
@@ -1357,6 +1364,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.DETAIL,
         )
 
     @_guarded_tool_call
@@ -1405,6 +1413,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.INLINE,
         )
 
     def _invoke_per_object(
@@ -1414,6 +1423,7 @@ class SBAdminTools(MCPToolset):
         object_id,
         component_values,
         confirmed,
+        expected_invoker: ActionInvoker,
     ):
         request = self.request
         admin = resolve_admin(view_id, request=request)
@@ -1424,6 +1434,13 @@ class SBAdminTools(MCPToolset):
             method="GET",
         )
         admin.init_view_dynamic(request, request.request_data)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=expected_invoker,
+            object_id=str(object_id),
+        )
         return SBAdminMCPActionInvokeService.invoke_row(
             admin,
             request,
@@ -1486,6 +1503,12 @@ class SBAdminTools(MCPToolset):
         request = self.request
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=ActionInvoker.SELECTION,
+        )
         return SBAdminMCPActionInvokeService.invoke_selection(
             admin,
             request,
@@ -1543,6 +1566,12 @@ class SBAdminTools(MCPToolset):
         request = self.request
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=ActionInvoker.LIST,
+        )
         # Callers pass column-name keys (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
         # ``list_rows``, otherwise a filter-aware action gets the
