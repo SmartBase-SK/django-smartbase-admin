@@ -28,7 +28,9 @@ from django_smartbase_admin.engine.const import (
     Action,
     ADVANCED_FILTER_DATA_NAME,
     AUTOCOMPLETE_FORWARD_NAME,
+    AUTOCOMPLETE_MCP_PAGE_SIZE,
     AUTOCOMPLETE_PAGE_NUM,
+    AUTOCOMPLETE_PAGE_SIZE_NAME,
     AUTOCOMPLETE_SEARCH_NAME,
     BASE_PARAMS_NAME,
     COLUMNS_DATA_NAME,
@@ -1568,6 +1570,7 @@ class SBAdminTools(MCPToolset):
         widget_id: str,
         search: str = "",
         page: int = 1,
+        page_size: int = AUTOCOMPLETE_MCP_PAGE_SIZE,
     ) -> list[dict]:
         """Search an autocomplete-backed field — same dropdown the UI shows.
 
@@ -1590,10 +1593,16 @@ class SBAdminTools(MCPToolset):
             inside ``action_autocomplete`` itself.
           search: free text term — empty string returns the first page
             of all matches.
-          page: 1-indexed page number. Pages are 20 entries.
+          page: 1-indexed page number, in units of ``page_size``.
+          page_size: entries per call, default 100, clamped to 1000.
+            Pass 1000 to pull a whole option list in one call instead of
+            paging through it.
 
         Returns ``[{"value": ..., "label": ...}, ...]`` ready to drop
         into ``filter_data`` (or into a write call for form fields).
+        A full page (``len == page_size``) means there may be more —
+        raise ``page_size`` or ask for the next ``page``; a short page is
+        the end of the list.
         """
         request = self.request
         admin = resolve_admin(view_id, request=request)
@@ -1604,6 +1613,7 @@ class SBAdminTools(MCPToolset):
             post={
                 AUTOCOMPLETE_SEARCH_NAME: search,
                 AUTOCOMPLETE_PAGE_NUM: str(int(page)),
+                AUTOCOMPLETE_PAGE_SIZE_NAME: str(int(page_size)),
                 AUTOCOMPLETE_FORWARD_NAME: "{}",
             },
             method="POST",

@@ -22,7 +22,9 @@ What you can do:
   ``view_id`` and ``parent_object_id`` from ``fetch_detail.widgets``; read
   non-list widgets with ``fetch_widget_data``.
 * Look up a related record by name to get its id — for filtering by it or
-  setting it on a create/update form (``autocomplete``).
+  setting it on a create/update form (``autocomplete``). Raise its
+  ``page_size`` (default 100, max 1000) to read a whole option list in one
+  call instead of paging through it.
 * Create, update, and delete records — including their related rows
   (``create_object`` / ``update_detail`` / ``delete_objects``).
 * Run actions on a row, a detail page, the whole list, a selection, or an

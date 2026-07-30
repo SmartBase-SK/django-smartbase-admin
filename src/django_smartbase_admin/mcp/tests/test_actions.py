@@ -8,7 +8,8 @@ full list-action / autocomplete-search code paths end to end.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import json
+from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
@@ -19,10 +20,20 @@ from filer.models import Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.const import Action
+from django_smartbase_admin.engine.const import (
+    Action,
+    AUTOCOMPLETE_FORWARD_NAME,
+    AUTOCOMPLETE_MCP_PAGE_SIZE,
+    AUTOCOMPLETE_PAGE_NUM,
+    AUTOCOMPLETE_PAGE_SIZE,
+    AUTOCOMPLETE_PAGE_SIZE_NAME,
+    AUTOCOMPLETE_SEARCH_NAME,
+)
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
+from django_smartbase_admin.mcp.bridge import set_request_payload
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -453,3 +464,98 @@ class AutocompleteTests(_ToolTestBase):
             SBAdminTools(request=build_mcp_request(user)).autocomplete(
                 "filer_folder", widget_id, search="queue"
             )
+
+
+class AutocompletePageSizeTests(_ToolTestBase):
+    """``page_size`` exists so an agent reads a whole option list in one
+    call instead of walking 20-row pages. It is MCP-only: the browser
+    autocomplete keeps the fixed page size its infinite scroll and
+    "show the search box" heuristic assume."""
+
+    ROW_COUNT = 25
+
+    @classmethod
+    def setUpTestData(cls):
+        # More rows than the UI page size, fewer than the MCP default, so
+        # "one call returns everything" and "20 is the browser cap" are
+        # both observable under one fixture.
+        for index in range(cls.ROW_COUNT):
+            Folder.objects.create(name=f"opt_{index:02d}")
+
+    def setUp(self):
+        super().setUp()
+        self.user = MagicMock(is_authenticated=True, is_superuser=True)
+        admins = SBAdminTools(request=build_mcp_request(self.user)).list_admins()
+        folder = next(
+            a for a in admins["admin_views"] if a["view_id"] == "filer_folder"
+        )
+        self.widget_id = next(
+            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
+        )
+
+    def _autocomplete(self, **kwargs):
+        return SBAdminTools(request=build_mcp_request(self.user)).autocomplete(
+            "filer_folder", self.widget_id, **kwargs
+        )
+
+    def _search_via_action(self, post_data, is_mcp):
+        """Drive ``action_autocomplete`` the way the transport does, but
+        with the MCP flag under test — ``build_mcp_request`` leaves
+        ``is_mcp`` unset, so a request that skips the tool wrapper is
+        indistinguishable from a browser one."""
+        request = build_mcp_request(self.user)
+        if is_mcp:
+            request.is_mcp = True
+        set_request_payload(
+            request,
+            post={
+                AUTOCOMPLETE_SEARCH_NAME: "",
+                AUTOCOMPLETE_PAGE_NUM: "1",
+                AUTOCOMPLETE_FORWARD_NAME: "{}",
+                **post_data,
+            },
+            method="POST",
+        )
+        response = SBAdminViewService.delegate_to_action(
+            request,
+            view="filer_folder",
+            action=Action.AUTOCOMPLETE.value,
+            modifier=self.widget_id,
+        )
+        return json.loads(response.content.decode())["data"]
+
+    def test_default_page_size_returns_whole_option_list_in_one_call(self):
+        self.assertGreater(AUTOCOMPLETE_MCP_PAGE_SIZE, self.ROW_COUNT)
+        self.assertEqual(len(self._autocomplete()), self.ROW_COUNT)
+        self.assertEqual(len(self._autocomplete(page_size=1000)), self.ROW_COUNT)
+
+    def test_paging_is_in_units_of_page_size(self):
+        first = self._autocomplete(page_size=10, page=1)
+        second = self._autocomplete(page_size=10, page=2)
+        third = self._autocomplete(page_size=10, page=3)
+        self.assertEqual([len(first), len(second), len(third)], [10, 10, 5])
+        # Contiguous, non-overlapping slices of the same ordering.
+        values = [row["value"] for row in first + second + third]
+        self.assertEqual(len(set(values)), self.ROW_COUNT)
+        self.assertEqual(
+            values, [row["value"] for row in self._autocomplete(page_size=1000)]
+        )
+
+    def test_page_size_clamped_to_max(self):
+        with patch(
+            "django_smartbase_admin.engine.filter_widgets.AUTOCOMPLETE_MCP_PAGE_SIZE_MAX",
+            3,
+        ):
+            self.assertEqual(len(self._autocomplete(page_size=99999)), 3)
+
+    def test_invalid_page_size_falls_back_to_ui_page_size(self):
+        rows = self._search_via_action(
+            {AUTOCOMPLETE_PAGE_SIZE_NAME: "abc"}, is_mcp=True
+        )
+        self.assertEqual(len(rows), AUTOCOMPLETE_PAGE_SIZE)
+
+    def test_browser_request_ignores_page_size(self):
+        rows = self._search_via_action(
+            {AUTOCOMPLETE_PAGE_SIZE_NAME: "1000"}, is_mcp=False
+        )
+        self.assertEqual(len(rows), AUTOCOMPLETE_PAGE_SIZE)
