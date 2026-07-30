@@ -1104,6 +1104,17 @@ class SBAdminTools(MCPToolset):
         request = self.request
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)
+        # Bind the edited pk the way the UI detail URL does — object-scoped
+        # widget querysets read ``request_data.object_id`` to narrow their
+        # choices, and without it they validate against an empty queryset and
+        # reject every value with ``invalid_choice``. Mirrors
+        # ``_fetch_detail_payload`` on the read side.
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            object_id=str(object_id),
+            method="GET",
+        )
         admin.init_view_dynamic(request, request.request_data)
         try:
             return SBAdminMCPDetailService.update_detail_data(

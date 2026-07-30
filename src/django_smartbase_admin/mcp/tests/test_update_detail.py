@@ -50,6 +50,13 @@ class UpdateFolderWithInlineAdmin(UpdateFolderAdmin):
 
 
 class ViewOnlyFolderPermissionInline(FolderPermissionInline):
+    readonly_fields = ("type", "everybody", "can_read")
+    can_delete = False
+    max_num = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
     def has_change_permission(self, request, obj=None):
         return False
 
