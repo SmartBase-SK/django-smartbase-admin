@@ -529,6 +529,24 @@ class AutocompletePageSizeTests(_ToolTestBase):
         self.assertEqual(len(self._autocomplete()), self.ROW_COUNT)
         self.assertEqual(len(self._autocomplete(page_size=1000)), self.ROW_COUNT)
 
+    def test_page_size_applies_when_autocomplete_is_the_first_tool_call(self):
+        """``get_page_size`` gates on ``request.is_mcp``, which the bridge
+        sets in ``ensure_sbadmin_request_data``. The ``autocomplete`` tool
+        doesn't call that itself — it arrives through ``resolve_admin``,
+        before the payload is set and the action dispatched. Pin that:
+        a request whose *only* tool call is ``autocomplete`` must still be
+        flagged, or the widget silently falls back to the 20-row UI page.
+        """
+        request = build_mcp_request(self.user)
+        self.assertFalse(getattr(request, "is_mcp", False))
+
+        rows = SBAdminTools(request=request).autocomplete(
+            "filer_folder", self.widget_id, page_size=1000
+        )
+
+        self.assertTrue(request.is_mcp)
+        self.assertEqual(len(rows), self.ROW_COUNT)
+
     def test_paging_is_in_units_of_page_size(self):
         first = self._autocomplete(page_size=10, page=1)
         second = self._autocomplete(page_size=10, page=2)
