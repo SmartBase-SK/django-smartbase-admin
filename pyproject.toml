@@ -51,11 +51,23 @@ setuptools = "^67.0.0"
 django-oauth-toolkit = {version = "^3.2", optional = true}
 djangorestframework = {version = "^3.17", optional = true}
 django-mcp-server = {version = "^0.5.7", optional = true}
+# ``django-mcp-server`` asks for ``mcp>=1.8.0`` with no upper bound, but
+# ``mcp`` 2.0 dropped ``FastMCP`` (renamed ``MCPServer``, and the
+# ``mcp.server.fastmcp`` package is gone), so its
+# ``from mcp.server import FastMCP`` fails on a fresh install. Cap here
+# until upstream supports 2.x.
+mcp = {version = ">=1.8,<2", optional = true}
 # Allowlist HTML sanitizer for ``fetch_detail`` display values.
 nh3 = {version = ">=0.2.15", optional = true}
 
 [tool.poetry.extras]
-mcp = ["django-oauth-toolkit", "djangorestframework", "django-mcp-server", "nh3"]
+mcp = [
+    "django-oauth-toolkit",
+    "djangorestframework",
+    "django-mcp-server",
+    "mcp",
+    "nh3",
+]
 
 [build-system]
 requires = ["poetry-core"]
