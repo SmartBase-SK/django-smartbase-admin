@@ -421,6 +421,26 @@ def _filter_preset_entries(admin, request) -> list[dict]:
     return entries
 
 
+def admin_index_entry(admin) -> dict:
+    """Identity-only schema entry: enough to pick an admin, nothing more.
+
+    Deliberately request-free — no field, filter, inline, preset or action
+    resolution runs — so indexing every admin in a large deployment stays
+    cheap. Follow up with ``admin_entry`` for the one that was chosen.
+    """
+    opts = admin.model._meta
+    entry: dict = {
+        "view_id": admin.get_id(),
+        "app_label": opts.app_label,
+        "model": opts.object_name,
+        "verbose_name": str(opts.verbose_name),
+        "verbose_name_plural": str(opts.verbose_name_plural),
+    }
+    if admin.mcp_description:
+        entry["description"] = str(admin.mcp_description)
+    return entry
+
+
 def admin_entry(admin, request) -> dict:
     """Schema entry for one registered SBAdmin admin."""
     model = admin.model
