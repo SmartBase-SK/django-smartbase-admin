@@ -175,6 +175,13 @@ class TestMCPPermissions(TestCase):
         self.assertIn("alpha_perm", labels)
         self.assertNotIn("hidden_perm", labels)
 
+        # A page big enough to hold the whole table must not become a way
+        # around the restriction.
+        unpaged = SBAdminTools(request=build_mcp_request(user)).autocomplete(
+            "filer_folder", parent_widget_id, page_size=1000
+        )
+        self.assertNotIn("hidden_perm", " ".join(row["label"] for row in unpaged))
+
     def test_dynamic_list_display_gates_schema_and_field_handles(self):
         """``get_sbadmin_list_display(request)`` is the de-facto
         field-level permission gate. The same hidden field must:

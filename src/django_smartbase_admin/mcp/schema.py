@@ -99,7 +99,8 @@ WIDGET_SHAPES: dict[str, dict] = {
     "AutocompleteFilterWidget": {
         "value_shape": (
             "list of {'value': <pk>, 'label': <str>} entries — "
-            "pks resolved via the autocomplete tool"
+            "pks resolved via the autocomplete tool (raise its page_size, "
+            "max 1000, to read a whole option list in one call)"
         ),
         "example": [],
     },

@@ -6089,6 +6089,12 @@ Authentication is configured once via `SBADMIN_MCP_REST_AUTHENTICATOR`; host pro
 SBADMIN_MCP_REST_AUTHENTICATOR = "my_project.mcp_auth.MyMCPRestAuthenticator"
 ```
 
+### Autocomplete page size
+
+The `autocomplete` MCP tool takes `page_size` (default `AUTOCOMPLETE_MCP_PAGE_SIZE = 100`, clamped to `AUTOCOMPLETE_MCP_PAGE_SIZE_MAX = 1000`), so an agent can read a whole option list in one call instead of walking pages. It travels as the `__pageSize__` post key and `AutocompleteFilterWidget.get_page_size()` honours it **only when `request.is_mcp`** — browser autocomplete stays on the fixed `AUTOCOMPLETE_PAGE_SIZE = 20`, which the JS infinite scroll and the "show the search box" heuristic both depend on. Invalid or missing values fall back to 20.
+
+`request.is_mcp` is set by `ensure_sbadmin_request_data` (`mcp/bridge.py`). The `autocomplete` tool doesn't call it directly — it arrives via `resolve_admin(view_id, request=request)` at the top of the tool, before the payload is set and the action dispatched, so a request whose first and only tool call is `autocomplete` is flagged too. A `resolve_admin` that stops bridging would silently drop every MCP caller back to 20 rows; `AutocompletePageSizeTests.test_page_size_applies_when_autocomplete_is_the_first_tool_call` pins it.
+
 ### Dashboard Usage
 
 `POST {DJANGO_MCP_ENDPOINT}rest/tools/list_rows/` can back local live dashboards when `SBADMIN_MCP_REST_AUTHENTICATOR` is configured and an authenticated probe succeeds. A 401 response means the REST authenticator rejected the request or is not configured for that deployment.
