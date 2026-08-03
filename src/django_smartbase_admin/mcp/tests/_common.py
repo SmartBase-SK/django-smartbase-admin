@@ -20,13 +20,12 @@ __all__ = ["MCPToolTestConfig", "build_mcp_request"]
 
 
 def build_mcp_request(user, *, path: str = "/mcp/"):
-    """DRF-wrapped request pre-bridged into the SBAdmin pipeline.
+    """Build the DRF request presented at the MCP transport boundary.
 
     Wraps a ``RequestFactory`` ``WSGIRequest`` in a DRF ``Request`` so
-    tests exercise the same request shape ``django-mcp-server`` hands
-    to ``SBAdminTools`` in production — ``request.POST`` / ``GET`` /
-    ``method`` go through DRF's read-only properties, ``request.user``
-    / ``request.session`` are attached directly on the wrapper.
+    tests exercise the request shape ``django-mcp-server`` hands to
+    ``SBAdminTools``. The toolset must unwrap it before any SBAdmin code
+    or admin action receives the request.
 
     Tests can still mutate ``request.request_data.request_get`` /
     ``request_post`` directly to drive each tool.

@@ -11,15 +11,18 @@ Hook pipeline (in call order):
 1. ``modify_tabulator_definition`` — Tabulator JSON sent to the client.
 2. ``modify_count_queryset`` — the qs ``.count()`` runs on (e.g. group
    by parent id so pagination counts parent groups, not rows).
-3. ``modify_base_queryset`` — unfiltered ``.values()``-applied qs;
+3. ``modify_aggregate_queryset`` — the qs list aggregates run on. By
+   default delegates to ``modify_count_queryset`` so existing plugins
+   preserve their count-shaping behavior for aggregates.
+4. ``modify_base_queryset`` — unfiltered ``.values()``-applied qs;
    **store-only**. Reshaping here leaks into the visible page.
-4. ``modify_data_queryset`` — unsliced, filtered, ordered qs; returned
+5. ``modify_data_queryset`` — unsliced, filtered, ordered qs; returned
    qs is sliced ``[from:to]`` by the caller.
-5. ``modify_raw_data`` — reshape raw row dicts before formatters and
+6. ``modify_raw_data`` — reshape raw row dicts before formatters and
    row actions run.
-6. ``modify_final_data`` — reshape finalized row dicts
+7. ``modify_final_data`` — reshape finalized row dicts
    (e.g. assemble ``_children`` trees from group metadata).
-7. ``modify_xlsx_data`` — final pass before XLSX serialization, after
+8. ``modify_xlsx_data`` — final pass before XLSX serialization, after
    all paged ``get_data`` chunks are concatenated (e.g. flatten a
    ``_children`` tree back into sibling rows the spreadsheet can render).
 
@@ -104,6 +107,24 @@ class SBAdminPlugin:
         """Reshape the qs ``.count()`` runs on (e.g. group by parent
         id so pagination counts parent groups, not rows)."""
         return qs
+
+    @classmethod
+    def modify_aggregate_queryset(
+        cls,
+        action: "SBAdminListAction",
+        request: "HttpRequest",
+        qs: "QuerySet",
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """Reshape the qs list aggregates run on. The default delegates
+        to the count hook for backwards compatibility with plugins that
+        use the same row grouping for counts and aggregates."""
+        return cls.modify_count_queryset(
+            action,
+            request=request,
+            qs=qs,
+            **kwargs,
+        )
 
     @classmethod
     def modify_data_queryset(

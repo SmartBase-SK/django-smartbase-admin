@@ -28,6 +28,7 @@ from django_smartbase_admin.engine.actions import (
     SBAdminRowAction,
     sbadmin_action,
 )
+from django_smartbase_admin.engine.const import BASE_PARAMS_NAME
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     ListActionModalView,
@@ -262,6 +263,12 @@ class FolderInvokeTestAdmin(SBAdmin):
 
     @sbadmin_action
     def action_touch(self, request, modifier, object_id):
+        # Mirrors admin actions that prepare POST before delegating to a
+        # regular Django view, such as Neoship's impersonation action.
+        post_data = request.POST.copy()
+        post_data["object_id"] = str(object_id)
+        request.POST = post_data
+
         obj = self.get_queryset(request).get(pk=object_id)
         obj.name = f"{obj.name}!"
         obj.save()
@@ -274,6 +281,24 @@ class FolderInvokeTestAdmin(SBAdmin):
     def action_archive(self, request, modifier, object_id):
         obj = self.get_queryset(request).get(pk=object_id)
         messages.success(request, f"Archived {obj.name}.")
+        from django.http import HttpResponse
+
+        return HttpResponse("")
+
+    @sbadmin_action
+    def action_shared(self, request, modifier, object_id):
+        obj = self.get_queryset(request).get(pk=object_id)
+        obj.name = f"{obj.name}#"
+        obj.save()
+        from django.http import HttpResponse
+
+        return HttpResponse("")
+
+    @sbadmin_action
+    def action_unpublished(self, request, modifier, object_id):
+        obj = self.get_queryset(request).get(pk=object_id)
+        obj.name = "should-not-run"
+        obj.save()
         from django.http import HttpResponse
 
         return HttpResponse("")
@@ -327,6 +352,12 @@ class FolderInvokeTestAdmin(SBAdmin):
                 action_id="action_export_bytes",
                 view=self,
             ),
+            SBAdminRowAction(
+                title="Shared",
+                icon="Check",
+                action_id="action_shared",
+                view=self,
+            ),
         ]
 
     def get_sbadmin_detail_actions(self, request, object_id=None):
@@ -335,6 +366,11 @@ class FolderInvokeTestAdmin(SBAdmin):
                 title="Archive",
                 view=self,
                 action_id="action_archive",
+            ),
+            SBAdminCustomAction(
+                title="Shared",
+                view=self,
+                action_id="action_shared",
             ),
         ]
 
@@ -561,6 +597,56 @@ class IntegrationTests(_Base):
             any("Renamed 2 folders." in m["message"] for m in result["messages"])
         )
 
+    def test_list_and_selection_actions_bind_context_before_validation(self):
+        class RequestDataAwareAdmin(FolderInvokeTestAdmin):
+            expected_view_params = {}
+
+            def init_view_dynamic(self, request, request_data, **kwargs):
+                raw_params = request_data.request_get.get(BASE_PARAMS_NAME)
+                base_params = json.loads(raw_params) if raw_params else {}
+                if (
+                    request_data.view != self.get_id()
+                    or request_data.object_id is not None
+                    or base_params.get(self.get_id()) != self.expected_view_params
+                ):
+                    raise AssertionError("Action request context was not bound.")
+                return super().init_view_dynamic(request, request_data, **kwargs)
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, RequestDataAwareAdmin)
+        config = MCPToolTestConfig()
+        config.init_view_map()
+        config.init_model_admin_view_map()
+
+        RequestDataAwareAdmin.expected_view_params = {
+            "filterData": {"sbadmin_full_text_search": "current"}
+        }
+        list_result = self._tools().invoke_list_action(
+            "filer_folder",
+            "CreateFolderModalView",
+            component_values={"main": {"name": "current"}},
+            full_text_search="current",
+        )
+
+        target = Folder.objects.create(name="target")
+        RequestDataAwareAdmin.expected_view_params = {
+            "selectionData": {
+                "table_selected_rows": [str(target.pk)],
+                "table_deselected_rows": [],
+            }
+        }
+        selection_result = self._tools().invoke_selection_action(
+            "filer_folder",
+            "BulkRenameModalView",
+            object_ids=[str(target.pk)],
+            component_values={"main": {"suffix": "_selected"}},
+        )
+
+        self.assertEqual(list_result["status"], "needs_confirmation")
+        self.assertEqual(selection_result["status"], "ok")
+        target.refresh_from_db()
+        self.assertEqual(target.name, "target_selected")
+
     def test_confirmation_framework_two_step_create(self):
         """First call returns ``needs_confirmation`` with structured data +
         formatted message and DOES NOT commit; ``confirmed=True`` commits."""
@@ -618,6 +704,74 @@ class IntegrationTests(_Base):
         )
         self.assertEqual(result["status"], "ok")
         self.assertTrue(any("Archived d" in m["message"] for m in result["messages"]))
+
+    def test_wrong_action_invokers_are_rejected_before_dispatch(self):
+        folder = Folder.objects.create(name="unchanged")
+        tools = self._tools()
+
+        with self.assertRaisesRegex(LookupError, "use invoke_row_action"):
+            tools.invoke_detail_action(
+                "filer_folder", "action_touch", object_id=str(folder.pk)
+            )
+        with self.assertRaisesRegex(LookupError, "use invoke_detail_action"):
+            tools.invoke_row_action(
+                "filer_folder", "action_archive", object_id=str(folder.pk)
+            )
+        with self.assertRaisesRegex(LookupError, "use invoke_row_action"):
+            tools.invoke_list_action("filer_folder", "action_touch")
+        with self.assertRaisesRegex(LookupError, "use invoke_list_action"):
+            tools.invoke_selection_action(
+                "filer_folder",
+                "CreateFolderModalView",
+                object_ids=[str(folder.pk)],
+            )
+        with self.assertRaisesRegex(LookupError, "use invoke_action"):
+            tools.invoke_list_action("filer_folder", "action_schema_declared")
+
+        folder_entry = next(
+            entry
+            for entry in tools.list_admins()["admin_views"]
+            if entry["view_id"] == "filer_folder"
+        )
+        inline_view_id = folder_entry["inlines"][0]["view_id"]
+        with self.assertRaisesRegex(LookupError, "use invoke_inline_action"):
+            tools.invoke_row_action(
+                inline_view_id,
+                "InlineRowRenameModalView",
+                object_id="missing",
+            )
+
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "unchanged")
+
+    def test_bare_decorated_action_is_not_mcp_invocable(self):
+        folder = Folder.objects.create(name="unchanged")
+
+        with self.assertRaisesRegex(LookupError, "is not available through"):
+            self._tools().invoke_detail_action(
+                "filer_folder",
+                "action_unpublished",
+                object_id=str(folder.pk),
+            )
+
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "unchanged")
+
+    def test_action_published_in_two_families_allows_both_invokers(self):
+        folder = Folder.objects.create(name="shared")
+        tools = self._tools()
+
+        row_result = tools.invoke_row_action(
+            "filer_folder", "action_shared", object_id=str(folder.pk)
+        )
+        detail_result = tools.invoke_detail_action(
+            "filer_folder", "action_shared", object_id=str(folder.pk)
+        )
+
+        self.assertEqual(row_result["status"], "ok")
+        self.assertEqual(detail_result["status"], "ok")
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "shared##")
 
     def test_object_fieldset_action_with_formset_round_trip(self):
         parent = Folder.objects.create(name="parent")

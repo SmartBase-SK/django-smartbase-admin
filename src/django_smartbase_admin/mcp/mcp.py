@@ -5,12 +5,12 @@ each public method on an ``MCPToolset`` subclass becomes one MCP tool.
 
 Tool methods stay thin — orchestration only — and delegate to:
 
-* ``bridge``    — DRF/MCP request <-> SBAdmin pipeline.
+* ``bridge``    — MCP transport request <-> SBAdmin pipeline.
 * ``resolvers`` — agent identifier -> SBAdmin object.
 * ``schema``    — ``list_admins`` discovery payload.
 
-``self.request`` is the live DRF request; ``self.request.user`` is
-whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
+``self.request`` is the underlying Django request; ``self.request.user``
+is whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
 """
 
 from __future__ import annotations
@@ -45,9 +45,11 @@ from django_smartbase_admin.engine.const import (
     TABLE_PARAMS_SORT_NAME,
 )
 from django_smartbase_admin.mcp.actions import (
+    ActionInvoker,
     SBAdminMCPActionFormService,
     SBAdminMCPActionInvokeService,
     collect_mcp_method_action_entries,
+    validate_ui_action_invoker,
 )
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.bridge import (
@@ -56,6 +58,7 @@ from django_smartbase_admin.mcp.bridge import (
     ensure_sbadmin_request_data,
     set_request_payload,
     strip_html_cells,
+    unwrap_drf_request,
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
@@ -72,6 +75,28 @@ from django_smartbase_admin.mcp.widgets import (
 )
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
+
+
+def _build_selection_action_base_params(view_id: str, object_ids: list) -> dict:
+    return {
+        view_id: {
+            "selectionData": {
+                "table_selected_rows": [str(i) for i in object_ids],
+                "table_deselected_rows": [],
+            }
+        }
+    }
+
+
+def _build_list_action_base_params(
+    view_id: str,
+    filter_data: dict | None,
+    full_text_search: str | None,
+) -> dict:
+    filter_payload = dict(filter_data or {})
+    if full_text_search:
+        filter_payload["sbadmin_full_text_search"] = full_text_search
+    return {view_id: {FILTER_DATA_NAME: filter_payload}}
 
 
 def _widgets_by_filter_field(admin, request, field_map=None) -> dict:
@@ -337,6 +362,9 @@ class SBAdminTools(MCPToolset):
     and row errors; each error is ``{"code", "message"}``. Permission denials
     raise ``PermissionError``; invisible objects raise ``LookupError``.
     """
+
+    def __init__(self, context=None, request=None):
+        super().__init__(context=context, request=unwrap_drf_request(request))
 
     @_guarded_tool_call
     def list_admins(
@@ -1401,6 +1429,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.ROW,
         )
 
     @_guarded_tool_call
@@ -1446,6 +1475,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.DETAIL,
         )
 
     @_guarded_tool_call
@@ -1494,6 +1524,7 @@ class SBAdminTools(MCPToolset):
             object_id,
             component_values,
             confirmed,
+            expected_invoker=ActionInvoker.INLINE,
         )
 
     def _invoke_per_object(
@@ -1503,6 +1534,7 @@ class SBAdminTools(MCPToolset):
         object_id,
         component_values,
         confirmed,
+        expected_invoker: ActionInvoker,
     ):
         request = self.request
         admin = resolve_admin(view_id, request=request)
@@ -1513,6 +1545,13 @@ class SBAdminTools(MCPToolset):
             method="GET",
         )
         admin.init_view_dynamic(request, request.request_data)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=expected_invoker,
+            object_id=str(object_id),
+        )
         return SBAdminMCPActionInvokeService.invoke_row(
             admin,
             request,
@@ -1574,7 +1613,20 @@ class SBAdminTools(MCPToolset):
 
         request = self.request
         admin = resolve_admin(view_id, request=request)
+        base_params = _build_selection_action_base_params(admin.get_id(), object_ids)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            method="GET",
+            get={BASE_PARAMS_NAME: json.dumps(base_params)},
+        )
         admin.init_view_dynamic(request, request.request_data)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=ActionInvoker.SELECTION,
+        )
         return SBAdminMCPActionInvokeService.invoke_selection(
             admin,
             request,
@@ -1631,21 +1683,40 @@ class SBAdminTools(MCPToolset):
 
         request = self.request
         admin = resolve_admin(view_id, request=request)
-        admin.init_view_dynamic(request, request.request_data)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            method="GET",
+        )
         # Callers pass column-name keys (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
         # ``list_rows``, otherwise a filter-aware action gets the
         # wrong/unknown filter keys.
         field_map = admin.get_field_map(request)
         filter_data = _normalize_filter_keys(filter_data, field_map)
+        base_params = _build_list_action_base_params(
+            admin.get_id(),
+            filter_data=filter_data,
+            full_text_search=full_text_search,
+        )
+        set_request_payload(
+            request,
+            get={BASE_PARAMS_NAME: json.dumps(base_params)},
+        )
+        admin.init_view_dynamic(request, request.request_data)
         _validate_filter_data(admin, request, filter_data, field_map)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=ActionInvoker.LIST,
+        )
+
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,
             action_id=action_id,
             component_values=component_values,
-            filter_data=filter_data,
-            full_text_search=full_text_search,
             confirmed=confirmed,
             modifier=modifier,
         )

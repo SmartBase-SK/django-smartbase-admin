@@ -1,11 +1,12 @@
-"""DRF/MCP request <-> SBAdmin pipeline bridging."""
+"""MCP transport <-> SBAdmin pipeline bridging."""
 
 from __future__ import annotations
 
 import numbers
 
-from django.http import QueryDict
+from django.http import HttpRequest, QueryDict
 from django.utils.datastructures import MultiValueDict
+from rest_framework.request import Request as DRFRequest
 
 from django_smartbase_admin.engine.const import (
     COLUMNS_DATA_COLUMNS_NAME,
@@ -20,7 +21,26 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.services.xlsx_export import strip_html_cell_value
 
 
-def ensure_sbadmin_request_data(request) -> None:
+def unwrap_drf_request(request) -> HttpRequest | None:
+    """Normalize the transport request to SBAdmin's Django request contract."""
+    if request is None:
+        return None
+    if isinstance(request, DRFRequest):
+        django_request = request._request
+        django_request.user = request.user
+
+        # The MCP server may attach these directly to the DRF wrapper instead
+        # of its underlying Django request.
+        for attribute in ("session", "request_data", "LANGUAGE_CODE", "_messages"):
+            if attribute in request.__dict__:
+                setattr(django_request, attribute, request.__dict__[attribute])
+        return django_request
+    if not isinstance(request, HttpRequest):
+        raise TypeError("SBAdmin MCP tools require a Django HttpRequest.")
+    return request
+
+
+def ensure_sbadmin_request_data(request: HttpRequest) -> None:
     """Attach ``request.request_data`` lazily so SBAdmin internals work.
 
     No-op if already set (test fixtures, pre-bridged requests). MCP
@@ -141,39 +161,30 @@ def build_columns_data(admin, request, fields: list[str], field_map=None) -> dic
 
 
 def set_request_post(
-    request, post_qd: QueryDict, files: MultiValueDict | None = None
+    request: HttpRequest,
+    post_qd: QueryDict,
+    files: MultiValueDict | None = None,
 ) -> None:
-    """Force ``request.POST`` / ``request.FILES`` on a DRF ``Request``.
-
-    DRF re-exposes ``POST`` / ``FILES`` as read-only properties backed
-    by parser-cache attrs (``_data`` / ``_files``), so pre-populating
-    the cache is the only way to make ``request.POST`` read our
-    ``QueryDict`` — assigning to ``request.POST`` raises
-    ``AttributeError: property has no setter``. ``method`` and ``GET``
-    on the DRF wrapper aren't class-level descriptors, so plain
-    ``request.method = ...`` / ``request.GET = ...`` work via the
-    instance ``__dict__``.
-
-    ``Request.POST`` also gates on ``is_form_media_type(content_type)``
-    and returns an empty ``QueryDict`` otherwise; we set
-    ``CONTENT_TYPE`` on the underlying request so the cache is read.
-    """
+    """Replace the synthetic Django request's form payload."""
+    if not isinstance(request, HttpRequest):
+        raise TypeError("SBAdmin request payload requires a Django HttpRequest.")
     if files is None:
         files = MultiValueDict()
-    request._data = post_qd
-    request._full_data = post_qd
+    request.POST = post_qd
     request._files = files
-    request._request.META["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
+    request.META["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
 
 
-def set_request_payload(request, *, get=None, post=None, method=None) -> None:
+def set_request_payload(
+    request: HttpRequest, *, get=None, post=None, method=None
+) -> None:
     """Mirror tool-supplied params onto both ``request_data`` and ``request``.
 
     SBAdmin actions read from ``request.request_data.request_get`` /
     ``.request_post`` / ``.request_method`` — the canonical pipeline
-    channel. We also mirror onto the DRF wrapper so ``has_*_permission``,
-    middleware, and Django admin code that touch ``request.GET`` /
-    ``POST`` / ``method`` see the same values.
+    channel. We also mirror onto the Django request so permissions,
+    middleware, and admin code that touch ``request.GET`` / ``POST`` /
+    ``method`` see the same values.
     """
     rd = request.request_data
 

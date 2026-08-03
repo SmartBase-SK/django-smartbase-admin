@@ -152,12 +152,8 @@ class FetchActionFormHtmlTests(TestCase):
                 "filer_folder", "HistoryModalView", object_id="99999999"
             )
 
-    def test_action_form_autocomplete_widget_id_is_action_scoped(self):
-        """An autocomplete-backed action-form field reports the same
-        action-scoped widget_id the UI registers/dispatches (carrying the
-        ``<action_id>::`` prefix) — not a bare id the ``autocomplete`` tool
-        can't resolve. End-to-end dispatch of that id is covered live and by
-        the register_action_autocomplete_views tests in test_dynamic_forms."""
+    def test_action_form_autocomplete_widget_id_dispatches(self):
+        """The action-scoped widget id must work directly with autocomplete."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
         tools = SBAdminTools(request=build_mcp_request(user))
 
@@ -170,4 +166,11 @@ class FetchActionFormHtmlTests(TestCase):
                 "ReparentModalView" + ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR
             ),
             widget_id,
+        )
+
+        choices = tools.autocomplete("filer_folder", widget_id, search="beta")
+
+        self.assertEqual(
+            choices,
+            [{"value": self.beta.pk, "label": str(self.beta)}],
         )
