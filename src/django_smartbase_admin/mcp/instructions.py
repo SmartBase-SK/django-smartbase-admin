@@ -13,6 +13,10 @@ allowed to.
 What you can do:
 * Discover the available admin views and, per view, their columns, filters,
   detail fields, inlines, filter presets, and actions (``list_admins``).
+  Scope it: start with ``list_admins(detail="index")`` for the list of
+  ``view_id``s, then ``list_admins(view_id="...")`` for that one view in full.
+  Reading every view in full can exceed your result budget, and post-filtering
+  an oversized payload silently drops keys you need — ``mcp_actions`` first.
 * Browse: filter (text, choice, boolean, number range, date range,
   related-record), full-text search, sort, and paginate (``list_rows``).
 * Apply a named or saved filter preset and replay it (``fetch_filter_preset``).
@@ -30,14 +34,17 @@ What you can do:
 * Run actions on a row, a detail page, the whole list, a selection, or an
   inline row (``invoke_*_action``); inspect a modal action's form first with
   ``fetch_action_form``. Object-only fieldset actions are discovered from
-  ``fetch_detail.detail_actions``. Submit forms and formsets through
-  ``component_values`` using the names returned under ``components``.
+  ``fetch_detail.detail_actions``, and actions with no UI button from
+  ``mcp_actions`` (on ``fetch_detail`` or ``list_admins``) — those are run with
+  ``invoke_action``. Submit forms and formsets through ``component_values``
+  using the names returned under ``components``.
 * Export a list or selection to a file.
 
 Safety: deletes and impactful actions return ``needs_confirmation`` with a
 preview first; re-call with ``confirmed=True`` to commit.
 
-Workflow: ``list_admins`` (discover ``view_id``, columns, filters, inlines) →
+Workflow: ``list_admins(detail="index")`` (find the ``view_id``) →
+``list_admins(view_id=...)`` (its columns, filters, inlines, actions) →
 ``list_rows`` / ``fetch_detail`` / ``fetch_add_form`` → ``autocomplete`` for
 labels → ``create_object`` or ``update_detail``.
 

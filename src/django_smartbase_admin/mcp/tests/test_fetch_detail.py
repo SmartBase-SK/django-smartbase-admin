@@ -721,3 +721,72 @@ class FetchDetailHtmlSanitizeTests(_FetchDetailTestBase):
         self.assertNotIn(".wrap{color:red}", value)
         self.assertNotIn("<script", value)
         self.assertNotIn("<style", value)
+
+
+class FolderMcpOnlyActionAdmin(FolderDetailTestAdmin):
+    """Admin whose only extra operation is MCP-exposed with no UI button."""
+
+    class RenameForm(forms.Form):
+        new_name = forms.CharField()
+
+    def get_rename_components(self, request):
+        return {"main": self.RenameForm()}
+
+    @sbadmin_action(
+        mcp_components="get_rename_components",
+        mcp_description="Rename the folder.",
+    )
+    def rename_folder(self, request, modifier, object_id=None):
+        return JsonResponse({"ok": True})
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FetchDetailMcpActionsTests(_FetchDetailTestBase):
+    """An ``mcp_components`` method on the admin itself has no UI button, so it
+    is in no action list — ``fetch_detail`` must carry it, otherwise a full
+    ``list_admins`` is the only way to find it."""
+
+    admin_class = FolderMcpOnlyActionAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.folder = Folder.objects.create(name="target")
+
+    def test_admin_mcp_actions_surface_on_detail(self):
+        result = self._fetch(self.folder.pk)
+
+        entries = {entry["action_id"]: entry for entry in result["mcp_actions"]}
+        self.assertIn("rename_folder", entries)
+        entry = entries["rename_folder"]
+        self.assertEqual(entry["kind"], "method")
+        self.assertEqual(entry["description"], "Rename the folder.")
+        # The invocation contract ships with the discovery entry.
+        self.assertEqual(list(entry["components"]["main"]["fields"]), ["new_name"])
+
+    def test_mcp_only_action_is_in_no_ui_action_list(self):
+        result = self._fetch(self.folder.pk)
+
+        listed = {entry["action_id"] for entry in result.get("detail_actions", [])}
+        self.assertNotIn("rename_folder", listed)
+
+    def test_key_is_absent_when_the_admin_declares_none(self):
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderDetailTestAdmin)
+        MCPToolTestConfig().init_view_map()
+
+        self.assertNotIn("mcp_actions", self._fetch(self.folder.pk))
+
+    def test_detail_entry_matches_list_admins(self):
+        """The cheap route must report the same action as the expensive one."""
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+        from_list = next(
+            e
+            for e in tools.list_admins(view_id="filer_folder")["admin_views"]
+            if e["view_id"] == "filer_folder"
+        )["mcp_actions"]
+
+        self.assertEqual(self._fetch(self.folder.pk)["mcp_actions"], from_list)

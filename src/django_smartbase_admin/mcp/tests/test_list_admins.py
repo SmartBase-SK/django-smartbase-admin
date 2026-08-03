@@ -412,3 +412,150 @@ class ListAdminsTests(TestCase):
             "DynamicPermissionInline",
             {inline["inline_name"] for inline in entry["inlines"]},
         )
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class ListAdminsScopingTests(TestCase):
+    """``view_id`` / ``detail`` scoping — the escape from reading every admin
+    in full, which on a large deployment overflows a caller's result budget
+    and pushes it into lossy post-filtering."""
+
+    def setUp(self):
+        super().setUp()
+        self._original_admin = sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderRichListAdminsTestAdmin)
+        MCPToolTestConfig.view_permission_for = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
+
+    def tearDown(self):
+        MCPToolTestConfig.view_permission_for = None
+        MCPToolTestConfig().mcp_whoami_sbadmin = None
+        sb_admin_site._registry.pop(Folder, None)
+        if self._original_admin is not None:
+            sb_admin_site._registry[Folder] = self._original_admin
+        super().tearDown()
+
+    @staticmethod
+    def _tools():
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        return SBAdminTools(request=build_mcp_request(user))
+
+    def test_default_call_is_unchanged(self):
+        """No arguments must behave exactly as before the scoping was added."""
+        result = self._tools().list_admins()
+
+        self.assertIn("widget_shapes", result)
+        self.assertIn("action_invokers", result)
+        entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
+        self.assertIn("fields", entry)
+        self.assertIn("detail_fields", entry)
+        self.assertGreater(len(result["admin_views"]), 1)
+
+    def test_view_id_returns_only_that_admin_in_full(self):
+        result = self._tools().list_admins(view_id="filer_folder")
+
+        self.assertEqual(
+            [e["view_id"] for e in result["admin_views"]], ["filer_folder"]
+        )
+        entry = result["admin_views"][0]
+        # Scoping narrows the set, it does not thin the entry.
+        self.assertIn("fields", entry)
+        self.assertIn("detail_fields", entry)
+        self.assertIn("inlines", entry)
+        self.assertIn("filter_presets", entry)
+        self.assertEqual(
+            entry["fields"][0]["filter"]["widget"], "MultipleChoiceFilterWidget"
+        )
+
+    def test_scoped_call_is_identical_to_the_entry_in_the_full_call(self):
+        """The cheap path must not be a different, lossier schema."""
+        tools = self._tools()
+        scoped = tools.list_admins(view_id="filer_folder")["admin_views"][0]
+        unscoped = next(
+            e
+            for e in self._tools().list_admins()["admin_views"]
+            if e["view_id"] == "filer_folder"
+        )
+
+        self.assertEqual(scoped, unscoped)
+
+    def test_index_returns_identity_only_and_drops_the_legends(self):
+        result = self._tools().list_admins(detail="index")
+
+        entry = next(e for e in result["admin_views"] if e["view_id"] == "filer_folder")
+        self.assertEqual(
+            set(entry),
+            {"view_id", "app_label", "model", "verbose_name", "verbose_name_plural"},
+        )
+        # Legends explain filter/action keys an index entry doesn't carry.
+        self.assertNotIn("widget_shapes", result)
+        self.assertNotIn("action_invokers", result)
+
+    def test_index_is_substantially_cheaper_than_full(self):
+        import json
+
+        tools = self._tools()
+        index = len(json.dumps(tools.list_admins(detail="index"), default=str))
+        full = len(json.dumps(self._tools().list_admins(), default=str))
+
+        self.assertLess(index, full / 2)
+
+    def test_index_still_lists_every_visible_admin(self):
+        tools = self._tools()
+        index_ids = [
+            e["view_id"] for e in tools.list_admins(detail="index")["admin_views"]
+        ]
+        full_ids = [e["view_id"] for e in self._tools().list_admins()["admin_views"]]
+
+        self.assertEqual(index_ids, full_ids)
+
+    def test_index_keeps_the_admin_description(self):
+        class FolderDescribedAdmin(SBAdmin):
+            model = Folder
+            list_display = ("id", "name")
+            mcp_description = "Folders of files."
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, FolderDescribedAdmin)
+
+        result = self._tools().list_admins(view_id="filer_folder", detail="index")
+
+        self.assertEqual(result["admin_views"][0]["description"], "Folders of files.")
+
+    def test_unknown_view_id_raises_instead_of_returning_empty(self):
+        """An empty list would read as "no such data" rather than "no such handle"."""
+        with self.assertRaises(LookupError):
+            self._tools().list_admins(view_id="filer_nosuchthing")
+
+    def test_view_id_still_honours_view_permission(self):
+        MCPToolTestConfig.view_permission_for = set()
+        user = MagicMock(is_authenticated=True, is_superuser=False)
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        with self.assertRaises(PermissionError):
+            tools.list_admins(view_id="filer_folder")
+
+    def test_invalid_detail_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self._tools().list_admins(detail="everything")
+
+    def test_whoami_survives_an_index_call(self):
+        folder = Folder.objects.create(name="profile")
+        user = MagicMock(
+            pk=folder.pk,
+            id=folder.pk,
+            is_authenticated=True,
+            is_anonymous=False,
+            is_superuser=True,
+        )
+        MCPToolTestConfig().mcp_whoami_sbadmin = SBAdminWhoamiConfig(
+            view_id="filer_folder"
+        )
+
+        result = SBAdminTools(request=build_mcp_request(user)).list_admins(
+            detail="index"
+        )
+
+        self.assertEqual(
+            result["whoami"], {"view_id": "filer_folder", "object_id": str(folder.pk)}
+        )
