@@ -16,6 +16,7 @@ whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
@@ -46,6 +47,7 @@ from django_smartbase_admin.engine.const import (
 from django_smartbase_admin.mcp.actions import (
     SBAdminMCPActionFormService,
     SBAdminMCPActionInvokeService,
+    collect_mcp_method_action_entries,
 )
 from django_smartbase_admin.mcp.service import SBAdminMCPDetailService
 from django_smartbase_admin.mcp.bridge import (
@@ -60,6 +62,7 @@ from django_smartbase_admin.mcp.resolvers import resolve_admin
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
 from django_smartbase_admin.mcp.schema import (
     admin_entry,
+    admin_index_entry,
     detail_action_entries,
     get_widget_shapes,
 )
@@ -336,12 +339,42 @@ class SBAdminTools(MCPToolset):
     """
 
     @_guarded_tool_call
-    def list_admins(self) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
+    def list_admins(
+        self,
+        view_id: str | None = None,
+        detail: Literal["index", "full"] = "full",
+    ) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
 
         Use this to discover the handles every other tool accepts —
         ``view_id``, field/filter names, ``widget_id``s, inline names,
         and ``action_id``s.
+
+        Scope the response instead of reading every admin in full. A
+        deployment with dozens of admins returns tens of thousands of
+        characters, which can exceed a caller's result budget and force
+        lossy post-filtering — projecting away keys that turn out to
+        matter. Prefer two cheap calls:
+
+          1. ``list_admins(detail="index")`` — ``view_id``, model and
+             display names for every visible admin, and nothing else.
+             Enough to choose the target.
+          2. ``list_admins(view_id="<chosen>")`` — that one admin's
+             complete record, typically an order of magnitude smaller
+             than the unscoped call.
+
+        Args:
+          view_id: return only this admin (still subject to view
+            permission). ``None`` returns every visible admin. An
+            unknown or invisible ``view_id`` raises ``LookupError``
+            rather than returning an empty list, so a typo is not
+            mistaken for "no such data".
+          detail: ``"full"`` (default) returns the schema documented
+            below; ``"index"`` returns only ``view_id``, ``app_label``,
+            ``model``, ``verbose_name``, ``verbose_name_plural`` and
+            ``description`` per admin. The ``widget_shapes`` and
+            ``action_invokers`` legends are omitted in ``"index"`` mode,
+            since the keys they explain are not returned.
 
         Returns ``{"admin_views": [...], "widget_shapes": {...}}``.
         ``widget_shapes`` is a legend keyed by widget category (the
@@ -390,25 +423,51 @@ class SBAdminTools(MCPToolset):
           - ``selection_actions``: bulk buttons over selected rows.
 
         Methods explicitly decorated with ``mcp_components=...`` are reported
-        separately under ``mcp_actions``. Their request-aware ``components`` use
-        the same representation as admin and modal forms.
+        separately under ``mcp_actions`` — an action listed there and nowhere
+        else has no UI counterpart and is invoked with ``invoke_action``. This
+        is the key most easily lost to post-filtering, which is what the
+        ``view_id`` / ``detail`` scoping above exists to avoid.
 
         When configured by the host project, the top-level ``whoami`` entry
         points at the current user's profile target: ``{"view_id", "object_id"}``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
+        if detail not in ("index", "full"):
+            raise ValueError(f"detail must be 'index' or 'full', got {detail!r}.")
+
+        # Resolved against the same registry the unscoped call iterates, so
+        # scoping can only ever narrow that set — never reach a widget or
+        # inline view_id that ``admin_entry`` cannot describe.
+        candidates = [
+            admin
+            for admin in sb_admin_site._registry.values()
+            if isinstance(admin, SBAdminBaseListView)
+        ]
+        if view_id:
+            candidates = [admin for admin in candidates if admin.get_id() == view_id]
+            if not candidates:
+                # Fail loudly: an empty ``admin_views`` would read as "no such
+                # data" rather than "no such handle".
+                raise LookupError(
+                    f"No SBAdmin view registered with view_id={view_id!r}."
+                )
 
         admins: list[dict] = []
-        for admin in sb_admin_site._registry.values():
-            if not isinstance(admin, SBAdminBaseListView):
-                continue
+        for admin in candidates:
             try:
                 if not admin.has_view_permission(request):
                     continue
             except Exception:
                 continue  # one broken admin shouldn't break discovery
-            admins.append(admin_entry(admin, request))
+            admins.append(
+                admin_index_entry(admin)
+                if detail == "index"
+                else admin_entry(admin, request)
+            )
+
+        if view_id and not admins:
+            raise PermissionError(f"User has no view permission on admin {view_id!r}.")
 
         admins.sort(key=lambda entry: entry["view_id"])
         # ``widget_shapes`` is the legend keyed by the ``widget`` field
@@ -419,11 +478,15 @@ class SBAdminTools(MCPToolset):
         # ``action_invokers`` is a sibling legend to ``widget_shapes`` —
         # keyed by action-list name, value is the MCP tool to call.
         # Saves repeating ``invoke_with`` on every individual action.
-        result = {
-            "admin_views": admins,
-            "widget_shapes": get_widget_shapes(),
-            "action_invokers": ACTION_INVOKERS,
-        }
+        # Both are dropped from an index response: they explain filter and
+        # action keys an index entry doesn't carry, so they would be the
+        # bulk of a payload whose whole point is to be cheap.
+        result = {"admin_views": admins}
+        if detail == "full":
+            result |= {
+                "widget_shapes": get_widget_shapes(),
+                "action_invokers": ACTION_INVOKERS,
+            }
         try:
             whoami = request.request_data.configuration.get_whoami_target(request)
         except LookupError:
@@ -767,6 +830,13 @@ class SBAdminTools(MCPToolset):
             actions = detail_action_entries(admin, request, object_id=object_id)
             if actions:
                 result["detail_actions"] = actions
+            # An ``mcp_components`` method has no UI button, so it appears in
+            # no action list — without this it would be discoverable only
+            # inside a full ``list_admins``, the one call large deployments
+            # cannot afford to read whole.
+            mcp_actions = collect_mcp_method_action_entries(admin, request)
+            if mcp_actions:
+                result["mcp_actions"] = mcp_actions
             return result
         except PermissionDenied as exc:
             message = str(exc).strip() or (
@@ -831,6 +901,12 @@ class SBAdminTools(MCPToolset):
         ``detail_actions`` contains the actions available for this specific
         object, including actions declared on object-dependent fieldsets.
         Invoke them with ``invoke_detail_action``.
+
+        ``mcp_actions`` contains this admin's methods exposed through
+        ``mcp_components`` — operations with no UI button, which therefore
+        appear in no other action list. Invoke them with ``invoke_action``,
+        passing this ``object_id``. Read them here rather than hunting for
+        them in a full ``list_admins``.
 
         ``widgets`` contains detail/dashboard widgets rendered in the
         detail fieldsets. Use each widget's ``data_tool`` to choose the
