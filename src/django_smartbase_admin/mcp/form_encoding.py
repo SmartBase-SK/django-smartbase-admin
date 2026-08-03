@@ -190,10 +190,11 @@ def form_errors_dict(form) -> dict:
     """Return field and form-wide validation errors for one bound form."""
     from django.core.exceptions import NON_FIELD_ERRORS
 
-    # Custom forms can expose a plain mapping instead of Django's ErrorDict.
-    # Normalize each value below so MCP reports the validation failure rather
-    # than masking it with an AttributeError from ErrorDict.as_data().
-    errors = form.errors
+    raw_errors = form.errors
+    # ``ModelAdmin._create_formsets`` blanks ``_errors`` to a plain ``{}`` on
+    # view-only inline rows to bypass their validation, so those rows carry no
+    # ``ErrorDict`` — and never any errors either.
+    errors = raw_errors.as_data() if hasattr(raw_errors, "as_data") else raw_errors
     return {
         "non_field": validation_error_entries(errors.get(NON_FIELD_ERRORS, [])),
         "fields": {

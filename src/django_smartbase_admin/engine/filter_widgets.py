@@ -24,8 +24,10 @@ from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_SEARCH_NAME,
     AUTOCOMPLETE_PAGE_SIZE,
+    AUTOCOMPLETE_MCP_PAGE_SIZE_MAX,
     Action,
     AUTOCOMPLETE_PAGE_NUM,
+    AUTOCOMPLETE_PAGE_SIZE_NAME,
     AUTOCOMPLETE_FORWARD_NAME,
     SELECT_ALL_KEYWORD,
 )
@@ -949,6 +951,22 @@ class AutocompleteFilterWidget(
     def get_value_field(self):
         return self.value_field or self.model._meta.pk.name
 
+    def get_page_size(self, request, post_data):
+        """MCP callers may ask for a bigger page so an agent can pull a whole
+        option list in one call instead of walking 20-row pages. Browser
+        requests always get the fixed UI page size - the JS infinite scroll
+        and the "show search box" heuristic both assume it.
+        """
+        if not getattr(request, "is_mcp", False):
+            return AUTOCOMPLETE_PAGE_SIZE
+        try:
+            page_size = int(
+                post_data.get(AUTOCOMPLETE_PAGE_SIZE_NAME, AUTOCOMPLETE_PAGE_SIZE)
+            )
+        except (TypeError, ValueError):
+            return AUTOCOMPLETE_PAGE_SIZE
+        return max(1, min(page_size, AUTOCOMPLETE_MCP_PAGE_SIZE_MAX))
+
     def filter_search_queryset(self, request, qs, search_term="", forward_data=None):
         if self.filter_search_lambda:
             forward_data = forward_data or {}
@@ -961,8 +979,9 @@ class AutocompleteFilterWidget(
         search_term = post_data.get(AUTOCOMPLETE_SEARCH_NAME)
         forward_data = json.loads(post_data.get(AUTOCOMPLETE_FORWARD_NAME, "{}"))
         page_num = int(post_data.get(AUTOCOMPLETE_PAGE_NUM, 1))
-        from_item = (page_num - 1) * AUTOCOMPLETE_PAGE_SIZE
-        to_item = (page_num) * AUTOCOMPLETE_PAGE_SIZE
+        page_size = self.get_page_size(request, post_data)
+        from_item = (page_num - 1) * page_size
+        to_item = (page_num) * page_size
 
         # filter queryset
         # base restricted queryset
@@ -1045,8 +1064,9 @@ class FromValuesAutocompleteWidget(AutocompleteFilterWidget):
         search_term = post_data.get(AUTOCOMPLETE_SEARCH_NAME)
         forward_data = json.loads(post_data.get(AUTOCOMPLETE_FORWARD_NAME, "{}"))
         page_num = int(post_data.get(AUTOCOMPLETE_PAGE_NUM, 1))
-        from_item = (page_num - 1) * AUTOCOMPLETE_PAGE_SIZE
-        to_item = (page_num) * AUTOCOMPLETE_PAGE_SIZE
+        page_size = self.get_page_size(request, post_data)
+        from_item = (page_num - 1) * page_size
+        to_item = (page_num) * page_size
         qs = self.get_queryset(request)
         qs = self.filter_search_queryset(request, qs, search_term, forward_data)
         qs = (

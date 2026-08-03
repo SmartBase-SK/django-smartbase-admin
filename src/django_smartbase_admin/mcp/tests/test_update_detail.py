@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django import forms
 from django.contrib import admin as django_admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
@@ -46,6 +47,53 @@ class FolderPermissionInline(SBAdminTableInline):
 
 class UpdateFolderWithInlineAdmin(UpdateFolderAdmin):
     inlines = [FolderPermissionInline]
+
+
+class ViewOnlyFolderPermissionInline(FolderPermissionInline):
+    readonly_fields = ("type", "everybody", "can_read")
+    can_delete = False
+    max_num = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class UpdateFolderWithViewOnlyInlineAdmin(UpdateFolderAdmin):
+    inlines = [ViewOnlyFolderPermissionInline]
+
+
+class ObjectIdProbeForm(forms.ModelForm):
+    """Records ``request_data.object_id`` seen while the POST is validated.
+
+    Object-scoped autocomplete querysets narrow their choices by the edited
+    pk, so the write path has to expose it the same way the UI detail URL
+    does.
+    """
+
+    seen_object_ids: list = []
+
+    class Meta:
+        model = Folder
+        fields = ("name",)
+
+    def clean(self):
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
+        request = SBAdminThreadLocalService.get_request()
+        type(self).seen_object_ids.append(
+            getattr(getattr(request, "request_data", None), "object_id", None)
+        )
+        return super().clean()
+
+
+class UpdateFolderObjectIdProbeAdmin(UpdateFolderAdmin):
+    form = ObjectIdProbeForm
+    fieldsets = ((None, {"fields": ("name",)}),)
 
 
 # Pre-register so ``sb_admin_site.urls`` includes
@@ -339,3 +387,59 @@ class UpdateDetailInlineTests(_UpdateDetailTestBase):
         self.assertEqual(row_errors["id"], self.perm_a.pk)
         self.assertIsInstance(row_errors["index"], int)
         self.assertTrue(row_errors["non_field"] or row_errors["fields"])
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class UpdateDetailViewOnlyInlineTests(_UpdateDetailTestBase):
+    """View-only inline rows must not swallow the real form errors.
+
+    ``ModelAdmin._create_formsets`` bypasses validation of those rows by
+    assigning ``form._errors = {}`` — a plain dict with no ``as_data``.
+    """
+
+    admin_class = UpdateFolderWithViewOnlyInlineAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.folder = Folder.objects.create(name="folder")
+        cls.perm = FolderPermission.objects.create(
+            folder=cls.folder, type=1, everybody=True
+        )
+
+    def test_main_form_errors_are_reported(self):
+        result = self._update(self.folder.pk, main_values={"name": ""})
+
+        self.assertEqual(result["status"], "invalid")
+        main_errors = result["errors"]["components"]["main"]
+        self.assertEqual(main_errors["fields"]["name"][0]["code"], "required")
+        self.assertNotIn(
+            "ViewOnlyFolderPermissionInline", result["errors"]["components"]
+        )
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class UpdateDetailObjectIdBindingTests(_UpdateDetailTestBase):
+    admin_class = UpdateFolderObjectIdProbeAdmin
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.folder = Folder.objects.create(name="folder")
+
+    def test_object_id_is_bound_while_the_post_is_validated(self):
+        ObjectIdProbeForm.seen_object_ids.clear()
+
+        result = self._update(self.folder.pk, main_values={"name": "renamed"})
+
+        self.assertEqual(result["status"], "ok", msg=result.get("errors"))
+        self.assertEqual(
+            set(ObjectIdProbeForm.seen_object_ids),
+            {str(self.folder.pk)},
+        )
