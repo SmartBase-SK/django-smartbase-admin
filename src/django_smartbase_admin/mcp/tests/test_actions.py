@@ -31,7 +31,7 @@ from django_smartbase_admin.engine.const import (
 )
 from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import AutocompleteFilterWidget
-from django_smartbase_admin.mcp.bridge import set_request_payload
+from django_smartbase_admin.mcp.bridge import set_request_payload, unwrap_drf_request
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.mcp.tests._common import (
@@ -503,7 +503,7 @@ class AutocompletePageSizeTests(_ToolTestBase):
         with the MCP flag under test — ``build_mcp_request`` leaves
         ``is_mcp`` unset, so a request that skips the tool wrapper is
         indistinguishable from a browser one."""
-        request = build_mcp_request(self.user)
+        request = unwrap_drf_request(build_mcp_request(self.user))
         if is_mcp:
             request.is_mcp = True
         set_request_payload(
