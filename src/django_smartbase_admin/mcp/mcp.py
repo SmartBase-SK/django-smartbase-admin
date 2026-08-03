@@ -72,6 +72,28 @@ from django_smartbase_admin.services.thread_local import SBAdminThreadLocalServi
 from django_smartbase_admin.services.views import SBAdminViewService
 
 
+def _build_selection_action_base_params(view_id: str, object_ids: list) -> dict:
+    return {
+        view_id: {
+            "selectionData": {
+                "table_selected_rows": [str(i) for i in object_ids],
+                "table_deselected_rows": [],
+            }
+        }
+    }
+
+
+def _build_list_action_base_params(
+    view_id: str,
+    filter_data: dict | None,
+    full_text_search: str | None,
+) -> dict:
+    filter_payload = dict(filter_data or {})
+    if full_text_search:
+        filter_payload["sbadmin_full_text_search"] = full_text_search
+    return {view_id: {FILTER_DATA_NAME: filter_payload}}
+
+
 def _widgets_by_filter_field(admin, request, field_map=None) -> dict:
     """Map of ``filter_field -> filter_widget`` for filterable columns.
 
@@ -1502,6 +1524,13 @@ class SBAdminTools(MCPToolset):
 
         request = self.request
         admin = resolve_admin(view_id, request=request)
+        base_params = _build_selection_action_base_params(admin.get_id(), object_ids)
+        bind_sbadmin_request_data(
+            request,
+            view=admin.get_id(),
+            method="GET",
+            get={BASE_PARAMS_NAME: json.dumps(base_params)},
+        )
         admin.init_view_dynamic(request, request.request_data)
         validate_ui_action_invoker(
             admin,
@@ -1565,12 +1594,10 @@ class SBAdminTools(MCPToolset):
 
         request = self.request
         admin = resolve_admin(view_id, request=request)
-        admin.init_view_dynamic(request, request.request_data)
-        validate_ui_action_invoker(
-            admin,
+        bind_sbadmin_request_data(
             request,
-            action_id=action_id,
-            expected_invoker=ActionInvoker.LIST,
+            view=admin.get_id(),
+            method="GET",
         )
         # Callers pass column-name keys (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
@@ -1578,14 +1605,29 @@ class SBAdminTools(MCPToolset):
         # wrong/unknown filter keys.
         field_map = admin.get_field_map(request)
         filter_data = _normalize_filter_keys(filter_data, field_map)
+        base_params = _build_list_action_base_params(
+            admin.get_id(),
+            filter_data=filter_data,
+            full_text_search=full_text_search,
+        )
+        set_request_payload(
+            request,
+            get={BASE_PARAMS_NAME: json.dumps(base_params)},
+        )
+        admin.init_view_dynamic(request, request.request_data)
         _validate_filter_data(admin, request, filter_data, field_map)
+        validate_ui_action_invoker(
+            admin,
+            request,
+            action_id=action_id,
+            expected_invoker=ActionInvoker.LIST,
+        )
+
         return SBAdminMCPActionInvokeService.invoke_list(
             admin,
             request,
             action_id=action_id,
             component_values=component_values,
-            filter_data=filter_data,
-            full_text_search=full_text_search,
             confirmed=confirmed,
             modifier=modifier,
         )

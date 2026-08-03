@@ -28,6 +28,7 @@ from django_smartbase_admin.engine.actions import (
     SBAdminRowAction,
     sbadmin_action,
 )
+from django_smartbase_admin.engine.const import BASE_PARAMS_NAME
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     ListActionModalView,
@@ -595,6 +596,56 @@ class IntegrationTests(_Base):
         self.assertTrue(
             any("Renamed 2 folders." in m["message"] for m in result["messages"])
         )
+
+    def test_list_and_selection_actions_bind_context_before_validation(self):
+        class RequestDataAwareAdmin(FolderInvokeTestAdmin):
+            expected_view_params = {}
+
+            def init_view_dynamic(self, request, request_data, **kwargs):
+                raw_params = request_data.request_get.get(BASE_PARAMS_NAME)
+                base_params = json.loads(raw_params) if raw_params else {}
+                if (
+                    request_data.view != self.get_id()
+                    or request_data.object_id is not None
+                    or base_params.get(self.get_id()) != self.expected_view_params
+                ):
+                    raise AssertionError("Action request context was not bound.")
+                return super().init_view_dynamic(request, request_data, **kwargs)
+
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, RequestDataAwareAdmin)
+        config = MCPToolTestConfig()
+        config.init_view_map()
+        config.init_model_admin_view_map()
+
+        RequestDataAwareAdmin.expected_view_params = {
+            "filterData": {"sbadmin_full_text_search": "current"}
+        }
+        list_result = self._tools().invoke_list_action(
+            "filer_folder",
+            "CreateFolderModalView",
+            component_values={"main": {"name": "current"}},
+            full_text_search="current",
+        )
+
+        target = Folder.objects.create(name="target")
+        RequestDataAwareAdmin.expected_view_params = {
+            "selectionData": {
+                "table_selected_rows": [str(target.pk)],
+                "table_deselected_rows": [],
+            }
+        }
+        selection_result = self._tools().invoke_selection_action(
+            "filer_folder",
+            "BulkRenameModalView",
+            object_ids=[str(target.pk)],
+            component_values={"main": {"suffix": "_selected"}},
+        )
+
+        self.assertEqual(list_result["status"], "needs_confirmation")
+        self.assertEqual(selection_result["status"], "ok")
+        target.refresh_from_db()
+        self.assertEqual(target.name, "target_selected")
 
     def test_confirmation_framework_two_step_create(self):
         """First call returns ``needs_confirmation`` with structured data +

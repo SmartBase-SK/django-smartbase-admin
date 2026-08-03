@@ -30,7 +30,7 @@ from django.http.response import HttpResponseRedirectBase
 from django.utils.safestring import mark_safe
 from mcp.types import BlobResourceContents, EmbeddedResource
 
-from django_smartbase_admin.engine.const import Action, BASE_PARAMS_NAME
+from django_smartbase_admin.engine.const import Action
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     RowActionModalView,
@@ -878,14 +878,6 @@ class SBAdminMCPActionInvokeService:
             modifier=modifier or "template",
             component_values=component_values,
             confirmed=confirmed,
-            base_params={
-                admin.get_id(): {
-                    "selectionData": {
-                        "table_selected_rows": [str(i) for i in object_ids],
-                        "table_deselected_rows": [],
-                    }
-                }
-            },
         )
 
     @classmethod
@@ -895,8 +887,6 @@ class SBAdminMCPActionInvokeService:
         request,
         action_id: str,
         component_values: dict | None = None,
-        filter_data: dict | None = None,
-        full_text_search: str | None = None,
         confirmed: bool = False,
         modifier: str | None = None,
     ) -> dict:
@@ -912,12 +902,6 @@ class SBAdminMCPActionInvokeService:
             modifier = resolve_action_modifier(
                 admin, request, "get_sbadmin_list_actions_processed", action_id
             )
-        base_params = None
-        if filter_data or full_text_search:
-            filter_payload = dict(filter_data or {})
-            if full_text_search:
-                filter_payload["sbadmin_full_text_search"] = full_text_search
-            base_params = {admin.get_id(): {"filterData": filter_payload}}
         return cls._invoke(
             admin,
             request,
@@ -925,7 +909,6 @@ class SBAdminMCPActionInvokeService:
             modifier=modifier or "template",
             component_values=component_values,
             confirmed=confirmed,
-            base_params=base_params,
         )
 
     # -- shared dispatch -----------------------------------------------------
@@ -940,7 +923,6 @@ class SBAdminMCPActionInvokeService:
         modifier: str | None,
         component_values: dict | None,
         object_id: str | None = None,
-        base_params: dict | None = None,
         confirmed: bool = False,
     ) -> dict:
         modal = cls._lookup_modal_action(
@@ -978,13 +960,8 @@ class SBAdminMCPActionInvokeService:
             if confirmed:
                 post_qd[ActionModalView.CONFIRMATION_POST_KEY] = "1"
 
-        get_payload = None
-        if base_params is not None:
-            get_payload = {BASE_PARAMS_NAME: json.dumps(base_params)}
-
         set_request_payload(
             request,
-            get=get_payload,
             post=post_qd,
             method="POST",
         )
