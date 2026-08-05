@@ -5,7 +5,7 @@
         <ul class="saved-filters" id="{{ view_id }}-views">
             {% for view in current_views %}
                 <li>
-                    <button type="button" class="relative js-view-button !h-24"
+                    <button type="button" class="relative js-view-button"
                             onclick="window.SBAdminTable['{{ view_id }}'].moduleInstances.viewsModule.openView(event, this.dataset.params, this.dataset.viewId)"
                             data-params="{{ view.url_params }}"
                             data-view-id="{{ view.id }}"
