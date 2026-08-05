@@ -81,6 +81,17 @@ class _StandaloneNoHeaderDashboardWidget(_StandaloneDashboardWidget):
     search_fields = ("display_name",)
 
 
+class _PresetsDashboardWidget(_StandaloneDashboardWidget):
+    widget_id = "embedded_presets_dashboard_widget"
+    show_views = True
+    sbadmin_list_view_config = [
+        {
+            "name": "Staff",
+            "url_params": {FILTER_DATA_NAME: {"display_name": "staff"}},
+        },
+    ]
+
+
 class _RegisteredAdminWidget(SBAdminDashboardWidget):
     widget_id = "registered_admin_widget"
 
@@ -397,6 +408,80 @@ class TestSBAdminDashboardListWidget(SimpleTestCase):
         self.assertIn("btn btn-only-icon", html)
         self.assertIn("action_xlsx_export/__all__/price-list-1/", html)
         self.assertIn("dropdown-menu", html)
+
+    def test_dashboard_list_widget_hides_views_bar_by_default(self):
+        widget = _StandaloneNoHeaderDashboardWidget()
+
+        html = self._render_widget(widget)
+
+        self.assertNotIn("js-view-button", html)
+        self.assertNotIn(f'id="{widget.widget_id}-views"', html)
+
+    def test_dashboard_list_widget_renders_presets_when_views_enabled(self):
+        widget_id = _PresetsDashboardWidget.widget_id
+
+        html = self._render_widget(_PresetsDashboardWidget())
+
+        self.assertIn(f'id="{widget_id}-views"', html)
+        self.assertIn("js-view-button", html)
+        self.assertIn(">Staff<", html)
+        # No "All" reset button in a widget bar — clearing the filter chips does that.
+        self.assertNotIn(">All<", html)
+        # Showing the bar also lets the user keep their own views, scoped to this widget.
+        self.assertIn(f'id="{widget_id}-save-view-modal-button"', html)
+        self.assertIn(f'id="{widget_id}-views-bar"', html)
+        # No nested <form>: the widget sits inside the change form, and the browser would drop it
+        # along with the save and delete requests.
+        self.assertNotIn("<form", html.split(f'id="{widget_id}-views-bar"')[1])
+        # Filters are what a view of an embedded table means; sorting or paging is not.
+        self.assertIn("data-views-filters-only", html)
+
+    def test_dashboard_list_widget_lists_only_declared_presets(self):
+        widget = _PresetsDashboardWidget()
+        request = self._widget_request()
+        widget.init_view_dynamic(request, request_data=request.request_data)
+
+        config_data = widget.get_config_data(request)
+
+        self.assertIsNone(widget.get_all_config(request))
+        self.assertEqual(
+            [view["name"] for view in config_data["current_views"]], ["Staff"]
+        )
+
+    def _widget_request(self):
+        request = self.factory.get("/dashboard/widget/")
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            object_id="price-list-1",
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        request.LANGUAGE_CODE = "en"
+        return request
+
+    def _render_widget(self, widget):
+        request = self.factory.get("/dashboard/widget/")
+        request.request_data = SimpleNamespace(
+            configuration=SBAdminRoleConfiguration(),
+            request_get={},
+            request_method="GET",
+            object_id="price-list-1",
+            user=SimpleNamespace(first_name="", last_name="", username="tester"),
+        )
+        request.user = SimpleNamespace(
+            is_anonymous=True, has_perm=lambda _permission: True
+        )
+        request.LANGUAGE_CODE = "en"
+        widget.init_view_dynamic(request, request_data=request.request_data)
+        return render_to_string(
+            widget.template_name,
+            widget.get_widget_context_data(request),
+            request=request,
+        )
         self.assertNotIn("sb_admin/dist/table.js", html)
 
     def test_dashboard_collects_widget_media_once(self):

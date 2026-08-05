@@ -656,6 +656,8 @@ class SBAdminBaseQuerysetMixin(object):
 
 class SBAdminBaseListView(SBAdminBaseView):
     sbadmin_list_view_config = None
+    show_views = True
+    views_bar_template_name = "sb_admin/config/view.html"
     mcp_description = None
     sbadmin_list_display = None
     sbadmin_list_display_data = None
@@ -1244,8 +1246,25 @@ class SBAdminBaseListView(SBAdminBaseView):
                 config_id=config_id,
             )
 
-        redirect_to = self.get_redirect_url_from_request(request, updated_configuration)
+        return self.get_config_response(request, updated_configuration)
 
+    def get_views_bar_context(self, request) -> dict[str, Any]:
+        """Context for rendering the views bar on its own (see get_config_response)."""
+        return {
+            "view_id": self.get_id(),
+            **self.get_config_data(request),
+            "content_context": {
+                "config_url": self.get_config_url(request),
+                "const": {
+                    "CONFIG_NAME": CONFIG_NAME,
+                    "URL_PARAMS_NAME": URL_PARAMS_NAME,
+                },
+            },
+        }
+
+    def get_config_response(self, request, updated_configuration=None):
+        """What a save/delete of a view answers with — a page (re)load by default."""
+        redirect_to = self.get_redirect_url_from_request(request, updated_configuration)
         response = redirect(redirect_to)
         if is_htmx_request(request.request_data.request_meta):
             response = HttpResponse()
@@ -1354,9 +1373,14 @@ class SBAdminBaseListView(SBAdminBaseView):
     def get_sbadmin_list_view_config(self, request) -> list:
         return self.sbadmin_list_view_config or []
 
+    def get_show_views(self, request) -> bool:
+        return self.show_views
+
     def get_base_config(self, request) -> list[dict[str, Any]]:
         sbadmin_list_config = self.get_sbadmin_list_view_config(request)
-        list_view_config = [self.get_all_config(request), *sbadmin_list_config]
+        all_config = self.get_all_config(request)
+        # get_all_config may be None where resetting to "everything" is not offered as a button.
+        list_view_config = [*([all_config] if all_config else []), *sbadmin_list_config]
         views = []
         for defined_view in list_view_config:
             url_params = SBAdminViewService.process_url_params(
@@ -1381,7 +1405,10 @@ class SBAdminBaseListView(SBAdminBaseView):
             view["detail_url"] = self.get_config_url(request, view["id"])
         config_views = self.get_base_config(request)
         config_views.extend(current_views)
-        return {"current_views": config_views}
+        return {
+            "current_views": config_views,
+            "show_views": self.get_show_views(request),
+        }
 
     def get_ajax_url(self, request=None) -> str:
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)

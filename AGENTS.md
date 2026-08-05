@@ -3768,6 +3768,50 @@ An "All" tab is automatically added as the first tab.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` - `SBAdminBaseListView.sbadmin_list_view_config`
 
+### Presets in Embedded List Widgets (`show_views`)
+
+`SBAdminDashboardListWidget` hides the views bar (`show_views = False`), because a widget renders
+inside someone else's page. Set `show_views = True` to offer the tabs defined in
+`sbadmin_list_view_config` as presets — clicking one applies its `filterData` and shows the
+matching filter chips, which is the supported way to give an embedded table a one-click filter:
+
+```python
+class TransportPriceWidget(SBAdminDashboardListWidget):
+    show_views = True
+    sbadmin_list_view_config = [
+        {
+            "name": "Domestic",
+            # Autocomplete filters take [{"value": <pk>, "label": ...}]; build the value in
+            # get_sbadmin_list_view_config(request) when the pk is not known at import time.
+            "url_params": {"filterData": {"state_from": '[{"value": 1, "label": "SK"}]'}},
+        },
+    ]
+```
+
+`show_views` turns on the whole bar: the declared presets, the user's own saved views next to them,
+and the "Save view" / delete affordances. There is no automatic "All" entry, because
+`get_all_config` returns `None` on the widget — clearing the filter chips is the way back to every
+row. Full list pages keep "All" (`show_views` defaults to `True` on `SBAdminBaseListView`).
+
+A preset applies when clicked, not on first load, so an embedded widget always opens unfiltered.
+Clicking one does not touch the page URL: with `sbadmin_table_history_enabled = False` the params go
+straight into the table (`SBAdminTable.loadFromParams`), leaving the address of the surrounding
+detail page alone. Saving or deleting a view works the same way — `get_config_response` on the widget
+answers with the re-rendered bar, which htmx swaps in place, instead of the redirect a page-owning
+view returns.
+
+The embedded bar (`views_bar_template_name` → `sb_admin/config/view_embedded.html`) renders **no
+`<form>`**. A widget on a change view sits inside the change form, and a browser drops a nested
+form — which would silently take the save and delete requests with it. htmx gathers the name and
+url-params inputs through `hx-include` instead, with the CSRF header coming from `hx-headers` on
+`<body>`. Keep it that way when editing that template.
+
+What counts as "still in this view" is the filters alone: the bar is wrapped in
+`data-views-filters-only`, so sorting, paging or moving a column does not mark the view as changed.
+
+**Source:** `django_smartbase_admin/engine/dashboard.py` - `SBAdminDashboardListWidget.show_views`,
+`get_all_config` and `get_config_response`, `templates/sb_admin/config/view.html`
+
 ### Default Tab and Menu Link to Filtered View
 
 By default, clicking a menu item opens the "All" tab. To make a custom tab the default (e.g., show "Published" articles when clicking the menu item):

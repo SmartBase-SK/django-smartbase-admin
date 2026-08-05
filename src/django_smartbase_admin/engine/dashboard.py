@@ -7,7 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models import Q, QuerySet
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, TruncYear
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -755,6 +755,8 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
     media = forms.Media(js=("sb_admin/dist/table.js",))
     cache_enabled = False
     sbadmin_table_history_enabled = False
+    show_views = False
+    views_bar_template_name = "sb_admin/config/view_embedded.html"
 
     def __init__(
         self,
@@ -821,6 +823,22 @@ class SBAdminDashboardListWidget(SBAdminBaseListView, SBAdminDashboardWidget):
         context["content_context"] = data
         context["list_base_template"] = "sb_admin/blank_base.html"
         return context
+
+    def get_config_response(self, request, updated_configuration=None):
+        # A widget cannot navigate the page it is embedded in, so a saved/deleted view answers with
+        # the re-rendered bar; viewsModule swaps it in and re-marks the active button.
+        return HttpResponse(
+            render_to_string(
+                self.views_bar_template_name,
+                self.get_views_bar_context(request),
+                request=request,
+            )
+        )
+
+    def get_all_config(self, request) -> None:
+        # No "All" button in a widget bar: it lists the presets declared in
+        # sbadmin_list_view_config, and clearing the filter chips already brings everything back.
+        return None
 
     def get_filters_template_name(self, request) -> str:
         return "sb_admin/dashboard/includes/list_widget_filters.html"

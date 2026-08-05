@@ -305,7 +305,7 @@
         .alert-icon { @apply text-notice; }
     }
 
-    #save-view-modal-button {
+    .js-save-view-button {
         &:disabled {
             @apply hidden;
         }

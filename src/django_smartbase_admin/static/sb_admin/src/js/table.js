@@ -85,10 +85,18 @@ class SBAdminTable {
     }
 
     getAllParamsFromUrl() {
-        `Retrieve filter data from "storage" -> currently supported storage is URL or HTML button`
+        `Retrieve filter data from "storage" -> currently supported storage is URL, HTML button or
+        an in-memory payload passed to loadFromParams`
+        if (this.paramsOverride) {
+            return {[this.viewId]: this.paramsOverride}
+        }
         const urlParamsString = window.location.search
         const urlParams = new URLSearchParams(urlParamsString)
-        const viewButton = document.querySelector(`.js-view-button[data-view-id="${urlParams.get("selectedView")}"]`)
+        // Scoped to this table's own views bar: selectedView is a single URL param, so an
+        // unscoped lookup would hand one table's view params to every other table on the page.
+        const viewButton = document.querySelector(
+            `#${this.viewId}-views .js-view-button[data-view-id="${urlParams.get("selectedView")}"]`
+        )
         let paramsFromUrl
         if(viewButton) {
             paramsFromUrl = {[this.viewId]: parseParamsPayload(viewButton.dataset.params)}
@@ -111,6 +119,15 @@ class SBAdminTable {
         if (this.tabulator) {
             this.loadFromUrlAfterInit()
             this.tabulator.setData()
+        }
+    }
+
+    loadFromParams(params) {
+        this.paramsOverride = params || {}
+        try {
+            this.loadFromUrl()
+        } finally {
+            this.paramsOverride = null
         }
     }
 
