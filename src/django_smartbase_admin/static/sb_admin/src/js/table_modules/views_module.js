@@ -72,6 +72,12 @@ export class ViewsModule extends SBAdminTableModule {
         return typeof value === 'object' && Object.keys(value).length === 0
     }
 
+    paramsForSave(params) {
+        return this.comparesFiltersOnly()
+            ? this.filterParamsForCompare(this.filterParamsOnlyForCompare(params))
+            : this.filterParamsForCompare(params)
+    }
+
     // Reduce a params payload to the filters that carry a value — see comparesFiltersOnly.
     filterParamsOnlyForCompare(params) {
         const filterDataName = this.table.constants.FILTER_DATA_NAME
@@ -89,7 +95,7 @@ export class ViewsModule extends SBAdminTableModule {
         const forCompare = (params) => filtersOnly ? this.filterParamsOnlyForCompare(params) : params
         const urlParamsNormalized = this.normalizeForCompare(forCompare(urlParams))
         const nothingToSaveNormalized = this.normalizeForCompare(forCompare({}))
-        const searchParams = decodeURI(JSON.stringify(this.filterParamsForCompare(urlParams)))
+        const searchParams = decodeURI(JSON.stringify(this.paramsForSave(urlParams)))
         this.selectedViewParams = this.table.getAllParamsFromUrl()[this.table.viewId]
         const selectedParamsNormalized = this.normalizeForCompare(forCompare(this.selectedViewParams))
 
