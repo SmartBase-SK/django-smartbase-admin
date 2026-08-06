@@ -305,7 +305,7 @@
         .alert-icon { @apply text-notice; }
     }
 
-    #save-view-modal-button {
+    .js-save-view-button {
         &:disabled {
             @apply hidden;
         }
@@ -600,6 +600,17 @@
     .tooltip,
     .popover {
         z-index: 1020;
+    }
+
+
+    .detail-view-tab .js-view-button {
+        @apply !h-24 border border-dark-200 px-8 py-4;
+        &.active {
+            @apply border-transparent;
+        }
+        >svg {
+            @apply ml-4;
+        }
     }
 
 }

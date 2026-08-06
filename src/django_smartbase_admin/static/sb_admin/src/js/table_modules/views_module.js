@@ -10,6 +10,26 @@ export class ViewsModule extends SBAdminTableModule {
         return true
     }
 
+    getViewsBar() {
+        return document.getElementById(`${this.table.viewId}-views`)
+    }
+
+    getViewButtons() {
+        return document.querySelectorAll(`#${this.table.viewId}-views .js-view-button`)
+    }
+
+    comparesFiltersOnly() {
+        return this.getViewsBar()?.closest('[data-views-filters-only]') != null
+    }
+
+    getSaveButton() {
+        return document.getElementById(`${this.table.viewId}-save-view-modal-button`)
+    }
+
+    getUrlParamsInput() {
+        return document.getElementById(`${this.table.viewId}-${this.table.constants.URL_PARAMS_NAME}`)
+    }
+
     // Recursively sort object keys for consistent JSON.stringify output
     sortObjectKeys(obj) {
         if (obj === null || typeof obj !== 'object') {
@@ -42,24 +62,53 @@ export class ViewsModule extends SBAdminTableModule {
         return JSON.stringify(this.sortObjectKeys(this.filterParamsForCompare(params)))
     }
 
+    isEmptyFilterValue(value) {
+        if (value === null || value === undefined || value === '' || value === '[]' || value === '{}') {
+            return true
+        }
+        if (Array.isArray(value)) {
+            return value.length === 0
+        }
+        return typeof value === 'object' && Object.keys(value).length === 0
+    }
+
+    paramsForSave(params) {
+        return this.comparesFiltersOnly()
+            ? this.filterParamsForCompare(this.filterParamsOnlyForCompare(params))
+            : this.filterParamsForCompare(params)
+    }
+
+    // Reduce a params payload to the filters that carry a value — see comparesFiltersOnly.
+    filterParamsOnlyForCompare(params) {
+        const filterDataName = this.table.constants.FILTER_DATA_NAME
+        const filterData = params?.[filterDataName] || {}
+        const withValue = Object.fromEntries(
+            Object.entries(filterData).filter(([, value]) => !this.isEmptyFilterValue(value))
+        )
+        return Object.keys(withValue).length > 0 ? {[filterDataName]: withValue} : {}
+    }
+
     refreshViewButtons() {
         const urlParams = JSON.parse(this.table.getUrlParamsStringForSave())
-        const urlParamsNormalized = this.normalizeForCompare(urlParams)
-        const searchParams = decodeURI(JSON.stringify(this.filterParamsForCompare(urlParams)))
-        let saveButton = document.getElementById('save-view-modal-button')
+        let saveButton = this.getSaveButton()
+        const filtersOnly = this.comparesFiltersOnly()
+        const forCompare = (params) => filtersOnly ? this.filterParamsOnlyForCompare(params) : params
+        const urlParamsNormalized = this.normalizeForCompare(forCompare(urlParams))
+        const nothingToSaveNormalized = this.normalizeForCompare(forCompare({}))
+        const searchParams = decodeURI(JSON.stringify(this.paramsForSave(urlParams)))
         this.selectedViewParams = this.table.getAllParamsFromUrl()[this.table.viewId]
-        const selectedParamsNormalized = this.normalizeForCompare(this.selectedViewParams)
+        const selectedParamsNormalized = this.normalizeForCompare(forCompare(this.selectedViewParams))
 
         let selectedView = null
         if (saveButton) {
             saveButton.disabled = true
         }
 
-        document.querySelectorAll('.js-view-button').forEach((item) => {
+        this.getViewButtons().forEach((item) => {
             if(!item.dataset.params) {
                 return
             }
-            const itemParamsNormalized = this.normalizeForCompare(parseParamsPayload(item.dataset.params))
+            const itemParamsNormalized = this.normalizeForCompare(forCompare(parseParamsPayload(item.dataset.params)))
             // Fast string comparison with sorted keys
             const sameAsUrlParams = (itemParamsNormalized === urlParamsNormalized)
             const sameAsSelectedParams = (selectedParamsNormalized === itemParamsNormalized)
@@ -82,12 +131,16 @@ export class ViewsModule extends SBAdminTableModule {
                 item.classList.add("changed")
             }
         })
-        if (!selectedView) {
+        if (!selectedView && urlParamsNormalized !== nothingToSaveNormalized) {
             if (saveButton) {
                 saveButton.disabled = false
             }
         }
-        document.querySelector("#" + this.table.constants.URL_PARAMS_NAME).value = searchParams
+        // A bar that cannot save (or one already swapped away) has no hidden input to fill.
+        const urlParamsInput = this.getUrlParamsInput()
+        if (urlParamsInput) {
+            urlParamsInput.value = searchParams
+        }
     }
 
     afterUrlStateUpdate() {
@@ -98,11 +151,24 @@ export class ViewsModule extends SBAdminTableModule {
         this.refreshViewButtons()
     }
 
+    afterInit() {
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            if (event.target?.id === `${this.table.viewId}-views-bar`) {
+                this.refreshViewButtons()
+            }
+        })
+    }
+
     openView(e, params, view_id) {
         if (!params) {
             return
         }
         if (e.target.closest("svg")) {
+            return
+        }
+        const savedParams = parseParamsPayload(params) || {}
+        if (!this.table.tableHistoryEnabled) {
+            this.table.loadFromParams(savedParams)
             return
         }
         if (this.table.tabulatorOptions["ajaxConfig"]["method"] === "POST") {
@@ -115,7 +181,6 @@ export class ViewsModule extends SBAdminTableModule {
             }
             history.pushState({}, "", new_path)
         } else {
-            const savedParams = parseParamsPayload(params) || {}
             const allParams = this.table.getAllUrlParams()
             allParams[this.table.viewId] = savedParams
             history.pushState({}, "", window.location.pathname + this.table.paramsObjectToUrlString(allParams))

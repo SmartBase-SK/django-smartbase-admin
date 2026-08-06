@@ -1,11 +1,6 @@
 {% load i18n %}
 
-<form id="{{ view_id }}-view_form"
-      method="post"
-      action="{{ content_context.config_url }}"
-      class="list-view-view-form max-sm:px-16 overflow-x-auto"
->
-    {% csrf_token %}
+<div id="{{ view_id }}-views-bar" class="list-view-view-form max-sm:px-16 overflow-x-auto">
     <div class="flex">
         <ul class="saved-filters" id="{{ view_id }}-views">
             {% for view in current_views %}
@@ -19,7 +14,8 @@
                         {% if view.detail_url %}
                             <svg hx-delete="{{ view.detail_url }}"
                                  hx-trigger="confirmDeleteView{{ view.id }} from:body"
-                                 hx-swap="none"
+                                 hx-target="#{{ view_id }}-views-bar"
+                                 hx-swap="outerHTML"
                                  class="ml-8 w-20 h-20"
                                  data-show-confirm
                                  data-submit-event="confirmDeleteView{{ view.id }}"
@@ -46,9 +42,10 @@
                         </svg>
                     </div>
                     <div class="modal-body">
-                        <label for="{{ content_context.const.CONFIG_NAME }}" class="block mb-8">{% trans 'New view' %} <span class="text-negative">*</span></label>
+                        <label for="{{ view_id }}-{{ content_context.const.CONFIG_NAME }}"
+                               class="block mb-8">{% trans 'New view' %} <span class="text-negative">*</span></label>
                         <input type="text" class="input" name="{{ content_context.const.CONFIG_NAME }}"
-                               form="{{ view_id }}-view_form"
+                               id="{{ view_id }}-{{ content_context.const.CONFIG_NAME }}"
                                placeholder="{% trans 'View name' %}">
 
                         <div class="mb-8 mt-24">{% trans 'or save as' %}</div>
@@ -56,7 +53,10 @@
                             {% for view in current_views %}
                                 {% if not view.default %}
                                     <li>
-                                        <div hx-post="{{ view.detail_url }}" href="#"
+                                        <div hx-post="{{ view.detail_url }}"
+                                             hx-include="#{{ view_id }}-{{ content_context.const.URL_PARAMS_NAME }}"
+                                             hx-target="#{{ view_id }}-views-bar"
+                                             hx-swap="outerHTML"
                                              class="btn btn-small rounded-full cursor-pointer">
                                             {{ view.name }}
                                         </div>
@@ -68,7 +68,11 @@
                     </div>
                     <div class="modal-footer">
                         <button class="btn" type="button" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
-                        <button class="btn btn-primary" type="submit" form="{{ view_id }}-view_form"
+                        <button class="btn btn-primary" type="button"
+                                hx-post="{{ content_context.config_url }}"
+                                hx-include="#{{ view_id }}-{{ content_context.const.CONFIG_NAME }}, #{{ view_id }}-{{ content_context.const.URL_PARAMS_NAME }}"
+                                hx-target="#{{ view_id }}-views-bar"
+                                hx-swap="outerHTML"
                                 data-bs-dismiss="modal">{% trans 'Save' %}</button>
                     </div>
                 </div>
@@ -77,6 +81,5 @@
     </div>
 
     <input type="hidden" name="{{ content_context.const.URL_PARAMS_NAME }}"
-           id="{{ view_id }}-{{ content_context.const.URL_PARAMS_NAME }}" form="{{ view_id }}-view_form">
-
-</form>
+           id="{{ view_id }}-{{ content_context.const.URL_PARAMS_NAME }}">
+</div>

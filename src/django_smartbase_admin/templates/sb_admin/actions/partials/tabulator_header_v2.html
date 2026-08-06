@@ -98,9 +98,9 @@
                         {% include "sb_admin/config/view.html" with current_views=content_context.current_views %}
                         {% block tabulator_custom_header_controls %}
                             <div class="flex items-center flex-shrink-0 gap-8 max-sm:px-16">
-                                <button id="save-view-modal-button" type="button"
-                                        class="btn btn-primary btn-empty mr-8" data-bs-toggle="modal"
-                                        data-bs-target="#save-view-modal">
+                                <button id="{{ view_id }}-save-view-modal-button" type="button"
+                                        class="js-save-view-button btn btn-primary btn-empty mr-8" data-bs-toggle="modal"
+                                        data-bs-target="#{{ view_id }}-save-view-modal">
                                     {% trans 'Save view' %}
                                 </button>
                                 {% include 'sb_admin/components/columns.html' %}

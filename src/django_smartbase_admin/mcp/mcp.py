@@ -590,8 +590,10 @@ class SBAdminTools(MCPToolset):
             # URL-ready, JSON-stringified form ``list_rows`` can't take.
             # This mirrors ``get_base_config``'s own assembly: the
             # implicit "All" reset first, then ``sbadmin_list_view_config``.
+            # get_all_config is None where the view offers no "All" reset.
+            all_config = admin.get_all_config(request)
             raw_presets = [
-                admin.get_all_config(request),
+                *([all_config] if all_config else []),
                 *(admin.get_sbadmin_list_view_config(request) or []),
             ]
             for preset in raw_presets:

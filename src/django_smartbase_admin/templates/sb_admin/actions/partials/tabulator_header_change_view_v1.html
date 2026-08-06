@@ -1,6 +1,22 @@
 {% extends "sb_admin/actions/partials/tabulator_header_v1.html" %}
+{% load i18n %}
 
-{% block tabulator_header_controls %}{% endblock %}
+{% block tabulator_header_controls %}
+    {% if content_context.show_views %}
+        <div class="flex justify-between max-sm:flex-wrap pt-16 md:p-16 md:gap-x-8 gap-y-12 md:pb-0"
+             data-views-filters-only>
+            {% include "sb_admin/config/view_embedded.html" with current_views=content_context.current_views %}
+            <div class="flex items-center flex-shrink-0 gap-8 max-sm:px-16">
+                <button id="{{ view_id }}-save-view-modal-button" type="button"
+                        class="js-save-view-button btn btn-tiny btn-primary btn-empty"
+                        data-bs-toggle="modal"
+                        data-bs-target="#{{ view_id }}-save-view-modal">
+                    {% trans 'Save view' %}
+                </button>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
 
 {% block tabulator_header_filters %}
     <div id="filters-collapse" class="collapse show tabulator-change-view-filters">
