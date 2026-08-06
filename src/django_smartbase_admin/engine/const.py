@@ -87,3 +87,5 @@ FIELDSET_HIDE_HEADER_CLASS = "hide-header"
 FIELDSET_PLAIN_CLASS = "sbadmin-fieldset-plain"
 ROW_CLASS_FIELD = "get_sbadmin_row_class"
 SUPPORTED_FILE_TYPE_ICONS = ["doc", "docx", "csv", "xls", "xlsx", "pdf", "ppt", "zip"]
+# How str(True) / str(False) arrive from a rendered choice — json.loads cannot read them.
+PYTHON_BOOL_LITERALS = {"True": True, "False": False}

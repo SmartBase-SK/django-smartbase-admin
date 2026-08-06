@@ -30,6 +30,7 @@ from django_smartbase_admin.engine.const import (
     AUTOCOMPLETE_PAGE_SIZE_NAME,
     AUTOCOMPLETE_FORWARD_NAME,
     SELECT_ALL_KEYWORD,
+    PYTHON_BOOL_LITERALS,
 )
 from django_smartbase_admin.services.translations import SBAdminTranslationsService
 from django_smartbase_admin.services.views import SBAdminViewService
@@ -246,6 +247,11 @@ class BooleanFilterWidget(SBAdminFilterWidget):
 
     def parse_value_from_input(self, request, filter_value):
         input_value = super().parse_value_from_input(request, filter_value)
+        # The radio template renders the choices above as str(True) / str(False); without this
+        # "False" would stay a string and read as truthy in a filter_query_lambda (and trip
+        # validate_value below).
+        if isinstance(input_value, str) and input_value in PYTHON_BOOL_LITERALS:
+            return PYTHON_BOOL_LITERALS[input_value]
         try:
             input_value = json.loads(input_value)
         except:
