@@ -1811,4 +1811,4 @@ mcp = ["django-mcp-server", "django-oauth-toolkit", "djangorestframework", "mcp"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "acc33f54232e5585ab79543da1378b9c3fa64113bd596e9aefd00dcbc7cefbd7"
+content-hash = "0e477c74d58125440fd0481d9712de6d2e4fcd301f1a217d2c54befef9d393f9"
