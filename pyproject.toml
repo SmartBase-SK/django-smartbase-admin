@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-smartbase-admin"
-version = "2.3.4b1"
+version = "2.3.4"
 description = ""
 authors = ["SmartBase <info@smartbase.sk>"]
 readme = "README.md"
@@ -32,7 +32,10 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-django = ">= 4.2, < 7.0"
+# Capped below 6.1: it drops the private django.utils.cache.cc_delim_re that every
+# djangorestframework release up to 3.17.2 imports (so the mcp extra cannot even be installed) and
+# the takes_context argument of the private template parse_bits() used by InclusionSBAdminNode.
+django = ">= 4.2, < 6.1"
 django-ckeditor = "^6.7.1"
 django-nested-admin = "^4.1.1"
 xlsxwriter = "^3.2.0"
