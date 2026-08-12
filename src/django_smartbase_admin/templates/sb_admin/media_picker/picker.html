@@ -1,218 +1,229 @@
 {% load i18n static %}
 
-<section class="sb-media-picker__surface" data-picker-surface data-endpoint="{{ endpoint }}"
-         data-picker-type="{{ picker_type }}"
-         hx-indicator="#sb-media-picker-loading"
-         hx-sync="closest [data-picker-surface]:replace">
-    <header class="sb-media-picker__header">
-        <h2 id="sb-media-picker-title">{% if picker_type == "image" %}{% trans "Select image" %}{% else %}{% trans "Select file" %}{% endif %}</h2>
-        <button type="button" class="sb-media-picker__icon-button" title="{% trans 'Cancel' %}" aria-label="{% trans 'Cancel' %}" data-picker-cancel>
-            <svg aria-hidden="true"><use xlink:href="#Close"></use></svg>
-        </button>
-    </header>
-
-    <form class="sb-media-picker__toolbar" data-picker-filters>
-        <input type="hidden" name="picker_type" value="{{ picker_type }}">
-        {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
-        <input type="search" id="sb-media-picker-search" class="sb-media-picker__control sb-media-picker__search" name="q" value="{{ query }}"
-               {% if picker_type == "image" %}placeholder="{% trans 'Search images' %}" aria-label="{% trans 'Search images' %}"{% else %}placeholder="{% trans 'Search files' %}" aria-label="{% trans 'Search files' %}"{% endif %}
-               autofocus
-               hx-preserve
-               hx-get="{{ endpoint }}" hx-trigger="input changed delay:300ms, search"
-               hx-include="closest form" hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-        <select class="sb-media-picker__control sb-media-picker__sort" name="order_by" aria-label="{% trans 'Sort' %}"
-                hx-get="{{ endpoint }}" hx-trigger="change" hx-include="closest form"
-                hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-            <option value="-uploaded_at"{% if ordering == '-uploaded_at' %} selected{% endif %}>{% trans "Newest first" %}</option>
-            <option value="uploaded_at"{% if ordering == 'uploaded_at' %} selected{% endif %}>{% trans "Oldest first" %}</option>
-            <option value="name"{% if ordering == 'name' %} selected{% endif %}>{% trans "Name A-Z" %}</option>
-            <option value="-name"{% if ordering == '-name' %} selected{% endif %}>{% trans "Name Z-A" %}</option>
-        </select>
-        <div class="sb-media-picker__view-switch">
-            <button type="button" class="sb-media-picker__icon-button" title="{% trans 'Grid view' %}"
-                    aria-label="{% trans 'Grid view' %}" data-picker-view="grid">
-                <svg aria-hidden="true"><use xlink:href="#All-application"></use></svg>
+<div class="modal-dialog sb-media-picker__dialog">
+    <section class="modal-content sb-media-picker__surface" data-picker-surface data-endpoint="{{ endpoint }}"
+             data-picker-type="{{ picker_type }}" hx-indicator="#sb-media-picker-loading"
+             hx-sync="closest [data-picker-surface]:replace">
+        <header class="modal-header">
+            <h2 class="text-16 leading-24 font-semibold" id="sb-media-picker-title">
+                {% if picker_type == "image" %}{% trans "Select image" %}{% else %}{% trans "Select file" %}{% endif %}
+            </h2>
+            <button type="button" class="btn btn-empty btn-small !px-8" title="{% trans 'Cancel' %}"
+                    aria-label="{% trans 'Cancel' %}" data-bs-dismiss="modal">
+                <svg aria-hidden="true"><use xlink:href="#Close"></use></svg>
             </button>
-            <button type="button" class="sb-media-picker__icon-button" title="{% trans 'List view' %}"
-                    aria-label="{% trans 'List view' %}" data-picker-view="list">
-                <svg aria-hidden="true"><use xlink:href="#List-two"></use></svg>
-            </button>
-        </div>
-    </form>
+        </header>
 
-    <div class="sb-media-picker__actions">
-        {% if permissions.can_upload %}
-            <div class="sb-media-picker__upload">
-                <button type="button" class="sb-media-picker__button sb-media-picker__button--primary sb-media-picker__button--small sb-media-picker__upload-trigger"
-                        data-picker-upload-trigger>
-                    <svg aria-hidden="true"><use xlink:href="#Upload"></use></svg>
-                    <span>{% trans "Upload" %}</span>
-                </button>
-                <input type="file"{% if picker_type == "image" %} accept="image/*"{% endif %} multiple data-picker-upload>
-            </div>
-        {% endif %}
-        {% if permissions.can_create_folder %}
-            <div class="sb-media-picker__new-folder" data-picker-new-folder>
-                <button type="button" class="sb-media-picker__button sb-media-picker__button--small" aria-expanded="false"
-                        data-picker-new-folder-trigger>
-                    <svg aria-hidden="true"><use xlink:href="#Add-one"></use></svg>
-                    <span>{% trans "New folder" %}</span>
-                </button>
-                <form class="sb-media-picker__folder-form" hidden data-picker-folder-form hx-post="{{ endpoint }}"
-                      hx-include="#sb-media-picker-search"
-                      hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-                    {% csrf_token %}
-                    <input type="hidden" name="picker_type" value="{{ picker_type }}">
-                    {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
-                    <input type="hidden" name="order_by" value="{{ ordering }}">
-                    <input type="text" class="sb-media-picker__control" name="name" placeholder="{% trans 'Folder name' %}"
-                           aria-label="{% trans 'Folder name' %}" required>
-                    <button type="submit" class="sb-media-picker__button sb-media-picker__button--primary">{% trans "Create" %}</button>
-                </form>
-            </div>
-        {% endif %}
-        <span class="sb-media-picker__status" aria-live="polite" data-picker-status>{% if errors %}{{ errors|join:" " }}{% endif %}</span>
-    </div>
-
-    <nav class="sb-media-picker__breadcrumbs" aria-label="{% trans 'Media library' %}">
-        <ol>
-            <li>
-                <button type="button" class="sb-media-picker__breadcrumb" data-picker-clear-search
-                        hx-get="{{ root_url }}" hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-                    <img src="{% static 'filer/icons/folder-root.svg' %}" alt="">
-                    <span>{% trans "Media library" %}</span>
-                </button>
-            </li>
-            {% for breadcrumb in breadcrumb_entries %}
-                <li class="sb-media-picker__breadcrumb-separator" aria-hidden="true">
-                    <svg><use xlink:href="#Right-small"></use></svg>
-                </li>
-                <li>
-                    {% if forloop.last %}
-                        <span class="sb-media-picker__breadcrumb is-current" aria-current="page">{{ breadcrumb.name }}</span>
-                    {% else %}
-                        <button type="button" class="sb-media-picker__breadcrumb" data-picker-clear-search
-                                hx-get="{{ breadcrumb.url }}" hx-target="closest [data-picker-surface]"
-                                hx-swap="outerHTML">{{ breadcrumb.name }}</button>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ol>
-    </nav>
-
-    <div id="sb-media-picker-loading" class="sb-media-picker__loading"
-         role="status" aria-live="polite" data-picker-loading
-         data-loading-label="{% trans 'Loading...' %}"
-         data-uploading-label="{% trans 'Uploading' %}">
-        <span class="sb-media-picker__loading-message">
-            <span class="sb-media-picker__spinner"></span>
-            <span data-picker-loading-text>{% trans "Loading..." %}</span>
-        </span>
-    </div>
-
-    <div class="sb-media-picker__results">
-        {% if permissions.can_upload %}
-            <div class="sb-media-picker__drop-overlay" data-picker-drop-overlay aria-hidden="true">
-                <svg aria-hidden="true"><use xlink:href="#Upload"></use></svg>
-                <span>{% trans "Upload Files" %}</span>
-            </div>
-        {% endif %}
-
-        <div class="sb-media-picker__content sb-media-picker__content--grid" data-picker-content>
-            {% for picker_folder in folder_entries %}
-                <div class="sb-media-picker__item-shell">
-                    <button type="button" class="sb-media-picker__item sb-media-picker__folder" data-picker-clear-search
-                            hx-get="{{ picker_folder.url }}" hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-                        <span class="sb-media-picker__folder-icon"><img src="{% static 'filer/icons/folder.svg' %}" alt=""></span>
-                        <span class="sb-media-picker__name" title="{{ picker_folder.name }}">{{ picker_folder.name }}</span>
+        <div class="modal-body !p-0 flex min-h-0 flex-col overflow-hidden">
+            <form class="sb-media-picker__toolbar flex items-center gap-8 px-20 pt-16 pb-8" data-picker-filters>
+                <input type="hidden" name="picker_type" value="{{ picker_type }}">
+                {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
+                <input type="search" id="sb-media-picker-search" class="input min-w-0 flex-1" name="q" value="{{ query }}"
+                       {% if picker_type == "image" %}placeholder="{% trans 'Search images' %}" aria-label="{% trans 'Search images' %}"{% else %}placeholder="{% trans 'Search files' %}" aria-label="{% trans 'Search files' %}"{% endif %}
+                       autofocus hx-preserve hx-get="{{ endpoint }}" hx-trigger="input changed delay:300ms, search"
+                       hx-include="closest form" hx-target="closest [data-picker-surface]"
+                       hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                <select class="input sb-media-picker__sort" name="order_by" aria-label="{% trans 'Sort' %}"
+                        hx-get="{{ endpoint }}" hx-trigger="change" hx-include="closest form"
+                        hx-target="closest [data-picker-surface]" hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                    <option value="-uploaded_at"{% if ordering == '-uploaded_at' %} selected{% endif %}>{% trans "Newest first" %}</option>
+                    <option value="uploaded_at"{% if ordering == 'uploaded_at' %} selected{% endif %}>{% trans "Oldest first" %}</option>
+                    <option value="name"{% if ordering == 'name' %} selected{% endif %}>{% trans "Name A-Z" %}</option>
+                    <option value="-name"{% if ordering == '-name' %} selected{% endif %}>{% trans "Name Z-A" %}</option>
+                </select>
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-empty !px-8" title="{% trans 'Grid view' %}"
+                            aria-label="{% trans 'Grid view' %}" data-picker-view="grid">
+                        <svg aria-hidden="true"><use xlink:href="#All-application"></use></svg>
                     </button>
-                    {% if picker_folder.change_url %}
-                        <a class="sb-media-picker__edit" href="{{ picker_folder.change_url }}" target="_blank" rel="noopener noreferrer"
-                           title="{% trans 'Edit' %}" aria-label="{% trans 'Edit' %}: {{ picker_folder.name }}">
-                            <svg aria-hidden="true"><use xlink:href="#Edit"></use></svg>
-                        </a>
-                    {% endif %}
-                </div>
-            {% endfor %}
-            {% for picker_item in items %}
-                <div class="sb-media-picker__item-shell">
-                    <button type="button" class="sb-media-picker__item sb-media-picker__file" aria-pressed="false"
-                            data-picker-item data-id="{{ picker_item.id }}" data-reference="{{ picker_item.reference }}"
-                            data-name="{{ picker_item.name }}" data-thumbnail-url="{{ picker_item.thumbnail_url }}"
-                            data-size="{% if picker_item.size is not None %}{{ picker_item.size }}{% endif %}"
-                            data-uploaded-at="{{ picker_item.uploaded_at|date:'c' }}">
-                        <span class="sb-media-picker__thumbnail">
-                            <img src="{{ picker_item.thumbnail_url }}" alt="" loading="lazy">
-                            <span class="sb-media-picker__check" aria-hidden="true">
-                                <svg><use xlink:href="#Check-small"></use></svg>
-                            </span>
-                        </span>
-                        <span class="sb-media-picker__details">
-                            <span class="sb-media-picker__name" title="{{ picker_item.name }}">{{ picker_item.name }}</span>
-                            <span class="sb-media-picker__meta">
-                                {% if picker_item.size is not None %}{{ picker_item.size|filesizeformat }} &middot; {% endif %}{{ picker_item.uploaded_at|date:"SHORT_DATE_FORMAT" }}
-                            </span>
-                        </span>
+                    <button type="button" class="btn btn-empty !px-8" title="{% trans 'List view' %}"
+                            aria-label="{% trans 'List view' %}" data-picker-view="list">
+                        <svg aria-hidden="true"><use xlink:href="#List-two"></use></svg>
                     </button>
-                    {% if picker_item.change_url %}
-                        <a class="sb-media-picker__edit" href="{{ picker_item.change_url }}" target="_blank" rel="noopener noreferrer"
-                           title="{% trans 'Edit' %}" aria-label="{% trans 'Edit' %}: {{ picker_item.name }}">
-                            <svg aria-hidden="true"><use xlink:href="#Edit"></use></svg>
-                        </a>
-                    {% endif %}
                 </div>
-            {% empty %}
-                {% if not folder_entries %}<div class="sb-media-picker__empty">{% if picker_type == "image" %}{% trans "No images found" %}{% else %}{% trans "No files found" %}{% endif %}</div>{% endif %}
-            {% endfor %}
-        </div>
-    </div>
+            </form>
 
-    <div class="sb-media-picker__pagination">
-        <div class="sb-media-picker__pagination-summary">
-            {% if pagination.paginator.count %}
-                <strong>{{ pagination.start_index }} - {{ pagination.end_index }}</strong>{% trans " of " %}<strong>{{ pagination.paginator.count }}</strong>
-                <span class="sb-media-picker__pagination-label">{% trans "results" %}</span>
-            {% else %}
-                <strong>0</strong> {% trans "results" %}
-            {% endif %}
-        </div>
-        {% if pagination.paginator.num_pages > 1 %}
-            <div class="sb-media-picker__paginator">
-                <button type="button" class="sb-media-picker__page" title="{% trans 'Previous page' %}"
-                        aria-label="{% trans 'Previous page' %}"
-                        {% if not pagination.has_previous %}disabled{% else %}hx-get="{{ previous_url }}"{% endif %}
-                        hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-                    <svg aria-hidden="true"><use xlink:href="#Left"></use></svg>
-                </button>
-                {% for item in pagination_items %}
-                    {% if item.kind == "page" %}
-                        {% if item.active %}
-                            <span class="sb-media-picker__page is-active" aria-current="page">{{ item.number }}</span>
-                        {% else %}
-                            <button type="button" class="sb-media-picker__page" hx-get="{{ item.url }}"
-                                    hx-target="closest [data-picker-surface]" hx-swap="outerHTML"
-                                    aria-label="{% trans 'Page' context 'pagination' %} {{ item.number }}">{{ item.number }}</button>
-                        {% endif %}
-                    {% else %}
-                        <button type="button" class="sb-media-picker__page" disabled aria-hidden="true">
-                            <svg aria-hidden="true"><use xlink:href="#More"></use></svg>
+            <div class="sb-media-picker__actions flex min-h-44 items-center gap-8 px-20 py-4">
+                {% if permissions.can_upload %}
+                    <div class="relative">
+                        <button type="button" class="btn btn-primary-light btn-small gap-6" data-picker-upload-trigger>
+                            <svg aria-hidden="true"><use xlink:href="#Upload"></use></svg>
+                            <span>{% trans "Upload" %}</span>
                         </button>
-                    {% endif %}
-                {% endfor %}
-                <button type="button" class="sb-media-picker__page" title="{% trans 'Next page' %}"
-                        aria-label="{% trans 'Next page' %}"
-                        {% if not pagination.has_next %}disabled{% else %}hx-get="{{ next_url }}"{% endif %}
-                        hx-target="closest [data-picker-surface]" hx-swap="outerHTML">
-                    <svg aria-hidden="true"><use xlink:href="#Right"></use></svg>
-                </button>
+                        <input type="file" class="hidden"{% if picker_type == "image" %} accept="image/*"{% endif %}
+                               multiple data-picker-upload>
+                    </div>
+                {% endif %}
+                {% if permissions.can_create_folder %}
+                    <div class="relative" data-picker-new-folder>
+                        <button type="button" class="btn btn-small gap-6" aria-expanded="false"
+                                data-picker-new-folder-trigger>
+                            <svg aria-hidden="true"><use xlink:href="#Add-one"></use></svg>
+                            <span>{% trans "New folder" %}</span>
+                        </button>
+                        <form class="sb-media-picker__folder-form" hidden data-picker-folder-form hx-post="{{ endpoint }}"
+                              hx-include="#sb-media-picker-search" hx-target="closest [data-picker-surface]"
+                              hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="picker_type" value="{{ picker_type }}">
+                            {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
+                            <input type="hidden" name="order_by" value="{{ ordering }}">
+                            <input type="text" class="input min-w-0" name="name" placeholder="{% trans 'Folder name' %}"
+                                   aria-label="{% trans 'Folder name' %}" required>
+                            <button type="submit" class="btn btn-primary">{% trans "Create" %}</button>
+                        </form>
+                    </div>
+                {% endif %}
+                <span class="ml-auto min-w-0 overflow-hidden text-14 text-negative text-ellipsis whitespace-nowrap"
+                      aria-live="polite" data-picker-status>{% if errors %}{{ errors|join:" " }}{% endif %}</span>
             </div>
-        {% endif %}
-    </div>
 
-    <footer class="sb-media-picker__footer">
-        <button type="button" class="sb-media-picker__button" data-picker-cancel>{% trans "Cancel" %}</button>
-        <button type="button" class="sb-media-picker__button sb-media-picker__button--primary" data-picker-done data-label="{% trans 'Done' %}" disabled>{% trans "Done" %}</button>
-    </footer>
+            <nav class="sb-media-picker__breadcrumbs" aria-label="{% trans 'Media library' %}">
+                <ol>
+                    <li>
+                        <button type="button" class="sb-media-picker__breadcrumb" data-picker-clear-search
+                                hx-get="{{ root_url }}" hx-target="closest [data-picker-surface]"
+                                hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                            <img src="{% static 'filer/icons/folder-root.svg' %}" alt="">
+                            <span>{% trans "Media library" %}</span>
+                        </button>
+                    </li>
+                    {% for breadcrumb in breadcrumb_entries %}
+                        <li class="sb-media-picker__breadcrumb-separator" aria-hidden="true">
+                            <svg><use xlink:href="#Right-small"></use></svg>
+                        </li>
+                        <li>
+                            {% if forloop.last %}
+                                <span class="sb-media-picker__breadcrumb is-current" aria-current="page">{{ breadcrumb.name }}</span>
+                            {% else %}
+                                <button type="button" class="sb-media-picker__breadcrumb" data-picker-clear-search
+                                        hx-get="{{ breadcrumb.url }}" hx-target="closest [data-picker-surface]"
+                                        hx-select="[data-picker-surface]" hx-swap="outerHTML">{{ breadcrumb.name }}</button>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ol>
+            </nav>
 
-    {% if upload.url %}<span class="sb-media-picker__hidden" data-picker-upload-url="{{ upload.url }}"></span>{% endif %}
-</section>
+            <div class="sb-media-picker__results">
+                <div id="sb-media-picker-loading" class="sb-media-picker__loading" role="status" aria-live="polite"
+                     data-picker-loading data-loading-label="{% trans 'Loading...' %}"
+                     data-uploading-label="{% trans 'Uploading' %}">
+                    <span class="sb-media-picker__loading-message">
+                        <span class="sb-media-picker__spinner"></span>
+                        <span data-picker-loading-text>{% trans "Loading..." %}</span>
+                    </span>
+                </div>
+
+                {% if permissions.can_upload %}
+                    <div class="sb-media-picker__drop-overlay" data-picker-drop-overlay aria-hidden="true">
+                        <svg aria-hidden="true"><use xlink:href="#Upload"></use></svg>
+                        <span>{% trans "Upload Files" %}</span>
+                    </div>
+                {% endif %}
+
+                <div class="sb-media-picker__content sb-media-picker__content--grid" data-picker-content>
+                    {% for picker_folder in folder_entries %}
+                        <div class="sb-media-picker__item-shell">
+                            <button type="button" class="sb-media-picker__item sb-media-picker__folder" data-picker-clear-search
+                                    hx-get="{{ picker_folder.url }}" hx-target="closest [data-picker-surface]"
+                                    hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                                <span class="sb-media-picker__folder-icon"><img src="{% static 'filer/icons/folder.svg' %}" alt=""></span>
+                                <span class="sb-media-picker__name" title="{{ picker_folder.name }}">{{ picker_folder.name }}</span>
+                            </button>
+                            {% if picker_folder.change_url %}
+                                <a class="sb-media-picker__edit" href="{{ picker_folder.change_url }}" target="_blank"
+                                   rel="noopener noreferrer" title="{% trans 'Edit' %}"
+                                   aria-label="{% trans 'Edit' %}: {{ picker_folder.name }}">
+                                    <svg aria-hidden="true"><use xlink:href="#Edit"></use></svg>
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    {% for picker_item in items %}
+                        <div class="sb-media-picker__item-shell">
+                            <button type="button" class="sb-media-picker__item sb-media-picker__file" aria-pressed="false"
+                                    data-picker-item data-id="{{ picker_item.id }}"
+                                    data-name="{{ picker_item.name }}" data-thumbnail-url="{{ picker_item.thumbnail_url }}">
+                                <span class="sb-media-picker__thumbnail">
+                                    <img src="{{ picker_item.thumbnail_url }}" alt="" loading="lazy">
+                                    <span class="sb-media-picker__check" aria-hidden="true">
+                                        <svg><use xlink:href="#Check-small"></use></svg>
+                                    </span>
+                                </span>
+                                <span class="sb-media-picker__details">
+                                    <span class="sb-media-picker__name" title="{{ picker_item.name }}">{{ picker_item.name }}</span>
+                                    <span class="sb-media-picker__meta">
+                                        {% if picker_item.size is not None %}{{ picker_item.size|filesizeformat }} &middot; {% endif %}{{ picker_item.uploaded_at|date:"SHORT_DATE_FORMAT" }}
+                                    </span>
+                                </span>
+                            </button>
+                            {% if picker_item.change_url %}
+                                <a class="sb-media-picker__edit" href="{{ picker_item.change_url }}" target="_blank"
+                                   rel="noopener noreferrer" title="{% trans 'Edit' %}"
+                                   aria-label="{% trans 'Edit' %}: {{ picker_item.name }}">
+                                    <svg aria-hidden="true"><use xlink:href="#Edit"></use></svg>
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        {% if not folder_entries %}
+                            <div class="sb-media-picker__empty">
+                                {% if picker_type == "image" %}{% trans "No images found" %}{% else %}{% trans "No files found" %}{% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="sb-media-picker__pagination">
+                <div class="text-14 text-dark-700">
+                    {% if pagination.paginator.count %}
+                        <strong>{{ pagination.start_index }} - {{ pagination.end_index }}</strong>{% trans " of " %}<strong>{{ pagination.paginator.count }}</strong>
+                        <span>{% trans "results" %}</span>
+                    {% else %}
+                        <strong>0</strong> {% trans "results" %}
+                    {% endif %}
+                </div>
+                {% if pagination.paginator.num_pages > 1 %}
+                    <div class="sb-media-picker__paginator">
+                        <button type="button" class="sb-media-picker__page" title="{% trans 'Previous page' %}"
+                                aria-label="{% trans 'Previous page' %}"
+                                {% if not pagination.has_previous %}disabled{% else %}hx-get="{{ previous_url }}"{% endif %}
+                                hx-target="closest [data-picker-surface]" hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                            <svg aria-hidden="true"><use xlink:href="#Left"></use></svg>
+                        </button>
+                        {% for item in pagination_items %}
+                            {% if item.kind == "page" %}
+                                {% if item.active %}
+                                    <span class="sb-media-picker__page is-active" aria-current="page">{{ item.number }}</span>
+                                {% else %}
+                                    <button type="button" class="sb-media-picker__page" hx-get="{{ item.url }}"
+                                            hx-target="closest [data-picker-surface]" hx-select="[data-picker-surface]" hx-swap="outerHTML"
+                                            aria-label="{% trans 'Page' context 'pagination' %} {{ item.number }}">{{ item.number }}</button>
+                                {% endif %}
+                            {% else %}
+                                <button type="button" class="sb-media-picker__page" disabled aria-hidden="true">
+                                    <svg aria-hidden="true"><use xlink:href="#More"></use></svg>
+                                </button>
+                            {% endif %}
+                        {% endfor %}
+                        <button type="button" class="sb-media-picker__page" title="{% trans 'Next page' %}"
+                                aria-label="{% trans 'Next page' %}"
+                                {% if not pagination.has_next %}disabled{% else %}hx-get="{{ next_url }}"{% endif %}
+                                hx-target="closest [data-picker-surface]" hx-select="[data-picker-surface]" hx-swap="outerHTML">
+                            <svg aria-hidden="true"><use xlink:href="#Right"></use></svg>
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <footer class="modal-footer">
+            <button type="button" class="btn" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+            <button type="button" class="btn btn-primary" data-picker-done disabled>{% trans "Done" %}</button>
+        </footer>
+
+        {% if upload.url %}<span class="hidden" data-picker-upload-url="{{ upload.url }}"></span>{% endif %}
+    </section>
+</div>

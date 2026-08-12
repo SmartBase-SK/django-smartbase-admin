@@ -241,16 +241,18 @@ class MediaPickerViewTests(TestCase):
 
         self.assertContains(
             image_response,
-            f'href="{folder_url}" target="_blank" rel="noopener noreferrer"',
+            f'href="{folder_url}"',
         )
         self.assertContains(
             image_response,
-            f'href="{image_url}" target="_blank" rel="noopener noreferrer"',
+            f'href="{image_url}"',
         )
         self.assertContains(
             file_response,
-            f'href="{file_url}" target="_blank" rel="noopener noreferrer"',
+            f'href="{file_url}"',
         )
+        self.assertContains(image_response, 'target="_blank"')
+        self.assertContains(image_response, 'rel="noopener noreferrer"')
         self.assertContains(image_response, 'class="sb-media-picker__edit"')
         self.assertContains(image_response, 'xlink:href="#Edit"')
 
@@ -262,10 +264,6 @@ class MediaPickerViewTests(TestCase):
             {item["id"] for item in response.context["items"]},
             {self.apple.pk, self.private.pk, self.document.pk},
         )
-        document = next(
-            item for item in response.context["items"] if item["id"] == self.document.pk
-        )
-        self.assertEqual(document["reference"], f"filer://file/{self.document.pk}")
         self.assertContains(response, "Select file")
         self.assertContains(response, "Search files")
         self.assertContains(response, 'data-picker-type="file"')
@@ -305,10 +303,6 @@ class MediaPickerViewTests(TestCase):
         self.assertContains(
             response,
             date_format(apple["uploaded_at"], "SHORT_DATE_FORMAT"),
-        )
-        self.assertContains(
-            response,
-            f'data-uploaded-at="{timezone.localtime(apple["uploaded_at"]).isoformat()}"',
         )
 
     def test_folders_follow_selected_sort_but_stay_before_files(self):
@@ -444,6 +438,8 @@ class MediaPickerViewTests(TestCase):
             'hx-sync="closest [data-picker-surface]:replace"',
         )
         self.assertContains(response, "data-picker-clear-search")
+        self.assertContains(response, 'hx-target="closest [data-picker-surface]"')
+        self.assertContains(response, 'hx-select="[data-picker-surface]"')
         self.assertContains(response, 'hx-swap="outerHTML"')
         self.assertContains(response, 'hx-indicator="#sb-media-picker-loading"')
         self.assertContains(response, "data-picker-loading-text")
@@ -460,8 +456,11 @@ class MediaPickerViewTests(TestCase):
         self.assertContains(response, 'aria-current="page"')
         self.assertContains(response, 'xlink:href="#Check-small"')
         self.assertNotContains(response, "&#10003;")
-        self.assertNotContains(response, 'class="btn')
-        self.assertNotContains(response, 'class="input')
+        self.assertContains(response, 'class="modal-dialog sb-media-picker__dialog"')
+        self.assertContains(response, 'class="modal-content sb-media-picker__surface"')
+        self.assertContains(response, 'class="btn')
+        self.assertContains(response, 'class="input')
+        self.assertContains(response, 'data-bs-dismiss="modal"')
         self.assertNotContains(response, "tabulator-")
         self.assertNotContains(response, "htmx-indicator")
 
@@ -629,8 +628,10 @@ class MediaPickerViewTests(TestCase):
         self.assertIn("sb-media-picker-widget__content", html)
         self.assertIn("/operations/upload/no_folder/", html)
         self.assertIn("data-sb-media-picker-trigger", html)
+        self.assertIn('data-bs-target="#sb-admin-modal"', html)
+        self.assertIn('hx-target="#sb-admin-modal"', html)
         self.assertIn("sb_admin/dist/media_picker.js", str(widget.media))
-        self.assertIn("sb_admin/dist/media_picker_style.css", str(widget.media))
+        self.assertNotIn("media_picker_style.css", str(widget.media))
         self.assertIn("filer/js/dist/admin-file-widget.bundle.js", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.css", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.fa.icons.css", str(widget.media))

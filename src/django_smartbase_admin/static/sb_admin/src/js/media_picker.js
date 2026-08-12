@@ -1,11 +1,5 @@
-// Public API: SBMediaPicker.open({endpoint, selected, multiple, origin, onSelect}).
-// Runtime dependency: HTMX. Styles are self-contained in media_picker_style.css.
-// The server renders the picker; this controller owns only transient browser state.
 const PICKER_TYPE_IMAGE = 'image'
-
-const dispatchPickerEvent = (target, name, detail) => {
-    target.dispatchEvent(new CustomEvent(name, {detail, bubbles: true}))
-}
+const MODAL_SELECTOR = '#sb-admin-modal'
 
 const pickerTranslation = (key, fallback) => (
     window.sb_admin_translation_strings?.[key] || fallback
@@ -27,19 +21,76 @@ const storeView = (view) => {
     }
 }
 
+const widgetItem = (item) => ({
+    id: Number(item.id),
+    name: item.name || '',
+    thumbnail_url: item.thumbnail_url || '',
+})
+
+const widgetSelectedItem = (widget) => {
+    const input = widget.querySelector('.vForeignKeyRawIdAdminField')
+    const id = input?.value
+    if (!id) return null
+
+    try {
+        const stored = JSON.parse(widget.querySelector('script[type="application/json"]')?.textContent || 'null')
+        if (String(stored?.id) === String(id)) return widgetItem(stored)
+    } catch (error) {
+        // A dropped file is reconstructed from django-filer's rendered preview below.
+    }
+
+    const dropzone = widget.querySelector('[data-picker-widget-dropzone]')
+    const uploadedPreviews = dropzone?.querySelectorAll('[data-picker-uploaded-preview]') || []
+    const uploadedPreview = uploadedPreviews[uploadedPreviews.length - 1]
+    const initialPreview = widget.querySelector('[data-picker-initial-preview]')
+    const image = uploadedPreview?.querySelector('[data-dz-thumbnail]')
+        || initialPreview?.querySelector('[data-picker-preview-image]')
+    const name = uploadedPreview?.querySelector('[data-dz-name]')?.textContent
+        || initialPreview?.querySelector('[data-picker-preview-name]')?.textContent
+        || ''
+    return widgetItem({
+        id: Number(id),
+        name,
+        thumbnail_url: image?.src || '',
+    })
+}
+
+const updateWidget = (widget, item) => {
+    if (!widget) return
+    const input = widget.querySelector('.vForeignKeyRawIdAdminField')
+    const dropzone = widget.querySelector('[data-picker-widget-dropzone]')
+    const preview = widget.querySelector('[data-picker-initial-preview]')
+    const clear = preview.querySelector('[data-picker-clear]')
+    const emptyPrompt = preview.querySelector('[data-picker-empty-prompt]')
+    const message = dropzone.querySelector('.js-filer-dropzone-message')
+    if (dropzone.dropzone?.files.length) dropzone.dropzone.removeAllFiles(true)
+    input.value = item?.id || ''
+    preview.style.removeProperty('display')
+    preview.querySelector('[data-picker-preview-image]').classList.toggle('hidden', !item)
+    clear.classList.toggle('hidden', !item)
+    emptyPrompt.classList.toggle('hidden', Boolean(item))
+    message.classList.toggle('hidden', Boolean(item))
+    dropzone.classList.toggle('js-object-attached', Boolean(item))
+    preview.querySelector('[data-picker-preview-image]').src = item?.thumbnail_url || ''
+    preview.querySelector('[data-picker-preview-name]').textContent = item?.name || ''
+    widget.querySelectorAll('[data-picker-trigger-label]').forEach((label) => {
+        label.textContent = item ? widget.dataset.changeLabel : widget.dataset.chooseLabel
+    })
+    widget.querySelector('script[type="application/json"]').textContent = JSON.stringify(item)
+    input.dispatchEvent(new Event('input', {bubbles: true}))
+    input.dispatchEvent(new Event('change', {bubbles: true}))
+}
+
 class MediaPicker {
-    constructor(options) {
-        this.options = options
-        this.origin = options.origin || document
-        this.multiple = Boolean(options.multiple)
-        this.selected = new Map((options.selected || []).map((item) => [String(item.id), item]))
+    constructor(widget) {
+        this.widget = widget
+        this.modalElement = document.querySelector(MODAL_SELECTOR)
+        const selectedItem = widgetSelectedItem(widget)
+        this.selected = new Map(selectedItem ? [[String(selectedItem.id), selectedItem]] : [])
         this.view = storedView()
         this.dragDepth = 0
         this.uploading = false
-        this.pointerDownOnBackdrop = false
-        this.restoreFocus = document.activeElement
         this.handleClick = this.handleClick.bind(this)
-        this.handlePointerDown = this.handlePointerDown.bind(this)
         this.handleClearSearch = this.handleClearSearch.bind(this)
         this.handleChange = this.handleChange.bind(this)
         this.handleAfterSwap = this.handleAfterSwap.bind(this)
@@ -47,93 +98,60 @@ class MediaPicker {
         this.handleDragOver = this.handleDragOver.bind(this)
         this.handleDragLeave = this.handleDragLeave.bind(this)
         this.handleDrop = this.handleDrop.bind(this)
-        this.handleKeyDown = this.handleKeyDown.bind(this)
-        this.createDialog()
+        this.handleHide = this.handleHide.bind(this)
+        this.handleHidden = this.handleHidden.bind(this)
+        this.bind()
     }
 
-    createDialog() {
-        this.dialog = document.createElement('dialog')
-        this.dialog.className = 'sb-media-picker'
-        this.dialog.setAttribute('aria-labelledby', 'sb-media-picker-title')
-        this.dialog.append(this.createInitialLoading())
-        this.dialog.addEventListener('pointerdown', this.handlePointerDown)
-        this.dialog.addEventListener('click', this.handleClearSearch, true)
-        this.dialog.addEventListener('click', this.handleClick)
-        this.dialog.addEventListener('change', this.handleChange)
-        this.dialog.addEventListener('cancel', (event) => {
-            if (event.target !== this.dialog) return
-            event.preventDefault()
-            if (!this.uploading) this.close(true)
-        })
-        this.dialog.addEventListener('dragenter', this.handleDragEnter)
-        this.dialog.addEventListener('dragover', this.handleDragOver)
-        this.dialog.addEventListener('dragleave', this.handleDragLeave)
-        this.dialog.addEventListener('drop', this.handleDrop)
+    bind() {
+        this.modalElement.addEventListener('click', this.handleClearSearch, true)
+        this.modalElement.addEventListener('click', this.handleClick)
+        this.modalElement.addEventListener('change', this.handleChange)
+        this.modalElement.addEventListener('dragenter', this.handleDragEnter)
+        this.modalElement.addEventListener('dragover', this.handleDragOver)
+        this.modalElement.addEventListener('dragleave', this.handleDragLeave)
+        this.modalElement.addEventListener('drop', this.handleDrop)
+        this.modalElement.addEventListener('hide.bs.modal', this.handleHide)
+        this.modalElement.addEventListener('hidden.bs.modal', this.handleHidden)
         document.addEventListener('htmx:afterSwap', this.handleAfterSwap)
-        document.addEventListener('keydown', this.handleKeyDown, true)
-        document.body.append(this.dialog)
-        document.body.classList.add('sb-media-picker-open')
-        this.dialog.showModal()
-        dispatchPickerEvent(this.origin, 'sb-media-picker:open', {picker: this})
-
-        const url = new URL(this.options.endpoint, window.location.href)
-        if (this.options.folder) url.searchParams.set('folder', this.options.folder)
-        window.htmx.ajax('GET', url.toString(), {target: this.dialog, swap: 'innerHTML'})
     }
 
-    createInitialLoading() {
-        const loading = document.createElement('div')
-        loading.className = 'sb-media-picker__loading is-loading'
-        loading.setAttribute('role', 'status')
-        loading.setAttribute('aria-live', 'polite')
-
-        const message = document.createElement('span')
-        message.className = 'sb-media-picker__loading-message'
-
-        const spinner = document.createElement('span')
-        spinner.className = 'sb-media-picker__spinner'
-        spinner.setAttribute('aria-hidden', 'true')
-
-        const label = document.createElement('span')
-        label.textContent = pickerTranslation('media_picker_loading', 'Loading...')
-        message.append(spinner, label)
-        loading.append(message)
-        return loading
+    destroy() {
+        this.modalElement.removeEventListener('click', this.handleClearSearch, true)
+        this.modalElement.removeEventListener('click', this.handleClick)
+        this.modalElement.removeEventListener('change', this.handleChange)
+        this.modalElement.removeEventListener('dragenter', this.handleDragEnter)
+        this.modalElement.removeEventListener('dragover', this.handleDragOver)
+        this.modalElement.removeEventListener('dragleave', this.handleDragLeave)
+        this.modalElement.removeEventListener('drop', this.handleDrop)
+        this.modalElement.removeEventListener('hide.bs.modal', this.handleHide)
+        this.modalElement.removeEventListener('hidden.bs.modal', this.handleHidden)
+        document.removeEventListener('htmx:afterSwap', this.handleAfterSwap)
+        if (activePicker === this) activePicker = null
     }
 
     handleAfterSwap() {
-        if (!this.dialog.open) return
+        if (!this.modalElement.classList.contains('show')) return
         this.dragDepth = 0
         window.requestAnimationFrame(() => this.syncSurface())
     }
 
-    handleKeyDown(event) {
-        if (event.key !== 'Escape' || !this.uploading || !this.dialog.open) return
-        event.preventDefault()
-        event.stopImmediatePropagation()
+    handleHide(event) {
+        if (this.uploading) event.preventDefault()
+    }
+
+    handleHidden() {
+        this.destroy()
     }
 
     handleClearSearch(event) {
         if (!event.target.closest('[data-picker-clear-search]')) return
-        const search = this.dialog.querySelector('#sb-media-picker-search')
+        const search = this.modalElement.querySelector('#sb-media-picker-search')
         if (search) search.value = ''
     }
 
-    isOutsideDialog(clientX, clientY) {
-        const bounds = this.dialog.getBoundingClientRect()
-        return clientX < bounds.left
-            || clientX > bounds.right
-            || clientY < bounds.top
-            || clientY > bounds.bottom
-    }
-
-    handlePointerDown(event) {
-        this.pointerDownOnBackdrop = event.target === this.dialog
-            && this.isOutsideDialog(event.clientX, event.clientY)
-    }
-
     syncSurface() {
-        const surface = this.dialog.querySelector('[data-picker-surface]')
+        const surface = this.modalElement.querySelector('[data-picker-surface]')
         if (!surface) return
         const content = surface.querySelector('[data-picker-content]')
         content.classList.remove('sb-media-picker__content--grid', 'sb-media-picker__content--list')
@@ -150,23 +168,7 @@ class MediaPicker {
     }
 
     handleClick(event) {
-        // Native dialog backdrop clicks target the dialog itself, not its contents.
-        if (event.target === this.dialog) {
-            const clickedBackdrop = this.pointerDownOnBackdrop
-                && this.isOutsideDialog(event.clientX, event.clientY)
-            this.pointerDownOnBackdrop = false
-            if (clickedBackdrop && !this.uploading) this.close(true)
-            return
-        }
-        this.pointerDownOnBackdrop = false
-
         if (this.handleFolderMenuClick(event)) return
-
-        const cancel = event.target.closest('[data-picker-cancel]')
-        if (cancel) {
-            if (!this.uploading) this.close(true)
-            return
-        }
 
         const uploadButton = event.target.closest('[data-picker-upload-trigger]')
         if (uploadButton) {
@@ -199,7 +201,7 @@ class MediaPicker {
             return true
         }
 
-        const openMenu = this.dialog.querySelector('[data-picker-new-folder].is-open')
+        const openMenu = this.modalElement.querySelector('[data-picker-new-folder].is-open')
         if (openMenu && !event.target.closest('[data-picker-new-folder]')) {
             this.setFolderMenuOpen(openMenu, false)
         }
@@ -214,19 +216,14 @@ class MediaPicker {
     }
 
     handleChange(event) {
-        if (event.target.matches('[data-picker-upload]')) {
-            this.uploadFiles(event.target.files)
-        }
+        if (event.target.matches('[data-picker-upload]')) this.uploadFiles(event.target.files)
     }
 
     itemFromButton(button) {
         return {
             id: Number(button.dataset.id),
-            reference: button.dataset.reference,
             name: button.dataset.name,
             thumbnail_url: button.dataset.thumbnailUrl,
-            size: button.dataset.size ? Number(button.dataset.size) : null,
-            uploaded_at: button.dataset.uploadedAt,
         }
     }
 
@@ -235,27 +232,19 @@ class MediaPicker {
         if (this.selected.has(id)) {
             this.selected.delete(id)
         } else {
-            if (!this.multiple) this.selected.clear()
+            this.selected.clear()
             this.selected.set(id, item)
         }
         this.syncSurface()
-        dispatchPickerEvent(this.origin, 'sb-media-picker:selection-change', {
-            items: Array.from(this.selected.values()),
-            multiple: this.multiple,
-        })
     }
 
     updateDoneButton() {
-        const button = this.dialog.querySelector('[data-picker-done]')
-        if (!button) return
-        button.disabled = this.selected.size === 0
-        button.textContent = this.multiple && this.selected.size
-            ? `${button.dataset.label} (${this.selected.size})`
-            : button.dataset.label
+        const button = this.modalElement.querySelector('[data-picker-done]')
+        if (button) button.disabled = this.selected.size === 0
     }
 
     uploadUrl() {
-        return this.dialog.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadUrl
+        return this.modalElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadUrl
     }
 
     hasDraggedFiles(event) {
@@ -263,7 +252,7 @@ class MediaPicker {
     }
 
     setDropzoneActive(active) {
-        this.dialog.querySelector('[data-picker-surface]')?.classList.toggle('is-dragging', active)
+        this.modalElement.querySelector('[data-picker-surface]')?.classList.toggle('is-dragging', active)
     }
 
     handleDragEnter(event) {
@@ -295,7 +284,7 @@ class MediaPicker {
     }
 
     setUploadProgress(current, total, percent = 0) {
-        const loading = this.dialog.querySelector('[data-picker-loading]')
+        const loading = this.modalElement.querySelector('[data-picker-loading]')
         if (!loading) return
         loading.querySelector('[data-picker-loading-text]').textContent =
             `${loading.dataset.uploadingLabel} ${current}/${total} (${percent}%)`
@@ -303,7 +292,7 @@ class MediaPicker {
     }
 
     clearUploadProgress() {
-        const loading = this.dialog.querySelector('[data-picker-loading]')
+        const loading = this.modalElement.querySelector('[data-picker-loading]')
         if (!loading) return
         loading.classList.remove('is-uploading')
         loading.querySelector('[data-picker-loading-text]').textContent = loading.dataset.loadingLabel
@@ -349,7 +338,7 @@ class MediaPicker {
     }
 
     async uploadFiles(fileList) {
-        const pickerType = this.dialog.querySelector('[data-picker-surface]')?.dataset.pickerType
+        const pickerType = this.modalElement.querySelector('[data-picker-surface]')?.dataset.pickerType
         const files = Array.from(fileList || []).filter(
             (file) => pickerType !== PICKER_TYPE_IMAGE || file.type.startsWith('image/'),
         )
@@ -357,7 +346,7 @@ class MediaPicker {
         if (!files.length || !uploadUrl || this.uploading) return
 
         this.uploading = true
-        this.dialog.querySelector('[data-picker-status]').textContent = ''
+        this.modalElement.querySelector('[data-picker-status]').textContent = ''
         this.setUploadProgress(1, files.length, 0)
         await this.waitForPaint()
         try {
@@ -370,126 +359,47 @@ class MediaPicker {
             }
             await this.refreshSurface()
         } catch (error) {
-            this.dialog.querySelector('[data-picker-status]').textContent = error.message || String(error)
+            this.modalElement.querySelector('[data-picker-status]').textContent = error.message || String(error)
         } finally {
             this.uploading = false
             this.clearUploadProgress()
-            const input = this.dialog.querySelector('[data-picker-upload]')
+            const input = this.modalElement.querySelector('[data-picker-upload]')
             if (input) input.value = ''
         }
     }
 
     refreshSurface() {
-        const surface = this.dialog.querySelector('[data-picker-surface]')
+        const surface = this.modalElement.querySelector('[data-picker-surface]')
         const filters = surface.querySelector('[data-picker-filters]')
         const url = new URL(surface.dataset.endpoint, window.location.href)
         new FormData(filters).forEach((value, key) => url.searchParams.set(key, value))
-        return window.htmx.ajax('GET', url.toString(), {target: surface, swap: 'outerHTML'})
+        return window.htmx.ajax('GET', url.toString(), {
+            target: surface,
+            select: '[data-picker-surface]',
+            swap: 'outerHTML',
+        })
     }
 
     finish() {
-        const items = Array.from(this.selected.values())
-        const detail = {items, item: items[0] || null, multiple: this.multiple}
-        dispatchPickerEvent(this.origin, 'sb-media-picker:select', detail)
-        if (typeof this.options.onSelect === 'function') this.options.onSelect(detail)
-        this.close(false)
-    }
-
-    close(cancelled) {
-        if (this.uploading || !this.dialog.isConnected) return
-        document.removeEventListener('htmx:afterSwap', this.handleAfterSwap)
-        document.removeEventListener('keydown', this.handleKeyDown, true)
-        document.body.classList.remove('sb-media-picker-open')
-        this.dialog.close()
-        this.dialog.remove()
-        if (cancelled) dispatchPickerEvent(this.origin, 'sb-media-picker:cancel', {})
-        this.restoreFocus?.focus()
+        const item = Array.from(this.selected.values())[0]
+        if (!item) return
+        updateWidget(this.widget, item)
+        window.bootstrap5.Modal.getInstance(this.modalElement)?.hide()
     }
 }
 
 let activePicker = null
 
-const open = (options) => {
-    if (!options?.endpoint) throw new Error('SBMediaPicker requires an endpoint')
-    if (!window.htmx) throw new Error('SBMediaPicker requires HTMX')
-    if (activePicker?.uploading) return activePicker
-    activePicker?.close(true)
-    activePicker = new MediaPicker(options)
-    return activePicker
-}
-
-window.SBMediaPicker = {open}
-
-const widgetSelectedItem = (widget) => {
-    const input = widget.querySelector('.vForeignKeyRawIdAdminField')
-    const id = input?.value
-    if (!id) return null
-
-    try {
-        const stored = JSON.parse(widget.querySelector('script[type="application/json"]')?.textContent || 'null')
-        if (String(stored?.id) === String(id)) return stored
-    } catch (error) {
-        // A dropped file is reconstructed from django-filer's rendered preview below.
-    }
-
-    const dropzone = widget.querySelector('[data-picker-widget-dropzone]')
-    const uploadedPreviews = dropzone?.querySelectorAll('[data-picker-uploaded-preview]') || []
-    const uploadedPreview = uploadedPreviews[uploadedPreviews.length - 1]
-    const initialPreview = widget.querySelector('[data-picker-initial-preview]')
-    const image = uploadedPreview?.querySelector('[data-dz-thumbnail]')
-        || initialPreview?.querySelector('[data-picker-preview-image]')
-    const name = uploadedPreview?.querySelector('[data-dz-name]')?.textContent
-        || initialPreview?.querySelector('[data-picker-preview-name]')?.textContent
-        || ''
-    return {
-        id: Number(id),
-        reference: `filer://${widget.dataset.pickerType}/${id}`,
-        name,
-        thumbnail_url: image?.src || '',
-        size: null,
-        uploaded_at: '',
-    }
-}
-
-const updateWidget = (widget, item) => {
-    if (!widget) return
-    const input = widget.querySelector('.vForeignKeyRawIdAdminField')
-    const dropzone = widget.querySelector('[data-picker-widget-dropzone]')
-    const preview = widget.querySelector('[data-picker-initial-preview]')
-    const clear = preview.querySelector('[data-picker-clear]')
-    const emptyPrompt = preview.querySelector('[data-picker-empty-prompt]')
-    const message = dropzone.querySelector('.js-filer-dropzone-message')
-    if (dropzone.dropzone?.files.length) dropzone.dropzone.removeAllFiles(true)
-    input.value = item?.id || ''
-    preview.style.removeProperty('display')
-    preview.querySelector('[data-picker-preview-image]').classList.toggle('hidden', !item)
-    clear.classList.toggle('hidden', !item)
-    emptyPrompt.classList.toggle('hidden', Boolean(item))
-    message.classList.toggle('hidden', Boolean(item))
-    dropzone.classList.toggle('js-object-attached', Boolean(item))
-    preview.querySelector('[data-picker-preview-image]').src = item?.thumbnail_url || ''
-    preview.querySelector('[data-picker-preview-name]').textContent = item?.name || ''
-    widget.querySelectorAll('[data-picker-trigger-label]').forEach((label) => {
-        label.textContent = item ? widget.dataset.changeLabel : widget.dataset.chooseLabel
-    })
-    widget.querySelector('script[type="application/json"]').textContent = JSON.stringify(item)
-    input.dispatchEvent(new Event('input', {bubbles: true}))
-    input.dispatchEvent(new Event('change', {bubbles: true}))
+const initializePicker = (widget) => {
+    if (!widget || !document.querySelector(MODAL_SELECTOR)) return
+    activePicker?.destroy()
+    activePicker = new MediaPicker(widget)
 }
 
 document.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-sb-media-picker-trigger]')
-    if (trigger) {
-        const widget = trigger.closest('[data-sb-media-picker-widget]')
-        const item = widgetSelectedItem(widget)
-        const selected = item ? [item] : []
-        open({endpoint: widget.dataset.endpoint, selected, origin: widget})
-    }
+    if (trigger) initializePicker(trigger.closest('[data-sb-media-picker-widget]'))
 
     const clear = event.target.closest('[data-picker-clear]')
     if (clear) updateWidget(clear.closest('[data-sb-media-picker-widget]'), null)
-})
-
-document.addEventListener('sb-media-picker:select', (event) => {
-    if (event.target.matches?.('[data-sb-media-picker-widget]')) updateWidget(event.target, event.detail.item)
-})
+}, true)

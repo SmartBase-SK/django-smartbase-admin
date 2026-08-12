@@ -1458,7 +1458,6 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
 
     class Media:
         extend = False
-        css = {"all": ["sb_admin/dist/media_picker_style.css"]}
         js = [
             *FilerAdminFileWidget.Media.js,
             "sb_admin/dist/media_picker.js",
@@ -1525,7 +1524,7 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         selected_item = None
         obj = self.get_selected_object(value)
         if obj is not None:
-            selected_item = FilerMediaPickerService.item_data(obj, self.picker_type)
+            selected_item = FilerMediaPickerService.item_data(obj)
 
         context = {
             "hidden_input": hidden_input,

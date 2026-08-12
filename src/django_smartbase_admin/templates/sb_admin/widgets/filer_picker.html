@@ -2,7 +2,6 @@
 
 <div class="sb-media-picker-widget"
      data-sb-media-picker-widget
-     data-endpoint="{{ endpoint }}"
      data-picker-type="{{ picker_type }}"
      data-choose-label="{% if picker_type == 'image' %}{% trans 'Choose image' %}{% else %}{% trans 'Choose file' %}{% endif %}"
      data-change-label="{% if picker_type == 'image' %}{% trans 'Change image' %}{% else %}{% trans 'Change file' %}{% endif %}">
@@ -17,7 +16,8 @@
                         <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>
                     </span>
                     <button type="button" class="btn btn-primary-light btn-tiny add-file-button"
-                            data-sb-media-picker-trigger>
+                            data-sb-media-picker-trigger data-bs-toggle="modal" data-bs-target="#sb-admin-modal"
+                            hx-get="{{ endpoint }}" hx-target="#sb-admin-modal">
                         <span data-picker-trigger-label>{% if picker_type == "image" %}{% trans "Change image" %}{% else %}{% trans "Change file" %}{% endif %}</span>
                     </button>
                 </div>
@@ -52,7 +52,8 @@
                         <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>
                     </span>
                     <button type="button" class="btn btn-primary-light btn-tiny add-file-button"
-                            data-sb-media-picker-trigger>
+                            data-sb-media-picker-trigger data-bs-toggle="modal" data-bs-target="#sb-admin-modal"
+                            hx-get="{{ endpoint }}" hx-target="#sb-admin-modal">
                         <span data-picker-trigger-label>
                             {% if object %}
                                 {% if picker_type == "image" %}{% trans "Change image" %}{% else %}{% trans "Change file" %}{% endif %}

@@ -334,7 +334,7 @@ class FilerMediaPickerService:
         )
 
     @classmethod
-    def item_data(cls, item: Any, picker_type: str) -> dict[str, Any]:
+    def item_data(cls, item: Any) -> dict[str, Any]:
         model_name = item._meta.model_name
         thumbnail_url = reverse(
             f"sb_admin:filer_{model_name}_fileicon",
@@ -345,7 +345,6 @@ class FilerMediaPickerService:
         )
         return {
             "id": item.pk,
-            "reference": f"filer://{picker_type}/{item.pk}",
             "name": item.label,
             "thumbnail_url": thumbnail_url,
             "change_url": cls.change_url(item),
@@ -368,7 +367,7 @@ class FilerMediaPickerService:
             "folder": (None if page.folder is None else cls.folder_data(page.folder)),
             "breadcrumbs": [cls.folder_data(folder) for folder in page.breadcrumbs],
             "folders": [cls.folder_data(folder) for folder in page.folders],
-            "items": [cls.item_data(item, page.picker_type) for item in page.items],
+            "items": [cls.item_data(item) for item in page.items],
             "pagination": page.pagination,
             "permissions": {
                 "can_upload": page.can_upload,

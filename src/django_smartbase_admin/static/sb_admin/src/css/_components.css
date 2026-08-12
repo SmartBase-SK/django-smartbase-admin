@@ -8,6 +8,7 @@
 @import "components/_table.css";
 @import "components/_json-editor.css";
 @import "components/_permission-tree.css";
+@import "components/_media_picker.css";
 
 @layer components {
     fieldset, .stacked-row {
