@@ -12,6 +12,9 @@ from django.utils.translation import gettext as _
 from django.views import View
 
 from django_smartbase_admin.services.media_picker import FilerMediaPickerService
+from django_smartbase_admin.services.configuration import (
+    SBAdminUserConfigurationService,
+)
 from django_smartbase_admin.templatetags.sb_paginated_inline import (
     build_tabulator_style_page_items,
 )
@@ -19,6 +22,7 @@ from django_smartbase_admin.templatetags.sb_paginated_inline import (
 
 class MediaPickerView(View):
     template_name = "sb_admin/media_picker/picker.html"
+    embedded_template_name = "sb_admin/media_picker/iframe.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
         return self.render_picker(request, request.GET)
@@ -131,7 +135,23 @@ class MediaPickerView(View):
                 ),
             }
         )
-        return render(request, self.template_name, context)
+        embedded = request.method == "GET" and params.get("embedded") == "1"
+        if embedded:
+            context.update(
+                {
+                    "request_id": str(params.get("request_id", "")),
+                    "selected_item": FilerMediaPickerService.selected_item_data(
+                        request,
+                        picker_type,
+                        params.get("selected_id"),
+                    ),
+                    "user_config": SBAdminUserConfigurationService.get_user_config(
+                        request
+                    ),
+                }
+            )
+        template_name = self.embedded_template_name if embedded else self.template_name
+        return render(request, template_name, context)
 
     @staticmethod
     def build_url(endpoint: str, **params: Any) -> str:

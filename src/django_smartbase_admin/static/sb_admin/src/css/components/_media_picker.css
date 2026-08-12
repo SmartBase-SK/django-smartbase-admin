@@ -13,6 +13,18 @@
         max-width: 1100px;
     }
 
+    .sb-media-picker__embed {
+        @apply h-screen w-screen overflow-hidden bg-bg-elevated;
+
+        > .sb-media-picker__dialog {
+            @apply m-0 h-full min-h-0 w-full max-w-none;
+        }
+
+        .sb-media-picker__surface {
+            @apply h-full rounded-none border-0;
+        }
+    }
+
     .sb-media-picker__surface {
         height: min(820px, calc(100dvh - 56px));
     }
@@ -391,6 +403,20 @@
 
         .sb-media-picker__page {
             @apply h-36 w-36 min-w-36;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .sb-media-picker__pagination {
+            @apply justify-center px-4;
+        }
+
+        .sb-media-picker__pagination-summary {
+            display: none;
+        }
+
+        .sb-media-picker__paginator {
+            @apply ml-0;
         }
     }
 }

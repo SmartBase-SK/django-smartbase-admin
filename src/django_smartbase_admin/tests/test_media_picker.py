@@ -464,6 +464,40 @@ class MediaPickerViewTests(TestCase):
         self.assertNotContains(response, "tabulator-")
         self.assertNotContains(response, "htmx-indicator")
 
+    def test_embedded_picker_renders_complete_iframe_document(self):
+        response = self.get_picker(
+            embedded="1",
+            request_id="studio-picker-7",
+            selected_id=self.apple.pk,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "sb_admin/media_picker/iframe.html")
+        self.assertContains(response, "<!doctype html>")
+        self.assertContains(response, "data-sb-media-picker-embed")
+        self.assertContains(response, 'data-picker-request-id="studio-picker-7"')
+        self.assertEqual(response.context["selected_item"]["id"], self.apple.pk)
+        self.assertContains(response, 'id="sb-media-picker-selected-item"')
+        self.assertContains(response, "sb_admin/dist/main_style.css")
+        self.assertContains(response, "sb_admin/js/htmx.min.js")
+        self.assertContains(response, "sb_admin/dist/media_picker.js")
+        self.assertContains(response, "data-picker-cancel", count=2)
+
+    def test_embedded_picker_rejects_inaccessible_initial_selection(self):
+        MediaPickerRoleConfiguration.restrict_qs = lambda qs, model: (
+            qs.exclude(pk=self.apple.pk) if model is Image else qs
+        )
+
+        response = self.get_picker(
+            embedded="1",
+            selected_id=self.apple.pk,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_item"])
+        self.assertContains(response, 'id="sb-media-picker-selected-item"')
+        self.assertContains(response, "null")
+
     def test_requires_staff_and_filer_directory_access(self):
         staff = get_user_model().objects.create_user(
             username="staff",

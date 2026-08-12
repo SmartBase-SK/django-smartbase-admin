@@ -5,11 +5,11 @@
              data-picker-type="{{ picker_type }}" hx-indicator="#sb-media-picker-loading"
              hx-sync="closest [data-picker-surface]:replace">
         <header class="modal-header">
-            <h2 class="text-16 leading-24 font-semibold" id="sb-media-picker-title">
+            <h2 class="text-dark-900 text-18 font-semibold leading-28" id="sb-media-picker-title">
                 {% if picker_type == "image" %}{% trans "Select image" %}{% else %}{% trans "Select file" %}{% endif %}
             </h2>
             <button type="button" class="btn btn-empty btn-small !px-8" title="{% trans 'Cancel' %}"
-                    aria-label="{% trans 'Cancel' %}" data-bs-dismiss="modal">
+                    aria-label="{% trans 'Cancel' %}" data-picker-cancel data-bs-dismiss="modal">
                 <svg aria-hidden="true"><use xlink:href="#Close"></use></svg>
             </button>
         </header>
@@ -177,7 +177,7 @@
             </div>
 
             <div class="sb-media-picker__pagination">
-                <div class="text-14 text-dark-700">
+                <div class="sb-media-picker__pagination-summary text-14 text-dark-700">
                     {% if pagination.paginator.count %}
                         <strong>{{ pagination.start_index }} - {{ pagination.end_index }}</strong>{% trans " of " %}<strong>{{ pagination.paginator.count }}</strong>
                         <span>{% trans "results" %}</span>
@@ -220,7 +220,7 @@
         </div>
 
         <footer class="modal-footer">
-            <button type="button" class="btn" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+            <button type="button" class="btn" data-picker-cancel data-bs-dismiss="modal">{% trans "Cancel" %}</button>
             <button type="button" class="btn btn-primary" data-picker-done disabled>{% trans "Done" %}</button>
         </footer>
 

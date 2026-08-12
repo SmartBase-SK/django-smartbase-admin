@@ -247,6 +247,23 @@ class FilerMediaPickerService:
             return model.objects.none()
         return cls.item_queryset(request, picker_type)
 
+    @classmethod
+    def selected_item_data(
+        cls,
+        request: HttpRequest,
+        picker_type: str,
+        value: Any,
+    ) -> dict[str, Any] | None:
+        try:
+            item = (
+                cls.accessible_item_queryset(request, picker_type)
+                .filter(pk=value)
+                .first()
+            )
+        except (TypeError, ValueError, ValidationError):
+            return None
+        return None if item is None else cls.item_data(item)
+
     @staticmethod
     def order_items(queryset, ordering: str):
         if ordering in MEDIA_PICKER_ORDERING:

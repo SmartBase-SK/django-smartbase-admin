@@ -1,5 +1,13 @@
 const PICKER_TYPE_IMAGE = 'image'
 const MODAL_SELECTOR = '#sb-admin-modal'
+const EMBEDDED_PICKER_SELECTOR = '[data-sb-media-picker-embed]'
+const EMBEDDED_MESSAGE_SOURCE = 'django-smartbase-admin:media-picker'
+const EMBEDDED_MESSAGE_TYPES = Object.freeze({
+    BUSY: 'busy',
+    CANCEL: 'cancel',
+    READY: 'ready',
+    SELECT: 'select',
+})
 
 const pickerTranslation = (key, fallback) => (
     window.sb_admin_translation_strings?.[key] || fallback
@@ -26,6 +34,17 @@ const widgetItem = (item) => ({
     name: item.name || '',
     thumbnail_url: item.thumbnail_url || '',
 })
+
+const embeddedSelectedItem = (rootElement) => {
+    try {
+        const item = JSON.parse(
+            rootElement.querySelector('#sb-media-picker-selected-item')?.textContent || 'null',
+        )
+        return item === null ? null : widgetItem(item)
+    } catch (error) {
+        return null
+    }
+}
 
 const widgetSelectedItem = (widget) => {
     const input = widget.querySelector('.vForeignKeyRawIdAdminField')
@@ -82,10 +101,13 @@ const updateWidget = (widget, item) => {
 }
 
 class MediaPicker {
-    constructor(widget) {
+    constructor({widget = null, rootElement, embedded = false}) {
         this.widget = widget
-        this.modalElement = document.querySelector(MODAL_SELECTOR)
-        const selectedItem = widgetSelectedItem(widget)
+        this.rootElement = rootElement
+        this.embedded = embedded
+        const selectedItem = embedded
+            ? embeddedSelectedItem(rootElement)
+            : widgetSelectedItem(widget)
         this.selected = new Map(selectedItem ? [[String(selectedItem.id), selectedItem]] : [])
         this.view = storedView()
         this.dragDepth = 0
@@ -98,40 +120,49 @@ class MediaPicker {
         this.handleDragOver = this.handleDragOver.bind(this)
         this.handleDragLeave = this.handleDragLeave.bind(this)
         this.handleDrop = this.handleDrop.bind(this)
+        this.handleKeyDown = this.handleKeyDown.bind(this)
         this.handleHide = this.handleHide.bind(this)
         this.handleHidden = this.handleHidden.bind(this)
         this.bind()
     }
 
     bind() {
-        this.modalElement.addEventListener('click', this.handleClearSearch, true)
-        this.modalElement.addEventListener('click', this.handleClick)
-        this.modalElement.addEventListener('change', this.handleChange)
-        this.modalElement.addEventListener('dragenter', this.handleDragEnter)
-        this.modalElement.addEventListener('dragover', this.handleDragOver)
-        this.modalElement.addEventListener('dragleave', this.handleDragLeave)
-        this.modalElement.addEventListener('drop', this.handleDrop)
-        this.modalElement.addEventListener('hide.bs.modal', this.handleHide)
-        this.modalElement.addEventListener('hidden.bs.modal', this.handleHidden)
+        this.rootElement.addEventListener('click', this.handleClearSearch, true)
+        this.rootElement.addEventListener('click', this.handleClick)
+        this.rootElement.addEventListener('change', this.handleChange)
+        this.rootElement.addEventListener('dragenter', this.handleDragEnter)
+        this.rootElement.addEventListener('dragover', this.handleDragOver)
+        this.rootElement.addEventListener('dragleave', this.handleDragLeave)
+        this.rootElement.addEventListener('drop', this.handleDrop)
+        if (!this.embedded) {
+            this.rootElement.addEventListener('hide.bs.modal', this.handleHide)
+            this.rootElement.addEventListener('hidden.bs.modal', this.handleHidden)
+        } else {
+            this.rootElement.addEventListener('keydown', this.handleKeyDown)
+        }
         document.addEventListener('htmx:afterSwap', this.handleAfterSwap)
     }
 
     destroy() {
-        this.modalElement.removeEventListener('click', this.handleClearSearch, true)
-        this.modalElement.removeEventListener('click', this.handleClick)
-        this.modalElement.removeEventListener('change', this.handleChange)
-        this.modalElement.removeEventListener('dragenter', this.handleDragEnter)
-        this.modalElement.removeEventListener('dragover', this.handleDragOver)
-        this.modalElement.removeEventListener('dragleave', this.handleDragLeave)
-        this.modalElement.removeEventListener('drop', this.handleDrop)
-        this.modalElement.removeEventListener('hide.bs.modal', this.handleHide)
-        this.modalElement.removeEventListener('hidden.bs.modal', this.handleHidden)
+        this.rootElement.removeEventListener('click', this.handleClearSearch, true)
+        this.rootElement.removeEventListener('click', this.handleClick)
+        this.rootElement.removeEventListener('change', this.handleChange)
+        this.rootElement.removeEventListener('dragenter', this.handleDragEnter)
+        this.rootElement.removeEventListener('dragover', this.handleDragOver)
+        this.rootElement.removeEventListener('dragleave', this.handleDragLeave)
+        this.rootElement.removeEventListener('drop', this.handleDrop)
+        if (!this.embedded) {
+            this.rootElement.removeEventListener('hide.bs.modal', this.handleHide)
+            this.rootElement.removeEventListener('hidden.bs.modal', this.handleHidden)
+        } else {
+            this.rootElement.removeEventListener('keydown', this.handleKeyDown)
+        }
         document.removeEventListener('htmx:afterSwap', this.handleAfterSwap)
         if (activePicker === this) activePicker = null
     }
 
     handleAfterSwap() {
-        if (!this.modalElement.classList.contains('show')) return
+        if (!this.embedded && !this.rootElement.classList.contains('show')) return
         this.dragDepth = 0
         window.requestAnimationFrame(() => this.syncSurface())
     }
@@ -144,14 +175,20 @@ class MediaPicker {
         this.destroy()
     }
 
+    handleKeyDown(event) {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        this.cancel()
+    }
+
     handleClearSearch(event) {
         if (!event.target.closest('[data-picker-clear-search]')) return
-        const search = this.modalElement.querySelector('#sb-media-picker-search')
+        const search = this.rootElement.querySelector('#sb-media-picker-search')
         if (search) search.value = ''
     }
 
     syncSurface() {
-        const surface = this.modalElement.querySelector('[data-picker-surface]')
+        const surface = this.rootElement.querySelector('[data-picker-surface]')
         if (!surface) return
         const content = surface.querySelector('[data-picker-content]')
         content.classList.remove('sb-media-picker__content--grid', 'sb-media-picker__content--list')
@@ -168,6 +205,13 @@ class MediaPicker {
     }
 
     handleClick(event) {
+        const cancelButton = event.target.closest('[data-picker-cancel]')
+        if (cancelButton && this.embedded) {
+            event.preventDefault()
+            this.cancel()
+            return
+        }
+
         if (this.handleFolderMenuClick(event)) return
 
         const uploadButton = event.target.closest('[data-picker-upload-trigger]')
@@ -201,7 +245,7 @@ class MediaPicker {
             return true
         }
 
-        const openMenu = this.modalElement.querySelector('[data-picker-new-folder].is-open')
+        const openMenu = this.rootElement.querySelector('[data-picker-new-folder].is-open')
         if (openMenu && !event.target.closest('[data-picker-new-folder]')) {
             this.setFolderMenuOpen(openMenu, false)
         }
@@ -239,12 +283,12 @@ class MediaPicker {
     }
 
     updateDoneButton() {
-        const button = this.modalElement.querySelector('[data-picker-done]')
+        const button = this.rootElement.querySelector('[data-picker-done]')
         if (button) button.disabled = this.selected.size === 0
     }
 
     uploadUrl() {
-        return this.modalElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadUrl
+        return this.rootElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadUrl
     }
 
     hasDraggedFiles(event) {
@@ -252,7 +296,7 @@ class MediaPicker {
     }
 
     setDropzoneActive(active) {
-        this.modalElement.querySelector('[data-picker-surface]')?.classList.toggle('is-dragging', active)
+        this.rootElement.querySelector('[data-picker-surface]')?.classList.toggle('is-dragging', active)
     }
 
     handleDragEnter(event) {
@@ -284,7 +328,7 @@ class MediaPicker {
     }
 
     setUploadProgress(current, total, percent = 0) {
-        const loading = this.modalElement.querySelector('[data-picker-loading]')
+        const loading = this.rootElement.querySelector('[data-picker-loading]')
         if (!loading) return
         loading.querySelector('[data-picker-loading-text]').textContent =
             `${loading.dataset.uploadingLabel} ${current}/${total} (${percent}%)`
@@ -292,7 +336,7 @@ class MediaPicker {
     }
 
     clearUploadProgress() {
-        const loading = this.modalElement.querySelector('[data-picker-loading]')
+        const loading = this.rootElement.querySelector('[data-picker-loading]')
         if (!loading) return
         loading.classList.remove('is-uploading')
         loading.querySelector('[data-picker-loading-text]').textContent = loading.dataset.loadingLabel
@@ -338,15 +382,15 @@ class MediaPicker {
     }
 
     async uploadFiles(fileList) {
-        const pickerType = this.modalElement.querySelector('[data-picker-surface]')?.dataset.pickerType
+        const pickerType = this.rootElement.querySelector('[data-picker-surface]')?.dataset.pickerType
         const files = Array.from(fileList || []).filter(
             (file) => pickerType !== PICKER_TYPE_IMAGE || file.type.startsWith('image/'),
         )
         const uploadUrl = this.uploadUrl()
         if (!files.length || !uploadUrl || this.uploading) return
 
-        this.uploading = true
-        this.modalElement.querySelector('[data-picker-status]').textContent = ''
+        this.setUploading(true)
+        this.rootElement.querySelector('[data-picker-status]').textContent = ''
         this.setUploadProgress(1, files.length, 0)
         await this.waitForPaint()
         try {
@@ -359,17 +403,17 @@ class MediaPicker {
             }
             await this.refreshSurface()
         } catch (error) {
-            this.modalElement.querySelector('[data-picker-status]').textContent = error.message || String(error)
+            this.rootElement.querySelector('[data-picker-status]').textContent = error.message || String(error)
         } finally {
-            this.uploading = false
+            this.setUploading(false)
             this.clearUploadProgress()
-            const input = this.modalElement.querySelector('[data-picker-upload]')
+            const input = this.rootElement.querySelector('[data-picker-upload]')
             if (input) input.value = ''
         }
     }
 
     refreshSurface() {
-        const surface = this.modalElement.querySelector('[data-picker-surface]')
+        const surface = this.rootElement.querySelector('[data-picker-surface]')
         const filters = surface.querySelector('[data-picker-filters]')
         const url = new URL(surface.dataset.endpoint, window.location.href)
         new FormData(filters).forEach((value, key) => url.searchParams.set(key, value))
@@ -380,20 +424,60 @@ class MediaPicker {
         })
     }
 
+    setUploading(uploading) {
+        this.uploading = uploading
+        if (this.embedded) {
+            this.postEmbeddedMessage(EMBEDDED_MESSAGE_TYPES.BUSY, {busy: uploading})
+        }
+    }
+
+    postEmbeddedMessage(type, detail = {}) {
+        window.parent.postMessage({
+            source: EMBEDDED_MESSAGE_SOURCE,
+            type,
+            requestId: this.rootElement.dataset.pickerRequestId,
+            ...detail,
+        }, window.location.origin)
+    }
+
+    cancel() {
+        if (!this.uploading) this.postEmbeddedMessage(EMBEDDED_MESSAGE_TYPES.CANCEL)
+    }
+
     finish() {
         const item = Array.from(this.selected.values())[0]
         if (!item) return
+        if (this.embedded) {
+            const pickerType = this.rootElement.querySelector('[data-picker-surface]').dataset.pickerType
+            this.postEmbeddedMessage(EMBEDDED_MESSAGE_TYPES.SELECT, {
+                item: {
+                    ...item,
+                    reference: `filer://${pickerType}/${item.id}`,
+                },
+            })
+            return
+        }
         updateWidget(this.widget, item)
-        window.bootstrap5.Modal.getInstance(this.modalElement)?.hide()
+        window.bootstrap5.Modal.getInstance(this.rootElement)?.hide()
     }
 }
 
 let activePicker = null
 
 const initializePicker = (widget) => {
-    if (!widget || !document.querySelector(MODAL_SELECTOR)) return
+    const rootElement = document.querySelector(MODAL_SELECTOR)
+    if (!widget || !rootElement) return
     activePicker?.destroy()
-    activePicker = new MediaPicker(widget)
+    activePicker = new MediaPicker({widget, rootElement})
+}
+
+const initializeEmbeddedPicker = () => {
+    const rootElement = document.querySelector(EMBEDDED_PICKER_SELECTOR)
+    if (!rootElement) return
+    activePicker?.destroy()
+    activePicker = new MediaPicker({rootElement, embedded: true})
+    activePicker.syncSurface()
+    activePicker.postEmbeddedMessage(EMBEDDED_MESSAGE_TYPES.READY)
 }
 
 document.addEventListener('click', (event) => {
@@ -403,3 +487,9 @@ document.addEventListener('click', (event) => {
     const clear = event.target.closest('[data-picker-clear]')
     if (clear) updateWidget(clear.closest('[data-sb-media-picker-widget]'), null)
 }, true)
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEmbeddedPicker, {once: true})
+} else {
+    initializeEmbeddedPicker()
+}
