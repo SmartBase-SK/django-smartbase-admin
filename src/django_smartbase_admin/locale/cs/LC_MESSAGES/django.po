@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-03 17:03+0200\n"
+"POT-Creation-Date: 2026-08-12 14:16+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Czech <cs@li.org>\n"
@@ -99,10 +99,8 @@ msgstr "Historie změn: %s"
 msgid "View"
 msgstr "Zobrazit"
 
-#, fuzzy
-#| msgid "Created"
 msgid "Create"
-msgstr "Vytvořeno"
+msgstr "Vytvořit"
 
 msgid "Edit"
 msgstr "Upravit"
@@ -158,11 +156,25 @@ msgstr "Souhrn"
 msgid "Publish"
 msgstr "Publikovat"
 
+msgid "Row ID"
+msgstr ""
+
+#, fuzzy
+#| msgid "Columns"
+msgid "Column"
+msgstr "Sloupce"
+
+msgid "Value"
+msgstr "Hodnota"
+
 msgid "Search..."
 msgstr "Hledat..."
 
 msgid "Exit Reorder"
 msgstr "Ukončit přeuspořádání"
+
+msgid "Not Implemented"
+msgstr ""
 
 #, python-brace-format
 msgid "Reorder {self.model._meta.verbose_name}"
@@ -275,6 +287,120 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr "Žádná data."
 
+msgid "Calls"
+msgstr ""
+
+#, fuzzy
+#| msgid "Timezone"
+msgid "Time"
+msgstr "Časové pásmo"
+
+msgid "User"
+msgstr "Uživatel"
+
+msgid "Tool"
+msgstr ""
+
+msgid "Record count"
+msgstr ""
+
+#, fuzzy
+#| msgid "Bulk operation"
+msgid "Duration"
+msgstr "Hromadná operace"
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Error"
+msgstr "Chyba:"
+
+msgid "MCP calls"
+msgstr ""
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Errors"
+msgstr "Chyba:"
+
+msgid "Avg duration (ms)"
+msgstr ""
+
+#, fuzzy
+#| msgid "items affected"
+msgid "Items returned"
+msgstr "ovlivněných položek"
+
+msgid "Request (KB)"
+msgstr ""
+
+msgid "Response (KB)"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+#, fuzzy
+#| msgid "All users"
+msgid "By user"
+msgstr "Všichni uživatelé"
+
+msgid "Grouping"
+msgstr ""
+
+msgid "AI Assistant Module"
+msgstr ""
+
+msgid "Request"
+msgstr ""
+
+msgid "Request size (B)"
+msgstr ""
+
+msgid "Response size (B)"
+msgstr ""
+
+msgid "Duration (ms)"
+msgstr ""
+
+#, fuzzy
+#| msgid "results"
+msgid "Result status"
+msgstr "výsledky"
+
+msgid "Returned field count"
+msgstr ""
+
+msgid "Returned inline count"
+msgstr ""
+
+msgid "Returned inline rows"
+msgstr ""
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Error type"
+msgstr "Chyba:"
+
+#, fuzzy
+#| msgid "New message"
+msgid "Error message"
+msgstr "Nová zpráva"
+
+msgid "Outcome"
+msgstr ""
+
+msgid "Request (B)"
+msgstr ""
+
+msgid "Response (B)"
+msgstr ""
+
+msgid "Response"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
 msgid "Toast"
 msgstr "Toast"
 
@@ -366,6 +492,9 @@ msgstr "Světlý"
 
 msgid "Theme"
 msgstr "Motiv"
+
+msgid "A folder with this name already exists."
+msgstr "Složka s tímto názvem již existuje."
 
 msgid "Translations"
 msgstr "Překlady"
@@ -493,9 +622,6 @@ msgstr "Pro stránku"
 msgid "Date/time"
 msgstr "Datum/čas"
 
-msgid "User"
-msgstr "Uživatel"
-
 msgid "Action"
 msgstr "Akce"
 
@@ -549,9 +675,6 @@ msgstr "ovlivněných položek"
 
 msgid "Field"
 msgstr "Pole"
-
-msgid "Value"
-msgstr "Hodnota"
 
 msgid "No changes recorded."
 msgstr "Žádné změny nebyly zaznamenány."
@@ -945,6 +1068,82 @@ msgstr "Změněno"
 msgid "Owner"
 msgstr "Vlastník"
 
+msgid "Select image"
+msgstr "Vybrat obrázek"
+
+#, fuzzy
+#| msgid "Select image"
+msgid "Select file"
+msgstr "Vybrat obrázek"
+
+msgid "Search images"
+msgstr "Hledat obrázky"
+
+#, fuzzy
+#| msgid "Search images"
+msgid "Search files"
+msgstr "Hledat obrázky"
+
+msgid "Sort"
+msgstr "Řazení"
+
+msgid "Newest first"
+msgstr "Nejnovější první"
+
+msgid "Oldest first"
+msgstr "Nejstarší první"
+
+msgid "Name A-Z"
+msgstr "Název A–Z"
+
+msgid "Name Z-A"
+msgstr "Název Z–A"
+
+msgid "Grid view"
+msgstr "Zobrazení mřížky"
+
+msgid "List view"
+msgstr "Zobrazení seznamu"
+
+msgid "Upload"
+msgstr "Nahrát"
+
+msgid "New folder"
+msgstr "Nová složka"
+
+msgid "Folder name"
+msgstr "Název složky"
+
+msgid "Media library"
+msgstr "Knihovna médií"
+
+msgid "Uploading"
+msgstr "Nahrávání"
+
+msgid "No images found"
+msgstr "Nebyly nalezeny žádné obrázky"
+
+#, fuzzy
+#| msgid "No images found"
+msgid "No files found"
+msgstr "Nebyly nalezeny žádné obrázky"
+
+msgid " of "
+msgstr " z "
+
+msgid "Previous page"
+msgstr "Předchozí stránka"
+
+msgctxt "pagination"
+msgid "Page"
+msgstr "Strana"
+
+msgid "Next page"
+msgstr "Další stránka"
+
+msgid "Done"
+msgstr "Hotovo"
+
 msgid "Acknowledge"
 msgstr "Rozumím"
 
@@ -988,6 +1187,10 @@ msgstr "<strong>0</strong> položek"
 #, python-brace-format
 msgid "${value} selected"
 msgstr "${value} vybráno"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr "Přejít"
 
 msgid "Unsaved changes"
 msgstr "Neuložené změny"
@@ -1062,6 +1265,17 @@ msgstr "Vyhledat"
 msgid "Choose File"
 msgstr "Vybrat soubor"
 
+msgid "Choose image"
+msgstr "Vybrat obrázek"
+
+#, fuzzy
+#| msgid "Choose File"
+msgid "Choose file"
+msgstr "Vybrat soubor"
+
+msgid "Change image"
+msgstr "Změnit obrázek"
+
 msgid "Search permissions…"
 msgstr "Vyhledat oprávnění…"
 
@@ -1134,6 +1348,9 @@ msgstr "Primární"
 msgid "Secondary"
 msgstr "Sekundární"
 
+msgid "Invalid folder."
+msgstr "Neplatná složka."
+
 msgid "Finish"
 msgstr "Dokončit"
 
@@ -1154,9 +1371,6 @@ msgstr "Přeloženo"
 
 msgid "Status"
 msgstr "Stav"
-
-msgid " of "
-msgstr " z "
 
 msgid "Language"
 msgstr "Jazyk"
@@ -1196,11 +1410,3 @@ msgstr "Jazyk"
 #, python-format
 #~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
 #~ msgstr "Opravdu chcete smazat vybrané %(objects_name)s? Všechny následující objekty a jejich související položky budou smazány:"
-
-msgctxt "pagination"
-msgid "Page"
-msgstr "Strana"
-
-msgctxt "pagination"
-msgid "Go"
-msgstr "Přejít"

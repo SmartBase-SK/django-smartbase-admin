@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-03 17:03+0200\n"
+"POT-Creation-Date: 2026-08-12 14:16+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -158,11 +158,25 @@ msgstr "Zusammenfassung"
 msgid "Publish"
 msgstr ""
 
+msgid "Row ID"
+msgstr ""
+
+#, fuzzy
+#| msgid "Columns"
+msgid "Column"
+msgstr "Spalten"
+
+msgid "Value"
+msgstr "Wert"
+
 msgid "Search..."
 msgstr "Suchen..."
 
 msgid "Exit Reorder"
 msgstr "Neuanordnung beenden"
+
+msgid "Not Implemented"
+msgstr ""
 
 #, python-brace-format
 msgid "Reorder {self.model._meta.verbose_name}"
@@ -273,6 +287,116 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr "Keine Daten."
 
+msgid "Calls"
+msgstr ""
+
+#, fuzzy
+#| msgid "Timezone"
+msgid "Time"
+msgstr "Zeitzone"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Tool"
+msgstr ""
+
+msgid "Record count"
+msgstr ""
+
+#, fuzzy
+#| msgid "Bulk operation"
+msgid "Duration"
+msgstr "Massenoperation"
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Error"
+msgstr "Fehler:"
+
+msgid "MCP calls"
+msgstr ""
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Errors"
+msgstr "Fehler:"
+
+msgid "Avg duration (ms)"
+msgstr ""
+
+#, fuzzy
+#| msgid "items affected"
+msgid "Items returned"
+msgstr "betroffene Einträge"
+
+msgid "Request (KB)"
+msgstr ""
+
+msgid "Response (KB)"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "By user"
+msgstr ""
+
+msgid "Grouping"
+msgstr ""
+
+msgid "AI Assistant Module"
+msgstr ""
+
+msgid "Request"
+msgstr ""
+
+msgid "Request size (B)"
+msgstr ""
+
+msgid "Response size (B)"
+msgstr ""
+
+msgid "Duration (ms)"
+msgstr ""
+
+#, fuzzy
+#| msgid "results"
+msgid "Result status"
+msgstr "Ergebnisse"
+
+msgid "Returned field count"
+msgstr ""
+
+msgid "Returned inline count"
+msgstr ""
+
+msgid "Returned inline rows"
+msgstr ""
+
+#, fuzzy
+#| msgid "Error:"
+msgid "Error type"
+msgstr "Fehler:"
+
+msgid "Error message"
+msgstr ""
+
+msgid "Outcome"
+msgstr ""
+
+msgid "Request (B)"
+msgstr ""
+
+msgid "Response (B)"
+msgstr ""
+
+msgid "Response"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
 msgid "Toast"
 msgstr ""
 
@@ -370,6 +494,9 @@ msgstr "Hell"
 
 msgid "Theme"
 msgstr "Design"
+
+msgid "A folder with this name already exists."
+msgstr ""
 
 msgid "Translations"
 msgstr "Übersetzungen"
@@ -508,9 +635,6 @@ msgstr "Für Seite"
 msgid "Date/time"
 msgstr "Datum/Uhrzeit"
 
-msgid "User"
-msgstr "Benutzer"
-
 msgid "Action"
 msgstr "Aktion"
 
@@ -564,9 +688,6 @@ msgstr "betroffene Einträge"
 
 msgid "Field"
 msgstr "Feld"
-
-msgid "Value"
-msgstr "Wert"
 
 msgid "No changes recorded."
 msgstr "Keine Änderungen aufgezeichnet."
@@ -958,6 +1079,84 @@ msgstr "Geändert"
 msgid "Owner"
 msgstr "Eigentümer"
 
+msgid "Select image"
+msgstr ""
+
+#, fuzzy
+#| msgid "Select all"
+msgid "Select file"
+msgstr "Alle auswählen"
+
+msgid "Search images"
+msgstr ""
+
+#, fuzzy
+#| msgid "Search and filter"
+msgid "Search files"
+msgstr "Suchen und filtern"
+
+msgid "Sort"
+msgstr ""
+
+msgid "Newest first"
+msgstr ""
+
+msgid "Oldest first"
+msgstr ""
+
+msgid "Name A-Z"
+msgstr ""
+
+msgid "Name Z-A"
+msgstr ""
+
+msgid "Grid view"
+msgstr ""
+
+msgid "List view"
+msgstr ""
+
+msgid "Upload"
+msgstr ""
+
+msgid "New folder"
+msgstr ""
+
+msgid "Folder name"
+msgstr ""
+
+msgid "Media library"
+msgstr ""
+
+msgid "Uploading"
+msgstr ""
+
+msgid "No images found"
+msgstr ""
+
+#, fuzzy
+#| msgid "results"
+msgid "No files found"
+msgstr "Ergebnisse"
+
+msgid " of "
+msgstr " von "
+
+msgid "Previous page"
+msgstr ""
+
+#, fuzzy
+#| msgid "Page Tree"
+msgctxt "pagination"
+msgid "Page"
+msgstr "Seitenbaum"
+
+msgid "Next page"
+msgstr ""
+
+msgid "Done"
+msgstr ""
+
 msgid "Acknowledge"
 msgstr ""
 
@@ -1003,6 +1202,10 @@ msgstr "<strong>0</strong> Einträge"
 #, python-brace-format
 msgid "${value} selected"
 msgstr "${value} ausgewählt"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr ""
 
 #, fuzzy
 #| msgid "Related Changes"
@@ -1079,6 +1282,17 @@ msgstr "Nachschlagen"
 msgid "Choose File"
 msgstr "Datei auswählen"
 
+msgid "Choose image"
+msgstr ""
+
+#, fuzzy
+#| msgid "Choose File"
+msgid "Choose file"
+msgstr "Datei auswählen"
+
+msgid "Change image"
+msgstr ""
+
 msgid "Search permissions…"
 msgstr ""
 
@@ -1150,6 +1364,9 @@ msgstr ""
 msgid "Secondary"
 msgstr ""
 
+msgid "Invalid folder."
+msgstr ""
+
 msgid "Finish"
 msgstr "Fertigstellen"
 
@@ -1171,14 +1388,8 @@ msgstr "Übersetzt"
 msgid "Status"
 msgstr "Status"
 
-msgid " of "
-msgstr " von "
-
 msgid "Language"
 msgstr ""
-
-#~ msgid "Search and filter"
-#~ msgstr "Suchen und filtern"
 
 #, fuzzy
 #~| msgid "Select all"

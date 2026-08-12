@@ -143,6 +143,7 @@ class SBAdminSite(admin.AdminSite):
             PasswordChangeView,
             PasswordChangeDoneView,
         )
+        from django_smartbase_admin.views.media_picker_view import MediaPickerView
         from django_smartbase_admin.views.user_config_view import ColorSchemeView
         from django_smartbase_admin.views.view_on_site_redirect_view import (
             ViewOnSiteRedirectView,
@@ -223,6 +224,11 @@ class SBAdminSite(admin.AdminSite):
                     "global-filter/",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
+                ),
+                path(
+                    "media-picker/",
+                    self.admin_view(MediaPickerView.as_view()),
+                    name="media_picker",
                 ),
                 path(
                     "color-scheme/",

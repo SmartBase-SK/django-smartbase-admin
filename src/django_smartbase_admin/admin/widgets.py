@@ -1,5 +1,4 @@
 import json
-import logging
 import sys
 
 from ckeditor.widgets import CKEditorWidget
@@ -8,7 +7,6 @@ from django import forms
 from django.conf import settings
 from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
-    ForeignKeyRawIdWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
 from django.contrib.postgres.forms import RangeWidget
@@ -22,14 +20,12 @@ from django.db.models import ForeignKey, OneToOneField
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.formats import get_format
-from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from django.utils.timezone import get_current_timezone_name
 from django.utils.translation import gettext_lazy as _, get_language
 from django.views.generic.base import ContextMixin
 from filer.fields.file import AdminFileWidget as FilerAdminFileWidget
 from filer.fields.image import AdminImageWidget
-from filer.models import File
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import (
@@ -45,6 +41,11 @@ from django_smartbase_admin.engine.filter_widgets import (
     AutocompleteFilterWidget,
     SBAdminTreeWidgetMixin,
 )
+from django_smartbase_admin.services.media_picker import (
+    MEDIA_PICKER_TYPE_FILE,
+    MEDIA_PICKER_TYPE_IMAGE,
+    FilerMediaPickerService,
+)
 from django_smartbase_admin.services.request_cache import (
     RequestCacheKey,
     cache_on_request,
@@ -56,7 +57,6 @@ from django_smartbase_admin.templatetags.sb_admin_tags import (
 from django_smartbase_admin.utils import (
     convert_django_to_flatpickr_format,
     is_modal,
-    sb_admin_filer_directory_listing_url_for_file,
 )
 
 try:
@@ -64,8 +64,6 @@ try:
     from django.contrib.admin.exceptions import NotRegistered
 except ImportError:
     from django.contrib.admin.sites import NotRegistered
-
-logger = logging.getLogger(__name__)
 
 
 def get_datetime_placeholder(lang=None):
@@ -1455,67 +1453,98 @@ class SBAdminImageWidget(SBAdminBaseWidget, AdminImageWidget):
         )
 
 
-class SBAdminFilerFileWidget(SBAdminBaseWidget, FilerAdminFileWidget):
+class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
+    picker_type = MEDIA_PICKER_TYPE_FILE
+
+    class Media:
+        extend = False
+        css = {"all": ["sb_admin/dist/media_picker_style.css"]}
+        js = [
+            *FilerAdminFileWidget.Media.js,
+            "sb_admin/dist/media_picker.js",
+        ]
+
     def __init__(self, form_field=None, *args, **kwargs):
         self.form_field = form_field
+        self.form = None
+        self.field_name = None
+        self.view = None
+        self.request = None
         super(FilerAdminFileWidget, self).__init__(
             form_field.rel, form_field.view.admin_site, *args, **kwargs
         )
 
-    def render(self, name, value, attrs=None, renderer=None):
-        obj = self.obj_for_value(value)
-        css_id = attrs.get("id", "id_image_x")
-        related_url = None
-        change_url = ""
-        if value:
-            try:
-                file_obj = File.objects.get(pk=value)
-                related_url = sb_admin_filer_directory_listing_url_for_file(file_obj)
-                change_url = reverse(
-                    "sb_admin:{}_{}_change".format(
-                        file_obj._meta.app_label,
-                        file_obj._meta.model_name,
-                    ),
-                    args=(file_obj.pk,),
+    def init_widget_dynamic(self, form, form_field, field_name, view, request):
+        super().init_widget_dynamic(form, form_field, field_name, view, request)
+        self.form = form
+        self.field_name = field_name
+        self.view = view
+        self.request = request
+
+    def get_request(self):
+        return self.request or SBAdminThreadLocalService.get_request()
+
+    def get_selected_object(self, value):
+        request = self.get_request()
+        if request is None or not hasattr(request, "request_data"):
+            return self.obj_for_value(value)
+        value = getattr(value, "pk", value)
+        try:
+            return (
+                FilerMediaPickerService.accessible_item_queryset(
+                    request,
+                    self.picker_type,
                 )
-            except Exception as e:
-                # catch exception and manage it. We can re-raise it for debugging
-                # purposes and/or just logging it, provided user configured
-                # proper logging configuration
-                if settings.FILER_ENABLE_LOGGING:
-                    logger.error("Error while rendering file widget: %s", e)
-                if settings.FILER_DEBUG:
-                    raise
-        if not related_url:
-            related_url = reverse("sb_admin:filer-directory_listing-last")
-        params = self.url_parameters()
-        params["_pick"] = "file"
-        if params:
-            lookup_url = "?" + urlencode(sorted(params.items()))
-        else:
-            lookup_url = ""
+                .filter(pk=value)
+                .first()
+            )
+        except (TypeError, ValueError, ValidationError):
+            return None
+
+    def value_from_datadict(self, data, files, name):
+        value = super().value_from_datadict(data, files, name)
+        initial = getattr(self.form, "initial", {}).get(self.field_name)
+        request = self.get_request()
+        if (
+            request is not None
+            and hasattr(request, "request_data")
+            and self.form_field.has_changed(initial, value)
+        ):
+            self.form_field.queryset = FilerMediaPickerService.accessible_item_queryset(
+                request,
+                self.picker_type,
+            )
+        return value
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = {} if attrs is None else attrs.copy()
+        css_id = attrs.get("id", f"id_{name}")
         if "class" not in attrs:
-            # The JavaScript looks for this hook.
             attrs["class"] = "vForeignKeyRawIdAdminField"
-        # rendering the super for ForeignKeyRawIdWidget on purpose here because
-        # we only need the input and none of the other stuff that
-        # ForeignKeyRawIdWidget adds
-        hidden_input = super(ForeignKeyRawIdWidget, self).render(
-            name, value, attrs
-        )  # grandparent super
+        hidden_input = forms.TextInput(attrs=attrs).render(name, value)
+        selected_item = None
+        obj = self.get_selected_object(value)
+        if obj is not None:
+            selected_item = FilerMediaPickerService.item_data(obj, self.picker_type)
+
         context = {
             "hidden_input": hidden_input,
-            "lookup_url": "{}{}".format(related_url, lookup_url),
-            "change_url": change_url,
-            "object": obj,
-            "lookup_name": name,
             "id": css_id,
-            "admin_icon_delete": "admin/img/icon-deletelink.svg",
+            "endpoint": (
+                f"{reverse('sb_admin:media_picker')}?picker_type={self.picker_type}"
+            ),
+            "upload_url": FilerMediaPickerService.upload_url(None),
+            "object": obj,
+            "selected_item": selected_item,
+            "picker_type": self.picker_type,
         }
-        # using template name directly to prevent override of template_name
-        # when calling render of ForeignKeyRawIdWidget
-        html = render_to_string("sb_admin/widgets/filer_file.html", context)
-        return mark_safe(html)
+        return mark_safe(
+            render_to_string("sb_admin/widgets/filer_picker.html", context)
+        )
+
+
+class SBAdminFilerImagePickerWidget(SBAdminFilerPickerWidget):
+    picker_type = MEDIA_PICKER_TYPE_IMAGE
 
 
 class SBAdminReadOnlyPasswordHashWidget(SBAdminBaseWidget, ReadOnlyPasswordHashWidget):
