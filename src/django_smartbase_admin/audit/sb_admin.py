@@ -181,6 +181,7 @@ class AdminAuditLogAdmin(SBAdmin):
             name="user_display",
             title="User",
             annotate=Coalesce(F("user__email"), Value(""), output_field=TextField()),
+            supporting_annotates={"user_source_val": F("source")},
             filter_field="user",
             filter_widget=AutocompleteFilterWidget(
                 model=get_user_model(),
@@ -806,8 +807,13 @@ class AdminAuditLogAdmin(SBAdmin):
     summary_html.short_description = _("Summary")
 
     def user_display(self, obj_id, value, **additional_data):
-        """Display the username or indicate if no user."""
-        return value if value else "-"
+        """Display the username, suffixed with the write channel when the
+        change didn't come through the admin UI (e.g. "user@x.sk (MCP)")."""
+        value = value if value else "-"
+        source = additional_data.get("user_source_val")
+        if source:
+            return f"{value} ({source.upper()})"
+        return value
 
     def action_type_display(self, obj_id, value, **additional_data):
         color = ACTION_COLORS.get(value, "secondary")
