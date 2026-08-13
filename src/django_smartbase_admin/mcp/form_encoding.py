@@ -25,6 +25,7 @@ encode_form_components(components, component_values)
 
 from __future__ import annotations
 
+import json
 from copy import copy
 
 from django.core.exceptions import ValidationError
@@ -153,6 +154,20 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
         return
 
     if isinstance(widget, AutocompleteParseMixin):
+        if isinstance(value, str):
+            # Autocomplete initials are set in the widget's own render format:
+            # a JSON list of pks or ``{"value", "label"}`` entries. Decode it
+            # the way ``parse_value_from_input`` does, so a restated initial
+            # POSTs pks and not the JSON blob. Only the list/dict shapes the
+            # widget renders — a scalar that merely parses as JSON ("null",
+            # "true", "123") is a legitimate value for a text-backed
+            # autocomplete and must stay a string.
+            try:
+                decoded = json.loads(value)
+            except ValueError:
+                decoded = None
+            if isinstance(decoded, (list, dict)):
+                value = unwrap_envelope(decoded)
         # Always a list — single-select widgets unwrap with
         # ``next(iter(...), None)`` on the read side, which needs an
         # iterable.
@@ -291,7 +306,11 @@ def encode_initial_form_values(
         if field.disabled:
             continue
         full_name = f"{prefix}-{name}" if prefix else name
-        value = overrides[name] if name in overrides else form.initial.get(name)
+        value = (
+            overrides[name]
+            if name in overrides
+            else form.get_initial_for_field(field, name)
+        )
         write_widget_input(qd, full_name, field.widget, value)
 
 
@@ -355,7 +374,7 @@ def encode_formset_rows(
             if name in row:
                 value = row[name]
             elif index < initial_count:
-                value = form.initial.get(name)
+                value = form.get_initial_for_field(field, name)
             else:
                 continue
             write_widget_input(
@@ -446,7 +465,7 @@ def encode_inline_formset_operations(
             elif operation and not deleted and name in operation:
                 value = operation[name]
             else:
-                value = form.initial.get(name)
+                value = form.get_initial_for_field(field, name)
             write_widget_input(
                 qd,
                 f"{formset.prefix}-{index}-{name}",
