@@ -158,11 +158,16 @@ def write_widget_input(qd: QueryDict, key: str, widget, value) -> None:
             # Autocomplete initials are set in the widget's own render format:
             # a JSON list of pks or ``{"value", "label"}`` entries. Decode it
             # the way ``parse_value_from_input`` does, so a restated initial
-            # POSTs pks and not the JSON blob.
+            # POSTs pks and not the JSON blob. Only the list/dict shapes the
+            # widget renders — a scalar that merely parses as JSON ("null",
+            # "true", "123") is a legitimate value for a text-backed
+            # autocomplete and must stay a string.
             try:
-                value = unwrap_envelope(json.loads(value))
+                decoded = json.loads(value)
             except ValueError:
-                pass
+                decoded = None
+            if isinstance(decoded, (list, dict)):
+                value = unwrap_envelope(decoded)
         # Always a list — single-select widgets unwrap with
         # ``next(iter(...), None)`` on the read side, which needs an
         # iterable.
