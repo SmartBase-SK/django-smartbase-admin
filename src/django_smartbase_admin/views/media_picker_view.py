@@ -67,7 +67,11 @@ class MediaPickerView(View):
         context = FilerMediaPickerService.page_data(page)
         route = reverse("sb_admin:media_picker")
         picker_type = page.picker_type
-        endpoint = self.build_url(route, picker_type=picker_type)
+        endpoint = self.build_url(
+            route,
+            picker_type=picker_type,
+            is_public=page.is_public,
+        )
         query = str(params.get("q", "")).strip()
         ordering = str(params.get("order_by", "-uploaded_at"))
         pagination_items = build_tabulator_style_page_items(
@@ -82,6 +86,7 @@ class MediaPickerView(View):
                     query,
                     ordering,
                     item["number"],
+                    page.is_public,
                 )
         context.update(
             {
@@ -95,6 +100,7 @@ class MediaPickerView(View):
                         "url": self.build_url(
                             route,
                             picker_type=picker_type,
+                            is_public=page.is_public,
                             folder=folder["id"],
                             order_by=ordering,
                         ),
@@ -107,6 +113,7 @@ class MediaPickerView(View):
                         "url": self.build_url(
                             route,
                             picker_type=picker_type,
+                            is_public=page.is_public,
                             folder=folder["id"],
                             order_by=ordering,
                         ),
@@ -116,6 +123,7 @@ class MediaPickerView(View):
                 "root_url": self.build_url(
                     route,
                     picker_type=picker_type,
+                    is_public=page.is_public,
                     order_by=ordering,
                 ),
                 "pagination_items": pagination_items,
@@ -125,6 +133,7 @@ class MediaPickerView(View):
                     query,
                     ordering,
                     page.pagination.number - 1,
+                    page.is_public,
                 ),
                 "next_url": self.pagination_url(
                     route,
@@ -132,6 +141,7 @@ class MediaPickerView(View):
                     query,
                     ordering,
                     page.pagination.number + 1,
+                    page.is_public,
                 ),
             }
         )
@@ -144,6 +154,7 @@ class MediaPickerView(View):
                         request,
                         picker_type,
                         params.get("selected_id"),
+                        is_public=page.is_public,
                     ),
                     "user_config": SBAdminUserConfigurationService.get_user_config(
                         request
@@ -168,11 +179,13 @@ class MediaPickerView(View):
         query: str,
         ordering: str,
         page: int,
+        is_public: bool | None = None,
     ) -> str:
         folder = context["folder"]
         return cls.build_url(
             endpoint,
             picker_type=context["picker_type"],
+            is_public=is_public,
             folder=None if folder is None else folder["id"],
             q=query,
             order_by=ordering,

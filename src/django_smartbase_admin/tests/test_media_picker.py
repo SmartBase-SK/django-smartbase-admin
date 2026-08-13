@@ -193,6 +193,28 @@ class MediaPickerViewTests(TestCase):
         self.assertTrue(data["permissions"]["can_upload"])
         self.assertIn(str(self.folder.pk), data["upload"]["url"])
 
+    def test_filters_public_images_and_preserves_filter_in_navigation(self):
+        response = self.get_picker(folder=self.folder.pk, is_public=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["name"] for item in response.context["items"]], ["Apple"]
+        )
+        self.assertIs(response.context["is_public"], True)
+        self.assertContains(response, 'name="is_public" value="True"', count=2)
+        self.assertIn("is_public=True", response.context["root_url"])
+        self.assertIn("is_public=True", response.context["folder_entries"][0]["url"])
+
+    def test_public_filter_rejects_private_initial_selection(self):
+        response = self.get_picker(
+            embedded="1",
+            is_public=True,
+            selected_id=self.private.pk,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_item"])
+
     def test_uploads_to_root_with_existing_filer_endpoint(self):
         self.get_picker(folder=self.folder.pk)
         response = self.get_picker()

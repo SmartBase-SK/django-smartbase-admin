@@ -33,6 +33,7 @@ MEDIA_PICKER_ORDERING = {
 @dataclass(frozen=True, slots=True)
 class MediaPickerPage:
     picker_type: str
+    is_public: bool | None
     folder: Folder | None
     breadcrumbs: tuple[Folder, ...]
     folders: tuple[Folder, ...]
@@ -53,6 +54,7 @@ class FilerMediaPickerService:
         cls.require_directory_access(request)
         params = request.GET if params is None else params
         picker_type = cls.get_picker_type(params.get("picker_type"))
+        is_public = cls.get_is_public(params.get("is_public"))
         item_model = cls.get_item_model(picker_type)
         cls.require_model_permission(request, Folder, "view")
         cls.require_model_permission(request, item_model, "view")
@@ -62,6 +64,8 @@ class FilerMediaPickerService:
 
         folders = tuple(cls.folder_queryset(request, folder, query, ordering))
         items = cls.item_queryset(request, picker_type)
+        if is_public is not None:
+            items = items.filter(is_public=is_public)
         if query:
             items = items.filter(
                 models.Q(name__icontains=query)
@@ -90,6 +94,7 @@ class FilerMediaPickerService:
         can_upload = cls.can_upload(request, folder)
         return MediaPickerPage(
             picker_type=picker_type,
+            is_public=is_public,
             folder=folder,
             breadcrumbs=cls.get_breadcrumbs(request, folder),
             folders=page_folders,
@@ -108,6 +113,17 @@ class FilerMediaPickerService:
             if picker_type in MEDIA_PICKER_TYPES
             else MEDIA_PICKER_TYPE_IMAGE
         )
+
+    @staticmethod
+    def get_is_public(value: Any) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        normalized = str(value).lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+        return None
 
     @staticmethod
     def require_directory_access(request: HttpRequest) -> None:
@@ -253,13 +269,14 @@ class FilerMediaPickerService:
         request: HttpRequest,
         picker_type: str,
         value: Any,
+        *,
+        is_public: bool | None = None,
     ) -> dict[str, Any] | None:
         try:
-            item = (
-                cls.accessible_item_queryset(request, picker_type)
-                .filter(pk=value)
-                .first()
-            )
+            queryset = cls.accessible_item_queryset(request, picker_type)
+            if is_public is not None:
+                queryset = queryset.filter(is_public=is_public)
+            item = queryset.filter(pk=value).first()
         except (TypeError, ValueError, ValidationError):
             return None
         return None if item is None else cls.item_data(item)
@@ -381,6 +398,7 @@ class FilerMediaPickerService:
     def page_data(cls, page: MediaPickerPage) -> dict[str, Any]:
         return {
             "picker_type": page.picker_type,
+            "is_public": page.is_public,
             "folder": (None if page.folder is None else cls.folder_data(page.folder)),
             "breadcrumbs": [cls.folder_data(folder) for folder in page.breadcrumbs],
             "folders": [cls.folder_data(folder) for folder in page.folders],

@@ -17,6 +17,7 @@
         <div class="modal-body !p-0 flex min-h-0 flex-col overflow-hidden">
             <form class="sb-media-picker__toolbar flex items-center gap-8 px-20 pt-16 pb-8" data-picker-filters>
                 <input type="hidden" name="picker_type" value="{{ picker_type }}">
+                {% if is_public is not None %}<input type="hidden" name="is_public" value="{{ is_public }}">{% endif %}
                 {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
                 <input type="search" id="sb-media-picker-search" class="input min-w-0 flex-1" name="q" value="{{ query }}"
                        {% if picker_type == "image" %}placeholder="{% trans 'Search images' %}" aria-label="{% trans 'Search images' %}"{% else %}placeholder="{% trans 'Search files' %}" aria-label="{% trans 'Search files' %}"{% endif %}
@@ -66,6 +67,7 @@
                               hx-select="[data-picker-surface]" hx-swap="outerHTML">
                             {% csrf_token %}
                             <input type="hidden" name="picker_type" value="{{ picker_type }}">
+                            {% if is_public is not None %}<input type="hidden" name="is_public" value="{{ is_public }}">{% endif %}
                             {% if folder %}<input type="hidden" name="folder" value="{{ folder.id }}">{% endif %}
                             <input type="hidden" name="order_by" value="{{ ordering }}">
                             <input type="text" class="input min-w-0" name="name" placeholder="{% trans 'Folder name' %}"
