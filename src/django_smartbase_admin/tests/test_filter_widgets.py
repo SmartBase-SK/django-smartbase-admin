@@ -27,12 +27,18 @@ class TestDateFilterWidget(TestCase):
 class TestBooleanFilterWidget(TestCase):
     def test_parses_every_shape_its_own_markup_produces(self):
         """The radio renders the (True, False) choices as str(True) / str(False), which json.loads
-        cannot read — "False" would stay a string and read as truthy in a filter_query_lambda."""
+        cannot read — "False" would stay a string and read as truthy in a filter_query_lambda.
+        """
         widget = BooleanFilterWidget()
 
-        parsed = {raw: widget.parse_value_from_input(None, raw) for raw in ("True", "False", "true", "false")}
+        parsed = {
+            raw: widget.parse_value_from_input(None, raw)
+            for raw in ("True", "False", "true", "false")
+        }
 
-        self.assertEqual(parsed, {"True": True, "False": False, "true": True, "false": False})
+        self.assertEqual(
+            parsed, {"True": True, "False": False, "true": True, "false": False}
+        )
 
     def test_leaves_no_value_alone(self):
         widget = BooleanFilterWidget()
