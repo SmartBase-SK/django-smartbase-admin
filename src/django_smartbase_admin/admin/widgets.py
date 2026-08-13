@@ -1509,9 +1509,11 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
             and hasattr(request, "request_data")
             and self.form_field.has_changed(initial, value)
         ):
-            self.form_field.queryset = FilerMediaPickerService.accessible_item_queryset(
-                request,
-                self.picker_type,
+            self.form_field.queryset = self.form_field.queryset & (
+                FilerMediaPickerService.accessible_item_queryset(
+                    request,
+                    self.picker_type,
+                )
             )
         return value
 

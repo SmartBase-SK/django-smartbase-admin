@@ -240,6 +240,19 @@ class MediaPickerViewTests(TestCase):
         self.assertIsNone(uploaded.folder)
         uploaded.delete()
 
+    def test_role_add_permission_controls_upload_for_selected_picker_model(self):
+        self.assertTrue(self.user.has_perm("filer.add_file"))
+
+        for picker_type, model in (("image", Image), ("file", File)):
+            with self.subTest(picker_type=picker_type):
+                MediaPickerRoleConfiguration.denied_permissions = {(model, "add")}
+
+                response = self.get_picker(picker_type=picker_type)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(response.context["permissions"]["can_upload"])
+                self.assertIsNone(response.context["upload"]["url"])
+
     def test_search_is_global_and_matches_display_filename(self):
         response = self.get_picker(folder=self.folder.pk, q="banana")
 
@@ -726,6 +739,33 @@ class MediaPickerViewTests(TestCase):
         model_field.remote_field.model = Image
         model_field.remote_field.field_name = Image._meta.pk.name
         form_field = model_field.formfield()
+        view = SimpleNamespace(admin_site=sb_admin_site)
+        form_field.view = view
+        widget = SBAdminFilerImagePickerWidget(form_field=form_field)
+        widget.init_widget_dynamic(
+            SimpleNamespace(initial={"hero_image": self.apple.pk}),
+            form_field,
+            "hero_image",
+            view,
+            request,
+        )
+
+        value = widget.value_from_datadict(
+            {"hero_image": str(self.private.pk)},
+            {},
+            "hero_image",
+        )
+
+        with self.assertRaises(ValidationError):
+            form_field.clean(value)
+
+    def test_widget_preserves_form_field_queryset_when_value_changes(self):
+        request = self.get_picker(folder=self.folder.pk).wsgi_request
+        model_field = FilerImageField(on_delete=models.SET_NULL, null=True)
+        model_field.remote_field.model = Image
+        model_field.remote_field.field_name = Image._meta.pk.name
+        form_field = model_field.formfield()
+        form_field.queryset = form_field.queryset.filter(is_public=True)
         view = SimpleNamespace(admin_site=sb_admin_site)
         form_field.view = view
         widget = SBAdminFilerImagePickerWidget(form_field=form_field)

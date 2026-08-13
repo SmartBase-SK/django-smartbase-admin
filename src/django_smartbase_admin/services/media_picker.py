@@ -91,7 +91,7 @@ class FilerMediaPickerService:
         item_start = max(0, result_start - folder_count)
         item_end = max(0, result_end - folder_count)
 
-        can_upload = cls.can_upload(request, folder)
+        can_upload = cls.can_upload(request, folder, item_model)
         return MediaPickerPage(
             picker_type=picker_type,
             is_public=is_public,
@@ -299,8 +299,12 @@ class FilerMediaPickerService:
             return queryset.order_by(display_name.desc(), "-pk")
         return queryset.order_by(display_name.asc(), "pk")
 
-    @staticmethod
-    def can_upload(request: HttpRequest, folder: Folder | None) -> bool:
+    @classmethod
+    def can_upload(
+        cls, request: HttpRequest, folder: Folder | None, item_model
+    ) -> bool:
+        if not cls.has_model_permission(request, item_model, "add"):
+            return False
         if not request.user.has_perm("filer.add_file"):
             return False
         if folder is None:
