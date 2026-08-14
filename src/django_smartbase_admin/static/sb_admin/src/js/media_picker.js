@@ -291,6 +291,14 @@ class MediaPicker {
         return this.rootElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadUrl
     }
 
+    maxUploadFiles() {
+        const value = Number.parseInt(
+            this.rootElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadMaxFiles,
+            10,
+        )
+        return Number.isNaN(value) ? null : Math.max(0, value)
+    }
+
     hasDraggedFiles(event) {
         return Array.from(event.dataTransfer?.types || []).includes('Files')
     }
@@ -383,9 +391,11 @@ class MediaPicker {
 
     async uploadFiles(fileList) {
         const pickerType = this.rootElement.querySelector('[data-picker-surface]')?.dataset.pickerType
-        const files = Array.from(fileList || []).filter(
+        const eligibleFiles = Array.from(fileList || []).filter(
             (file) => pickerType !== PICKER_TYPE_IMAGE || file.type.startsWith('image/'),
         )
+        const maxFiles = this.maxUploadFiles()
+        const files = maxFiles === null ? eligibleFiles : eligibleFiles.slice(0, maxFiles)
         const uploadUrl = this.uploadUrl()
         if (!files.length || !uploadUrl || this.uploading) return
 

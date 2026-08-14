@@ -226,6 +226,9 @@
             <button type="button" class="btn btn-primary" data-picker-done disabled>{% trans "Done" %}</button>
         </footer>
 
-        {% if upload.url %}<span class="hidden" data-picker-upload-url="{{ upload.url }}"></span>{% endif %}
+        {% if upload.url %}
+            <span class="hidden" data-picker-upload-url="{{ upload.url }}"
+                  data-picker-upload-max-files="{{ upload.max_files }}"></span>
+        {% endif %}
     </section>
 </div>
