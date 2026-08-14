@@ -1071,18 +1071,14 @@ msgstr "Vlastník"
 msgid "Select image"
 msgstr "Vybrat obrázek"
 
-#, fuzzy
-#| msgid "Select image"
 msgid "Select file"
-msgstr "Vybrat obrázek"
+msgstr "Vybrat soubor"
 
 msgid "Search images"
 msgstr "Hledat obrázky"
 
-#, fuzzy
-#| msgid "Search images"
 msgid "Search files"
-msgstr "Hledat obrázky"
+msgstr "Hledat soubory"
 
 msgid "Sort"
 msgstr "Řazení"
@@ -1123,10 +1119,8 @@ msgstr "Nahrávání"
 msgid "No images found"
 msgstr "Nebyly nalezeny žádné obrázky"
 
-#, fuzzy
-#| msgid "No images found"
 msgid "No files found"
-msgstr "Nebyly nalezeny žádné obrázky"
+msgstr "Nebyly nalezeny žádné soubory"
 
 msgid " of "
 msgstr " z "
