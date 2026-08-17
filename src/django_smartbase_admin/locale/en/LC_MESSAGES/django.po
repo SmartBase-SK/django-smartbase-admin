@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-03 17:03+0200\n"
+"POT-Creation-Date: 2026-08-12 14:16+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -154,10 +154,22 @@ msgstr ""
 msgid "Publish"
 msgstr ""
 
+msgid "Row ID"
+msgstr ""
+
+msgid "Column"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
 msgid "Search..."
 msgstr ""
 
 msgid "Exit Reorder"
+msgstr ""
+
+msgid "Not Implemented"
 msgstr ""
 
 #, python-brace-format
@@ -269,6 +281,102 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr ""
 
+msgid "Calls"
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "Tool"
+msgstr ""
+
+msgid "Record count"
+msgstr ""
+
+msgid "Duration"
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "MCP calls"
+msgstr ""
+
+msgid "Errors"
+msgstr ""
+
+msgid "Avg duration (ms)"
+msgstr ""
+
+msgid "Items returned"
+msgstr ""
+
+msgid "Request (KB)"
+msgstr ""
+
+msgid "Response (KB)"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "By user"
+msgstr ""
+
+msgid "Grouping"
+msgstr ""
+
+msgid "AI Assistant Module"
+msgstr ""
+
+msgid "Request"
+msgstr ""
+
+msgid "Request size (B)"
+msgstr ""
+
+msgid "Response size (B)"
+msgstr ""
+
+msgid "Duration (ms)"
+msgstr ""
+
+msgid "Result status"
+msgstr ""
+
+msgid "Returned field count"
+msgstr ""
+
+msgid "Returned inline count"
+msgstr ""
+
+msgid "Returned inline rows"
+msgstr ""
+
+msgid "Error type"
+msgstr ""
+
+msgid "Error message"
+msgstr ""
+
+msgid "Outcome"
+msgstr ""
+
+msgid "Request (B)"
+msgstr ""
+
+msgid "Response (B)"
+msgstr ""
+
+msgid "Response"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
 msgid "Toast"
 msgstr ""
 
@@ -357,6 +465,9 @@ msgid "Light"
 msgstr ""
 
 msgid "Theme"
+msgstr ""
+
+msgid "A folder with this name already exists."
 msgstr ""
 
 msgid "Translations"
@@ -485,9 +596,6 @@ msgstr ""
 msgid "Date/time"
 msgstr ""
 
-msgid "User"
-msgstr ""
-
 msgid "Action"
 msgstr ""
 
@@ -540,9 +648,6 @@ msgid "items affected"
 msgstr ""
 
 msgid "Field"
-msgstr ""
-
-msgid "Value"
 msgstr ""
 
 msgid "No changes recorded."
@@ -905,6 +1010,76 @@ msgstr ""
 msgid "Owner"
 msgstr ""
 
+msgid "Select image"
+msgstr ""
+
+msgid "Select file"
+msgstr ""
+
+msgid "Search images"
+msgstr ""
+
+msgid "Search files"
+msgstr ""
+
+msgid "Sort"
+msgstr ""
+
+msgid "Newest first"
+msgstr ""
+
+msgid "Oldest first"
+msgstr ""
+
+msgid "Name A-Z"
+msgstr ""
+
+msgid "Name Z-A"
+msgstr ""
+
+msgid "Grid view"
+msgstr ""
+
+msgid "List view"
+msgstr ""
+
+msgid "Upload"
+msgstr ""
+
+msgid "New folder"
+msgstr ""
+
+msgid "Folder name"
+msgstr ""
+
+msgid "Media library"
+msgstr ""
+
+msgid "Uploading"
+msgstr ""
+
+msgid "No images found"
+msgstr ""
+
+msgid "No files found"
+msgstr ""
+
+msgid " of "
+msgstr ""
+
+msgid "Previous page"
+msgstr ""
+
+msgctxt "pagination"
+msgid "Page"
+msgstr ""
+
+msgid "Next page"
+msgstr ""
+
+msgid "Done"
+msgstr ""
+
 msgid "Acknowledge"
 msgstr ""
 
@@ -947,6 +1122,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "${value} selected"
+msgstr ""
+
+msgctxt "pagination"
+msgid "Go"
 msgstr ""
 
 msgid "Unsaved changes"
@@ -1022,6 +1201,15 @@ msgstr ""
 msgid "Choose File"
 msgstr ""
 
+msgid "Choose image"
+msgstr ""
+
+msgid "Choose file"
+msgstr ""
+
+msgid "Change image"
+msgstr ""
+
 msgid "Search permissions…"
 msgstr ""
 
@@ -1089,6 +1277,9 @@ msgstr ""
 msgid "Secondary"
 msgstr ""
 
+msgid "Invalid folder."
+msgstr ""
+
 msgid "Finish"
 msgstr ""
 
@@ -1108,9 +1299,6 @@ msgid "Translated"
 msgstr ""
 
 msgid "Status"
-msgstr ""
-
-msgid " of "
 msgstr ""
 
 msgid "Language"

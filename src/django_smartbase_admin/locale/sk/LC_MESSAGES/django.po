@@ -2,12 +2,12 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-03 17:03+0200\n"
+"POT-Creation-Date: 2026-08-12 14:16+0200\n"
 "PO-Revision-Date: 2023-11-15 15:21+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -97,10 +97,8 @@ msgstr "História zmien: %s"
 msgid "View"
 msgstr "Zobraziť"
 
-#, fuzzy
-#| msgid "Created"
 msgid "Create"
-msgstr "Vytvorená"
+msgstr "Vytvoriť"
 
 msgid "Edit"
 msgstr "Upraviť"
@@ -160,11 +158,25 @@ msgstr "Zhrnutie"
 msgid "Publish"
 msgstr "Publikovať"
 
+msgid "Row ID"
+msgstr ""
+
+#, fuzzy
+#| msgid "Columns"
+msgid "Column"
+msgstr "Stĺpce"
+
+msgid "Value"
+msgstr "Hodnota"
+
 msgid "Search..."
 msgstr "Vyhľadať..."
 
 msgid "Exit Reorder"
 msgstr "Ukončiť preusporiadanie"
+
+msgid "Not Implemented"
+msgstr ""
 
 #, python-brace-format
 msgid "Reorder {self.model._meta.verbose_name}"
@@ -275,6 +287,107 @@ msgctxt "Tree widget"
 msgid "No data."
 msgstr "Žiadne dáta."
 
+msgid "Calls"
+msgstr "Volania"
+
+msgid "Time"
+msgstr "Čas"
+
+msgid "User"
+msgstr "Užívateľ"
+
+msgid "Tool"
+msgstr "Nástroj"
+
+msgid "Record count"
+msgstr "Počet záznamov"
+
+msgid "Duration"
+msgstr "Trvanie"
+
+msgid "Error"
+msgstr "Chyba"
+
+msgid "MCP calls"
+msgstr "MCP volania"
+
+msgid "Errors"
+msgstr "Chyby"
+
+msgid "Avg duration (ms)"
+msgstr "Priem. trvanie (ms)"
+
+msgid "Items returned"
+msgstr "Vrátené položky"
+
+msgid "Request (KB)"
+msgstr "Požiadavka (KB)"
+
+msgid "Response (KB)"
+msgstr "Odpoveď (KB)"
+
+msgid "Total"
+msgstr "Spolu"
+
+msgid "By user"
+msgstr "Podľa používateľa"
+
+msgid "Grouping"
+msgstr "Zoskupenie"
+
+# MCP request log / AI Assistant Module dashboard
+msgid "AI Assistant Module"
+msgstr "AI asistent"
+
+msgid "Request"
+msgstr "Požiadavka"
+
+msgid "Request size (B)"
+msgstr "Veľkosť požiadavky (B)"
+
+msgid "Response size (B)"
+msgstr "Veľkosť odpovede (B)"
+
+msgid "Duration (ms)"
+msgstr "Trvanie (ms)"
+
+msgid "Result status"
+msgstr "Stav výsledku"
+
+msgid "Returned field count"
+msgstr "Počet vrátených polí"
+
+msgid "Returned inline count"
+msgstr "Počet vrátených inlinov"
+
+msgid "Returned inline rows"
+msgstr "Počet vrátených riadkov inlinov"
+
+msgid "Error type"
+msgstr "Typ chyby"
+
+msgid "Error message"
+msgstr "Chybová správa"
+
+msgid "Outcome"
+msgstr ""
+
+#, fuzzy
+#| msgid "Request (KB)"
+msgid "Request (B)"
+msgstr "Požiadavka (KB)"
+
+#, fuzzy
+#| msgid "Response (KB)"
+msgid "Response (B)"
+msgstr "Odpoveď (KB)"
+
+msgid "Response"
+msgstr "Odpoveď"
+
+msgid "OK"
+msgstr ""
+
 msgid "Toast"
 msgstr "Toast"
 
@@ -366,6 +479,9 @@ msgstr "Svetlá"
 
 msgid "Theme"
 msgstr "Téma"
+
+msgid "A folder with this name already exists."
+msgstr "Priečinok s týmto názvom už existuje."
 
 msgid "Translations"
 msgstr "Preklady"
@@ -493,9 +609,6 @@ msgstr "Veľkost strany"
 msgid "Date/time"
 msgstr "Datum/čas"
 
-msgid "User"
-msgstr "Užívateľ"
-
 msgid "Action"
 msgstr "Akcia"
 
@@ -551,9 +664,6 @@ msgstr "ovplyvnené položky"
 
 msgid "Field"
 msgstr "Pole"
-
-msgid "Value"
-msgstr "Hodnota"
 
 msgid "No changes recorded."
 msgstr "Neboli zaznamenané žiadne zmeny."
@@ -940,6 +1050,76 @@ msgstr "Upravené"
 msgid "Owner"
 msgstr "Vlastník"
 
+msgid "Select image"
+msgstr "Vybrať obrázok"
+
+msgid "Select file"
+msgstr "Vybrať súbor"
+
+msgid "Search images"
+msgstr "Hľadať obrázky"
+
+msgid "Search files"
+msgstr "Hľadať súbory"
+
+msgid "Sort"
+msgstr "Zoradiť"
+
+msgid "Newest first"
+msgstr "Od najnovších"
+
+msgid "Oldest first"
+msgstr "Od najstarších"
+
+msgid "Name A-Z"
+msgstr "Názov A–Z"
+
+msgid "Name Z-A"
+msgstr "Názov Z–A"
+
+msgid "Grid view"
+msgstr "Zobrazenie mriežky"
+
+msgid "List view"
+msgstr "Zobrazenie zoznamu"
+
+msgid "Upload"
+msgstr "Nahrať"
+
+msgid "New folder"
+msgstr "Nový priečinok"
+
+msgid "Folder name"
+msgstr "Názov priečinka"
+
+msgid "Media library"
+msgstr "Knižnica médií"
+
+msgid "Uploading"
+msgstr "Nahráva sa"
+
+msgid "No images found"
+msgstr "Nenašli sa žiadne obrázky"
+
+msgid "No files found"
+msgstr "Nenašli sa žiadne súbory"
+
+msgid " of "
+msgstr " z "
+
+msgid "Previous page"
+msgstr "Predchádzajúca strana"
+
+msgctxt "pagination"
+msgid "Page"
+msgstr "Strana"
+
+msgid "Next page"
+msgstr "Nasledujúca strana"
+
+msgid "Done"
+msgstr "Hotovo"
+
 msgid "Acknowledge"
 msgstr "Rozumiem"
 
@@ -983,6 +1163,10 @@ msgstr "<strong>0</strong> položiek"
 #, python-brace-format
 msgid "${value} selected"
 msgstr "${value} vybrané"
+
+msgctxt "pagination"
+msgid "Go"
+msgstr "Prejsť"
 
 msgid "Unsaved changes"
 msgstr "Neuložené zmeny"
@@ -1057,6 +1241,17 @@ msgstr "Vyhľadať"
 msgid "Choose File"
 msgstr "Zvoľte súbor"
 
+msgid "Choose image"
+msgstr "Vybrať obrázok"
+
+#, fuzzy
+#| msgid "Choose File"
+msgid "Choose file"
+msgstr "Zvoľte súbor"
+
+msgid "Change image"
+msgstr "Zmeniť obrázok"
+
 msgid "Search permissions…"
 msgstr "Vyhľadať oprávnenia…"
 
@@ -1124,6 +1319,9 @@ msgstr "Primárne"
 msgid "Secondary"
 msgstr "Sekundárne"
 
+msgid "Invalid folder."
+msgstr "Neplatný priečinok."
+
 msgid "Finish"
 msgstr "Dokončiť"
 
@@ -1144,9 +1342,6 @@ msgstr "Preložené"
 
 msgid "Status"
 msgstr "Stav"
-
-msgid " of "
-msgstr " z "
 
 msgid "Language"
 msgstr "Jazyk"
@@ -1185,129 +1380,38 @@ msgstr "Jazyk"
 #~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
 #~ msgstr "Ste si istý že chcete odstrániť vybrané %(objects_name)s? Všetky nasledujúce položky a ich súvisiace objekty budú odstránené:"
 
-msgctxt "pagination"
-msgid "Page"
-msgstr "Strana"
+#~ msgid "No data"
+#~ msgstr "Žiadne dáta"
 
-msgctxt "pagination"
-msgid "Go"
-msgstr "Prejsť"
+#~ msgid "Recent calls"
+#~ msgstr "Posledné volania"
 
-# MCP request log / AI Assistant Module dashboard
+#~ msgid "Fields"
+#~ msgstr "Polia"
 
-msgid "AI Assistant Module"
-msgstr "AI asistent"
+#~ msgid "Inlines"
+#~ msgstr "Vnorené"
 
-msgid "Calls"
-msgstr "Volania"
+#~ msgid "Inline rows"
+#~ msgstr "Riadky vnorených"
 
-msgid "Errors"
-msgstr "Chyby"
+#~ msgid "Last %(days)s days"
+#~ msgstr "Posledných %(days)s dní"
 
-msgid "Avg duration (ms)"
-msgstr "Priem. trvanie (ms)"
+#~ msgid "Changed"
+#~ msgstr "Zmenené"
 
-msgid "Items returned"
-msgstr "Vrátené položky"
+#~ msgid "rows"
+#~ msgstr "riadkov"
 
-msgid "Request (KB)"
-msgstr "Požiadavka (KB)"
+#~ msgid "Audit log"
+#~ msgstr "Audit"
 
-msgid "Response (KB)"
-msgstr "Odpoveď (KB)"
+#~ msgid "Detail field count"
+#~ msgstr "Počet polí detailu"
 
-msgid "No data"
-msgstr "Žiadne dáta"
+#~ msgid "Detail inline count"
+#~ msgstr "Počet inlinov detailu"
 
-msgid "Recent calls"
-msgstr "Posledné volania"
-
-msgid "Time"
-msgstr "Čas"
-
-msgid "Tool"
-msgstr "Nástroj"
-
-msgid "Duration (ms)"
-msgstr "Trvanie (ms)"
-
-msgid "Error"
-msgstr "Chyba"
-
-msgid "Request"
-msgstr "Požiadavka"
-
-msgid "Response"
-msgstr "Odpoveď"
-
-msgid "Request size (B)"
-msgstr "Veľkosť požiadavky (B)"
-
-msgid "Response size (B)"
-msgstr "Veľkosť odpovede (B)"
-
-msgid "Result status"
-msgstr "Stav výsledku"
-
-msgid "Total"
-msgstr "Spolu"
-
-msgid "Fields"
-msgstr "Polia"
-
-msgid "Inlines"
-msgstr "Vnorené"
-
-msgid "Inline rows"
-msgstr "Riadky vnorených"
-
-msgid "Error type"
-msgstr "Typ chyby"
-
-msgid "Error message"
-msgstr "Chybová správa"
-
-msgid "Last %(days)s days"
-msgstr "Posledných %(days)s dní"
-
-msgid "Duration"
-msgstr "Trvanie"
-
-msgid "Changed"
-msgstr "Zmenené"
-
-msgid "rows"
-msgstr "riadkov"
-
-msgid "Audit log"
-msgstr "Audit"
-
-msgid "Record count"
-msgstr "Počet záznamov"
-
-msgid "Detail field count"
-msgstr "Počet polí detailu"
-
-msgid "Detail inline count"
-msgstr "Počet inlinov detailu"
-
-msgid "Detail inline rows"
-msgstr "Riadky inlinov detailu"
-
-msgid "Returned field count"
-msgstr "Počet vrátených polí"
-
-msgid "Returned inline count"
-msgstr "Počet vrátených inlinov"
-
-msgid "Returned inline rows"
-msgstr "Počet vrátených riadkov inlinov"
-
-msgid "MCP calls"
-msgstr "MCP volania"
-
-msgid "Grouping"
-msgstr "Zoskupenie"
-
-msgid "By user"
-msgstr "Podľa používateľa"
+#~ msgid "Detail inline rows"
+#~ msgstr "Riadky inlinov detailu"

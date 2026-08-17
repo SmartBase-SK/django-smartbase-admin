@@ -1,0 +1,71 @@
+{% load i18n static %}
+
+<div class="sb-media-picker-widget"
+     data-sb-media-picker-widget
+     data-picker-type="{{ picker_type }}"
+     data-choose-label="{% if picker_type == 'image' %}{% trans 'Choose image' %}{% else %}{% trans 'Choose file' %}{% endif %}"
+     data-change-label="{% if picker_type == 'image' %}{% trans 'Change image' %}{% else %}{% trans 'Change file' %}{% endif %}">
+    <div class="dz-preview dz-file-preview hidden js-filer-dropzone-template">
+        <span class="filerFile" data-picker-uploaded-preview>
+            <div class="dz-thumbnail"><img class="quiet" data-dz-thumbnail></div>
+            <div>
+                <span data-dz-name class="dz-name"></span>
+                <div class="flex items-center gap-4">
+                    <span class="filerClearer" title="{% trans 'Clear' %}" data-dz-remove data-picker-clear
+                          data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
+                        <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>
+                    </span>
+                    <button type="button" class="btn btn-primary-light btn-tiny add-file-button"
+                            data-sb-media-picker-trigger data-bs-toggle="modal" data-bs-target="#sb-admin-modal"
+                            hx-get="{{ endpoint }}" hx-target="#sb-admin-modal">
+                        <span data-picker-trigger-label>{% if picker_type == "image" %}{% trans "Change image" %}{% else %}{% trans "Change file" %}{% endif %}</span>
+                    </button>
+                </div>
+            </div>
+            <div class="dz-progress js-filer-dropzone-progress">
+                <span class="dz-upload" data-dz-uploadprogress></span>
+            </div>
+        </span>
+    </div>
+
+    <div class="js-filer-dropzone filer-dropzone{% if object %} js-object-attached{% endif %}"
+         data-picker-widget-dropzone data-url="{{ upload_url }}" data-max-files="1">
+        <div class="z-index-fix"></div>
+        <div class="dz-default dz-message js-filer-dropzone-message{% if object %} hidden{% endif %}">
+            <span class="w-64 h-64 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon">
+                <svg class="w-24 h-24" aria-hidden="true"><use xlink:href="#Upload"></use></svg>
+            </span>
+        </div>
+
+        <span class="filerFile js-file-selector" data-picker-initial-preview>
+            <img class="thumbnail_img{% if not object %} hidden{% endif %} quiet"
+                 src="{% if selected_item %}{{ selected_item.thumbnail_url }}{% endif %}"
+                 alt="{% trans 'No file selected' %}" data-picker-preview-image>
+            <div class="sb-media-picker-widget__content">
+                <span class="sb-media-picker-widget__prompt{% if object %} hidden{% endif %}" data-picker-empty-prompt>
+                    {% trans "drop your file here or" %}
+                </span>
+                <span class="description_text" data-picker-preview-name>{% if object %}{{ object.label }}{% endif %}</span>
+                <div class="flex items-center gap-4">
+                    <span class="filerClearer{% if not object %} hidden{% endif %}" title="{% trans 'Clear' %}"
+                          data-picker-clear data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
+                        <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>
+                    </span>
+                    <button type="button" class="btn btn-primary-light btn-tiny add-file-button"
+                            data-sb-media-picker-trigger data-bs-toggle="modal" data-bs-target="#sb-admin-modal"
+                            hx-get="{{ endpoint }}" hx-target="#sb-admin-modal">
+                        <span data-picker-trigger-label>
+                            {% if object %}
+                                {% if picker_type == "image" %}{% trans "Change image" %}{% else %}{% trans "Change file" %}{% endif %}
+                            {% else %}
+                                {% if picker_type == "image" %}{% trans "Choose image" %}{% else %}{% trans "Choose file" %}{% endif %}
+                            {% endif %}
+                        </span>
+                    </button>
+                </div>
+                <div class="hidden">{{ hidden_input }}</div>
+            </div>
+        </span>
+    </div>
+    {{ selected_item|json_script:id }}
+</div>

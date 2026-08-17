@@ -1,0 +1,30 @@
+{% load i18n static %}
+
+<!doctype html>
+<html lang="{{ request.LANGUAGE_CODE }}" data-theme="{{ user_config.color_scheme|default:'light' }}">
+<head>
+    {% include "sb_admin/fonts.html" %}
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>
+        {% if picker_type == "image" %}{% trans "Select image" %}{% else %}{% trans "Select file" %}{% endif %}
+    </title>
+    <link rel="stylesheet" href="{% static 'sb_admin/dist/main_style.css' %}">
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <div class="hidden" aria-hidden="true">
+        {% include "sb_admin/sprites/sb_admin.svg" %}
+    </div>
+    <main class="sb-media-picker__embed"
+          data-sb-media-picker-embed
+          data-picker-request-id="{{ request_id }}">
+        {{ selected_item|json_script:"sb-media-picker-selected-item" }}
+        {% include "sb_admin/media_picker/picker.html" %}
+    </main>
+
+    {% include "sb_admin/sb_admin_js_trans.html" %}
+    <script src="{% static 'sb_admin/js/htmx.min.js' %}"></script>
+    <script src="{% static 'sb_admin/dist/media_picker.js' %}"></script>
+</body>
+</html>

@@ -151,7 +151,8 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminAttributesWidget,
     SBAdminMultipleChoiceInlineWidget,
     SBAdminColorWidget,
-    SBAdminFilerFileWidget,
+    SBAdminFilerPickerWidget,
+    SBAdminFilerImagePickerWidget,
     SBAdminDateTimeRangeWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
@@ -210,8 +211,8 @@ class SBAdminFormFieldWidgetsMixin:
         forms.HiddenInput: SBAdminHiddenWidget,
     }
     db_field_widgets = {
-        FilerImageField: SBAdminFilerFileWidget,
-        FilerFileField: SBAdminFilerFileWidget,
+        FilerImageField: SBAdminFilerImagePickerWidget,
+        FilerFileField: SBAdminFilerPickerWidget,
     }
     if postrgres_enabled:
         formfield_widgets[SimpleArrayField] = SBAdminArrayWidget
