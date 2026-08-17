@@ -299,6 +299,13 @@ class MediaPicker {
         return Number.isNaN(value) ? null : Math.max(0, value)
     }
 
+    maxUploadFileSize() {
+        const value = Number.parseFloat(
+            this.rootElement.querySelector('[data-picker-upload-url]')?.dataset.pickerUploadMaxFileSize,
+        )
+        return Number.isNaN(value) || value <= 0 ? null : value
+    }
+
     hasDraggedFiles(event) {
         return Array.from(event.dataTransfer?.types || []).includes('Files')
     }
@@ -391,13 +398,33 @@ class MediaPicker {
 
     async uploadFiles(fileList) {
         const pickerType = this.rootElement.querySelector('[data-picker-surface]')?.dataset.pickerType
-        const eligibleFiles = Array.from(fileList || []).filter(
+        const mediaFiles = Array.from(fileList || []).filter(
             (file) => pickerType !== PICKER_TYPE_IMAGE || file.type.startsWith('image/'),
         )
+        const maxFileSize = this.maxUploadFileSize()
+        const maxFileSizeBytes = maxFileSize === null ? null : maxFileSize * 1024 * 1024
+        const oversizedFiles = maxFileSizeBytes === null
+            ? []
+            : mediaFiles.filter((file) => file.size > maxFileSizeBytes)
+        const eligibleFiles = maxFileSizeBytes === null
+            ? mediaFiles
+            : mediaFiles.filter((file) => file.size <= maxFileSizeBytes)
         const maxFiles = this.maxUploadFiles()
         const files = maxFiles === null ? eligibleFiles : eligibleFiles.slice(0, maxFiles)
         const uploadUrl = this.uploadUrl()
-        if (!files.length || !uploadUrl || this.uploading) return
+        const sizeError = oversizedFiles.length
+            ? `${pickerTranslation('media_picker_error', 'Error:')} ${
+                oversizedFiles.map((file) => file.name).join(', ')
+            } > ${maxFileSize} MB`
+            : ''
+        if (!files.length || !uploadUrl || this.uploading) {
+            if (sizeError && uploadUrl && !this.uploading) {
+                this.rootElement.querySelector('[data-picker-status]').textContent = sizeError
+            }
+            const input = this.rootElement.querySelector('[data-picker-upload]')
+            if (input) input.value = ''
+            return
+        }
 
         this.setUploading(true)
         this.rootElement.querySelector('[data-picker-status]').textContent = ''
@@ -412,6 +439,9 @@ class MediaPicker {
                 this.setUploadProgress(index + 1, files.length, 100)
             }
             await this.refreshSurface()
+            if (sizeError) {
+                this.rootElement.querySelector('[data-picker-status]').textContent = sizeError
+            }
         } catch (error) {
             this.rootElement.querySelector('[data-picker-status]').textContent = error.message || String(error)
         } finally {

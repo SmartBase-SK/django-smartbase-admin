@@ -240,12 +240,17 @@ class MediaPickerViewTests(TestCase):
         self.assertIsNone(uploaded.folder)
         uploaded.delete()
 
-    def test_exposes_filer_max_files_to_uploader(self):
-        with mock.patch.object(filer_settings, "FILER_UPLOADER_MAX_FILES", 2):
+    def test_exposes_filer_upload_limits_to_uploader(self):
+        with (
+            mock.patch.object(filer_settings, "FILER_UPLOADER_MAX_FILES", 2),
+            mock.patch.object(filer_settings, "FILER_UPLOADER_MAX_FILE_SIZE", 3.5),
+        ):
             response = self.get_picker()
 
         self.assertEqual(response.context["upload"]["max_files"], 2)
+        self.assertEqual(response.context["upload"]["max_file_size"], 3.5)
         self.assertContains(response, 'data-picker-upload-max-files="2"')
+        self.assertContains(response, 'data-picker-upload-max-file-size="3.5"')
 
     def test_role_add_permission_controls_upload_for_selected_picker_model(self):
         self.assertTrue(self.user.has_perm("filer.add_file"))

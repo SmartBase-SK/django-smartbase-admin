@@ -228,7 +228,8 @@
 
         {% if upload.url %}
             <span class="hidden" data-picker-upload-url="{{ upload.url }}"
-                  data-picker-upload-max-files="{{ upload.max_files }}"></span>
+                  data-picker-upload-max-files="{{ upload.max_files }}"
+                  data-picker-upload-max-file-size="{{ upload.max_file_size|default_if_none:'' }}"></span>
         {% endif %}
     </section>
 </div>
