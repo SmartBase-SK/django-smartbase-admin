@@ -32,9 +32,11 @@ class MediaPickerView(View):
             parent_value = request.POST.get("folder")
             parent_id = int(parent_value) if parent_value else None
         except (TypeError, ValueError):
+            params = request.POST.copy()
+            params.pop("folder", None)
             return self.render_picker(
                 request,
-                request.POST,
+                params,
                 errors=[_("Invalid folder.")],
             )
 

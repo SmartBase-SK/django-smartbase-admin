@@ -475,6 +475,17 @@ class MediaPickerViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "already exists")
 
+    def test_rejects_non_numeric_folder(self):
+        response = self.client.post(
+            reverse("sb_admin:media_picker"),
+            data={"folder": "invalid", "name": "Campaigns"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid folder.")
+        self.assertIsNone(response.context["folder"])
+        self.assertFalse(Folder.objects.filter(name="Campaigns").exists())
+
     def test_fragment_uses_htmx_for_server_rendered_interactions(self):
         response = self.get_picker(folder=self.folder.pk)
 
