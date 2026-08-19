@@ -85,6 +85,7 @@ class SBAdminBaseView(object):
     widget_views = None
 
     def init_view_static(self, configuration, model, admin_site):
+        self.admin_site = admin_site
         self.init_widgets_static(configuration)
 
     def get_id(self):

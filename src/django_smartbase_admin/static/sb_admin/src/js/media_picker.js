@@ -1,6 +1,7 @@
 const PICKER_TYPE_IMAGE = 'image'
 const MODAL_SELECTOR = '#sb-admin-modal'
 const EMBEDDED_PICKER_SELECTOR = '[data-sb-media-picker-embed]'
+const SET_PICKER_VALUE_EVENT = 'sbadmin:media-picker:set-value'
 const EMBEDDED_MESSAGE_SOURCE = 'django-smartbase-admin:media-picker'
 const EMBEDDED_MESSAGE_TYPES = Object.freeze({
     BUSY: 'busy',
@@ -522,11 +523,20 @@ const initializeEmbeddedPicker = () => {
 
 document.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-sb-media-picker-trigger]')
-    if (trigger) initializePicker(trigger.closest('[data-sb-media-picker-widget]'))
+    const triggerWidget = trigger?.closest('[data-sb-media-picker-widget]')
+    if (trigger && triggerWidget?.dataset.pickerReadonly !== 'true') initializePicker(triggerWidget)
 
     const clear = event.target.closest('[data-picker-clear]')
-    if (clear) updateWidget(clear.closest('[data-sb-media-picker-widget]'), null)
+    const clearWidget = clear?.closest('[data-sb-media-picker-widget]')
+    if (clear && clearWidget?.dataset.pickerReadonly !== 'true') updateWidget(clearWidget, null)
 }, true)
+
+document.addEventListener(SET_PICKER_VALUE_EVENT, (event) => {
+    updateWidget(
+        event.target.closest('[data-sb-media-picker-widget]'),
+        event.detail?.item || null,
+    )
+})
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeEmbeddedPicker, {once: true})

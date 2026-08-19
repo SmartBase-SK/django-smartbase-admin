@@ -185,7 +185,6 @@ class SBAdminFormFieldWidgetsMixin:
         forms.SplitDateTimeField: SBAdminSplitDateTimeWidget,
         forms.DateField: SBAdminDateWidget,
         forms.TimeField: SBAdminTimeWidget,
-        forms.Textarea: SBAdminTextareaWidget,
         forms.URLField: SBAdminURLFieldWidget,
         forms.IntegerField: SBAdminNumberWidget,
         forms.FloatField: SBAdminNumberWidget,
@@ -229,6 +228,7 @@ class SBAdminFormFieldWidgetsMixin:
     django_widget_to_widget = {
         forms.HiddenInput: SBAdminHiddenWidget,
         forms.PasswordInput: SBAdminPasswordInputWidget,
+        forms.Textarea: SBAdminTextareaWidget,
         AdminTextareaWidget: SBAdminTextareaWidget,
     }
 
@@ -263,14 +263,11 @@ class SBAdminFormFieldWidgetsMixin:
 
         if not widget:
             return form_field
-        choices = getattr(form_field, "choices", None)
         widget_attrs = form_field.widget.attrs
         widget_attrs.pop(
             "class", None
         )  # remove origin classes to prevent override our custom widget class
         kwargs = {}
-        if choices and widget != SBAdminHiddenWidget:
-            kwargs["choices"] = choices
         if isinstance(form_field, RichTextFormField):
             kwargs["config_name"] = getattr(
                 form_field.widget, "config_name", None
@@ -283,6 +280,8 @@ class SBAdminFormFieldWidgetsMixin:
                 form_field.widget, "extra_plugins", None
             ) or getattr(db_field, "extra_plugins", [])
         form_field.widget = widget(form_field=form_field, attrs=widget_attrs, **kwargs)
+        if hasattr(form_field, "choices") and hasattr(form_field.widget, "choices"):
+            form_field.widget.choices = form_field.choices
         return form_field
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

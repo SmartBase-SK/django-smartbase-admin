@@ -63,8 +63,10 @@ class SBAdminTranslationsService(object):
                     field_val_bool = str(f"{annotate_name}_{model_field.name}_bool")
                     annotates[field_val_bool] = Case(
                         When(
-                            Q(**{f"{annotate_name}__{model_field.name}__isnull": False})
-                            & ~Q(**{f"{annotate_name}__{model_field.name}": ""}),
+                            cls.get_translation_field_value_condition(
+                                annotate_name,
+                                model_field,
+                            ),
                             then=Value(1),
                         ),
                         default=Value(0),
@@ -77,6 +79,14 @@ class SBAdminTranslationsService(object):
                 annotates[f"{annotate_name}_count"] = field_val_bools
         queryset = queryset.annotate(**annotates)
         return queryset
+
+    @classmethod
+    def get_translation_field_value_condition(cls, annotate_name, model_field):
+        field_name = f"{annotate_name}__{model_field.name}"
+        condition = Q(**{f"{field_name}__isnull": False})
+        if model_field.empty_strings_allowed:
+            condition &= ~Q(**{field_name: ""})
+        return condition
 
     @classmethod
     def is_translated_model(cls, model):
