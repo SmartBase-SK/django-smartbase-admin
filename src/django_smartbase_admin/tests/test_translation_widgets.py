@@ -82,6 +82,26 @@ class _ChoicesProtocolWidget(forms.TextInput):
 
 
 class TranslationWidgetTests(SimpleTestCase):
+    def test_translation_view_excludes_configured_model_fields(self):
+        included_field = mock.Mock(name="included_field")
+        included_field.name = "title"
+        excluded_field = mock.Mock(name="excluded_field")
+        excluded_field.name = "route_site"
+        translation_model = mock.Mock()
+        translation_model._meta.get_fields.return_value = (
+            included_field,
+            excluded_field,
+        )
+        model = mock.Mock()
+        model._parler_meta.get_all_models.return_value = (translation_model,)
+
+        translated_fields = ModelTranslationView(
+            model=model,
+            exclude_fields=("route_site",),
+        ).get_translated_fields()
+
+        self.assertEqual(translated_fields, {translation_model: [included_field]})
+
     def test_default_choice_widgets_keep_field_choices(self):
         choices = (("draft", "Draft"), ("published", "Published"))
         cases = (

@@ -44,7 +44,11 @@ class SBAdminTranslationsService(object):
 
     @classmethod
     def annotate_queryset_with_translations_count(
-        cls, queryset, model, language_codes_to_annotate
+        cls,
+        queryset,
+        model,
+        language_codes_to_annotate,
+        translated_fields=None,
     ):
         annotates = {}
         for translation_model in model._parler_meta.get_all_models():
@@ -56,10 +60,9 @@ class SBAdminTranslationsService(object):
                     condition=Q(**{f"{rel_name}__language_code": language_code}),
                 )
                 field_val_bools = None
-                translated_fields_dict = (
-                    SBAdminTranslationsService.get_translated_fields_for_model(model)
-                )
-                for model_field in translated_fields_dict.get(translation_model, []):
+                if translated_fields is None:
+                    translated_fields = cls.get_translated_fields_for_model(model)
+                for model_field in translated_fields.get(translation_model, []):
                     field_val_bool = str(f"{annotate_name}_{model_field.name}_bool")
                     annotates[field_val_bool] = Case(
                         When(
@@ -125,15 +128,21 @@ class SBAdminTranslationsService(object):
         )
 
     @classmethod
-    def get_translated_fields_for_model(cls, model, visible_fields=None):
+    def get_translated_fields_for_model(
+        cls,
+        model,
+        visible_fields=None,
+        exclude_fields=None,
+    ):
         translated_fields = {}
         if not cls.is_translated_model(model):
             return translated_fields
+        excluded_fields = {*cls.parler_technical_fields, *(exclude_fields or ())}
         for translation_model in model._parler_meta.get_all_models():
             translated_fields[translation_model] = [
                 model_field
                 for model_field in translation_model._meta.get_fields()
-                if model_field.name not in cls.parler_technical_fields
+                if model_field.name not in excluded_fields
                 # if field is in visible fields or visible fields are empty
                 and (not visible_fields or model_field.name in visible_fields)
             ]
