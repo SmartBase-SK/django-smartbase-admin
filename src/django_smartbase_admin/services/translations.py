@@ -79,6 +79,8 @@ class SBAdminTranslationsService(object):
                         field_val_bools = F(field_val_bool)
                     else:
                         field_val_bools += F(field_val_bool)
+                if field_val_bools is None:
+                    field_val_bools = Value(0, output_field=IntegerField())
                 annotates[f"{annotate_name}_count"] = field_val_bools
         queryset = queryset.annotate(**annotates)
         return queryset

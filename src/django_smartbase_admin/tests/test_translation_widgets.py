@@ -32,6 +32,37 @@ class TranslatedArticle(models.Model):
         managed = False
 
 
+class TranslationCountArticle(models.Model):
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class TranslationCountArticleTranslation(models.Model):
+    master = models.ForeignKey(
+        TranslationCountArticle,
+        related_name="translations",
+        on_delete=models.CASCADE,
+    )
+    language_code = models.CharField(max_length=15)
+    content = models.TextField()
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+        managed = False
+
+
+class _TranslationCountParlerMeta:
+    def get_all_models(self):
+        return (TranslationCountArticleTranslation,)
+
+    def __getitem__(self, translation_model):
+        return SimpleNamespace(rel_name="translations")
+
+
+TranslationCountArticle._parler_meta = _TranslationCountParlerMeta()
+
+
 def get_image_model_field():
     model_field = FilerImageField(null=True, on_delete=models.SET_NULL)
     model_field.remote_field.model = Image
@@ -82,6 +113,29 @@ class _ChoicesProtocolWidget(forms.TextInput):
 
 
 class TranslationWidgetTests(SimpleTestCase):
+    def test_translation_count_is_zero_when_all_fields_are_excluded(self):
+        translation_model = TranslationCountArticleTranslation
+        annotate_name = SBAdminTranslationsService.get_annotate_name(
+            translation_model,
+            "en",
+        )
+        translated_fields = SBAdminTranslationsService.get_translated_fields_for_model(
+            TranslationCountArticle,
+            exclude_fields=("content",),
+        )
+
+        queryset = SBAdminTranslationsService.annotate_queryset_with_translations_count(
+            TranslationCountArticle.objects.all(),
+            TranslationCountArticle,
+            ("en",),
+            translated_fields=translated_fields,
+        )
+
+        count_expression = queryset.query.annotations[f"{annotate_name}_count"]
+        self.assertIsInstance(count_expression, models.Value)
+        self.assertEqual(count_expression.value, 0)
+        self.assertIsInstance(count_expression.output_field, models.IntegerField)
+
     def test_translation_view_excludes_configured_model_fields(self):
         included_field = mock.Mock(name="included_field")
         included_field.name = "title"
