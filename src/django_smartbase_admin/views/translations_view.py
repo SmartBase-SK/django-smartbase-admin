@@ -37,6 +37,7 @@ class ModelTranslationView(
     SBAdminBaseListView,
 ):
     translated_fields = None
+    exclude_fields = ()
     list_template_name = "sb_admin/actions/translations-list.html"
     FORM_BASE_ID = "translation-form-"
     TRANSLATION_NOT_TRANSLATED = 0
@@ -47,6 +48,10 @@ class ModelTranslationView(
         (TRANSLATION_INCOMPLETE, _("Incomplete")),
         (TRANSLATION_TRANSLATED, _("Translated")),
     ]
+
+    def __init__(self, *args, exclude_fields=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.exclude_fields = tuple(exclude_fields or self.exclude_fields)
 
     def get_sbadmin_list_view_config(self, request):
         result = []
@@ -106,7 +111,10 @@ class ModelTranslationView(
     def get_queryset(self, request=None):
         qs = super().get_queryset(request)
         qs = SBAdminTranslationsService.annotate_queryset_with_translations_count(
-            qs, self.model, self.get_display_language_codes(request)
+            qs,
+            self.model,
+            self.get_display_language_codes(request),
+            translated_fields=self.get_translated_fields(),
         )
         return qs
 
@@ -230,7 +238,10 @@ class ModelTranslationView(
             )
 
     def get_translated_fields(self):
-        return SBAdminTranslationsService.get_translated_fields_for_model(self.model)
+        return SBAdminTranslationsService.get_translated_fields_for_model(
+            self.model,
+            exclude_fields=self.exclude_fields,
+        )
 
     def handle_language_choice_change(self, request):
         if (
@@ -502,6 +513,10 @@ class SBAdminTranslationsView(SBAdminView):
                 }
                 if translation_definition.get("fields"):
                     view_class_params["fields"] = translation_definition.get("fields")
+                if translation_definition.get("exclude_fields"):
+                    view_class_params["exclude_fields"] = translation_definition.get(
+                        "exclude_fields"
+                    )
                 view = view_class(**view_class_params)
                 self.sub_views.append(view)
         return self.sub_views

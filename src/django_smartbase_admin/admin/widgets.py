@@ -1042,7 +1042,7 @@ class SBAdminAutocompleteWidget(
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         self.input_id = (
-            context["widget"]["attrs"]["id"] or f'id_{context["widget"]["name"]}'
+            context["widget"]["attrs"]["id"] or f"id_{context['widget']['name']}"
         )
 
         context["widget"]["type"] = "hidden"
@@ -1449,7 +1449,8 @@ class SBAdminImageWidget(SBAdminBaseWidget, AdminImageWidget):
     def __init__(self, form_field=None, *args, **kwargs):
         self.form_field = form_field
         super(AdminImageWidget, self).__init__(
-            form_field.rel, form_field.view.admin_site
+            form_field.rel,
+            form_field.view.admin_site,
         )
 
 
@@ -1470,7 +1471,10 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         self.view = None
         self.request = None
         super(FilerAdminFileWidget, self).__init__(
-            form_field.rel, form_field.view.admin_site, *args, **kwargs
+            form_field.rel,
+            form_field.view.admin_site,
+            *args,
+            **kwargs,
         )
 
     def init_widget_dynamic(self, form, form_field, field_name, view, request):
@@ -1518,7 +1522,7 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         return value
 
     def render(self, name, value, attrs=None, renderer=None):
-        attrs = {} if attrs is None else attrs.copy()
+        attrs = self.build_attrs(self.attrs, attrs)
         css_id = attrs.get("id", f"id_{name}")
         if "class" not in attrs:
             attrs["class"] = "vForeignKeyRawIdAdminField"
@@ -1531,6 +1535,7 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
         context = {
             "hidden_input": hidden_input,
             "id": css_id,
+            "selected_item_id": f"{css_id}-selected-item",
             "endpoint": (
                 f"{reverse('sb_admin:media_picker')}?picker_type={self.picker_type}"
             ),
@@ -1538,6 +1543,7 @@ class SBAdminFilerPickerWidget(SBAdminBaseWidget, FilerAdminFileWidget):
             "object": obj,
             "selected_item": selected_item,
             "picker_type": self.picker_type,
+            "is_readonly": bool(attrs.get("readonly") or attrs.get("disabled")),
         }
         return mark_safe(
             render_to_string("sb_admin/widgets/filer_picker.html", context)

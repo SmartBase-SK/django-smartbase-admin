@@ -283,6 +283,8 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
             view.init_view_static(self, None, sb_admin_site)
             sub_views = view.get_sub_views(self)
             if sub_views:
+                for sub_view in sub_views:
+                    sub_view.init_view_static(self, None, sb_admin_site)
                 registered_views.extend(sub_views)
         self.registered_views = registered_views
 
