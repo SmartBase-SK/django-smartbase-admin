@@ -718,6 +718,7 @@ class MediaPickerViewTests(TestCase):
         self.assertIn("data-picker-widget-dropzone", html)
         self.assertIn("data-picker-empty-prompt", html)
         self.assertIn("sb-media-picker-widget__content", html)
+        self.assertIn("sb-media-picker-widget__actions", html)
         self.assertIn("/operations/upload/no_folder/", html)
         self.assertIn("data-sb-media-picker-trigger", html)
         self.assertIn('data-bs-target="#sb-admin-modal"', html)

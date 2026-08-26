@@ -12,7 +12,7 @@
             <div class="dz-thumbnail"><img class="quiet" data-dz-thumbnail></div>
             <div>
                 <span data-dz-name class="dz-name"></span>
-                {% if not is_readonly %}<div class="flex items-center gap-4">
+                {% if not is_readonly %}<div class="sb-media-picker-widget__actions flex items-center gap-4">
                     <span class="filerClearer" title="{% trans 'Clear' %}" data-dz-remove data-picker-clear
                           data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
                         <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>
@@ -30,12 +30,14 @@
         </span>
     </div>
 
-    <div class="{% if not is_readonly %}js-filer-dropzone {% endif %}filer-dropzone{% if object %} js-object-attached{% endif %}"
+    <div class="{% if not is_readonly %}js-filer-dropzone {% endif %}filer-dropzone{% if object %} js-object-attached{% elif is_readonly %} sb-media-picker-widget__readonly-empty{% endif %}"
          data-picker-widget-dropzone{% if not is_readonly %} data-url="{{ upload_url }}"{% endif %} data-max-files="1">
         <div class="z-index-fix"></div>
         <div class="dz-default dz-message js-filer-dropzone-message{% if object %} hidden{% endif %}">
-            <span class="w-64 h-64 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon">
-                <svg class="w-24 h-24" aria-hidden="true"><use xlink:href="#Upload"></use></svg>
+            <span class="w-64 h-64 flex items-center justify-center rounded-full mr-16 js-input-file-empty input-file-upload-icon{% if is_readonly %} sb-media-picker-widget__empty-icon{% endif %}">
+                <svg class="w-24 h-24" aria-hidden="true">
+                    <use xlink:href="#{% if is_readonly and picker_type == 'image' %}Picture-one{% elif is_readonly %}Paperclip{% else %}Upload{% endif %}"></use>
+                </svg>
             </span>
         </div>
 
@@ -45,10 +47,10 @@
                  alt="{% trans 'No file selected' %}" data-picker-preview-image>
             <div class="sb-media-picker-widget__content">
                 <span class="sb-media-picker-widget__prompt{% if object %} hidden{% endif %}" data-picker-empty-prompt>
-                    {% trans "drop your file here or" %}
+                    {% if is_readonly %}{% trans "No file selected" %}{% else %}{% trans "drop your file here or" %}{% endif %}
                 </span>
                 <span class="description_text" data-picker-preview-name>{% if object %}{{ object.label }}{% endif %}</span>
-                {% if not is_readonly %}<div class="flex items-center gap-4">
+                {% if not is_readonly %}<div class="sb-media-picker-widget__actions flex items-center gap-4">
                     <span class="filerClearer{% if not object %} hidden{% endif %}" title="{% trans 'Clear' %}"
                           data-picker-clear data-no-icon-file="{% static 'filer/icons/file-unknown.svg' %}">
                         <button type="button" class="btn btn-tiny btn-destructive">{% trans "Delete" %}</button>

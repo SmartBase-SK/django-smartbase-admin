@@ -294,6 +294,11 @@ class TranslationWidgetTests(SimpleTestCase):
         self.assertNotIn("data-picker-clear", html)
         self.assertNotIn(">Delete<", html)
         self.assertNotIn('class="js-filer-dropzone filer-dropzone', html)
+        self.assertIn("sb-media-picker-widget__readonly-empty", html)
+        self.assertIn('xlink:href="#Picture-one"', html)
+        self.assertIn("No file selected", html)
+        self.assertNotIn("drop your file here or", html)
+        self.assertNotIn('xlink:href="#Upload"', html)
         self.assertEqual(html.count('id="id_meta_image"'), 1)
         self.assertIn('id="id_meta_image-selected-item"', html)
 

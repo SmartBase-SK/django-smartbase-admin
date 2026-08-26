@@ -7,6 +7,25 @@
         .filer-dropzone:not(.js-object-attached) .sb-media-picker-widget__content {
             @apply flex min-w-0 flex-wrap items-center gap-8;
         }
+
+        .sb-media-picker-widget__readonly-empty {
+            @apply !border-dark-200 !bg-dark-50 text-dark;
+            border-style: solid !important;
+
+            .sb-media-picker-widget__empty-icon {
+                @apply bg-dark-100 text-dark-400;
+            }
+
+            .sb-media-picker-widget__prompt {
+                @apply font-medium text-dark;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .sb-media-picker-widget__actions {
+                @apply flex-col items-start;
+            }
+        }
     }
 
     .sb-media-picker__dialog {
