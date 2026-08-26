@@ -32,16 +32,14 @@
                     <option value="name"{% if ordering == 'name' %} selected{% endif %}>{% trans "Name A-Z" %}</option>
                     <option value="-name"{% if ordering == '-name' %} selected{% endif %}>{% trans "Name Z-A" %}</option>
                 </select>
-                <div class="flex gap-2">
-                    <button type="button" class="btn btn-empty !px-8" title="{% trans 'Grid view' %}"
-                            aria-label="{% trans 'Grid view' %}" data-picker-view="grid">
-                        <svg aria-hidden="true"><use xlink:href="#All-application"></use></svg>
-                    </button>
-                    <button type="button" class="btn btn-empty !px-8" title="{% trans 'List view' %}"
-                            aria-label="{% trans 'List view' %}" data-picker-view="list">
-                        <svg aria-hidden="true"><use xlink:href="#List-two"></use></svg>
-                    </button>
-                </div>
+                <button type="button" class="btn !px-8" title="{% trans 'Grid view' %}"
+                        aria-label="{% trans 'Grid view' %}" data-picker-view="grid">
+                    <svg aria-hidden="true"><use xlink:href="#All-application"></use></svg>
+                </button>
+                <button type="button" class="btn !px-8" title="{% trans 'List view' %}"
+                        aria-label="{% trans 'List view' %}" data-picker-view="list">
+                    <svg aria-hidden="true"><use xlink:href="#List-two"></use></svg>
+                </button>
             </form>
 
             <div class="sb-media-picker__actions flex min-h-44 items-center gap-8 px-20 py-4">

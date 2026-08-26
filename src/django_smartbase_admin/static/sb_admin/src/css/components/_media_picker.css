@@ -8,6 +8,23 @@
             @apply flex min-w-0 flex-wrap items-center gap-8;
         }
 
+        .sb-media-picker-widget__actions {
+            @apply flex-wrap;
+        }
+
+        .add-file-button {
+            @apply h-auto min-h-24 max-w-full flex-shrink py-4;
+
+            > span {
+                @apply m-0 min-w-0 whitespace-normal text-center;
+                display: block;
+                overflow: visible;
+                overflow-wrap: anywhere;
+                -webkit-box-orient: initial;
+                -webkit-line-clamp: initial;
+            }
+        }
+
         .sb-media-picker-widget__readonly-empty {
             @apply !border-dark-200 !bg-dark-50 text-dark;
             border-style: solid !important;

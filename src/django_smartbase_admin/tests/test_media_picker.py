@@ -506,6 +506,8 @@ class MediaPickerViewTests(TestCase):
         self.assertContains(response, "data-picker-new-folder")
         self.assertContains(response, "data-picker-new-folder-trigger")
         self.assertContains(response, "data-picker-upload-trigger")
+        self.assertContains(response, 'class="btn !px-8"', count=2)
+        self.assertNotContains(response, 'class="btn btn-empty !px-8"')
         self.assertContains(response, "data-picker-item")
         self.assertContains(response, 'title="Summer"')
         self.assertContains(response, 'title="Apple"')
