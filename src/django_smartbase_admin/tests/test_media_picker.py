@@ -764,6 +764,7 @@ class MediaPickerViewTests(TestCase):
             "Text-bold",
             "Text-italic",
             "Text-underline",
+            "Background-color",
             "Align-text-left",
             "Align-text-center",
             "Align-text-right",
