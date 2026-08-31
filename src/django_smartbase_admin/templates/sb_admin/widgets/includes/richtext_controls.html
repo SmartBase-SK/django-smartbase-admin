@@ -1,67 +1,12 @@
 {% load i18n %}
 
 <div class="sbadmin-richtext__toolbar" role="toolbar" aria-label="{% trans 'Rich text formatting' %}">
-    {% if "block" not in richtext_disabled_actions %}
-        <select class="input" data-richtext-block aria-label="{% trans 'Paragraph style' %}">
-            <option value="0">{% trans "Paragraph" %}</option>
-            <option value="2">H2</option>
-            <option value="3">H3</option>
-            <option value="4">H4</option>
-            <option value="5">H5</option>
-            <option value="6">H6</option>
-        </select>
-    {% endif %}
-    {% if "bold" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="bold" title="{% trans 'Bold' %}" aria-label="{% trans 'Bold' %}"><svg aria-hidden="true"><use xlink:href="#Text-bold"></use></svg></button>{% endif %}
-    {% if "italic" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="italic" title="{% trans 'Italic' %}" aria-label="{% trans 'Italic' %}"><svg aria-hidden="true"><use xlink:href="#Text-italic"></use></svg></button>{% endif %}
-    {% if "underline" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="underline" title="{% trans 'Underline' %}" aria-label="{% trans 'Underline' %}"><svg aria-hidden="true"><use xlink:href="#Text-underline"></use></svg></button>{% endif %}
-    {% if "color" not in richtext_disabled_actions %}
-        <label class="btn sbadmin-richtext__color" title="{% trans 'Text color' %}">
-            <svg aria-hidden="true"><use xlink:href="#Color-card"></use></svg>
-            <input type="color" value="#000000" data-richtext-color aria-label="{% trans 'Text color' %}">
-        </label>
-    {% endif %}
-    {% if "align-left" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="align-left" title="{% trans 'Align left' %}" aria-label="{% trans 'Align left' %}"><svg aria-hidden="true"><use xlink:href="#Align-text-left"></use></svg></button>{% endif %}
-    {% if "align-center" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="align-center" title="{% trans 'Align center' %}" aria-label="{% trans 'Align center' %}"><svg aria-hidden="true"><use xlink:href="#Align-text-center"></use></svg></button>{% endif %}
-    {% if "align-right" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="align-right" title="{% trans 'Align right' %}" aria-label="{% trans 'Align right' %}"><svg aria-hidden="true"><use xlink:href="#Align-text-right"></use></svg></button>{% endif %}
-    {% if "align-justify" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="align-justify" title="{% trans 'Justify' %}" aria-label="{% trans 'Justify' %}"><svg aria-hidden="true"><use xlink:href="#Align-text-both"></use></svg></button>{% endif %}
-    {% if "link" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="link" title="{% trans 'Link' %}" aria-label="{% trans 'Link' %}"><svg aria-hidden="true"><use xlink:href="#Link"></use></svg></button>{% endif %}
-    {% if "image" not in richtext_disabled_actions|default:"" %}
-        <button class="btn" type="button" data-richtext-action="image"{% if richtext_media_picker_url %} data-sb-media-picker-trigger data-bs-toggle="modal" data-bs-target="#sb-admin-modal" hx-get="{{ richtext_media_picker_url }}" hx-target="#sb-admin-modal"{% endif %} title="{% trans 'Image' %}" aria-label="{% trans 'Image' %}"><svg aria-hidden="true"><use xlink:href="#Add-picture"></use></svg></button>
-    {% endif %}
-    {% if "table" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="table" title="{% trans 'Insert table' %}" aria-label="{% trans 'Insert table' %}"><svg aria-hidden="true"><use xlink:href="#Insert-table"></use></svg></button>{% endif %}
-    {% if "bullet-list" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="bullet-list" title="{% trans 'Bulleted list' %}" aria-label="{% trans 'Bulleted list' %}"><svg aria-hidden="true"><use xlink:href="#List-two"></use></svg></button>{% endif %}
-    {% if "ordered-list" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="ordered-list" title="{% trans 'Numbered list' %}" aria-label="{% trans 'Numbered list' %}"><svg aria-hidden="true"><use xlink:href="#List-numbers"></use></svg></button>{% endif %}
-    {% if "outdent" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="outdent" title="{% trans 'Outdent' %}" aria-label="{% trans 'Outdent' %}"><svg aria-hidden="true"><use xlink:href="#Indent-left"></use></svg></button>{% endif %}
-    {% if "indent" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="indent" title="{% trans 'Indent' %}" aria-label="{% trans 'Indent' %}"><svg aria-hidden="true"><use xlink:href="#Indent-right"></use></svg></button>{% endif %}
-    {% if "clear" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="clear" title="{% trans 'Clear formatting' %}" aria-label="{% trans 'Clear formatting' %}"><svg aria-hidden="true"><use xlink:href="#Clear-format"></use></svg></button>{% endif %}
-    {% if "source" not in richtext_disabled_actions %}<button class="btn" type="button" data-richtext-action="source" title="{% trans 'HTML source' %}" aria-label="{% trans 'HTML source' %}"><svg aria-hidden="true"><use xlink:href="#Code"></use></svg></button>{% endif %}
-    {% if "table" not in richtext_disabled_actions %}
-        <span class="sbadmin-richtext__table-dropdown" data-richtext-table-menu hidden>
-            <button class="btn" type="button" data-richtext-table-menu-trigger title="{% trans 'Table options' %}" aria-label="{% trans 'Table options' %}" aria-haspopup="menu" aria-expanded="false" aria-pressed="false">
-                <svg aria-hidden="true"><use xlink:href="#Application-menu"></use></svg>
-            </button>
-            <span class="sbadmin-richtext__table-menu-options" data-richtext-table-menu-options role="menu" hidden>
-                {% if "add-table-row" not in richtext_disabled_actions %}<button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="add-table-row">{% trans "Add row below" %}</button>{% endif %}
-                {% if "add-table-column" not in richtext_disabled_actions %}<button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="add-table-column">{% trans "Add column after" %}</button>{% endif %}
-                {% if "delete-table-row" not in richtext_disabled_actions %}<button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table-row">{% trans "Delete row" %}</button>{% endif %}
-                {% if "delete-table-column" not in richtext_disabled_actions %}<button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table-column">{% trans "Delete column" %}</button>{% endif %}
-                {% if "delete-table" not in richtext_disabled_actions %}<button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table">{% trans "Delete table" %}</button>{% endif %}
-            </span>
-        </span>
-    {% endif %}
+    {% for action in richtext_actions %}
+        {% include action.template with action=action %}
+    {% endfor %}
 </div>
-{% if "link" not in richtext_disabled_actions %}
-    <div class="sbadmin-richtext__link-dialog hidden" data-richtext-link-dialog>
-        <button class="btn btn-empty sbadmin-richtext__link-dialog-close" type="button" data-richtext-action="cancel-link" title="{% trans 'Close' %}" aria-label="{% trans 'Close' %}">
-            <svg aria-hidden="true"><use xlink:href="#Close-small"></use></svg>
-        </button>
-        <label>
-            <span class="sbadmin-richtext__link-dialog-label">{% trans "Link URL" %}</span>
-            <input class="input" type="url" data-richtext-link-url>
-        </label>
-        <div class="sbadmin-richtext__link-dialog-actions">
-            <button class="btn btn-primary btn-small" type="button" data-richtext-action="apply-link">{% trans "Apply" %}</button>
-            <button class="btn btn-secondary btn-small" type="button" data-richtext-action="remove-link">{% trans "Remove link" %}</button>
-        </div>
-    </div>
-{% endif %}
+{% for action in richtext_actions %}
+    {% if action.dialog_template %}
+        {% include action.dialog_template with action=action %}
+    {% endif %}
+{% endfor %}

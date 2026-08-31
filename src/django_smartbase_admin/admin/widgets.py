@@ -353,6 +353,86 @@ class _RichTextImageIdParser(HTMLParser):
 
 class SBAdminRichTextWidget(SBAdminTextareaWidget):
     template_name = "sb_admin/widgets/richtext.html"
+    button_template = "sb_admin/widgets/includes/richtext/action_button.html"
+    toolbar_actions = (
+        {
+            "name": "block",
+            "template": "sb_admin/widgets/includes/richtext/block.html",
+        },
+        {"name": "bold", "label": _("Bold"), "icon": "Text-bold"},
+        {"name": "italic", "label": _("Italic"), "icon": "Text-italic"},
+        {
+            "name": "underline",
+            "label": _("Underline"),
+            "icon": "Text-underline",
+        },
+        {
+            "name": "color",
+            "label": _("Text color"),
+            "template": "sb_admin/widgets/includes/richtext/color.html",
+        },
+        {
+            "name": "align-left",
+            "label": _("Align left"),
+            "icon": "Align-text-left",
+        },
+        {
+            "name": "align-center",
+            "label": _("Align center"),
+            "icon": "Align-text-center",
+        },
+        {
+            "name": "align-right",
+            "label": _("Align right"),
+            "icon": "Align-text-right",
+        },
+        {
+            "name": "align-justify",
+            "label": _("Justify"),
+            "icon": "Align-text-both",
+        },
+        {
+            "name": "link",
+            "label": _("Link"),
+            "icon": "Link",
+            "dialog_template": "sb_admin/widgets/includes/richtext/link_dialog.html",
+        },
+        {
+            "name": "image",
+            "label": _("Image"),
+            "icon": "Add-picture",
+            "template": "sb_admin/widgets/includes/richtext/image.html",
+        },
+        {
+            "name": "table",
+            "label": _("Insert table"),
+            "icon": "Insert-table",
+        },
+        {
+            "name": "bullet-list",
+            "label": _("Bulleted list"),
+            "icon": "List-two",
+        },
+        {
+            "name": "ordered-list",
+            "label": _("Numbered list"),
+            "icon": "List-numbers",
+        },
+        {"name": "outdent", "label": _("Outdent"), "icon": "Indent-left"},
+        {"name": "indent", "label": _("Indent"), "icon": "Indent-right"},
+        {
+            "name": "clear",
+            "label": _("Clear formatting"),
+            "icon": "Clear-format",
+        },
+        {"name": "source", "label": _("HTML source"), "icon": "Code"},
+        {
+            "name": "table-menu",
+            "label": _("Table options"),
+            "requires": "table",
+            "template": "sb_admin/widgets/includes/richtext/table_menu.html",
+        },
+    )
 
     class Media:
         extend = False
@@ -422,6 +502,23 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
             for item in (FilerMediaPickerService.item_data(image),)
         }
 
+    def get_toolbar_actions(self):
+        disabled_actions = set(self.disabled_actions)
+        actions = []
+        for definition in self.toolbar_actions:
+            if definition["name"] in disabled_actions:
+                continue
+            if definition.get("requires") in disabled_actions:
+                continue
+            action = {"template": self.button_template, **definition}
+            if action["name"] == "image":
+                action["media_picker_url"] = (
+                    f"{reverse('sb_admin:media_picker')}?picker_type=image"
+                    f"&is_public={str(self.is_public).lower()}"
+                )
+            actions.append(action)
+        return tuple(actions)
+
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         widget = context["widget"]
@@ -431,14 +528,7 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
             widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
         )
         widget["disabled_actions"] = self.disabled_actions
-        widget["media_picker_url"] = (
-            None
-            if "image" in self.disabled_actions
-            else (
-                f"{reverse('sb_admin:media_picker')}?picker_type=image"
-                f"&is_public={str(self.is_public).lower()}"
-            )
-        )
+        widget["toolbar_actions"] = self.get_toolbar_actions()
         return context
 
 
