@@ -1,3 +1,8 @@
+function richTextItems(root) {
+    const element = document.getElementById(root.dataset.richtextItemsId)
+    return element ? JSON.parse(element.textContent) : {}
+}
+
 class Translations {
     constructor() {
         document.querySelectorAll('.js-copy-translation').forEach(button => {
@@ -11,6 +16,18 @@ class Translations {
             button.addEventListener('click', () => {
                 if(window.CKEDITOR && window.CKEDITOR.instances[input.id]) {
                     window.CKEDITOR.instances[input.id].setData(window.CKEDITOR.instances[mainInputID].getData())
+                    return
+                }
+                const targetRichText = input.closest('[data-sbadmin-richtext]')
+                const mainRichText = mainInput.closest('[data-sbadmin-richtext]')
+                if(targetRichText && mainRichText) {
+                    targetRichText.dispatchEvent(new CustomEvent('sbadmin:richtext:set-value', {
+                        bubbles: true,
+                        detail: {
+                            value: mainInput.value,
+                            items: richTextItems(mainRichText),
+                        },
+                    }))
                     return
                 }
                 const targetPicker = input.closest('[data-sb-media-picker-widget]')

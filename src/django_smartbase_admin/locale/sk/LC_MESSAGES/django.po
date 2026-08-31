@@ -493,7 +493,7 @@ msgid "Save"
 msgstr "Uložiť"
 
 msgid "Close"
-msgstr "Zatvoriť"
+msgstr "Zavrieť"
 
 msgid "Prev"
 msgstr "Pred."

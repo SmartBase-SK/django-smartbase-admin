@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
+from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
@@ -26,6 +27,7 @@ from django_smartbase_admin.admin.site import SBAdminSite, sb_admin_site
 from django_smartbase_admin.admin.widgets import (
     SBAdminFilerImagePickerWidget,
     SBAdminFilerPickerWidget,
+    SBAdminRichTextWidget,
 )
 from django_smartbase_admin.engine.configuration import (
     SBAdminConfigurationBase,
@@ -730,6 +732,78 @@ class MediaPickerViewTests(TestCase):
         self.assertIn("filer/js/dist/admin-file-widget.bundle.js", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.css", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.fa.icons.css", str(widget.media))
+
+    def test_richtext_widget_renders_existing_filer_image_and_media(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(form_field=field)
+        request = self.get_picker(folder=self.folder.pk).wsgi_request
+        widget.init_widget_dynamic(
+            SimpleNamespace(initial={"content": ""}),
+            field,
+            "content",
+            SimpleNamespace(admin_site=sb_admin_site),
+            request,
+        )
+
+        html = widget.render(
+            "content",
+            f'<p>Copy</p><img data-filer-image-id="{self.apple.pk}">',
+            attrs={"id": "id_content"},
+        )
+
+        self.assertIn("data-sbadmin-richtext", html)
+        self.assertIn("data-sb-media-picker-consumer", html)
+        self.assertLess(
+            html.index('<label for="id_content"'),
+            html.index("data-richtext-editor"),
+        )
+        self.assertEqual(html.count("<button") + 1, html.count('class="btn'))
+        self.assertIn('class="btn sbadmin-richtext__color"', html)
+        for icon in (
+            "Text-bold",
+            "Text-italic",
+            "Text-underline",
+            "Align-text-left",
+            "Align-text-center",
+            "Align-text-right",
+            "Align-text-both",
+            "Link",
+            "Add-picture",
+            "Insert-table",
+            "Application-menu",
+            "List-two",
+            "List-numbers",
+            "Indent-left",
+            "Indent-right",
+            "Clear-format",
+            "Code",
+        ):
+            self.assertIn(f'xlink:href="#{icon}"', html)
+        self.assertIn("data-richtext-table-menu", html)
+        self.assertIn("Table options", html)
+        self.assertIn(
+            'class="btn" type="button" data-richtext-table-menu-trigger', html
+        )
+        self.assertIn('data-richtext-action="add-table-row"', html)
+        self.assertIn('data-richtext-action="delete-table"', html)
+        self.assertNotIn('data-richtext-action="undo"', html)
+        self.assertNotIn('data-richtext-action="redo"', html)
+        self.assertIn("Apple", html)
+        self.assertIn('"original_url": ""', html)
+        self.assertIn("picker_type=image", html)
+        self.assertIn("sb_admin/dist/media_picker.js", str(widget.media))
+        self.assertIn("sb_admin/dist/richtext.js", str(widget.media))
+
+    def test_richtext_widget_ignores_filer_ids_that_cannot_be_parsed(self):
+        overlong_id = "9" * 5_000
+
+        self.assertEqual(
+            SBAdminRichTextWidget.image_ids(
+                '<img data-filer-image-id="12">'
+                f'<img data-filer-image-id="{overlong_id}">'
+            ),
+            (12,),
+        )
 
     def test_widget_hides_metadata_for_restricted_selected_item(self):
         MediaPickerRoleConfiguration.restrict_qs = lambda queryset, model: (

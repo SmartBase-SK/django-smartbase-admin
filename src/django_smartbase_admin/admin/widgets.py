@@ -1,5 +1,6 @@
 import json
 import sys
+from html.parser import HTMLParser
 
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -326,6 +327,106 @@ class SBAdminTextareaWidget(SBAdminBaseWidget, forms.Textarea):
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
+
+
+def _parse_richtext_image_id(value):
+    if not value or not value.isascii() or not value.isdigit() or value.startswith("0"):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+class _RichTextImageIdParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.image_ids = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.casefold() != "img":
+            return
+        image_id = _parse_richtext_image_id(dict(attrs).get("data-filer-image-id"))
+        if image_id is not None:
+            self.image_ids.append(image_id)
+
+
+class SBAdminRichTextWidget(SBAdminTextareaWidget):
+    template_name = "sb_admin/widgets/richtext.html"
+
+    class Media:
+        extend = False
+        js = [
+            "sb_admin/dist/media_picker.js",
+            "sb_admin/dist/richtext.js",
+        ]
+
+    def __init__(self, form_field=None, attrs=None, *, is_public=True):
+        self.form = None
+        self.field_name = None
+        self.view = None
+        self.request = None
+        self.is_public = is_public
+        super().__init__(
+            form_field=form_field,
+            attrs={
+                "class": "input sbadmin-richtext__source hidden",
+                "rows": 8,
+                **(attrs or {}),
+            },
+        )
+
+    def init_widget_dynamic(self, form, form_field, field_name, view, request):
+        super().init_widget_dynamic(form, form_field, field_name, view, request)
+        self.form = form
+        self.field_name = field_name
+        self.view = view
+        self.request = request
+
+    def get_request(self):
+        return self.request or SBAdminThreadLocalService.get_request()
+
+    @staticmethod
+    def image_ids(value):
+        parser = _RichTextImageIdParser()
+        parser.feed(str(value or ""))
+        parser.close()
+        return tuple(dict.fromkeys(parser.image_ids))
+
+    def image_items(self, value):
+        image_ids = self.image_ids(value)
+        request = self.get_request()
+        if not image_ids or request is None or not hasattr(request, "request_data"):
+            return {}
+        queryset = FilerMediaPickerService.accessible_item_queryset(
+            request,
+            MEDIA_PICKER_TYPE_IMAGE,
+        ).filter(pk__in=image_ids)
+        if self.is_public is not None:
+            queryset = queryset.filter(is_public=self.is_public)
+        return {
+            str(image.pk): {
+                "label": item["name"],
+                "thumbnail_url": item["thumbnail_url"],
+                "original_url": item["original_url"],
+            }
+            for image in queryset
+            for item in (FilerMediaPickerService.item_data(image),)
+        }
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        widget = context["widget"]
+        widget["items"] = self.image_items(value)
+        widget["items_id"] = f"{widget['attrs']['id']}-richtext-items"
+        widget["is_readonly"] = bool(
+            widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
+        )
+        widget["media_picker_url"] = (
+            f"{reverse('sb_admin:media_picker')}?picker_type=image"
+            f"&is_public={str(self.is_public).lower()}"
+        )
+        return context
 
 
 class SBAdminEmailInputWidget(
