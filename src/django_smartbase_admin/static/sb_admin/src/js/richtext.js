@@ -137,7 +137,6 @@ function resizableImageNodeView({node, editor, view, getPos, image, updateImage}
             return true
         },
         options: {
-            min: {width: 48},
             max: {width: editorContentWidth(view)},
             preserveAspectRatio: true,
             directions: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
@@ -318,7 +317,8 @@ function editorExtensions(items, imageClass) {
 }
 
 function readItems(root) {
-    const element = document.getElementById(root.dataset.richtextItemsId)
+    const itemsId = root.dataset.richtextItemsId
+    const element = itemsId ? document.getElementById(itemsId) : null
     return element ? JSON.parse(element.textContent) : {}
 }
 
@@ -352,14 +352,16 @@ function createEditor({
 }
 
 class RichTextWidgetController {
-    constructor(root) {
+    constructor(root, options = {}) {
         this.root = root
         this.textarea = root.querySelector('textarea')
         this.editorElement = root.querySelector('[data-richtext-editor]')
         this.readonly = root.dataset.richtextReadonly === 'true'
+        this.items = options.items || readItems(root)
+        this.onUpdate = options.onUpdate
+        this.onImage = options.onImage
         this.sourceMode = false
         this.editorHasFocused = false
-        this.items = readItems(root)
         this.editor = null
         this.destroyed = false
         this.initializeEditor = this.initializeEditor.bind(this)
@@ -398,7 +400,10 @@ class RichTextWidgetController {
                 class: 'sbadmin-richtext__content',
                 'aria-labelledby': this.textarea.id,
             },
-            onUpdate: (value) => this.syncTextarea(value, 'input'),
+            onUpdate: (value) => {
+                this.syncTextarea(value, 'input')
+                this.onUpdate?.(value)
+            },
             onBlur: () => this.textarea.dispatchEvent(new Event('change', {bubbles: true})),
             onFocus: (editor) => {
                 this.editorHasFocused = true
@@ -415,12 +420,40 @@ class RichTextWidgetController {
         if (eventName) this.textarea.dispatchEvent(new Event(eventName, {bubbles: true}))
     }
 
+    syncItemsElement() {
+        const itemsId = this.root.dataset.richtextItemsId
+        const itemsElement = itemsId ? document.getElementById(itemsId) : null
+        if (itemsElement) itemsElement.textContent = JSON.stringify(this.items)
+    }
+
+    applySourceValue() {
+        this.initializeEditor()
+        this.editor.commands.setContent(this.textarea.value, {emitUpdate: false})
+    }
+
     chain() {
         return this.initializeEditor().chain().focus()
     }
 
     syncToolbar(editor = this.editor) {
         if (!editor || this.readonly) return
+
+        const sourceModeControls = this.root.querySelectorAll([
+            '[data-richtext-action]',
+            '[data-richtext-block]',
+            '[data-richtext-color]',
+            '[data-richtext-table-menu-trigger]',
+        ].join(','))
+        sourceModeControls.forEach((control) => {
+            const isSourceToggle = control.dataset.richtextAction === 'source'
+            if (this.sourceMode && !isSourceToggle && !control.disabled) {
+                control.disabled = true
+                control.dataset.richtextDisabledBySource = ''
+            } else if (!this.sourceMode && control.hasAttribute('data-richtext-disabled-by-source')) {
+                control.disabled = false
+                delete control.dataset.richtextDisabledBySource
+            }
+        })
 
         const blockSelect = this.root.querySelector('[data-richtext-block]')
         const activeHeading = [2, 3, 4, 5, 6].find(
@@ -506,13 +539,22 @@ class RichTextWidgetController {
     }
 
     handleBlockChange(event) {
+        if (this.sourceMode) return
         const level = Number(event.target.value)
         if (level === 0) this.chain().setParagraph().run()
         else this.chain().toggleHeading({level}).run()
     }
 
     handleColorChange(event) {
+        if (this.sourceMode) return
         this.chain().setColor(event.target.value).run()
+    }
+
+    async openImagePicker() {
+        if (!this.onImage) return
+        const item = await this.onImage()
+        if (this.destroyed || !item) return
+        this.handleMediaSelection({detail: {item}})
     }
 
     handleMediaSelection(event) {
@@ -524,7 +566,10 @@ class RichTextWidgetController {
             thumbnail_url: item.thumbnail_url || '',
             original_url: item.original_url || '',
         }
-        this.chain().insertContent({
+        this.syncItemsElement()
+        if (this.sourceMode) this.applySourceValue()
+        const chain = this.sourceMode ? this.editor.chain() : this.chain()
+        chain.insertContent({
             type: 'studioFilerImage',
             attrs: {
                 filerImageId: imageId,
@@ -537,8 +582,7 @@ class RichTextWidgetController {
         Object.entries(event.detail?.items || {}).forEach(([imageId, item]) => {
             if (FILER_IMAGE_ID_PATTERN.test(imageId)) this.items[imageId] = item
         })
-        const itemsElement = document.getElementById(this.root.dataset.richtextItemsId)
-        if (itemsElement) itemsElement.textContent = JSON.stringify(this.items)
+        this.syncItemsElement()
         this.setValue(String(event.detail?.value || ''))
     }
 
@@ -572,7 +616,7 @@ class RichTextWidgetController {
     toggleSource(button) {
         this.initializeEditor()
         if (this.sourceMode) {
-            this.editor.commands.setContent(this.textarea.value, {emitUpdate: false})
+            this.applySourceValue()
             this.syncTextarea(editorValue(this.editor), 'input')
         } else {
             this.syncTextarea(editorValue(this.editor))
@@ -592,6 +636,7 @@ class RichTextWidgetController {
         }
         const tableMenuTrigger = event.target.closest('[data-richtext-table-menu-trigger]')
         if (tableMenuTrigger && this.root.contains(tableMenuTrigger)) {
+            if (this.sourceMode) return
             this.toggleTableMenu()
             return
         }
@@ -600,6 +645,7 @@ class RichTextWidgetController {
             if (!event.target.closest('[data-richtext-table-menu]')) this.closeTableMenu()
             return
         }
+        if (this.sourceMode && button.dataset.richtextAction !== 'source') return
         const actions = {
             bold: () => this.chain().toggleBold().run(),
             italic: () => this.chain().toggleItalic().run(),
@@ -609,6 +655,7 @@ class RichTextWidgetController {
             'align-right': () => this.chain().setTextAlign('right').run(),
             'align-justify': () => this.chain().setTextAlign('justify').run(),
             link: () => this.openLinkDialog(),
+            image: () => this.openImagePicker(),
             table: () => this.chain().insertTable({rows: 3, cols: 3, withHeaderRow: true}).run(),
             'add-table-row': () => this.chain().addRowAfter().run(),
             'add-table-column': () => this.chain().addColumnAfter().run(),
@@ -650,16 +697,30 @@ class RichTextWidgetController {
     }
 }
 
+function initializeWidget(root, options = {}) {
+    if (!controllers.has(root)) {
+        controllers.set(root, new RichTextWidgetController(root, options))
+    }
+    return controllers.get(root)
+}
+
+function destroyWidget(root) {
+    controllers.get(root)?.destroy()
+}
+
 function initializeWidgets(target = document) {
     const roots = []
     if (target.matches?.(WIDGET_SELECTOR)) roots.push(target)
     roots.push(...target.querySelectorAll?.(WIDGET_SELECTOR) || [])
-    roots.forEach((root) => {
-        if (!controllers.has(root)) controllers.set(root, new RichTextWidgetController(root))
-    })
+    roots.forEach((root) => initializeWidget(root))
 }
 
-window.SBAdminRichText = Object.freeze({createEditor, editorValue})
+window.SBAdminRichText = Object.freeze({
+    createEditor,
+    destroyWidget,
+    editorValue,
+    initializeWidget,
+})
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => initializeWidgets(), {once: true})
