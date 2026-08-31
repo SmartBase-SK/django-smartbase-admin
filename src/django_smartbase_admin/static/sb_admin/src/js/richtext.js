@@ -172,6 +172,14 @@ function filerImage(items, imageClass) {
                     default: null,
                     parseHTML: (element) => element.getAttribute('data-filer-image-id'),
                 },
+                src: {
+                    default: null,
+                    parseHTML: (element) => element.getAttribute('src'),
+                },
+                alt: {
+                    default: null,
+                    parseHTML: (element) => element.getAttribute('alt'),
+                },
                 resizeWidth: {
                     default: DEFAULT_IMAGE_WIDTH,
                     parseHTML: imageWidthFromElement,
@@ -191,9 +199,19 @@ function filerImage(items, imageClass) {
         },
 
         renderHTML({HTMLAttributes}) {
-            const {filerImageId, resizeWidth, ...attributes} = HTMLAttributes
+            const {
+                filerImageId,
+                resizeWidth,
+                src,
+                alt,
+                ...attributes
+            } = HTMLAttributes
+            const item = items[filerImageId] || {}
+            const resolvedSrc = item.original_url || src || item.thumbnail_url || null
             return ['img', mergeAttributes(attributes, {
                 'data-filer-image-id': filerImageId,
+                ...(resolvedSrc ? {src: resolvedSrc} : {}),
+                alt: item.label || alt || '',
                 style: imageWidthStyle(resizeWidth),
             })]
         },
@@ -573,6 +591,8 @@ class RichTextWidgetController {
             type: 'studioFilerImage',
             attrs: {
                 filerImageId: imageId,
+                src: item.original_url || item.thumbnail_url || null,
+                alt: item.name || '',
                 resizeWidth: DEFAULT_IMAGE_WIDTH,
             },
         }).run()

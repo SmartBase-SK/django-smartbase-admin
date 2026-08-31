@@ -805,6 +805,19 @@ class MediaPickerViewTests(TestCase):
             (12,),
         )
 
+    def test_richtext_widget_can_disable_image_picker(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(
+            form_field=field,
+            disabled_actions=("image",),
+        )
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+
+        self.assertNotIn('data-richtext-action="image"', html)
+        self.assertNotIn("data-sb-media-picker-trigger", html)
+        self.assertNotIn("picker_type=image", html)
+
     def test_widget_hides_metadata_for_restricted_selected_item(self):
         MediaPickerRoleConfiguration.restrict_qs = lambda queryset, model: (
             queryset.exclude(pk=self.private.pk) if model is Image else queryset

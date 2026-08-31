@@ -361,12 +361,20 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
             "sb_admin/dist/richtext.js",
         ]
 
-    def __init__(self, form_field=None, attrs=None, *, is_public=True):
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        *,
+        is_public=True,
+        disabled_actions=(),
+    ):
         self.form = None
         self.field_name = None
         self.view = None
         self.request = None
         self.is_public = is_public
+        self.disabled_actions = tuple(disabled_actions)
         super().__init__(
             form_field=form_field,
             attrs={
@@ -422,9 +430,14 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         widget["is_readonly"] = bool(
             widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
         )
+        widget["disabled_actions"] = self.disabled_actions
         widget["media_picker_url"] = (
-            f"{reverse('sb_admin:media_picker')}?picker_type=image"
-            f"&is_public={str(self.is_public).lower()}"
+            None
+            if "image" in self.disabled_actions
+            else (
+                f"{reverse('sb_admin:media_picker')}?picker_type=image"
+                f"&is_public={str(self.is_public).lower()}"
+            )
         )
         return context
 

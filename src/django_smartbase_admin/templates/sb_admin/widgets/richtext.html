@@ -9,7 +9,7 @@
 >
     {% include 'sb_admin/widgets/includes/field_label.html' %}
     {% if not widget.is_readonly %}
-        {% include 'sb_admin/widgets/includes/richtext_controls.html' with richtext_media_picker_url=widget.media_picker_url %}
+        {% include 'sb_admin/widgets/includes/richtext_controls.html' with richtext_media_picker_url=widget.media_picker_url richtext_disabled_actions=widget.disabled_actions %}
     {% endif %}
     <div class="sbadmin-richtext__editor" data-richtext-editor></div>
     <textarea name="{{ widget.name }}"{% include "sb_admin/widgets/attrs.html" %}>{% if widget.value %}{{ widget.value }}{% endif %}</textarea>

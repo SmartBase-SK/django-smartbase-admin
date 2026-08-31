@@ -38,6 +38,10 @@
         @apply min-h-160 w-full rounded-b border border-t-0 border-dark-300 bg-bg-input text-14 leading-20;
     }
 
+    .sbadmin-richtext[data-richtext-readonly="true"] .sbadmin-richtext__editor {
+        @apply rounded border-t;
+    }
+
     .sbadmin-richtext__content {
         @apply min-h-160 p-10 text-dark-900 outline-none;
 
@@ -172,11 +176,30 @@
     }
 
     .sbadmin-richtext__link-dialog {
-        @apply flex flex-col gap-8 border-x border-dark-300 bg-dark-50 p-8 text-12;
+        @apply relative flex flex-col gap-8 border-x border-dark-300 bg-dark-50 p-8 text-12;
 
-        > label:first-child {
+        > label {
             @apply flex flex-col gap-4;
         }
+    }
+
+    .sbadmin-richtext__link-dialog-label {
+        @apply pr-28;
+    }
+
+    .sbadmin-richtext__link-dialog-close {
+        @apply absolute right-8 top-8 text-dark-600;
+        width: 1.5rem;
+        height: 1.5rem;
+        padding: 0.25rem;
+
+        > svg {
+            @apply h-16 w-16;
+        }
+    }
+
+    .sbadmin-richtext__link-dialog-actions {
+        @apply flex flex-wrap gap-4;
     }
 
     .sbadmin-richtext__table-dropdown {
