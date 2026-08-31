@@ -818,6 +818,32 @@ class MediaPickerViewTests(TestCase):
         self.assertNotIn("data-sb-media-picker-trigger", html)
         self.assertNotIn("picker_type=image", html)
 
+    def test_richtext_widget_can_disable_other_actions_and_related_controls(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(
+            form_field=field,
+            disabled_actions=(
+                "block",
+                "bold",
+                "color",
+                "link",
+                "table",
+                "source",
+            ),
+        )
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+
+        self.assertNotIn("data-richtext-block", html)
+        self.assertNotIn('data-richtext-action="bold"', html)
+        self.assertNotIn("data-richtext-color", html)
+        self.assertNotIn('data-richtext-action="link"', html)
+        self.assertNotIn("data-richtext-link-dialog", html)
+        self.assertNotIn('data-richtext-action="table"', html)
+        self.assertNotIn("data-richtext-table-menu", html)
+        self.assertNotIn('data-richtext-action="source"', html)
+        self.assertIn('data-richtext-action="italic"', html)
+
     def test_widget_hides_metadata_for_restricted_selected_item(self):
         MediaPickerRoleConfiguration.restrict_qs = lambda queryset, model: (
             queryset.exclude(pk=self.private.pk) if model is Image else queryset
