@@ -10,6 +10,7 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
+from django.template.loader import render_to_string
 from django.test import TestCase, override_settings
 from django.urls import path, reverse
 from django.utils import timezone
@@ -843,6 +844,16 @@ class MediaPickerViewTests(TestCase):
         self.assertNotIn("data-richtext-table-menu", html)
         self.assertNotIn('data-richtext-action="source"', html)
         self.assertIn('data-richtext-action="italic"', html)
+
+    def test_richtext_controls_support_direct_template_include(self):
+        html = render_to_string(
+            "sb_admin/widgets/includes/richtext_controls.html",
+            {"richtext_disabled_actions": "image"},
+        )
+
+        self.assertIn('data-richtext-action="bold"', html)
+        self.assertIn('data-richtext-action="table"', html)
+        self.assertNotIn('data-richtext-action="image"', html)
 
     def test_widget_hides_metadata_for_restricted_selected_item(self):
         MediaPickerRoleConfiguration.restrict_qs = lambda queryset, model: (

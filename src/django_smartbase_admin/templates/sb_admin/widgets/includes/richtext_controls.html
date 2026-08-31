@@ -1,11 +1,12 @@
-{% load i18n %}
+{% load i18n sb_admin_tags %}
+{% sb_admin_richtext_actions richtext_actions richtext_disabled_actions as resolved_richtext_actions %}
 
 <div class="sbadmin-richtext__toolbar" role="toolbar" aria-label="{% trans 'Rich text formatting' %}">
-    {% for action in richtext_actions %}
+    {% for action in resolved_richtext_actions %}
         {% include action.template with action=action %}
     {% endfor %}
 </div>
-{% for action in richtext_actions %}
+{% for action in resolved_richtext_actions %}
     {% if action.dialog_template %}
         {% include action.dialog_template with action=action %}
     {% endif %}
