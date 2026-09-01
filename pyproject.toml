@@ -46,6 +46,8 @@ django-htmx = "^1.17.3"
 # JSON Schema validation server-side for SBAdminJsonEditorField
 jsonschema = "^4.10"
 lzstring = "^1.0.4"
+# HTML sanitization for rich-text submissions and MCP display values.
+nh3 = ">=0.2.15"
 # required for django-filer
 setuptools = "^67.0.0"
 # Optional MCP dependencies: only required when wiring the MCP toolset
@@ -60,8 +62,6 @@ django-mcp-server = {version = "^0.5.7", optional = true}
 # ``from mcp.server import FastMCP`` fails on a fresh install. Cap here
 # until upstream supports 2.x.
 mcp = {version = ">=1.8,<2", optional = true}
-# Allowlist HTML sanitizer for ``fetch_detail`` display values.
-nh3 = {version = ">=0.2.15", optional = true}
 
 [tool.poetry.extras]
 mcp = [
@@ -69,7 +69,6 @@ mcp = [
     "djangorestframework",
     "django-mcp-server",
     "mcp",
-    "nh3",
 ]
 
 [build-system]

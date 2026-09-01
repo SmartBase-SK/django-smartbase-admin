@@ -228,8 +228,11 @@ function filerImage(items, imageClass) {
                     image,
                     updateImage: (element, currentNode) => {
                         const item = items[currentNode.attrs.filerImageId] || {}
-                        element.src = item.original_url || item.thumbnail_url || ''
-                        element.alt = item.label || ''
+                        element.src = item.original_url
+                            || currentNode.attrs.src
+                            || item.thumbnail_url
+                            || ''
+                        element.alt = item.label || currentNode.attrs.alt || ''
                         element.dataset.filerImageId = currentNode.attrs.filerImageId
                     },
                 })

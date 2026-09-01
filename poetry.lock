@@ -986,7 +986,7 @@ ws = ["websockets (>=15.0.1)"]
 name = "nh3"
 version = "0.3.5"
 description = "Python binding to Ammonia HTML sanitizer Rust crate"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "nh3-0.3.5-cp314-cp314t-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:23a312224875f72cd16bde417f49071451877e29ef646a60e50fcb69407cc18a"},
@@ -1806,9 +1806,9 @@ files = [
 ]
 
 [extras]
-mcp = ["django-mcp-server", "django-oauth-toolkit", "djangorestframework", "mcp", "nh3"]
+mcp = ["django-mcp-server", "django-oauth-toolkit", "djangorestframework", "mcp"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "0e477c74d58125440fd0481d9712de6d2e4fcd301f1a217d2c54befef9d393f9"
+content-hash = "7a5465643e65009872c918132a64089692845860c2ebf795a2e56fbaec9f85b7"

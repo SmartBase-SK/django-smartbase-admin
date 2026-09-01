@@ -2,6 +2,7 @@ import json
 import sys
 from html.parser import HTMLParser
 
+import nh3
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
@@ -351,6 +352,36 @@ class _RichTextImageIdParser(HTMLParser):
             self.image_ids.append(image_id)
 
 
+_RICH_TEXT_ALLOWED_ATTRIBUTES = {
+    tag: set(attributes) for tag, attributes in nh3.ALLOWED_ATTRIBUTES.items()
+}
+_RICH_TEXT_ALLOWED_ATTRIBUTES["*"] = {"style"}
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("img", set()).update(
+    {"data-filer-image-id", "loading", "title"}
+)
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("td", set()).add("colwidth")
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("th", set()).add("colwidth")
+
+
+def _sanitize_rich_text(value):
+    """Sanitize submitted HTML while preserving the attributes Tiptap emits.
+
+    The nh3 defaults provide the security allowlist, but omit ``style``, filer image
+    IDs, image metadata, and table ``colwidth``. Those attributes are added above,
+    with CSS still restricted to the three properties supported by this editor.
+    ``link_rel`` is disabled because Tiptap does not emit ``rel`` without ``target``.
+    """
+    if value is None or value == "":
+        return value
+    return nh3.clean(
+        str(value),
+        tags=nh3.ALLOWED_TAGS,
+        attributes=_RICH_TEXT_ALLOWED_ATTRIBUTES,
+        filter_style_properties={"color", "text-align", "width"},
+        link_rel=None,
+    )
+
+
 class SBAdminRichTextWidget(SBAdminTextareaWidget):
     template_name = "sb_admin/widgets/richtext.html"
     button_template = "sb_admin/widgets/includes/richtext/action_button.html"
@@ -474,6 +505,9 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
     def get_request(self):
         return self.request or SBAdminThreadLocalService.get_request()
 
+    def value_from_datadict(self, data, files, name):
+        return _sanitize_rich_text(super().value_from_datadict(data, files, name))
+
     @staticmethod
     def image_ids(value):
         parser = _RichTextImageIdParser()
@@ -527,6 +561,10 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         widget["is_readonly"] = bool(
             widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
         )
+        # The textarea is hidden behind Tiptap, so native required validation cannot
+        # focus it. Django remains responsible for required-field validation and the
+        # surrounding form templates render the resulting bound-field errors.
+        widget["attrs"].pop("required", None)
         widget["disabled_actions"] = self.disabled_actions
         widget["toolbar_actions"] = self.get_toolbar_actions()
         return context

@@ -820,6 +820,62 @@ class MediaPickerViewTests(TestCase):
         self.assertNotIn("data-sb-media-picker-trigger", html)
         self.assertNotIn("picker_type=image", html)
 
+    def test_richtext_widget_sanitizes_submitted_html_on_backend(self):
+        class RichTextForm(forms.Form):
+            content = forms.CharField(required=False, widget=SBAdminRichTextWidget())
+
+        form = RichTextForm(
+            data={
+                "content": (
+                    '<h2 style="text-align:center" onclick="alert(1)">Title</h2>'
+                    '<script>alert("xss")</script>'
+                    '<a href="javascript:alert(1)">Unsafe</a>'
+                    '<img src="/media/image.jpg" data-filer-image-id="12" '
+                    'title="Image" loading="lazy" '
+                    'style="width:100%;position:fixed" onerror="alert(1)">'
+                    '<span style="color:#123abc">Text</span>'
+                )
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        value = form.cleaned_data["content"]
+        self.assertIn('<h2 style="text-align:center">Title</h2>', value)
+        self.assertIn("<a>Unsafe</a>", value)
+        self.assertIn('src="/media/image.jpg"', value)
+        self.assertIn('data-filer-image-id="12"', value)
+        self.assertIn('title="Image"', value)
+        self.assertIn('loading="lazy"', value)
+        self.assertIn('style="width:100%"', value)
+        self.assertIn('style="color:#123abc"', value)
+        self.assertNotIn("script", value)
+        self.assertNotIn("javascript:", value)
+        self.assertNotIn("onclick", value)
+        self.assertNotIn("onerror", value)
+        self.assertNotIn("position", value)
+
+    def test_required_richtext_relies_on_backend_validation(self):
+        class RequiredRichTextForm(forms.Form):
+            content = forms.CharField(required=True, widget=SBAdminRichTextWidget())
+
+        field = RequiredRichTextForm.base_fields["content"]
+        widget = field.widget
+        widget.form_field = field
+
+        html = widget.render(
+            "content",
+            "",
+            attrs={"id": "id_content", "required": True},
+        )
+        textarea_start = html.index("<textarea")
+        textarea_end = html.index(">", textarea_start)
+        textarea_tag = html[textarea_start:textarea_end]
+
+        self.assertNotIn("required", textarea_tag)
+        form = RequiredRichTextForm(data={"content": ""})
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors.as_data()["content"][0].code, "required")
+
     def test_richtext_widget_can_disable_other_actions_and_related_controls(self):
         field = forms.CharField(label="Content", required=False)
         widget = SBAdminRichTextWidget(
