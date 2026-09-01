@@ -379,8 +379,9 @@ class RichTextWidgetController {
         this.editorElement = root.querySelector('[data-richtext-editor]')
         this.readonly = root.dataset.richtextReadonly === 'true'
         this.items = options.items || readItems(root)
-        this.onUpdate = options.onUpdate
-        this.onImage = options.onImage
+        this.onUpdate = null
+        this.onImage = null
+        this.updateOptions(options)
         this.sourceMode = false
         this.editorHasFocused = false
         this.editor = null
@@ -405,6 +406,15 @@ class RichTextWidgetController {
         if (this.readonly) this.initializeEditor()
         else if (lazyEditorObserver) lazyEditorObserver.observe(root)
         else this.initializeEditor()
+    }
+
+    updateOptions(options = {}) {
+        if (Object.prototype.hasOwnProperty.call(options, 'onUpdate')) {
+            this.onUpdate = options.onUpdate
+        }
+        if (Object.prototype.hasOwnProperty.call(options, 'onImage')) {
+            this.onImage = options.onImage
+        }
     }
 
     initializeEditor() {
@@ -723,6 +733,8 @@ class RichTextWidgetController {
 function initializeWidget(root, options = {}) {
     if (!controllers.has(root)) {
         controllers.set(root, new RichTextWidgetController(root, options))
+    } else {
+        controllers.get(root).updateOptions(options)
     }
     return controllers.get(root)
 }
