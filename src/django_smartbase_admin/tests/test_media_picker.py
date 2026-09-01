@@ -876,6 +876,24 @@ class MediaPickerViewTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors.as_data()["content"][0].code, "required")
 
+    def test_richtext_widget_supports_forms_without_auto_id(self):
+        class RichTextForm(forms.Form):
+            content = forms.CharField(required=False, widget=SBAdminRichTextWidget())
+
+        html = str(RichTextForm(auto_id=False)["content"])
+
+        self.assertIn('data-richtext-items-id="id_content-richtext-items"', html)
+        self.assertIn('id="id_content-richtext-items"', html)
+        self.assertNotIn('id="id_content"', html)
+
+    def test_richtext_widget_supports_direct_render_without_id(self):
+        widget = SBAdminRichTextWidget()
+
+        html = widget.render("content", "")
+
+        self.assertIn('data-richtext-items-id="id_content-richtext-items"', html)
+        self.assertIn('id="id_content-richtext-items"', html)
+
     def test_richtext_widget_can_disable_other_actions_and_related_controls(self):
         field = forms.CharField(label="Content", required=False)
         widget = SBAdminRichTextWidget(

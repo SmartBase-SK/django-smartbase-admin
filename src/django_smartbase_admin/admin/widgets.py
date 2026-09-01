@@ -557,7 +557,8 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         context = super().get_context(name, value, attrs)
         widget = context["widget"]
         widget["items"] = self.image_items(value)
-        widget["items_id"] = f"{widget['attrs']['id']}-richtext-items"
+        widget_id = widget["attrs"].get("id") or f"id_{name}"
+        widget["items_id"] = f"{widget_id}-richtext-items"
         widget["is_readonly"] = bool(
             widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
         )
