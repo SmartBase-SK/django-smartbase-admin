@@ -409,12 +409,29 @@ class RichTextWidgetController {
     }
 
     updateOptions(options = {}) {
+        if (options.items && typeof options.items === 'object') {
+            Object.assign(this.items, options.items)
+            this.syncItemsElement()
+            this.refreshFilerImages()
+        }
         if (Object.prototype.hasOwnProperty.call(options, 'onUpdate')) {
             this.onUpdate = options.onUpdate
         }
         if (Object.prototype.hasOwnProperty.call(options, 'onImage')) {
             this.onImage = options.onImage
         }
+    }
+
+    refreshFilerImages() {
+        if (!this.editor) return
+        this.editorElement.querySelectorAll('img[data-filer-image-id]').forEach((image) => {
+            const item = this.items[image.dataset.filerImageId] || {}
+            image.src = item.original_url
+                || image.getAttribute('src')
+                || item.thumbnail_url
+                || ''
+            image.alt = item.label || image.getAttribute('alt') || ''
+        })
     }
 
     initializeEditor() {
