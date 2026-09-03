@@ -387,6 +387,7 @@ class RichTextWidgetController {
         this.editor = null
         this.destroyed = false
         this.initializeEditor = this.initializeEditor.bind(this)
+        this.handleCustomImageClick = this.handleCustomImageClick.bind(this)
         this.handleClick = this.handleClick.bind(this)
         this.handleBlockChange = this.handleBlockChange.bind(this)
         this.handleColorChange = this.handleColorChange.bind(this)
@@ -396,6 +397,7 @@ class RichTextWidgetController {
         this.handleKeydown = this.handleKeydown.bind(this)
         root.addEventListener('pointerenter', this.initializeEditor)
         root.addEventListener('focusin', this.initializeEditor)
+        root.addEventListener('click', this.handleCustomImageClick, true)
         root.addEventListener('click', this.handleClick)
         root.querySelector('[data-richtext-block]')?.addEventListener('change', this.handleBlockChange)
         root.querySelector('[data-richtext-color]')?.addEventListener('input', this.handleColorChange)
@@ -419,6 +421,8 @@ class RichTextWidgetController {
         }
         if (Object.prototype.hasOwnProperty.call(options, 'onImage')) {
             this.onImage = options.onImage
+            this.root.querySelector('[data-richtext-action="image"]')
+                ?.toggleAttribute('data-sb-media-picker-trigger', !this.onImage)
         }
     }
 
@@ -605,6 +609,19 @@ class RichTextWidgetController {
         this.handleMediaSelection({detail: {item}})
     }
 
+    handleCustomImageClick(event) {
+        if (!this.onImage) return
+        const button = event.target.closest('[data-richtext-action="image"]')
+        if (!button || !this.root.contains(button)) return
+
+        // The server-rendered button also triggers HTMX and Bootstrap's built-in picker.
+        // Stop that click before it reaches their target/document listeners when the
+        // embedding integration owns image selection through onImage.
+        event.preventDefault()
+        event.stopPropagation()
+        if (!this.sourceMode && !button.disabled) this.openImagePicker()
+    }
+
     handleMediaSelection(event) {
         const item = event.detail?.item
         const imageId = String(item?.id || '')
@@ -734,6 +751,7 @@ class RichTextWidgetController {
         lazyEditorObserver?.unobserve(this.root)
         this.root.removeEventListener('pointerenter', this.initializeEditor)
         this.root.removeEventListener('focusin', this.initializeEditor)
+        this.root.removeEventListener('click', this.handleCustomImageClick, true)
         this.root.removeEventListener('click', this.handleClick)
         this.root.querySelector('[data-richtext-block]')?.removeEventListener('change', this.handleBlockChange)
         this.root.querySelector('[data-richtext-color]')?.removeEventListener('input', this.handleColorChange)
