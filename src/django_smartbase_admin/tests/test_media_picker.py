@@ -880,10 +880,11 @@ class MediaPickerViewTests(TestCase):
         class RichTextForm(forms.Form):
             content = forms.CharField(required=False, widget=SBAdminRichTextWidget())
 
-        html = str(RichTextForm(auto_id=False)["content"])
+        html = "".join(str(RichTextForm(auto_id=False)["content"]) for _ in range(2))
 
-        self.assertIn('data-richtext-items-id="id_content-richtext-items"', html)
-        self.assertIn('id="id_content-richtext-items"', html)
+        self.assertEqual(html.count('<script type="application/json">'), 2)
+        self.assertNotIn("data-richtext-items-id", html)
+        self.assertNotIn("richtext-items", html)
         self.assertNotIn('id="id_content"', html)
 
     def test_richtext_widget_supports_direct_render_without_id(self):
@@ -891,8 +892,22 @@ class MediaPickerViewTests(TestCase):
 
         html = widget.render("content", "")
 
-        self.assertIn('data-richtext-items-id="id_content-richtext-items"', html)
-        self.assertIn('id="id_content-richtext-items"', html)
+        self.assertIn('<script type="application/json">', html)
+        self.assertNotIn("data-richtext-items-id", html)
+        self.assertNotIn("richtext-items", html)
+
+    def test_richtext_widget_appends_custom_classes_to_internal_classes(self):
+        widget = SBAdminRichTextWidget(attrs={"class": "custom-editor another-class"})
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+        textarea = html[
+            html.index("<textarea") : html.index(">", html.index("<textarea"))
+        ]
+
+        self.assertIn(
+            'class="input sbadmin-richtext__source hidden custom-editor another-class"',
+            textarea,
+        )
 
     def test_richtext_widget_can_disable_other_actions_and_related_controls(self):
         field = forms.CharField(label="Content", required=False)

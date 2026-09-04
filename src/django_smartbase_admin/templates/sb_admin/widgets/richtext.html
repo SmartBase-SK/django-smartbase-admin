@@ -4,7 +4,6 @@
     class="sbadmin-richtext"
     data-sbadmin-richtext
     data-sb-media-picker-consumer
-    data-richtext-items-id="{{ widget.items_id }}"
     data-richtext-readonly="{{ widget.is_readonly|yesno:'true,false' }}"
 >
     {% include 'sb_admin/widgets/includes/field_label.html' %}
@@ -14,5 +13,5 @@
     <div class="sbadmin-richtext__editor" data-richtext-editor></div>
     <textarea name="{{ widget.name }}"{% include "sb_admin/widgets/attrs.html" %}>{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
     {% include 'sb_admin/widgets/includes/help_text.html' %}
-    {{ widget.items|json_script:widget.items_id }}
+    {{ widget.items|json_script }}
 </div>

@@ -338,8 +338,7 @@ function editorExtensions(items, imageClass) {
 }
 
 function readItems(root) {
-    const itemsId = root.dataset.richtextItemsId
-    const element = itemsId ? document.getElementById(itemsId) : null
+    const element = root.querySelector(':scope > script[type="application/json"]')
     return element ? JSON.parse(element.textContent) : {}
 }
 
@@ -473,8 +472,7 @@ class RichTextWidgetController {
     }
 
     syncItemsElement() {
-        const itemsId = this.root.dataset.richtextItemsId
-        const itemsElement = itemsId ? document.getElementById(itemsId) : null
+        const itemsElement = this.root.querySelector(':scope > script[type="application/json"]')
         if (itemsElement) itemsElement.textContent = JSON.stringify(this.items)
     }
 

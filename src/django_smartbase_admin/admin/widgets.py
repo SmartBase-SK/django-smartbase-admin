@@ -486,12 +486,16 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         self.request = None
         self.is_public = is_public
         self.disabled_actions = tuple(disabled_actions)
+        attrs = attrs or {}
         super().__init__(
             form_field=form_field,
             attrs={
-                "class": "input sbadmin-richtext__source hidden",
+                "class": (
+                    f"input sbadmin-richtext__source hidden "
+                    f"{attrs.get('class') or ''}"
+                ).strip(),
                 "rows": 8,
-                **(attrs or {}),
+                **{key: value for key, value in attrs.items() if key != "class"},
             },
         )
 
@@ -557,8 +561,6 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         context = super().get_context(name, value, attrs)
         widget = context["widget"]
         widget["items"] = self.image_items(value)
-        widget_id = widget["attrs"].get("id") or f"id_{name}"
-        widget["items_id"] = f"{widget_id}-richtext-items"
         widget["is_readonly"] = bool(
             widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
         )
