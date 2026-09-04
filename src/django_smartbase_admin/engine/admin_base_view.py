@@ -84,6 +84,11 @@ class SBAdminBaseView(object):
     widgets = None
     widget_views = None
 
+    @staticmethod
+    def get_request_parameter(request, name: str, default=None):
+        """Read routing state from GET, with POST fallback for compatibility."""
+        return request.GET.get(name, request.POST.get(name, default))
+
     def init_view_static(self, configuration, model, admin_site):
         self.admin_site = admin_site
         self.init_widgets_static(configuration)

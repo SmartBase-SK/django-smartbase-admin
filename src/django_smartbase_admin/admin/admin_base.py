@@ -159,7 +159,6 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseListView,
     SBAdminBaseView,
     SBAdminBaseQuerysetMixin,
-    SBADMIN_IS_MODAL_VAR,
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
     SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
@@ -1249,10 +1248,13 @@ class SBAdmin(
             response,
             "sbadmin:modal-change-form-response",
             {
-                "field": request.POST.get("sb_admin_source_field"),
+                "field": cls.get_request_parameter(request, "sb_admin_source_field"),
                 "id": obj.pk,
                 "label": str(obj),
-                "reload": request.POST.get(SBADMIN_RELOAD_ON_SAVE_VAR) == "1",
+                "reload": (
+                    cls.get_request_parameter(request, SBADMIN_RELOAD_ON_SAVE_VAR)
+                    == "1"
+                ),
             },
         )
         trigger_client_event(response, "hideModal", {"elt": "sb-admin-modal"})
@@ -1299,8 +1301,10 @@ class SBAdmin(
     def set_generic_relation_from_parent(cls, request, obj):
         from django_smartbase_admin.admin.site import sb_admin_site
 
-        parent_path = request.POST.get(SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR)
-        parent_pk = request.POST.get(SBADMIN_PARENT_INSTANCE_PK_VAR)
+        parent_path = cls.get_request_parameter(
+            request, SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR
+        )
+        parent_pk = cls.get_request_parameter(request, SBADMIN_PARENT_INSTANCE_PK_VAR)
         if not (parent_path and parent_pk):
             return
 
@@ -1329,7 +1333,7 @@ class SBAdmin(
         obj.object_id = int(parent_pk)
 
     def save_model(self, request, obj, form, change):
-        if self.sbadmin_is_generic_model and SBADMIN_IS_MODAL_VAR in request.POST:
+        if self.sbadmin_is_generic_model and is_modal(request):
             self.set_generic_relation_from_parent(request, obj)
         super().save_model(request, obj, form, change)
 
