@@ -1,5 +1,5 @@
 function richTextItems(root) {
-    const element = document.getElementById(root.dataset.richtextItemsId)
+    const element = root.querySelector(':scope > script[type="application/json"]')
     return element ? JSON.parse(element.textContent) : {}
 }
 
