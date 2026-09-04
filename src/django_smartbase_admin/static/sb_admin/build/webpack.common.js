@@ -16,6 +16,7 @@ const entries = {
     tree_widget: './src/django_smartbase_admin/static/sb_admin/src/js/tree_widget.js',
     tree_widget_style: './src/django_smartbase_admin/static/sb_admin/src/css/tree_widget.css',
     media_picker: './src/django_smartbase_admin/static/sb_admin/src/js/media_picker.js',
+    richtext: './src/django_smartbase_admin/static/sb_admin/src/js/richtext.js',
     calendar_style: './src/django_smartbase_admin/static/sb_admin/src/css/calendar.css',
     modal_view: './src/django_smartbase_admin/static/sb_admin/src/js/modal_view.js',
     sbadmin_formset: './src/django_smartbase_admin/static/sb_admin/src/js/sbadmin_formset.js',

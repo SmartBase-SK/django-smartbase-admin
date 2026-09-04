@@ -98,6 +98,21 @@ def get_item(dictionary, key):
     return dictionary.get(key, None) if dictionary else None
 
 
+@register.simple_tag
+def sb_admin_richtext_actions(actions=None, disabled_actions=None):
+    if actions:
+        return actions
+    if isinstance(disabled_actions, str):
+        disabled_actions = (disabled_actions,)
+
+    # Imported lazily because widgets.py uses SBAdminJSONEncoder from this module.
+    from django_smartbase_admin.admin.widgets import SBAdminRichTextWidget
+
+    return SBAdminRichTextWidget(
+        disabled_actions=disabled_actions or (),
+    ).get_toolbar_actions()
+
+
 @register.simple_tag(takes_context=True)
 def sb_admin_prepopulated_fields_init(context):
     adminform = context.get("adminform")

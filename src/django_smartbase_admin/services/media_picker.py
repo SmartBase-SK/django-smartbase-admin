@@ -374,6 +374,7 @@ class FilerMediaPickerService:
     @classmethod
     def item_data(cls, item: Any) -> dict[str, Any]:
         model_name = item._meta.model_name
+        file = getattr(item, "file", None)
         thumbnail_url = reverse(
             f"sb_admin:filer_{model_name}_fileicon",
             kwargs={
@@ -385,6 +386,7 @@ class FilerMediaPickerService:
             "id": item.pk,
             "name": item.label,
             "thumbnail_url": thumbnail_url,
+            "original_url": file.url if file else "",
             "change_url": cls.change_url(item),
             "size": item._file_size,
             "uploaded_at": item.uploaded_at,

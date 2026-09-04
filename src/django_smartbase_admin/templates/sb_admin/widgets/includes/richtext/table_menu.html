@@ -1,0 +1,14 @@
+{% load i18n %}
+
+<span class="sbadmin-richtext__table-dropdown" data-richtext-table-menu hidden>
+    <button class="btn" type="button" data-richtext-table-menu-trigger title="{{ action.label }}" aria-label="{{ action.label }}" aria-haspopup="menu" aria-expanded="false" aria-pressed="false">
+        <svg aria-hidden="true"><use xlink:href="#Application-menu"></use></svg>
+    </button>
+    <span class="sbadmin-richtext__table-menu-options" data-richtext-table-menu-options role="menu" hidden>
+        <button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="add-table-row">{% trans "Add row below" %}</button>
+        <button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="add-table-column">{% trans "Add column after" %}</button>
+        <button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table-row">{% trans "Delete row" %}</button>
+        <button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table-column">{% trans "Delete column" %}</button>
+        <button class="btn btn-empty" type="button" role="menuitem" data-richtext-action="delete-table">{% trans "Delete table" %}</button>
+    </span>
+</span>

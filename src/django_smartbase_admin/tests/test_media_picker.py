@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
+from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
@@ -9,6 +10,7 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
+from django.template.loader import render_to_string
 from django.test import TestCase, override_settings
 from django.urls import path, reverse
 from django.utils import timezone
@@ -26,6 +28,7 @@ from django_smartbase_admin.admin.site import SBAdminSite, sb_admin_site
 from django_smartbase_admin.admin.widgets import (
     SBAdminFilerImagePickerWidget,
     SBAdminFilerPickerWidget,
+    SBAdminRichTextWidget,
 )
 from django_smartbase_admin.engine.configuration import (
     SBAdminConfigurationBase,
@@ -730,6 +733,217 @@ class MediaPickerViewTests(TestCase):
         self.assertIn("filer/js/dist/admin-file-widget.bundle.js", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.css", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.fa.icons.css", str(widget.media))
+
+    def test_richtext_widget_renders_existing_filer_image_and_media(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(form_field=field)
+        request = self.get_picker(folder=self.folder.pk).wsgi_request
+        widget.init_widget_dynamic(
+            SimpleNamespace(initial={"content": ""}),
+            field,
+            "content",
+            SimpleNamespace(admin_site=sb_admin_site),
+            request,
+        )
+
+        html = widget.render(
+            "content",
+            f'<p>Copy</p><img data-filer-image-id="{self.apple.pk}">',
+            attrs={"id": "id_content"},
+        )
+
+        self.assertIn("data-sbadmin-richtext", html)
+        self.assertIn("data-sb-media-picker-consumer", html)
+        self.assertLess(
+            html.index('<label for="id_content"'),
+            html.index("data-richtext-editor"),
+        )
+        self.assertEqual(html.count("<button") + 1, html.count('class="btn'))
+        self.assertIn('class="btn sbadmin-richtext__color"', html)
+        for icon in (
+            "Text-bold",
+            "Text-italic",
+            "Text-underline",
+            "Background-color",
+            "Align-text-left",
+            "Align-text-center",
+            "Align-text-right",
+            "Align-text-both",
+            "Link",
+            "Add-picture",
+            "Insert-table",
+            "Application-menu",
+            "List-two",
+            "List-numbers",
+            "Indent-left",
+            "Indent-right",
+            "Clear-format",
+            "Code",
+        ):
+            self.assertIn(f'xlink:href="#{icon}"', html)
+        self.assertIn("data-richtext-table-menu", html)
+        self.assertIn("Table options", html)
+        self.assertIn(
+            'class="btn" type="button" data-richtext-table-menu-trigger', html
+        )
+        self.assertIn('data-richtext-action="add-table-row"', html)
+        self.assertIn('data-richtext-action="delete-table"', html)
+        self.assertNotIn('data-richtext-action="undo"', html)
+        self.assertNotIn('data-richtext-action="redo"', html)
+        self.assertIn("Apple", html)
+        self.assertIn('"original_url": ""', html)
+        self.assertIn("picker_type=image", html)
+        self.assertIn("sb_admin/dist/media_picker.js", str(widget.media))
+        self.assertIn("sb_admin/dist/richtext.js", str(widget.media))
+
+    def test_richtext_widget_ignores_filer_ids_that_cannot_be_parsed(self):
+        overlong_id = "9" * 5_000
+
+        self.assertEqual(
+            SBAdminRichTextWidget.image_ids(
+                '<img data-filer-image-id="12">'
+                f'<img data-filer-image-id="{overlong_id}">'
+            ),
+            (12,),
+        )
+
+    def test_richtext_widget_can_disable_image_picker(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(
+            form_field=field,
+            disabled_actions=("image",),
+        )
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+
+        self.assertNotIn('data-richtext-action="image"', html)
+        self.assertNotIn("data-sb-media-picker-trigger", html)
+        self.assertNotIn("picker_type=image", html)
+
+    def test_richtext_widget_sanitizes_submitted_html_on_backend(self):
+        class RichTextForm(forms.Form):
+            content = forms.CharField(required=False, widget=SBAdminRichTextWidget())
+
+        form = RichTextForm(
+            data={
+                "content": (
+                    '<h2 style="text-align:center" onclick="alert(1)">Title</h2>'
+                    '<script>alert("xss")</script>'
+                    '<a href="javascript:alert(1)">Unsafe</a>'
+                    '<img src="/media/image.jpg" data-filer-image-id="12" '
+                    'title="Image" loading="lazy" '
+                    'style="width:100%;position:fixed" onerror="alert(1)">'
+                    '<span style="color:#123abc">Text</span>'
+                )
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        value = form.cleaned_data["content"]
+        self.assertIn('<h2 style="text-align:center">Title</h2>', value)
+        self.assertIn("<a>Unsafe</a>", value)
+        self.assertIn('src="/media/image.jpg"', value)
+        self.assertIn('data-filer-image-id="12"', value)
+        self.assertIn('title="Image"', value)
+        self.assertIn('loading="lazy"', value)
+        self.assertIn('style="width:100%"', value)
+        self.assertIn('style="color:#123abc"', value)
+        self.assertNotIn("script", value)
+        self.assertNotIn("javascript:", value)
+        self.assertNotIn("onclick", value)
+        self.assertNotIn("onerror", value)
+        self.assertNotIn("position", value)
+
+    def test_required_richtext_relies_on_backend_validation(self):
+        class RequiredRichTextForm(forms.Form):
+            content = forms.CharField(required=True, widget=SBAdminRichTextWidget())
+
+        field = RequiredRichTextForm.base_fields["content"]
+        widget = field.widget
+        widget.form_field = field
+
+        html = widget.render(
+            "content",
+            "",
+            attrs={"id": "id_content", "required": True},
+        )
+        textarea_start = html.index("<textarea")
+        textarea_end = html.index(">", textarea_start)
+        textarea_tag = html[textarea_start:textarea_end]
+
+        self.assertNotIn("required", textarea_tag)
+        form = RequiredRichTextForm(data={"content": ""})
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors.as_data()["content"][0].code, "required")
+
+    def test_richtext_widget_supports_forms_without_auto_id(self):
+        class RichTextForm(forms.Form):
+            content = forms.CharField(required=False, widget=SBAdminRichTextWidget())
+
+        html = "".join(str(RichTextForm(auto_id=False)["content"]) for _ in range(2))
+
+        self.assertEqual(html.count('<script type="application/json">'), 2)
+        self.assertNotIn("data-richtext-items-id", html)
+        self.assertNotIn("richtext-items", html)
+        self.assertNotIn('id="id_content"', html)
+
+    def test_richtext_widget_supports_direct_render_without_id(self):
+        widget = SBAdminRichTextWidget()
+
+        html = widget.render("content", "")
+
+        self.assertIn('<script type="application/json">', html)
+        self.assertNotIn("data-richtext-items-id", html)
+        self.assertNotIn("richtext-items", html)
+
+    def test_richtext_widget_appends_custom_classes_to_internal_classes(self):
+        widget = SBAdminRichTextWidget(attrs={"class": "custom-editor another-class"})
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+        textarea = html[
+            html.index("<textarea") : html.index(">", html.index("<textarea"))
+        ]
+
+        self.assertIn(
+            'class="input sbadmin-richtext__source hidden custom-editor another-class"',
+            textarea,
+        )
+
+    def test_richtext_widget_can_disable_other_actions_and_related_controls(self):
+        field = forms.CharField(label="Content", required=False)
+        widget = SBAdminRichTextWidget(
+            form_field=field,
+            disabled_actions=(
+                "block",
+                "bold",
+                "color",
+                "link",
+                "table",
+                "source",
+            ),
+        )
+
+        html = widget.render("content", "", attrs={"id": "id_content"})
+
+        self.assertNotIn("data-richtext-block", html)
+        self.assertNotIn('data-richtext-action="bold"', html)
+        self.assertNotIn("data-richtext-color", html)
+        self.assertNotIn('data-richtext-action="link"', html)
+        self.assertNotIn("data-richtext-link-dialog", html)
+        self.assertNotIn('data-richtext-action="table"', html)
+        self.assertNotIn("data-richtext-table-menu", html)
+        self.assertNotIn('data-richtext-action="source"', html)
+        self.assertIn('data-richtext-action="italic"', html)
+
+    def test_richtext_controls_support_direct_template_include(self):
+        html = render_to_string(
+            "sb_admin/widgets/includes/richtext_controls.html",
+            {"richtext_disabled_actions": "image"},
+        )
+
+        self.assertIn('data-richtext-action="bold"', html)
+        self.assertIn('data-richtext-action="table"', html)
+        self.assertNotIn('data-richtext-action="image"', html)
 
     def test_widget_hides_metadata_for_restricted_selected_item(self):
         MediaPickerRoleConfiguration.restrict_qs = lambda queryset, model: (

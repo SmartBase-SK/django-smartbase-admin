@@ -1,0 +1,15 @@
+{% load i18n %}
+
+<div class="sbadmin-richtext__link-dialog hidden" data-richtext-link-dialog>
+    <button class="btn btn-empty sbadmin-richtext__link-dialog-close" type="button" data-richtext-action="cancel-link" title="{% trans 'Close' %}" aria-label="{% trans 'Close' %}">
+        <svg aria-hidden="true"><use xlink:href="#Close-small"></use></svg>
+    </button>
+    <label>
+        <span class="sbadmin-richtext__link-dialog-label">{% trans "Link URL" %}</span>
+        <input class="input" type="url" data-richtext-link-url>
+    </label>
+    <div class="sbadmin-richtext__link-dialog-actions">
+        <button class="btn btn-primary btn-small" type="button" data-richtext-action="apply-link">{% trans "Apply" %}</button>
+        <button class="btn btn-secondary btn-small" type="button" data-richtext-action="remove-link">{% trans "Remove link" %}</button>
+    </div>
+</div>

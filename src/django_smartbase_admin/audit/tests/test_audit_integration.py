@@ -10,6 +10,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory, TransactionTestCase
+from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.audit.manager import (
     AuditParentContext,
     audit_parent_context,
@@ -214,6 +215,17 @@ class TestAdminCRUD(BaseAuditTest):
         self.assertEqual(log.changes["name"]["new"], "Test Group")
         self.assertEqual(log.snapshot_before, {})
         self.assertIsNotNone(log.request_id)
+
+    def test_create_logs_object_repr_when_str_returns_lazy_proxy(self):
+        group = Group(name=_("New device"))
+
+        with MockSBAdminContext(user=self.admin_user):
+            self.admin.save_model(self.request, group, form=None, change=False)
+
+        log = AdminAuditLog.objects.get(
+            content_type=self.group_ct, action_type="create"
+        )
+        self.assertEqual(log.object_repr, "New device")
 
     def test_update_logs_old_and_new_values(self):
         with NoAdminContext():

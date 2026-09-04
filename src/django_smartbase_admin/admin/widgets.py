@@ -1,6 +1,8 @@
 import json
 import sys
+from html.parser import HTMLParser
 
+import nh3
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
@@ -326,6 +328,249 @@ class SBAdminTextareaWidget(SBAdminBaseWidget, forms.Textarea):
 
     def __init__(self, form_field=None, attrs=None):
         super().__init__(form_field, attrs={"class": "input", **(attrs or {})})
+
+
+def _parse_richtext_image_id(value):
+    if not value or not value.isascii() or not value.isdigit() or value.startswith("0"):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+class _RichTextImageIdParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.image_ids = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.casefold() != "img":
+            return
+        image_id = _parse_richtext_image_id(dict(attrs).get("data-filer-image-id"))
+        if image_id is not None:
+            self.image_ids.append(image_id)
+
+
+_RICH_TEXT_ALLOWED_ATTRIBUTES = {
+    tag: set(attributes) for tag, attributes in nh3.ALLOWED_ATTRIBUTES.items()
+}
+_RICH_TEXT_ALLOWED_ATTRIBUTES["*"] = {"style"}
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("img", set()).update(
+    {"data-filer-image-id", "loading", "title"}
+)
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("td", set()).add("colwidth")
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("th", set()).add("colwidth")
+
+
+def _sanitize_rich_text(value):
+    """Sanitize submitted HTML while preserving the attributes Tiptap emits.
+
+    The nh3 defaults provide the security allowlist, but omit ``style``, filer image
+    IDs, image metadata, and table ``colwidth``. Those attributes are added above,
+    with CSS still restricted to the three properties supported by this editor.
+    ``link_rel`` is disabled because Tiptap does not emit ``rel`` without ``target``.
+    """
+    if value is None or value == "":
+        return value
+    return nh3.clean(
+        str(value),
+        tags=nh3.ALLOWED_TAGS,
+        attributes=_RICH_TEXT_ALLOWED_ATTRIBUTES,
+        filter_style_properties={"color", "text-align", "width"},
+        link_rel=None,
+    )
+
+
+class SBAdminRichTextWidget(SBAdminTextareaWidget):
+    template_name = "sb_admin/widgets/richtext.html"
+    button_template = "sb_admin/widgets/includes/richtext/action_button.html"
+    toolbar_actions = (
+        {
+            "name": "block",
+            "template": "sb_admin/widgets/includes/richtext/block.html",
+        },
+        {"name": "bold", "label": _("Bold"), "icon": "Text-bold"},
+        {"name": "italic", "label": _("Italic"), "icon": "Text-italic"},
+        {
+            "name": "underline",
+            "label": _("Underline"),
+            "icon": "Text-underline",
+        },
+        {
+            "name": "color",
+            "label": _("Text color"),
+            "template": "sb_admin/widgets/includes/richtext/color.html",
+        },
+        {
+            "name": "align-left",
+            "label": _("Align left"),
+            "icon": "Align-text-left",
+        },
+        {
+            "name": "align-center",
+            "label": _("Align center"),
+            "icon": "Align-text-center",
+        },
+        {
+            "name": "align-right",
+            "label": _("Align right"),
+            "icon": "Align-text-right",
+        },
+        {
+            "name": "align-justify",
+            "label": _("Justify"),
+            "icon": "Align-text-both",
+        },
+        {
+            "name": "link",
+            "label": _("Link"),
+            "icon": "Link",
+            "dialog_template": "sb_admin/widgets/includes/richtext/link_dialog.html",
+        },
+        {
+            "name": "image",
+            "label": _("Image"),
+            "icon": "Add-picture",
+            "template": "sb_admin/widgets/includes/richtext/image.html",
+        },
+        {
+            "name": "table",
+            "label": _("Insert table"),
+            "icon": "Insert-table",
+        },
+        {
+            "name": "bullet-list",
+            "label": _("Bulleted list"),
+            "icon": "List-two",
+        },
+        {
+            "name": "ordered-list",
+            "label": _("Numbered list"),
+            "icon": "List-numbers",
+        },
+        {"name": "outdent", "label": _("Outdent"), "icon": "Indent-left"},
+        {"name": "indent", "label": _("Indent"), "icon": "Indent-right"},
+        {
+            "name": "clear",
+            "label": _("Clear formatting"),
+            "icon": "Clear-format",
+        },
+        {"name": "source", "label": _("HTML source"), "icon": "Code"},
+        {
+            "name": "table-menu",
+            "label": _("Table options"),
+            "requires": "table",
+            "template": "sb_admin/widgets/includes/richtext/table_menu.html",
+        },
+    )
+
+    class Media:
+        extend = False
+        js = [
+            "sb_admin/dist/media_picker.js",
+            "sb_admin/dist/richtext.js",
+        ]
+
+    def __init__(
+        self,
+        form_field=None,
+        attrs=None,
+        *,
+        is_public=True,
+        disabled_actions=(),
+    ):
+        self.form = None
+        self.field_name = None
+        self.view = None
+        self.request = None
+        self.is_public = is_public
+        self.disabled_actions = tuple(disabled_actions)
+        attrs = attrs or {}
+        super().__init__(
+            form_field=form_field,
+            attrs={
+                "class": (
+                    f"input sbadmin-richtext__source hidden "
+                    f"{attrs.get('class') or ''}"
+                ).strip(),
+                "rows": 8,
+                **{key: value for key, value in attrs.items() if key != "class"},
+            },
+        )
+
+    def init_widget_dynamic(self, form, form_field, field_name, view, request):
+        super().init_widget_dynamic(form, form_field, field_name, view, request)
+        self.form = form
+        self.field_name = field_name
+        self.view = view
+        self.request = request
+
+    def get_request(self):
+        return self.request or SBAdminThreadLocalService.get_request()
+
+    def value_from_datadict(self, data, files, name):
+        return _sanitize_rich_text(super().value_from_datadict(data, files, name))
+
+    @staticmethod
+    def image_ids(value):
+        parser = _RichTextImageIdParser()
+        parser.feed(str(value or ""))
+        parser.close()
+        return tuple(dict.fromkeys(parser.image_ids))
+
+    def image_items(self, value):
+        image_ids = self.image_ids(value)
+        request = self.get_request()
+        if not image_ids or request is None or not hasattr(request, "request_data"):
+            return {}
+        queryset = FilerMediaPickerService.accessible_item_queryset(
+            request,
+            MEDIA_PICKER_TYPE_IMAGE,
+        ).filter(pk__in=image_ids)
+        if self.is_public is not None:
+            queryset = queryset.filter(is_public=self.is_public)
+        return {
+            str(image.pk): {
+                "label": item["name"],
+                "thumbnail_url": item["thumbnail_url"],
+                "original_url": item["original_url"],
+            }
+            for image in queryset
+            for item in (FilerMediaPickerService.item_data(image),)
+        }
+
+    def get_toolbar_actions(self):
+        disabled_actions = set(self.disabled_actions)
+        actions = []
+        for definition in self.toolbar_actions:
+            if definition["name"] in disabled_actions:
+                continue
+            if definition.get("requires") in disabled_actions:
+                continue
+            action = {"template": self.button_template, **definition}
+            if action["name"] == "image":
+                action["media_picker_url"] = (
+                    f"{reverse('sb_admin:media_picker')}?picker_type=image"
+                    f"&is_public={str(self.is_public).lower()}"
+                )
+            actions.append(action)
+        return tuple(actions)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        widget = context["widget"]
+        widget["items"] = self.image_items(value)
+        widget["is_readonly"] = bool(
+            widget["attrs"].get("readonly") or widget["attrs"].get("disabled")
+        )
+        # The textarea is hidden behind Tiptap, so native required validation cannot
+        # focus it. Django remains responsible for required-field validation and the
+        # surrounding form templates render the resulting bound-field errors.
+        widget["attrs"].pop("required", None)
+        widget["disabled_actions"] = self.disabled_actions
+        widget["toolbar_actions"] = self.get_toolbar_actions()
+        return context
 
 
 class SBAdminEmailInputWidget(
