@@ -27,8 +27,11 @@ export const choicesJSOptions = (choiceInput, options = {}) => ({
             item: (templateOptions, item, removeItemButton) => {
                 const originalItem = Choices.defaults.templates.item.call(this, templateOptions, withSanitizedLabel(item), removeItemButton)
                 if (removeItemButton) {
-                    originalItem.children[0].innerHTML = ''
-                    originalItem.children[0].appendChild(createIcon('Close-small', []))
+                    const removeButton = originalItem.querySelector('[data-button]')
+                    if (removeButton) {
+                        removeButton.innerHTML = ''
+                        removeButton.appendChild(createIcon('Close-small', []))
+                    }
                 }
                 return originalItem
             },
