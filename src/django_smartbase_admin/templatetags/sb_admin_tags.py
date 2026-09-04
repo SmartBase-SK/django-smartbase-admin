@@ -148,6 +148,13 @@ def render_widget(widget, request):
     return widget.render(request)
 
 
+def _render_with_hidden_initial(form_field, attrs=None):
+    rendered = form_field.as_widget(attrs=attrs)
+    if form_field.field.show_hidden_initial:
+        rendered += form_field.as_hidden(only_initial=True)
+    return rendered
+
+
 @register.simple_tag(takes_context=True)
 def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
     request = context["request"]
@@ -159,12 +166,12 @@ def sb_admin_render_form_field(context, form_field, label_as_placeholder=False):
     if label_as_placeholder:
         form_field.field.widget.attrs["placeholder"] = form_field.field.label
         form_field.field.label = None
-    return form_field.as_widget()
+    return _render_with_hidden_initial(form_field)
 
 
 @register.simple_tag
 def sb_admin_render_inline_table_field(form_field):
-    return form_field.as_widget(attrs={"sbadmin_hide_label": True})
+    return _render_with_hidden_initial(form_field, attrs={"sbadmin_hide_label": True})
 
 
 @register.simple_tag

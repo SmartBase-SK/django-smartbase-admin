@@ -1,7 +1,7 @@
 from django import forms
 from django.db import models
 from django.template import Context, Template
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.monkeypatch.admin_readonly_field_monkeypatch import (
@@ -84,6 +84,42 @@ class InlineTableFieldRenderingTests(SimpleTestCase):
         self.assertIn("<label", html)
         self.assertIn("Enabled", html)
         self.assertNotIn("sbadmin_hide_label", html)
+
+    def test_inline_table_field_renders_hidden_initial(self):
+        class ExampleForm(forms.Form):
+            field = forms.CharField(
+                initial=lambda: "initial value",
+                show_hidden_initial=True,
+            )
+
+        html = self.render_inline_table_field(ExampleForm())
+
+        self.assertIn('name="field"', html)
+        self.assertIn('type="hidden"', html)
+        self.assertIn('name="initial-field"', html)
+
+    def test_form_field_renders_hidden_initial(self):
+        class ExampleForm(forms.Form):
+            field = forms.CharField(
+                initial=lambda: "initial value",
+                show_hidden_initial=True,
+            )
+
+        template = Template(
+            "{% load sb_admin_tags %}{% sb_admin_render_form_field form.field %}"
+        )
+        html = template.render(
+            Context(
+                {
+                    "form": ExampleForm(),
+                    "request": RequestFactory().get("/"),
+                }
+            )
+        )
+
+        self.assertIn('name="field"', html)
+        self.assertIn('type="hidden"', html)
+        self.assertIn('name="initial-field"', html)
 
     def test_inline_table_readonly_field_hides_own_label(self):
         form = InlineReadonlyDemoForm(
