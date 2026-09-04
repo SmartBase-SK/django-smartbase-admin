@@ -69,6 +69,7 @@ if TYPE_CHECKING:
 
 SBADMIN_IS_MODAL_VAR = "sbadmin_is_modal"
 SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR = "sbadmin_parent_instance_field"
+SBADMIN_PARENT_INSTANCE_MODEL_VAR = "sbadmin_parent_instance_model"
 SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
 SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
 SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"

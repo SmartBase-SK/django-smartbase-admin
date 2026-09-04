@@ -162,6 +162,7 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
     SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
+    SBADMIN_PARENT_INSTANCE_MODEL_VAR,
     SBADMIN_RELOAD_ON_SAVE_VAR,
 )
 from django_smartbase_admin.engine.const import (
@@ -1301,17 +1302,18 @@ class SBAdmin(
     def set_generic_relation_from_parent(cls, request, obj):
         from django_smartbase_admin.admin.site import sb_admin_site
 
-        parent_path = cls.get_request_parameter(
+        parent_field = cls.get_request_parameter(
             request, SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR
         )
+        parent_model_path = cls.get_request_parameter(
+            request, SBADMIN_PARENT_INSTANCE_MODEL_VAR
+        )
         parent_pk = cls.get_request_parameter(request, SBADMIN_PARENT_INSTANCE_PK_VAR)
-        if not (parent_path and parent_pk):
+        if not (parent_field and parent_model_path and parent_pk):
             return
 
-        # Token: ``modal_<app>_<model>_<field>_<parent_model>``; rsplit
-        # tolerates underscores in app labels / model names.
         try:
-            _, _, app_label, model_name = parent_path.rsplit("_", 3)
+            app_label, model_name = parent_model_path.split(".", 1)
             content_type = ContentType.objects.get(
                 app_label=app_label, model=model_name
             )
@@ -1529,14 +1531,20 @@ class SBAdminInline(
             "add_url": add_url,
         }
         if self.parent_instance:
+            parent_field_name = "{}_{}_id_{}".format(
+                self.model._meta.app_label,
+                self.model._meta.model_name,
+                self.parent_model._meta.model_name,
+            )
+            parent_model_path = "{}.{}".format(
+                self.parent_model._meta.app_label,
+                self.parent_model._meta.model_name,
+            )
             context_data["parent_data"] = {
                 SBADMIN_PARENT_INSTANCE_PK_VAR: self.parent_instance.pk,
                 SBADMIN_PARENT_INSTANCE_LABEL_VAR: str(self.parent_instance),
-                SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: "{}_{}_id_{}".format(
-                    self.model._meta.app_label,
-                    self.model._meta.model_name,
-                    self.parent_model._meta.model_name,
-                ),
+                SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: parent_field_name,
+                SBADMIN_PARENT_INSTANCE_MODEL_VAR: parent_model_path,
             }
         return context_data
 

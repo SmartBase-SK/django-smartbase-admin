@@ -13,6 +13,7 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBADMIN_IS_MODAL_VAR,
     SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR,
     SBADMIN_PARENT_INSTANCE_LABEL_VAR,
+    SBADMIN_PARENT_INSTANCE_MODEL_VAR,
     SBADMIN_PARENT_INSTANCE_PK_VAR,
     SBADMIN_RELOAD_ON_SAVE_VAR,
 )
@@ -76,6 +77,7 @@ class ModalParentContextPersistenceTest(TestCase):
                 SBADMIN_PARENT_INSTANCE_FIELD_NAME_VAR: (
                     "modal_app_attachment_id_parent"
                 ),
+                SBADMIN_PARENT_INSTANCE_MODEL_VAR: "app.parent",
                 SBADMIN_PARENT_INSTANCE_PK_VAR: "42",
                 SBADMIN_PARENT_INSTANCE_LABEL_VAR: "Parent #42",
             }
