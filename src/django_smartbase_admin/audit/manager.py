@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from django.db import transaction
+from django.utils.encoding import force_str
 from django_smartbase_admin.audit.utils.diff import (
     compute_bulk_diff,
     compute_bulk_snapshot,
@@ -206,15 +207,6 @@ def _extract_fk_affected(model, changes: dict) -> list[dict]:
     return affected
 
 
-def _get_object_repr(model, pk) -> str:
-    """Try to get object repr, fallback to ID."""
-    try:
-        obj = model._default_manager.get(pk=pk)
-        return str(obj)
-    except Exception:
-        return f"#{pk}"
-
-
 def _get_request_id() -> uuid.UUID | None:
     """
     Get or create a request_id to group changes from the same request.
@@ -239,10 +231,21 @@ def _get_request_id() -> uuid.UUID | None:
         return None
 
 
+def _safe_str(obj, limit: int = 255) -> str:
+    """Return a bounded string even if ``__str__`` returns a lazy proxy."""
+    try:
+        return force_str(type(obj).__str__(obj))[:limit]
+    except Exception:
+        try:
+            return f"{obj._meta.verbose_name} #{obj.pk}"
+        except Exception:
+            return ""
+
+
 def _get_object_repr(model, object_id) -> str:
     try:
         obj = model._default_manager.get(pk=object_id)
-        return str(obj)[:255]
+        return _safe_str(obj)
     except Exception:
         return f"{model.__name__} #{object_id}"
 
@@ -488,7 +491,7 @@ def audited_qs_update(self, **kwargs):
                         action_type="update",
                         model=model,
                         object_id=str(pk),
-                        object_repr=str(obj),
+                        object_repr=_safe_str(obj),
                         snapshot_before=before,
                         changes=changes,
                     )
@@ -534,7 +537,7 @@ def audited_qs_delete(self):
             for obj in self.all():
                 pks.append(str(obj.pk))
                 data = serialize_instance(obj)
-                data["__repr__"] = str(obj)[:255]
+                data["__repr__"] = _safe_str(obj)
                 objects_before.append(data)
     except Exception:
         logger.debug(
@@ -745,7 +748,7 @@ def audited_model_save(self, *args, **kwargs):
                     action_type="create",
                     model=model,
                     object_id=str(self.pk),
-                    object_repr=str(self),
+                    object_repr=_safe_str(self),
                     snapshot_before={},
                     changes=changes,
                 )
@@ -758,7 +761,7 @@ def audited_model_save(self, *args, **kwargs):
                     action_type="update",
                     model=model,
                     object_id=str(self.pk),
-                    object_repr=str(self),
+                    object_repr=_safe_str(self),
                     snapshot_before=before,
                     changes=changes,
                 )
@@ -782,7 +785,7 @@ def audited_model_delete(self, *args, **kwargs):
     try:
         with transaction.atomic():
             before = serialize_instance(self)
-            obj_repr = str(self)[:255]
+            obj_repr = _safe_str(self)
     except Exception:
         logger.debug(
             "Audit: Could not capture object before delete for %s",
