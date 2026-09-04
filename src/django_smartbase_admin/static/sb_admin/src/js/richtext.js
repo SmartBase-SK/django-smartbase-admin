@@ -19,14 +19,21 @@ const DEFAULT_IMAGE_WIDTH = '100%'
 const MEDIA_PICKER_SELECTED_EVENT = 'sbadmin:media-picker:selected'
 const SET_VALUE_EVENT = 'sbadmin:richtext:set-value'
 const WIDGET_SELECTOR = '[data-sbadmin-richtext]'
-const controllers = new WeakMap()
-const lazyEditorObserver = 'IntersectionObserver' in window
-    ? new IntersectionObserver((entries) => {
+const RICH_TEXT_STATE_KEY = Symbol.for('django-smartbase-admin.richtext')
+const richTextState = window[RICH_TEXT_STATE_KEY] || {
+    controllers: new WeakMap(),
+    lazyEditorObserver: null,
+    bootstrapInstalled: false,
+}
+window[RICH_TEXT_STATE_KEY] = richTextState
+const controllers = richTextState.controllers
+const lazyEditorObserver = richTextState.lazyEditorObserver
+    || ('IntersectionObserver' in window ? new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
             if (entry.isIntersecting) controllers.get(entry.target)?.initializeEditor?.()
         })
-    }, {rootMargin: '200px'})
-    : null
+    }, {rootMargin: '200px'}) : null)
+richTextState.lazyEditorObserver = lazyEditorObserver
 
 function sanitizeImageWidth(value) {
     const match = String(value || '').trim().match(IMAGE_WIDTH_PATTERN)
@@ -790,19 +797,26 @@ window.SBAdminRichText = Object.freeze({
     initializeWidget,
 })
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initializeWidgets(), {once: true})
+if (!richTextState.bootstrapInstalled) {
+    richTextState.bootstrapInstalled = true
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => initializeWidgets(), {once: true})
+    } else {
+        initializeWidgets()
+    }
+
+    document.addEventListener('formset:added', (event) => initializeWidgets(event.target))
+    document.addEventListener('htmx:beforeSwap', (event) => {
+        const target = event.detail?.target
+        if (!target) return
+        const roots = []
+        if (target.matches?.(WIDGET_SELECTOR)) roots.push(target)
+        roots.push(...target.querySelectorAll?.(WIDGET_SELECTOR) || [])
+        roots.forEach((root) => controllers.get(root)?.destroy())
+    })
+    document.addEventListener('htmx:afterSwap', (event) => initializeWidgets(event.detail?.elt || document))
 } else {
+    // A repeated media bundle may be evaluated after new form markup was inserted.
+    // The shared registry makes this scan safe while ensuring each root has one controller.
     initializeWidgets()
 }
-
-document.addEventListener('formset:added', (event) => initializeWidgets(event.target))
-document.addEventListener('htmx:beforeSwap', (event) => {
-    const target = event.detail?.target
-    if (!target) return
-    const roots = []
-    if (target.matches?.(WIDGET_SELECTOR)) roots.push(target)
-    roots.push(...target.querySelectorAll?.(WIDGET_SELECTOR) || [])
-    roots.forEach((root) => controllers.get(root)?.destroy())
-})
-document.addEventListener('htmx:afterSwap', (event) => initializeWidgets(event.detail?.elt || document))
