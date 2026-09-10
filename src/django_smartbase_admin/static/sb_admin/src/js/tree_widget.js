@@ -397,6 +397,14 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             initAllTrees()
         })
 
+        document.addEventListener('htmx:afterSwap', () => {
+            initAllTrees()
+        })
+
+        document.addEventListener('htmx:oobAfterSwap', () => {
+            initAllTrees()
+        })
+
         const queryBuilderEl$ = $(".query-builder-advanced")
         queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function () {
             setTimeout(() => {
