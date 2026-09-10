@@ -373,8 +373,8 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             })
         }
 
-        const initAllTrees = function () {
-            $('.js-tree-widget').each(function (index, element) {
+        const initAllTrees = function (root = document) {
+            $(root).find('.js-tree-widget').addBack('.js-tree-widget').each(function (index, element) {
                 const $treeEl = $(element)
                 if ($treeEl.hasClass('fancytree-container') || element.closest('.djn-empty-form')) {
                     return
@@ -393,23 +393,24 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
         }
         initAllTrees()
 
-        document.addEventListener('formset:added', () => {
-            initAllTrees()
+        document.addEventListener('formset:added', (event) => {
+            initAllTrees(event.target)
         })
 
-        document.addEventListener('htmx:afterSwap', () => {
-            initAllTrees()
+        document.addEventListener('htmx:afterSwap', (event) => {
+            initAllTrees(event.detail && event.detail.elt)
         })
 
-        document.addEventListener('htmx:oobAfterSwap', () => {
-            initAllTrees()
+        document.addEventListener('htmx:oobAfterSwap', (event) => {
+            initAllTrees(event.detail && event.detail.elt)
         })
 
         const queryBuilderEl$ = $(".query-builder-advanced")
         queryBuilderEl$.on("afterCreateRuleInput.queryBuilder", function () {
+            const builder = this
             setTimeout(() => {
                 //next tick
-                initAllTrees()
+                initAllTrees(builder)
             }, 0)
         })
     })
