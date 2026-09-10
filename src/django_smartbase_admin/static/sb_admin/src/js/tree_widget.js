@@ -1,4 +1,5 @@
 import {sanitizeHtml} from './sanitize'
+import {SBADMIN_INIT_TREES_EVENT} from './utils'
 
 const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
     let value = $inputEl.val()
@@ -397,12 +398,8 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
             initAllTrees(event.target)
         })
 
-        document.addEventListener('htmx:afterSwap', (event) => {
-            initAllTrees(event.detail && event.detail.elt)
-        })
-
-        document.addEventListener('htmx:oobAfterSwap', (event) => {
-            initAllTrees(event.detail && event.detail.elt)
+        document.addEventListener(SBADMIN_INIT_TREES_EVENT, (event) => {
+            initAllTrees(event.detail && event.detail.target)
         })
 
         const queryBuilderEl$ = $(".query-builder-advanced")
