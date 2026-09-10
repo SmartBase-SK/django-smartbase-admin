@@ -32,7 +32,7 @@ import Autocomplete from "./autocomplete"
 import StaticAutocomplete from "./static_autocomplete"
 import ChoicesJS from "./choices"
 import TextTags from "./text_tags"
-import { ensureFilterForms, setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
+import { SBADMIN_INIT_TREES_EVENT, ensureFilterForms, setCookie, setDropdownLabel, shouldProcessAfterSwap } from "./utils"
 import Multiselect from "./multiselect"
 import Radio from "./radio"
 import "./inline_paginator"
@@ -82,6 +82,7 @@ class Main {
                 this.initTooltips(target)
                 this.syncEmptyFieldsets(target)
                 this.scheduleScrollToFirstErrorField(target)
+                document.dispatchEvent(new CustomEvent(SBADMIN_INIT_TREES_EVENT, {detail: {target: target}}))
             }
             window.htmx.on("htmx:afterSwap", (event) => {
                 if (!shouldProcessAfterSwap(event)) {

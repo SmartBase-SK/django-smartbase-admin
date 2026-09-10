@@ -1,5 +1,7 @@
 import {sanitizeHtml} from './sanitize'
 
+export const SBADMIN_INIT_TREES_EVENT = 'SBAdminInitTrees'
+
 export const createIcon = (iconId, classes = ['w-24', 'h-24']) => {
     const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svgEl.classList.add(...classes)
