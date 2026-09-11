@@ -1,5 +1,5 @@
 import {sanitizeHtml} from './sanitize'
-import {SBADMIN_INIT_TREES_EVENT} from './utils'
+import {SBADMIN_INIT_TREES_EVENT, syncDropdownMenuWidth} from './utils'
 
 const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
     let value = $inputEl.val()
@@ -382,6 +382,11 @@ const loadValue = function ($inputEl, treeWidgetData, treeInstance) {
                 }
                 const $dropdownMenu = $treeEl.closest('.dropdown-menu')
                 if ($dropdownMenu.length > 0) {
+                    const wrapperEl = $treeEl.closest('.tree-widget-wrapper')[0]
+                    const toggleEl = $dropdownMenu.prev()[0]
+                    if (wrapperEl && toggleEl) {
+                        syncDropdownMenuWidth(wrapperEl, toggleEl)
+                    }
                     const initTreeOnShow = function () {
                         initTree($treeEl)
                         $dropdownMenu.prev().off('show.bs.dropdown', initTreeOnShow)
