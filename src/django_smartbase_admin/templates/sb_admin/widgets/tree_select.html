@@ -2,15 +2,15 @@
 
 <div class="relative">
     {% include 'sb_admin/widgets/includes/field_label.html' %}
-    <div id="{{ widget.attrs.id }}-wrapper" class="tree-widget-wrapper">
-        <input type="hidden" id="{{ widget.attrs.id }}" name="{{ widget.name }}"{% if widget.raw_value %} value="{{ widget.raw_value|get_json }}"{% endif %}>
+    <div id="{{ widget.attrs.id }}-wrapper" class="tree-widget-wrapper"{% if filter_widget.full_width %} data-autocomplete-full-width="true"{% endif %}>
+        <input type="hidden" id="{{ widget.attrs.id }}" name="{{ widget.name }}"{% if widget.raw_value %} value="{% if filter_widget.multiselect %}{{ widget.raw_value|get_json }}{% else %}{{ widget.raw_value }}{% endif %}"{% endif %}>
         <button
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
                 data-bs-offset="[0, 8]"
                 class="btn px-10 font-normal w-full"
         >
-            <span id="{{ widget.attrs.id }}_label">{% get_item widget.value_dict widget.raw_value widget.form_field.empty_label %}</span>
+            <span id="{{ widget.attrs.id }}_label">{% for item in widget.value_list %}{{ item.label }}{% if not forloop.last %}, {% endif %}{% empty %}{{ widget.form_field.empty_label|default:"---------" }}{% endfor %}</span>
             <svg class="ml-8">
                 <use xlink:href="#Down"></use>
             </svg>

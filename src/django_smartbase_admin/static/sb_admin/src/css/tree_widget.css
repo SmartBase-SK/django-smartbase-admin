@@ -4,6 +4,11 @@
     width: auto;
 }
 
+/* full_width=True: JS sets the exact width, the 480px minimum must not win */
+.tree-widget-wrapper[data-autocomplete-full-width='true'] > .dropdown-menu {
+    min-width: 0;
+}
+
 .fancytree-ext-table {
     @apply text-14 h-full text-dark-900;
     >thead {
