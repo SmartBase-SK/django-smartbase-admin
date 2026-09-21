@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from django import forms
 from django.apps import apps
-from django.db.models import Case, When, F, Value, CharField
+from django.db.models import Case, When, F, Value, CharField, Count
 from django.db.models.functions import Concat
 from django.forms import modelform_factory
 from django.http import HttpResponse
@@ -159,7 +159,20 @@ class ModelTranslationView(
             for model_field in translated_fields:
                 if not self.fields or model_field.name in self.fields:
                     field = self.auto_create_field_from_model_field(model_field)
-                    field.field = f"{main_lang_annotate_name}__{model_field.name}"
+                    translation_field = f"{main_lang_annotate_name}__{model_field.name}"
+                    if model_field.many_to_many or model_field.one_to_many:
+                        field.field = f"{main_lang_annotate_name}_{model_field.name}"
+                        field.filter_field = translation_field
+                        field.annotate = Concat(
+                            Count(translation_field, distinct=True),
+                            Value(" - "),
+                            Value(
+                                str(model_field.related_model._meta.verbose_name_plural)
+                            ),
+                            output_field=CharField(),
+                        )
+                    else:
+                        field.field = translation_field
                     fields.append(field)
 
         for translation_model, translated_fields in translated_fields_dict.items():

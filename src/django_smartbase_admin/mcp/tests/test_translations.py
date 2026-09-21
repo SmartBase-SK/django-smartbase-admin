@@ -152,6 +152,11 @@ class TranslationMCPTests(TransactionTestCase):
         super().tearDown()
 
     def test_translation_view_is_discoverable_and_listable(self):
+        english_translation = MCPTranslatedArticleTranslation.objects.get(
+            master=self.article,
+            language_code="en",
+        )
+        english_translation.tags.set([self.first_tag, self.second_tag])
         view = self.tools.request.request_data.configuration.view_map[self.view_id]
         self.assertIs(
             SBAdminMCPDetailService.for_view(view),
@@ -166,14 +171,25 @@ class TranslationMCPTests(TransactionTestCase):
         field_names = {field["name"] for field in entry["fields"]}
         source_title_key = f"{self.translation_table}_en__title"
         self.assertIn("title", field_names)
+        self.assertIn("tags", field_names)
         self.assertIn(f"{self.translation_table}_de_status", field_names)
         self.assertIn(f"{self.translation_table}_fr_status", field_names)
 
-        result = self.tools.list_rows(view_id=self.view_id, fields=["title"])
+        result = self.tools.list_rows(
+            view_id=self.view_id,
+            fields=["title", "tags"],
+            filter_data={
+                "tags": [{"value": self.first_tag.pk, "label": "First"}],
+            },
+        )
         self.assertEqual(result["last_row"], 1)
         self.assertIn("title", result["data"][0], result)
         self.assertNotIn(source_title_key, result["data"][0], result)
         self.assertEqual(result["data"][0]["title"], "Source title")
+        self.assertEqual(
+            result["data"][0]["tags"],
+            f"2 - {MCPTranslationTag._meta.verbose_name_plural}",
+        )
 
     def test_fetch_and_update_translation_components(self):
         detail = self.tools.fetch_detail(self.view_id, str(self.article.pk))
