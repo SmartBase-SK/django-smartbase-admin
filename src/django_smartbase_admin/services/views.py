@@ -366,21 +366,23 @@ class SBAdminViewService(object):
                             else value
                         )
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
-        for (
-            translation_model,
-            translated_fields,
-        ) in SBAdminTranslationsService.get_translated_fields_for_model(
-            model, visible_fields=visible_fields
-        ).items():
-            annotate_name = f"{SBAdminTranslationsService.get_translations_key(translation_model)}_{main_language_code}"
-            lang_annotates[annotate_name] = FilteredRelation(
-                model._parler_meta[translation_model].rel_name,
-                condition=Q(translations__language_code=main_language_code),
-            )
-            for model_field in translated_fields:
-                lang_annotates[model_field.name] = F(
-                    f"{annotate_name}__{model_field.name}"
+        translated_value_names = visible_fields if fields else values
+        if translated_value_names:
+            for (
+                translation_model,
+                translated_fields,
+            ) in SBAdminTranslationsService.get_translated_fields_for_model(
+                model, visible_fields=translated_value_names
+            ).items():
+                annotate_name = f"{SBAdminTranslationsService.get_translations_key(translation_model)}_{main_language_code}"
+                lang_annotates[annotate_name] = FilteredRelation(
+                    model._parler_meta[translation_model].rel_name,
+                    condition=Q(translations__language_code=main_language_code),
                 )
+                for model_field in translated_fields:
+                    lang_annotates[model_field.name] = F(
+                        f"{annotate_name}__{model_field.name}"
+                    )
         return {**lang_annotates, **field_annotates}
 
     @classmethod

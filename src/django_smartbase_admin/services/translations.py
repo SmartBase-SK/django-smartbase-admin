@@ -1,5 +1,15 @@
 from django.conf import settings
-from django.db.models import Value, IntegerField, Q, When, Case, FilteredRelation, F
+from django.db.models import (
+    Case,
+    Exists,
+    F,
+    FilteredRelation,
+    IntegerField,
+    OuterRef,
+    Q,
+    Value,
+    When,
+)
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
@@ -66,7 +76,9 @@ class SBAdminTranslationsService(object):
                     field_val_bool = str(f"{annotate_name}_{model_field.name}_bool")
                     annotates[field_val_bool] = Case(
                         When(
-                            cls.get_translation_field_value_condition(
+                            cls.get_translation_field_value_expression(
+                                translation_model,
+                                language_code,
                                 annotate_name,
                                 model_field,
                             ),
@@ -84,6 +96,25 @@ class SBAdminTranslationsService(object):
                 annotates[f"{annotate_name}_count"] = field_val_bools
         queryset = queryset.annotate(**annotates)
         return queryset
+
+    @classmethod
+    def get_translation_field_value_expression(
+        cls,
+        translation_model,
+        language_code,
+        annotate_name,
+        model_field,
+    ):
+        if model_field.many_to_many or model_field.one_to_many:
+            return Exists(
+                translation_model._base_manager.filter(
+                    master_id=OuterRef("pk"),
+                    language_code=language_code,
+                    **{f"{model_field.name}__isnull": False},
+                )
+            )
+
+        return cls.get_translation_field_value_condition(annotate_name, model_field)
 
     @classmethod
     def get_translation_field_value_condition(cls, annotate_name, model_field):

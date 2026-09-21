@@ -255,6 +255,26 @@ class TranslationMCPTests(TransactionTestCase):
             [self.second_tag.pk],
         )
 
+    def test_many_to_many_translation_status_does_not_duplicate_list_rows(self):
+        english_translation = MCPTranslatedArticleTranslation.objects.get(
+            master=self.article,
+            language_code="en",
+        )
+        english_translation.tags.set([self.first_tag, self.second_tag])
+        self.german_translation.tags.set([self.first_tag, self.second_tag])
+        source_title = f"{self.translation_table}_en__title"
+
+        result = self.tools.list_rows(
+            view_id=self.view_id,
+            fields=[source_title],
+            page_size=1,
+        )
+
+        self.assertEqual(result["last_row"], 1)
+        self.assertEqual(result["last_page"], 1)
+        self.assertEqual(len(result["data"]), 1)
+        self.assertEqual(result["data"][0][source_title], "Source title")
+
     def test_browser_detail_uses_shared_translation_forms(self):
         request = self.tools.request
         view = request.request_data.configuration.view_map[self.view_id]
