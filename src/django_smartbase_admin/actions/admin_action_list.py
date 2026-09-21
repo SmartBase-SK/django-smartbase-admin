@@ -904,20 +904,20 @@ class SBAdminListAction(SBAdminAction):
 
         # Resolve group targets the same way; a computed (annotated) group
         # column needs its expression present before ``.values()``.
-        # Keep the caller-facing group key (the declared name they grouped by)
-        # separate from the ORM target. They diverge when a declared field's
-        # public name differs from its DB column — e.g. an ``id_alias`` method
+        # Keep the caller-facing group key (the browser data key they grouped by)
+        # separate from the ORM target. They diverge when an annotated field's
+        # data key differs from its DB column — e.g. an ``id_alias_annt`` method
         # field backed by ``@admin.display(ordering="id")`` resolves to ``id``.
         # ``group_targets`` drives ``.values()`` / ``order_by`` / dedup; the
-        # response ``group`` dict is keyed by ``group_keys`` so
-        # ``group_by=["id_alias"]`` comes back under ``id_alias``, not ``id``.
+        # response ``group`` dict is keyed by ``group_keys`` so an annotated
+        # column comes back under its data key, not its underlying ORM target.
         group_keys: list[str] = []
         group_targets: list[str] = []
         for field in group_fields:
             target = (
                 field.model_field.name if field.model_field is not None else field.field
             )
-            group_keys.append(field.name)
+            group_keys.append(field.field)
             group_targets.append(target)
             if (
                 field.model_field is None

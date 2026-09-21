@@ -63,6 +63,11 @@ class FolderPresetTestAdmin(SBAdmin):
                 choices=[("alpha", "Alpha"), ("beta", "Beta")]
             ),
         ),
+        SBAdminField(
+            name="parent",
+            annotate=F("parent__name"),
+            filter_field="parent",
+        ),
     )
     sbadmin_list_view_config = [
         {
@@ -93,6 +98,14 @@ class FolderPresetTestAdmin(SBAdmin):
             "url_params": {
                 "filterData": {
                     "status": '[{"value": "alpha", "label": "Alpha"}]',
+                }
+            },
+        },
+        {
+            "name": "By parent",
+            "url_params": {
+                "filterData": {
+                    "parent": [{"value": 1, "label": "Parent"}],
                 }
             },
         },
@@ -194,8 +207,8 @@ class FetchFilterPresetTests(TestCase):
         decoded_status = tools.fetch_filter_preset(
             view_id="filer_folder", name="By status", source="static"
         )
-        # The key is surfaced as the column ``name`` (here name == filter_field
-        # == "status"), the single identifier the agent uses everywhere else;
+        # The key is surfaced as the column data key (here it also equals
+        # filter_field == "status"), the identifier the agent uses everywhere;
         # on replay list_rows normalizes it back to the filter_field. Key
         # round-tripping when they differ is covered in test_filter_validation.
         self.assertEqual(
@@ -212,4 +225,15 @@ class FetchFilterPresetTests(TestCase):
         self.assertEqual(
             decoded_str["filter_data"],
             {"status": [{"value": "alpha", "label": "Alpha"}]},
+        )
+
+        # 8. Presets are stored under the internal filter_field, but the
+        # fetched payload uses the same browser data key as list_admins and
+        # list_rows. The configured name is not exposed as a legacy alias.
+        decoded_parent = tools.fetch_filter_preset(
+            view_id="filer_folder", name="By parent", source="static"
+        )
+        self.assertEqual(
+            decoded_parent["filter_data"],
+            {"parent_annt": [{"value": 1, "label": "Parent"}]},
         )

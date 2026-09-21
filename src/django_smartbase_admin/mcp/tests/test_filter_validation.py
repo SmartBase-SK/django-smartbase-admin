@@ -103,59 +103,58 @@ class FilterValidationTests(TestCase):
         self.assertIn("start", shape["value_shape"])
         self.assertEqual(shape["example"], ["2026-06-01", "2026-06-30"])
 
-    def test_filter_key_normalization_round_trips_name_and_filter_field(self):
-        """The agent uses one identifier — the column ``name`` — everywhere.
-        ``_normalize_filter_keys`` accepts a column ``name`` (or a raw
-        ``filter_field``) on input and re-keys to ``filter_field`` for the
-        pipeline; ``_filter_keys_to_names`` is its inverse, used to hand a
-        decoded preset back in column-``name`` terms so the agent never meets
+    def test_filter_key_normalization_round_trips_data_key_and_filter_field(self):
+        """The agent uses one identifier — ``field.field`` — everywhere.
+        ``_normalize_filter_keys`` accepts a column data key and re-keys it to
+        ``filter_field`` for the
+        pipeline; ``_filter_keys_to_data_keys`` is its inverse, used to hand a
+        decoded preset back in data-key terms so the agent never meets
         a ``filter_field`` it can't find in the schema."""
         from types import SimpleNamespace
 
         from django_smartbase_admin.mcp.mcp import (
-            _filter_keys_to_names,
+            _filter_keys_to_data_keys,
             _normalize_filter_keys,
         )
 
-        # Column name differs from its filter_field; another column has no
-        # explicit filter_field (falls back to its own name).
+        # The first column's data key differs from both its configured name
+        # and filter_field; the second falls back to its own data key.
         field_map = {
-            "closed": SimpleNamespace(filter_field="status__is_closed"),
+            "closed_annt": SimpleNamespace(filter_field="status__is_closed"),
             "name": SimpleNamespace(filter_field=None),
         }
         v = ["x"]
 
-        # Input normalization: name | filter_field | unknown.
+        # Input normalization: data key only. Neither the internal
+        # filter_field nor the old configured name is a public alias.
         self.assertEqual(
-            _normalize_filter_keys({"closed": v}, field_map),
-            {"status__is_closed": v},  # name -> filter_field
+            _normalize_filter_keys({"closed_annt": v}, field_map),
+            {"status__is_closed": v},
         )
-        self.assertEqual(
-            _normalize_filter_keys({"status__is_closed": v}, field_map),
-            {"status__is_closed": v},  # exact filter_field left untouched
-        )
+        with self.assertRaises(ValueError):
+            _normalize_filter_keys({"status__is_closed": v}, field_map)
         self.assertEqual(
             _normalize_filter_keys({"name": v}, field_map),
-            {"name": v},  # filter_field falls back to the column name
+            {"name": v},
         )
-        self.assertEqual(
-            _normalize_filter_keys({"nope": v}, field_map),
-            {"nope": v},  # unknown passes through to be reported downstream
-        )
+        with self.assertRaises(ValueError):
+            _normalize_filter_keys({"closed": v}, field_map)
+        with self.assertRaises(ValueError):
+            _normalize_filter_keys({"nope": v}, field_map)
         self.assertIsNone(_normalize_filter_keys(None, field_map))
 
-        # Inverse (preset output): filter_field -> column name, and a
+        # Inverse (preset output): filter_field -> data key, and a
         # filter_field with no matching column is left as-is.
         self.assertEqual(
-            _filter_keys_to_names({"status__is_closed": v}, field_map),
-            {"closed": v},
+            _filter_keys_to_data_keys({"status__is_closed": v}, field_map),
+            {"closed_annt": v},
         )
         self.assertEqual(
-            _filter_keys_to_names({"unmapped": v}, field_map), {"unmapped": v}
+            _filter_keys_to_data_keys({"unmapped": v}, field_map), {"unmapped": v}
         )
-        # Round trip: a preset key surfaced as a name normalizes back to the
+        # Round trip: a preset key surfaced as a data key normalizes back to the
         # same filter_field on replay.
-        surfaced = _filter_keys_to_names({"status__is_closed": v}, field_map)
+        surfaced = _filter_keys_to_data_keys({"status__is_closed": v}, field_map)
         self.assertEqual(
             _normalize_filter_keys(surfaced, field_map), {"status__is_closed": v}
         )

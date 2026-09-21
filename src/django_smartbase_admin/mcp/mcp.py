@@ -115,7 +115,7 @@ def _widgets_by_filter_field(admin, request, field_map=None) -> dict:
         widget = getattr(field, "filter_widget", None)
         if widget is None:
             continue
-        mapping[getattr(field, "filter_field", None) or field.name] = widget
+        mapping[getattr(field, "filter_field", None) or field.field] = widget
     return mapping
 
 
@@ -138,55 +138,62 @@ def _validate_filter_data(
         widgets[key].validate_value(value)
 
 
+def _fields_by_data_key(field_map) -> dict:
+    """Index initialized list fields by the key used in browser row data."""
+    return {field.field: field for field in (field_map or {}).values()}
+
+
 def _normalize_filter_keys(filter_data: dict | None, field_map) -> dict | None:
     """Re-key ``filter_data`` to the ``filter_field`` the list pipeline uses,
-    accepting either a column ``name`` (the same identifier ``fields`` and
-    ``sort`` take) or the ``filter_field`` itself.
+    accepting column data keys (the same ``field.field`` identifier ``fields``
+    and ``sort`` take).
 
-    This lets the agent use one identifier — the column name — everywhere,
-    instead of tracking that a column's filter key often differs. An exact
-    ``filter_field`` match wins, so saved presets (whose keys are already
-    ``filter_field``) replay unchanged and a column name that happens to
-    collide with another column's filter_field stays unambiguous.
-    Unrecognised keys pass through so ``_validate_filter_data`` reports them.
+    This lets the agent use one identifier — the column data key — everywhere,
+    instead of tracking that a column's internal filter key often differs.
+    Stored presets are converted back to data keys before they leave
+    ``fetch_filter_preset``; raw ``filter_field`` keys are not a public alias.
     """
     if not filter_data:
         return filter_data
-    name_to_filter = {
-        name: (getattr(f, "filter_field", None) or name)
-        for name, f in (field_map or {}).items()
+    data_key_to_filter = {
+        data_key: (getattr(field, "filter_field", None) or data_key)
+        for data_key, field in (field_map or {}).items()
     }
-    filter_fields = set(name_to_filter.values())
+    unknown = [key for key in filter_data if key not in data_key_to_filter]
+    if unknown:
+        raise ValueError(
+            f"Unknown filter key(s) {unknown!r}. "
+            f"Known list fields: {sorted(data_key_to_filter)}"
+        )
     normalized: dict = {}
     for key, value in filter_data.items():
-        if key in filter_fields:
-            normalized[key] = value
-        elif key in name_to_filter:
-            normalized[name_to_filter[key]] = value
-        else:
-            normalized[key] = value
+        normalized[data_key_to_filter[key]] = value
     return normalized
 
 
-def _filter_keys_to_names(filter_data: dict | None, field_map) -> dict | None:
+def _filter_keys_to_data_keys(filter_data: dict | None, field_map) -> dict | None:
     """Inverse of :func:`_normalize_filter_keys`: re-key filter_data from the
-    stored ``filter_field`` form back to the column ``name``.
+    stored ``filter_field`` form back to the column data key.
 
     A decoded preset's keys are ``filter_field``-shaped (that's how the list
-    action stores them); rewriting them to the column ``name`` means a fetched
+    action stores them); rewriting them to ``field.field`` means a fetched
     preset speaks the same single identifier as the schema and ``list_rows``,
     so the agent never has to recognise a ``filter_field`` it can't find in
     ``list_admins``. A ``filter_field`` with no matching column is left as-is
-    (it still round-trips through ``_normalize_filter_keys`` unchanged); when
-    several columns share one ``filter_field`` the first is used — they
-    normalize back to the same key, so the choice is immaterial.
+    so the bad preset remains inspectable (replay will reject it); when several
+    columns share one ``filter_field`` the first is used — they normalize back
+    to the same internal key, so the choice is immaterial.
     """
     if not filter_data:
         return filter_data
-    filter_to_name: dict = {}
-    for name, f in (field_map or {}).items():
-        filter_to_name.setdefault(getattr(f, "filter_field", None) or name, name)
-    return {filter_to_name.get(key, key): value for key, value in filter_data.items()}
+    filter_to_data_key: dict = {}
+    for data_key, field in (field_map or {}).items():
+        filter_to_data_key.setdefault(
+            getattr(field, "filter_field", None) or data_key, data_key
+        )
+    return {
+        filter_to_data_key.get(key, key): value for key, value in filter_data.items()
+    }
 
 
 def _validate_sort(admin, request, sort, field_map=None) -> None:
@@ -198,7 +205,7 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
     if not sort:
         return
     if field_map is None:
-        field_map = admin.get_field_map(request)
+        field_map = _fields_by_data_key(admin.get_field_map(request))
     field_map = field_map or {}
     for entry in sort:
         # ``dir`` is required, not defaulted — the list pipeline reads
@@ -464,14 +471,31 @@ class SBAdminTools(MCPToolset):
         if detail not in ("index", "full"):
             raise ValueError(f"detail must be 'index' or 'full', got {detail!r}.")
 
-        # Resolved against the same registry the unscoped call iterates, so
-        # scoping can only ever narrow that set — never reach a widget or
-        # inline view_id that ``admin_entry`` cannot describe.
-        candidates = [
-            admin
-            for admin in sb_admin_site._registry.values()
-            if isinstance(admin, SBAdminBaseListView)
-        ]
+        # Model admins live in the Django admin registry, while configured
+        # list views (notably ``ModelTranslationView``) live only in the
+        # role configuration.  Both are top-level MCP surfaces.  Do not walk
+        # ``view_map`` here: it also contains inlines and dashboard/detail
+        # widgets, which are discovered through their owning admin instead.
+        configured_views = getattr(
+            request.request_data.configuration, "registered_views", ()
+        )
+        candidates_by_id = {
+            candidate.get_id(): candidate
+            for candidate in configured_views
+            if isinstance(candidate, SBAdminBaseListView)
+            and candidate.model is not None
+        }
+        # Match ``SBAdminRoleConfiguration.init_view_map`` collision
+        # semantics: a real model admin wins over a configured view with the
+        # same id.
+        candidates_by_id.update(
+            {
+                admin.get_id(): admin
+                for admin in sb_admin_site._registry.values()
+                if isinstance(admin, SBAdminBaseListView)
+            }
+        )
+        candidates = list(candidates_by_id.values())
         if view_id:
             candidates = [admin for admin in candidates if admin.get_id() == view_id]
             if not candidates:
@@ -570,14 +594,14 @@ class SBAdminTools(MCPToolset):
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 
-        field_map = admin.get_field_map(request)
+        field_map = _fields_by_data_key(admin.get_field_map(request))
 
         def decode(url_params):
             decoded = _decode_preset_url_params(url_params)
-            # Hand back column ``name`` keys, the single identifier the agent
-            # uses everywhere else (list_rows still accepts these on replay).
+            # Hand back browser data keys, the single identifier the agent
+            # uses everywhere else.
             if "filter_data" in decoded:
-                decoded["filter_data"] = _filter_keys_to_names(
+                decoded["filter_data"] = _filter_keys_to_data_keys(
                     decoded["filter_data"], field_map
                 )
             return decoded
@@ -746,7 +770,8 @@ class SBAdminTools(MCPToolset):
         admin.init_view_dynamic(request, request.request_data)
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
-        field_map = admin.get_field_map(request)
+        declared_field_map = admin.get_field_map(request)
+        field_map = _fields_by_data_key(declared_field_map)
         # Accept ``"id"`` as an alias for a differently-named pk on input,
         # so the documented refetch works (output always mirrors the pk to
         # ``"id"``). No-op for the usual ``id``-pk model.
@@ -769,7 +794,7 @@ class SBAdminTools(MCPToolset):
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)
-        columns_data = build_columns_data(admin, request, fields, field_map)
+        columns_data = build_columns_data(admin, request, fields, declared_field_map)
 
         table_params: dict = {
             TABLE_PARAMS_PAGE_NAME: int(page),
@@ -854,7 +879,8 @@ class SBAdminTools(MCPToolset):
         )
         try:
             admin.init_view_dynamic(request, request.request_data)
-            result = SBAdminMCPDetailService.get_detail_data(
+            detail_service = SBAdminMCPDetailService.for_view(admin)
+            result = detail_service.get_detail_data(
                 admin, request, object_id, fields=fields
             )
             actions = detail_action_entries(admin, request, object_id=object_id)
@@ -1223,7 +1249,8 @@ class SBAdminTools(MCPToolset):
         )
         admin.init_view_dynamic(request, request.request_data)
         try:
-            return SBAdminMCPDetailService.update_detail_data(
+            detail_service = SBAdminMCPDetailService.for_view(admin)
+            return detail_service.update_detail_data(
                 admin,
                 request,
                 object_id,
@@ -1690,11 +1717,11 @@ class SBAdminTools(MCPToolset):
             view=admin.get_id(),
             method="GET",
         )
-        # Callers pass column-name keys (per the schema/presets), so re-key
+        # Callers pass column data keys (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
         # ``list_rows``, otherwise a filter-aware action gets the
         # wrong/unknown filter keys.
-        field_map = admin.get_field_map(request)
+        field_map = _fields_by_data_key(admin.get_field_map(request))
         filter_data = _normalize_filter_keys(filter_data, field_map)
         base_params = _build_list_action_base_params(
             admin.get_id(),

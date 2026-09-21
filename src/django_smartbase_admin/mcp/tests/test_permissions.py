@@ -158,7 +158,9 @@ class TestMCPPermissions(TestCase):
         admins = tools.list_admins()["admin_views"]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         parent_widget_id = next(
-            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
+            f["filter"]["widget_id"]
+            for f in folder["fields"]
+            if f["name"] == "parent_annt"
         )
 
         rows = SBAdminTools(request=build_mcp_request(user)).list_rows(
@@ -201,25 +203,25 @@ class TestMCPPermissions(TestCase):
             "admin_views"
         ]
         super_folder = next(a for a in super_admins if a["view_id"] == "filer_folder")
-        self.assertIn("parent", {f["name"] for f in super_folder["fields"]})
+        self.assertIn("parent_annt", {f["name"] for f in super_folder["fields"]})
 
         admins = SBAdminTools(request=build_mcp_request(denied)).list_admins()[
             "admin_views"
         ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         names = {f["name"] for f in folder["fields"]}
-        self.assertNotIn("parent", names)
+        self.assertNotIn("parent_annt", names)
         self.assertIn("name", names)
 
         with self.assertRaises(LookupError):
             SBAdminTools(request=build_mcp_request(denied)).list_rows(
-                "filer_folder", fields=["parent"]
+                "filer_folder", fields=["parent_annt"]
             )
 
         parent_widget_id = next(
             f["filter"]["widget_id"]
             for f in super_folder["fields"]
-            if f["name"] == "parent"
+            if f["name"] == "parent_annt"
         )
         # A widget the user can't see is "not found" for them — same
         # ``LookupError`` as the ``fields=[hidden]`` branch, no existence leak.
@@ -274,7 +276,9 @@ class TestMCPPermissions(TestCase):
         ]
         folder = next(a for a in admins if a["view_id"] == "filer_folder")
         parent_widget_id = next(
-            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
+            f["filter"]["widget_id"]
+            for f in folder["fields"]
+            if f["name"] == "parent_annt"
         )
 
         with patch(

@@ -143,11 +143,12 @@ def _filter_info(field) -> dict | None:
     if widget is None:
         return None
 
-    # The filter is keyed by the column ``name`` in list_rows filter_data
-    # (the same identifier ``fields`` / ``sort`` use), so the internal
+    # The filter is keyed by the column's data key (``field.field``) in
+    # list_rows filter_data (the same identifier ``fields`` / ``sort`` use),
+    # so the internal
     # ``filter_field`` is deliberately not surfaced — one filter identifier,
-    # not two. list_rows still *accepts* a raw ``filter_field`` key (presets
-    # emit those), but the agent never needs to construct one.
+    # not two. Stored presets use ``filter_field`` internally, but fetched
+    # presets are converted back to the data key before reaching the caller.
     info: dict = {
         "widget": _widget_category(widget),
     }
@@ -169,7 +170,7 @@ def _filter_info(field) -> dict | None:
 def _field_entry(field) -> dict:
     filter_info = _filter_info(field)
     entry: dict = {
-        "name": field.name,
+        "name": field.field,
         "title": str(getattr(field, "title", None) or field.name),
     }
     # Default is ``true``; emit only when hidden so the field still
@@ -265,8 +266,11 @@ def _inline_entry(inline, request) -> dict:
 
 def _inline_entries(admin, request) -> list[dict]:
     """Real + fake inlines the user can view; broken inlines are skipped."""
-    inline_classes = list(admin.get_inlines(request, None) or [])
-    inline_classes.extend(admin.get_sbadmin_fake_inlines(request, obj=None) or [])
+    inline_classes = []
+    if hasattr(admin, "get_inlines"):
+        inline_classes.extend(admin.get_inlines(request, None) or [])
+    if hasattr(admin, "get_sbadmin_fake_inlines"):
+        inline_classes.extend(admin.get_sbadmin_fake_inlines(request, obj=None) or [])
 
     entries: list[dict] = []
     for inline_class in inline_classes:
@@ -344,9 +348,8 @@ def _detail_field_entries(admin, request) -> list[str]:
     truth instead of two.
     """
     try:
-        names = list(
-            SBAdminMCPDetailService.get_detail_fields(admin, request, None) or []
-        )
+        detail_service = SBAdminMCPDetailService.for_view(admin)
+        names = list(detail_service.get_detail_fields(admin, request, None) or [])
     except ImproperlyConfigured:
         # List-only admin with no detail page — no fieldsets by design.
         # Mirrors how get_form autocomplete registration treats this case.
