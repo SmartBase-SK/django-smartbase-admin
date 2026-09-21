@@ -78,6 +78,10 @@
 	{% include 'sb_admin/partials/modal/modal.html' %}
 {% endblock %}
 
+{% block media_picker_modal %}
+	{% include 'sb_admin/partials/modal/modal.html' with modal_id='sb-admin-media-picker-modal' modal_class='sb-media-picker-modal' %}
+{% endblock %}
+
 {% block js %}
     {% include 'sb_admin/sb_admin_js_trans.html' %}
     <script>

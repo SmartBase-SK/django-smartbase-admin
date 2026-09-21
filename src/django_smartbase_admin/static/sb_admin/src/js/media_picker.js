@@ -1,5 +1,7 @@
 const PICKER_TYPE_IMAGE = 'image'
-const MODAL_SELECTOR = '#sb-admin-modal'
+const MODAL_SELECTOR = '#sb-admin-media-picker-modal'
+const NESTED_MODAL_CLASS = 'sb-media-picker-modal--nested'
+const NESTED_BACKDROP_CLASS = 'sb-media-picker-backdrop--nested'
 const EMBEDDED_PICKER_SELECTOR = '[data-sb-media-picker-embed]'
 const MEDIA_PICKER_SELECTED_EVENT = 'sbadmin:media-picker:selected'
 const SET_PICKER_VALUE_EVENT = 'sbadmin:media-picker:set-value'
@@ -518,6 +520,53 @@ const initializePicker = (widget) => {
     if (!widget || !rootElement) return
     activePicker?.destroy()
     activePicker = new MediaPicker({widget, rootElement})
+    // bootstrap's data-api closes an already open modal, so the picker opens itself
+    window.bootstrap5?.Modal.getOrCreateInstance(rootElement).show()
+}
+
+const modalBelow = (modalElement) => {
+    const open = Array.from(document.querySelectorAll('.modal.show')).filter(
+        (element) => element !== modalElement,
+    )
+    return open[open.length - 1] || null
+}
+
+const tagBackdrop = () => {
+    const backdrops = document.querySelectorAll('.modal-backdrop')
+    backdrops[backdrops.length - 1]?.classList.add(NESTED_BACKDROP_CLASS)
+}
+
+const bodyScrollLock = () => ({
+    open: document.body.classList.contains('modal-open'),
+    overflow: document.body.style.overflow,
+    paddingRight: document.body.style.paddingRight,
+})
+
+const restoreBodyScrollLock = (lock) => {
+    document.body.classList.toggle('modal-open', lock.open)
+    document.body.style.overflow = lock.overflow
+    document.body.style.paddingRight = lock.paddingRight
+}
+
+const initializeNestedModal = () => {
+    const modalElement = document.querySelector(MODAL_SELECTOR)
+    if (!modalElement) return
+    let parentLock = null
+
+    modalElement.addEventListener('show.bs.modal', () => {
+        if (!modalBelow(modalElement)) return
+        // bootstrap unlocks the body when any modal hides, the one underneath still needs the lock
+        parentLock = bodyScrollLock()
+        modalElement.classList.add(NESTED_MODAL_CLASS)
+        window.requestAnimationFrame(tagBackdrop)
+    })
+
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        modalElement.classList.remove(NESTED_MODAL_CLASS)
+        if (!parentLock) return
+        restoreBodyScrollLock(parentLock)
+        parentLock = null
+    })
 }
 
 const initializeEmbeddedPicker = () => {
@@ -548,8 +597,13 @@ document.addEventListener(SET_PICKER_VALUE_EVENT, (event) => {
     )
 })
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeEmbeddedPicker, {once: true})
-} else {
+const initialize = () => {
     initializeEmbeddedPicker()
+    initializeNestedModal()
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize, {once: true})
+} else {
+    initialize()
 }

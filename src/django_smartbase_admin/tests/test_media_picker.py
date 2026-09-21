@@ -10,7 +10,9 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.template.loader import render_to_string
+from django.template import Context
+from django.template.loader import get_template, render_to_string
+from django.template.loader_tags import BlockNode
 from django.test import TestCase, override_settings
 from django.urls import path, reverse
 from django.utils import timezone
@@ -726,13 +728,35 @@ class MediaPickerViewTests(TestCase):
         self.assertIn("sb-media-picker-widget__actions", html)
         self.assertIn("/operations/upload/no_folder/", html)
         self.assertIn("data-sb-media-picker-trigger", html)
-        self.assertIn('data-bs-target="#sb-admin-modal"', html)
-        self.assertIn('hx-target="#sb-admin-modal"', html)
+        self.assertIn('hx-target="#sb-admin-media-picker-modal"', html)
+        self.assertNotIn("data-bs-toggle", html)
         self.assertIn("sb_admin/dist/media_picker.js", str(widget.media))
         self.assertNotIn("media_picker_style.css", str(widget.media))
         self.assertIn("filer/js/dist/admin-file-widget.bundle.js", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.css", str(widget.media))
         self.assertNotIn("filer/css/admin_filer.fa.icons.css", str(widget.media))
+
+    def test_base_template_renders_a_separate_modal_for_the_picker(self):
+        """The picker has to open next to a change form opened in a modal, so it
+        gets a container of its own instead of sharing ``#sb-admin-modal``."""
+        template = get_template("sb_admin/sb_admin_base_no_sidebar.html").template
+        block = next(
+            node
+            for node in template.nodelist.get_nodes_by_type(BlockNode)
+            if node.name == "media_picker_modal"
+        )
+
+        context = Context({})
+        with context.bind_template(template):
+            html = block.render(context)
+
+        self.assertIn('id="sb-admin-media-picker-modal"', html)
+        self.assertIn("sb-media-picker-modal", html)
+        self.assertIn('const modalId = "sb-admin-media-picker-modal";', html)
+        self.assertIn(
+            'id="sb-admin-modal"',
+            render_to_string("sb_admin/partials/modal/modal.html"),
+        )
 
     def test_richtext_widget_renders_existing_filer_image_and_media(self):
         field = forms.CharField(label="Content", required=False)

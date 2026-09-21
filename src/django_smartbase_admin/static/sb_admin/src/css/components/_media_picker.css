@@ -49,6 +49,14 @@
         max-width: 1100px;
     }
 
+    .modal.sb-media-picker-modal--nested {
+        z-index: 1030;
+    }
+
+    .modal-backdrop.sb-media-picker-backdrop--nested {
+        z-index: 1020;
+    }
+
     .sb-media-picker__embed {
         @apply h-screen w-screen overflow-hidden bg-bg-elevated;
 
