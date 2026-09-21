@@ -397,7 +397,7 @@ class ListAdminsTests(TestCase):
         status = fields_by_name["status"]
         self.assertEqual(status["title"], "Status")
         self.assertEqual(status["filter"]["widget"], "MultipleChoiceFilterWidget")
-        # The filter is keyed by the column data key in list_rows; the
+        # The filter is keyed by the column name in list_rows; the
         # internal ``filter_field`` is not surfaced.
         self.assertNotIn("filter_field", status["filter"])
         self.assertEqual(
@@ -408,7 +408,7 @@ class ListAdminsTests(TestCase):
             ],
         )
 
-        parent = fields_by_name["parent_annt"]
+        parent = fields_by_name["parent"]
         self.assertEqual(parent["filter"]["widget"], "AutocompleteFilterWidget")
         self.assertFalse(parent["filter"]["multiselect"])
         self.assertEqual(parent["filter"]["target_model"], "filer.Folder")

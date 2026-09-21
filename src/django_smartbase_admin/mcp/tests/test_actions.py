@@ -199,30 +199,43 @@ class ListRowsTests(_ToolTestBase):
                 "filer_folder", fields=["name"]
             )
 
-    def test_annotated_column_uses_browser_data_key_everywhere(self):
-        parent = Folder.objects.create(name="parent")
-        Folder.objects.create(name="child", parent=parent)
+    def test_annotated_column_uses_public_name_everywhere(self):
+        first_parent = Folder.objects.create(name="a parent")
+        last_parent = Folder.objects.create(name="z parent")
+        Folder.objects.create(name="sort child a", parent=first_parent)
+        Folder.objects.create(name="sort child z", parent=last_parent)
         user = MagicMock(is_authenticated=True, is_superuser=True)
         tools = SBAdminTools(request=build_mcp_request(user))
 
         entry = tools.list_admins(view_id="filer_folder")["admin_views"][0]
-        self.assertIn("parent_annt", {field["name"] for field in entry["fields"]})
+        self.assertIn("parent", {field["name"] for field in entry["fields"]})
         result = tools.list_rows(
             "filer_folder",
-            fields=["parent_annt"],
-            filter_data={"parent_annt": [{"value": parent.pk, "label": "parent"}]},
-            sort=[{"field": "parent_annt", "dir": "asc"}],
+            fields=["parent"],
+            sort=[{"field": "parent", "dir": "desc"}],
+            full_text_search="sort child",
         )
 
-        self.assertEqual(result["data"][0]["parent_annt"], "parent")
-        self.assertNotIn("parent", result["data"][0])
+        self.assertEqual(
+            [row["parent"] for row in result["data"]],
+            ["z parent", "a parent"],
+        )
+        self.assertNotIn("parent_annt", result["data"][0])
+        filtered = tools.list_rows(
+            "filer_folder",
+            fields=["parent"],
+            filter_data={"parent": [{"value": first_parent.pk, "label": "a parent"}]},
+        )
+        self.assertEqual(filtered["data"][0]["parent"], "a parent")
         with self.assertRaises(LookupError):
-            tools.list_rows("filer_folder", fields=["parent"])
+            tools.list_rows("filer_folder", fields=["parent_annt"])
         with self.assertRaises(ValueError):
             tools.list_rows(
                 "filer_folder",
                 fields=["name"],
-                filter_data={"parent": [{"value": parent.pk, "label": "parent"}]},
+                filter_data={
+                    "parent_annt": [{"value": first_parent.pk, "label": "a parent"}]
+                },
             )
 
     def test_list_rows_respects_action_permission(self):
@@ -410,7 +423,7 @@ class AutocompleteTests(_ToolTestBase):
         feed straight back into ``list_rows`` as a filter value."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
         tools = SBAdminTools(request=build_mcp_request(user))
-        widget_id = self._filter_widget_id(tools, "filer_folder", "parent_annt")
+        widget_id = self._filter_widget_id(tools, "filer_folder", "parent")
 
         result = SBAdminTools(request=build_mcp_request(user)).autocomplete(
             "filer_folder", widget_id, search="queue"
@@ -435,7 +448,7 @@ class AutocompleteTests(_ToolTestBase):
         widget_id = self._filter_widget_id(
             SBAdminTools(request=build_mcp_request(user)),
             "filer_folder",
-            "parent_annt",
+            "parent",
         )
 
         denied_user = MagicMock(is_authenticated=True, is_superuser=False)
@@ -487,7 +500,7 @@ class AutocompleteTests(_ToolTestBase):
 
         user = MagicMock(is_authenticated=True, is_superuser=True)
         tools = SBAdminTools(request=build_mcp_request(user))
-        widget_id = self._filter_widget_id(tools, "filer_folder", "parent_annt")
+        widget_id = self._filter_widget_id(tools, "filer_folder", "parent")
         with self.assertRaises(PermissionDenied):
             SBAdminTools(request=build_mcp_request(user)).autocomplete(
                 "filer_folder", widget_id, search="queue"
@@ -518,9 +531,7 @@ class AutocompletePageSizeTests(_ToolTestBase):
             a for a in admins["admin_views"] if a["view_id"] == "filer_folder"
         )
         self.widget_id = next(
-            f["filter"]["widget_id"]
-            for f in folder["fields"]
-            if f["name"] == "parent_annt"
+            f["filter"]["widget_id"] for f in folder["fields"] if f["name"] == "parent"
         )
 
     def _autocomplete(self, **kwargs):

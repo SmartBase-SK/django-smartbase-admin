@@ -133,8 +133,8 @@ def _to_querydict(mapping: dict) -> QueryDict:
 
 def build_columns_data(admin, request, fields: list[str], field_map=None) -> dict:
     """Translate an MCP ``fields`` selection into the list action's
-    ``columnsData`` payload: validates against the columns' browser data
-    keys (``SBAdminField.field``) and marks the requested subset visible.
+    ``columnsData`` payload: validates against the admin's public field names
+    and translates them to the browser data keys used by the list action.
 
     ``field_map`` lets the caller reuse an already-built map instead of
     rebuilding it (``get_field_map`` clones every field on each call).
@@ -144,19 +144,18 @@ def build_columns_data(admin, request, fields: list[str], field_map=None) -> dic
 
     if field_map is None:
         field_map = admin.get_field_map(request)
-    fields_by_data_key = {field.field: field for field in field_map.values()}
-    unknown = [name for name in fields if name not in fields_by_data_key]
+    unknown = [name for name in fields if name not in field_map]
     if unknown:
         raise LookupError(
             f"Admin {admin.get_id()!r} has no fields {unknown}; "
-            f"available: {sorted(fields_by_data_key)}."
+            f"available: {sorted(field_map)}."
         )
 
     requested = set(fields)
     return {
         COLUMNS_DATA_COLUMNS_NAME: {
-            field.field: {COLUMNS_DATA_VISIBLE_NAME: field.field in requested}
-            for field in field_map.values()
+            field.field: {COLUMNS_DATA_VISIBLE_NAME: name in requested}
+            for name, field in field_map.items()
         }
     }
 

@@ -143,12 +143,11 @@ def _filter_info(field) -> dict | None:
     if widget is None:
         return None
 
-    # The filter is keyed by the column's data key (``field.field``) in
-    # list_rows filter_data (the same identifier ``fields`` / ``sort`` use),
-    # so the internal
+    # The filter is keyed by the column ``name`` in list_rows filter_data
+    # (the same identifier ``fields`` / ``sort`` use), so the internal
     # ``filter_field`` is deliberately not surfaced — one filter identifier,
     # not two. Stored presets use ``filter_field`` internally, but fetched
-    # presets are converted back to the data key before reaching the caller.
+    # presets are converted back to the public name before reaching the caller.
     info: dict = {
         "widget": _widget_category(widget),
     }
@@ -170,7 +169,7 @@ def _filter_info(field) -> dict | None:
 def _field_entry(field) -> dict:
     filter_info = _filter_info(field)
     entry: dict = {
-        "name": field.field,
+        "name": field.name,
         "title": str(getattr(field, "title", None) or field.name),
     }
     # Default is ``true``; emit only when hidden so the field still

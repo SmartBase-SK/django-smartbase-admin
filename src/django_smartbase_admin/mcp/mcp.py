@@ -115,7 +115,7 @@ def _widgets_by_filter_field(admin, request, field_map=None) -> dict:
         widget = getattr(field, "filter_widget", None)
         if widget is None:
             continue
-        mapping[getattr(field, "filter_field", None) or field.field] = widget
+        mapping[getattr(field, "filter_field", None) or field.name] = widget
     return mapping
 
 
@@ -138,45 +138,37 @@ def _validate_filter_data(
         widgets[key].validate_value(value)
 
 
-def _fields_by_data_key(field_map) -> dict:
-    """Index initialized list fields by the key used in browser row data."""
-    return {field.field: field for field in (field_map or {}).values()}
-
-
 def _normalize_filter_keys(filter_data: dict | None, field_map) -> dict | None:
     """Re-key ``filter_data`` to the ``filter_field`` the list pipeline uses,
-    accepting column data keys (the same ``field.field`` identifier ``fields``
-    and ``sort`` take).
+    accepting public column names (the same identifier ``fields`` and
+    ``sort`` take).
 
-    This lets the agent use one identifier — the column data key — everywhere,
+    This lets the agent use one identifier — the column name — everywhere,
     instead of tracking that a column's internal filter key often differs.
-    Stored presets are converted back to data keys before they leave
+    Stored presets are converted back to names before they leave
     ``fetch_filter_preset``; raw ``filter_field`` keys are not a public alias.
     """
     if not filter_data:
         return filter_data
-    data_key_to_filter = {
-        data_key: (getattr(field, "filter_field", None) or data_key)
-        for data_key, field in (field_map or {}).items()
+    name_to_filter = {
+        name: (getattr(field, "filter_field", None) or name)
+        for name, field in (field_map or {}).items()
     }
-    unknown = [key for key in filter_data if key not in data_key_to_filter]
+    unknown = [key for key in filter_data if key not in name_to_filter]
     if unknown:
         raise ValueError(
             f"Unknown filter key(s) {unknown!r}. "
-            f"Known list fields: {sorted(data_key_to_filter)}"
+            f"Known list fields: {sorted(name_to_filter)}"
         )
-    normalized: dict = {}
-    for key, value in filter_data.items():
-        normalized[data_key_to_filter[key]] = value
-    return normalized
+    return {name_to_filter[key]: value for key, value in filter_data.items()}
 
 
-def _filter_keys_to_data_keys(filter_data: dict | None, field_map) -> dict | None:
+def _filter_keys_to_names(filter_data: dict | None, field_map) -> dict | None:
     """Inverse of :func:`_normalize_filter_keys`: re-key filter_data from the
-    stored ``filter_field`` form back to the column data key.
+    stored ``filter_field`` form back to the public column name.
 
     A decoded preset's keys are ``filter_field``-shaped (that's how the list
-    action stores them); rewriting them to ``field.field`` means a fetched
+    action stores them); rewriting them to ``field.name`` means a fetched
     preset speaks the same single identifier as the schema and ``list_rows``,
     so the agent never has to recognise a ``filter_field`` it can't find in
     ``list_admins``. A ``filter_field`` with no matching column is left as-is
@@ -186,14 +178,10 @@ def _filter_keys_to_data_keys(filter_data: dict | None, field_map) -> dict | Non
     """
     if not filter_data:
         return filter_data
-    filter_to_data_key: dict = {}
-    for data_key, field in (field_map or {}).items():
-        filter_to_data_key.setdefault(
-            getattr(field, "filter_field", None) or data_key, data_key
-        )
-    return {
-        filter_to_data_key.get(key, key): value for key, value in filter_data.items()
-    }
+    filter_to_name: dict = {}
+    for name, field in (field_map or {}).items():
+        filter_to_name.setdefault(getattr(field, "filter_field", None) or name, name)
+    return {filter_to_name.get(key, key): value for key, value in filter_data.items()}
 
 
 def _validate_sort(admin, request, sort, field_map=None) -> None:
@@ -205,7 +193,7 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
     if not sort:
         return
     if field_map is None:
-        field_map = _fields_by_data_key(admin.get_field_map(request))
+        field_map = admin.get_field_map(request)
     field_map = field_map or {}
     for entry in sort:
         # ``dir`` is required, not defaulted — the list pipeline reads
@@ -223,6 +211,57 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
             )
         if entry["dir"] not in ("asc", "desc"):
             raise ValueError(f"sort dir must be 'asc' or 'desc', got {entry['dir']!r}")
+
+
+def _sort_keys_to_fields(sort: list | None, field_map) -> list | None:
+    """Translate validated public sort names to browser data keys."""
+    if not sort:
+        return sort
+    return [{**entry, "field": field_map[entry["field"]].field} for entry in sort]
+
+
+def _sort_keys_to_names(sort: list | None, field_map) -> list | None:
+    """Translate browser sort keys from a stored preset to public names."""
+    if not sort:
+        return sort
+    field_to_name: dict = {}
+    for name, field in (field_map or {}).items():
+        field_to_name.setdefault(field.field, name)
+    return [
+        (
+            {**entry, "field": field_to_name.get(entry["field"], entry["field"])}
+            if isinstance(entry, dict) and "field" in entry
+            else entry
+        )
+        for entry in sort
+    ]
+
+
+def _row_keys_to_names(rows: list[dict], fields: list[str], field_map) -> None:
+    """Translate declared browser row keys back to MCP public field names."""
+    mappings = [
+        (name, field_map[name].field)
+        for name in fields
+        if name in field_map and field_map[name].field != name
+    ]
+    if not mappings:
+        return
+
+    public_names = set(fields)
+    internal_keys = {field_key for _name, field_key in mappings}
+
+    def translate(row):
+        translated = {
+            name: row[field_key] for name, field_key in mappings if field_key in row
+        }
+        for field_key in internal_keys - public_names:
+            row.pop(field_key, None)
+        row.update(translated)
+        for child in row.get("_children") or []:
+            translate(child)
+
+    for row in rows:
+        translate(row)
 
 
 def _decode_preset_url_params(url_params) -> dict:
@@ -594,16 +633,18 @@ class SBAdminTools(MCPToolset):
         admin = resolve_admin(view_id, request=request)
         admin.init_view_dynamic(request, request.request_data)
 
-        field_map = _fields_by_data_key(admin.get_field_map(request))
+        field_map = admin.get_field_map(request)
 
         def decode(url_params):
             decoded = _decode_preset_url_params(url_params)
-            # Hand back browser data keys, the single identifier the agent
+            # Hand back public column names, the single identifier the agent
             # uses everywhere else.
             if "filter_data" in decoded:
-                decoded["filter_data"] = _filter_keys_to_data_keys(
+                decoded["filter_data"] = _filter_keys_to_names(
                     decoded["filter_data"], field_map
                 )
+            if "sort" in decoded:
+                decoded["sort"] = _sort_keys_to_names(decoded["sort"], field_map)
             return decoded
 
         if source == "static":
@@ -770,8 +811,7 @@ class SBAdminTools(MCPToolset):
         admin.init_view_dynamic(request, request.request_data)
         # Built once and shared — ``get_field_map`` rebuilds + clones on
         # every call.
-        declared_field_map = admin.get_field_map(request)
-        field_map = _fields_by_data_key(declared_field_map)
+        field_map = admin.get_field_map(request)
         # Accept ``"id"`` as an alias for a differently-named pk on input,
         # so the documented refetch works (output always mirrors the pk to
         # ``"id"``). No-op for the usual ``id``-pk model.
@@ -794,7 +834,8 @@ class SBAdminTools(MCPToolset):
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)
-        columns_data = build_columns_data(admin, request, fields, declared_field_map)
+        sort = _sort_keys_to_fields(sort, field_map)
+        columns_data = build_columns_data(admin, request, fields, field_map)
 
         table_params: dict = {
             TABLE_PARAMS_PAGE_NAME: int(page),
@@ -857,6 +898,7 @@ class SBAdminTools(MCPToolset):
             if pk_attname != "id" and "id" not in row and pk_attname in row:
                 row["id"] = row[pk_attname]
         strip_html_cells(admin, request, rows)
+        _row_keys_to_names(rows, fields, field_map)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
         if aggregates is not None:
@@ -1717,11 +1759,11 @@ class SBAdminTools(MCPToolset):
             view=admin.get_id(),
             method="GET",
         )
-        # Callers pass column data keys (per the schema/presets), so re-key
+        # Callers pass public column names (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
         # ``list_rows``, otherwise a filter-aware action gets the
         # wrong/unknown filter keys.
-        field_map = _fields_by_data_key(admin.get_field_map(request))
+        field_map = admin.get_field_map(request)
         filter_data = _normalize_filter_keys(filter_data, field_map)
         base_params = _build_list_action_base_params(
             admin.get_id(),

@@ -164,15 +164,16 @@ class TranslationMCPTests(TransactionTestCase):
         entry = self.tools.list_admins(view_id=self.view_id)["admin_views"][0]
         self.assertEqual(entry["detail_fields"], ["title", "slug", "tags"])
         field_names = {field["name"] for field in entry["fields"]}
-        source_title = f"{self.translation_table}_en__title"
-        self.assertIn(source_title, field_names)
+        source_title_key = f"{self.translation_table}_en__title"
+        self.assertIn("title", field_names)
         self.assertIn(f"{self.translation_table}_de_status", field_names)
         self.assertIn(f"{self.translation_table}_fr_status", field_names)
 
-        result = self.tools.list_rows(view_id=self.view_id, fields=[source_title])
+        result = self.tools.list_rows(view_id=self.view_id, fields=["title"])
         self.assertEqual(result["last_row"], 1)
-        self.assertIn(source_title, result["data"][0], result)
-        self.assertEqual(result["data"][0][source_title], "Source title")
+        self.assertIn("title", result["data"][0], result)
+        self.assertNotIn(source_title_key, result["data"][0], result)
+        self.assertEqual(result["data"][0]["title"], "Source title")
 
     def test_fetch_and_update_translation_components(self):
         detail = self.tools.fetch_detail(self.view_id, str(self.article.pk))
@@ -262,18 +263,16 @@ class TranslationMCPTests(TransactionTestCase):
         )
         english_translation.tags.set([self.first_tag, self.second_tag])
         self.german_translation.tags.set([self.first_tag, self.second_tag])
-        source_title = f"{self.translation_table}_en__title"
-
         result = self.tools.list_rows(
             view_id=self.view_id,
-            fields=[source_title],
+            fields=["title"],
             page_size=1,
         )
 
         self.assertEqual(result["last_row"], 1)
         self.assertEqual(result["last_page"], 1)
         self.assertEqual(len(result["data"]), 1)
-        self.assertEqual(result["data"][0][source_title], "Source title")
+        self.assertEqual(result["data"][0]["title"], "Source title")
 
     def test_browser_detail_uses_shared_translation_forms(self):
         request = self.tools.request

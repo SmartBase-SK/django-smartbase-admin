@@ -317,10 +317,9 @@ class PrimaryKeyAliasTests(TestCase):
         self.assertEqual(list(fields), ["public_id", "name"])  # no synthetic "id"
 
     def test_display_method_ordering_suppresses_synthetic(self):
-        # ``id_label`` orders on the pk → its data key addresses it; no
-        # synthetic "id".
+        # ``id_label`` orders on the pk → addresses it; no synthetic "id".
         fields = self._fields(_PkMethodOrderingAdmin)
-        self.assertEqual(list(fields), ["id_label_annt", "name"])
+        self.assertEqual(list(fields), ["id_label", "name"])  # no synthetic "id"
 
 
 class TabulatorIdColumnNameTests(TestCase):

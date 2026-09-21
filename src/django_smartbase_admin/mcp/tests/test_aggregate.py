@@ -42,7 +42,7 @@ class _Admin(SBAdmin):
 
     # A method field with ``admin_order_field`` → backed by the ``id``
     # column via an annotation, so its ORM identifier is suffixed
-    # (``id_alias_annt``), which is also the MCP/browser data key.
+    # (``id_alias_annt``), distinct from the agent-facing name ``id_alias``.
     @admin.display(ordering="id")
     def id_alias(self, obj):
         return obj.id
@@ -117,16 +117,18 @@ class AggregateTests(TestCase):
         self.assertEqual(result["last_row"], 2)
         self.assertEqual(result["aggregates"], {"count": 2, "sum_id": sum(ids)})
 
-    def test_field_data_key_resolves_to_orm_identifier(self):
+    def test_field_name_resolves_to_orm_identifier(self):
         ids = [Folder.objects.create(name=n).pk for n in ("a", "b", "c")]
 
         result = self._tools().list_rows(
             "filer_folder",
             fields=["id", "name"],
-            aggregate=[{"fn": "sum", "field": "id_alias_annt"}],
+            aggregate=[{"fn": "sum", "field": "id_alias"}],
         )
 
-        self.assertEqual(result["aggregates"], {"sum_id_alias_annt": sum(ids)})
+        # "id_alias" resolves to its ORM alias "id_alias_annt"; summing the
+        # raw name would raise FieldError.
+        self.assertEqual(result["aggregates"], {"sum_id_alias": sum(ids)})
 
     def test_group_by_breaks_totals_down_per_group(self):
         # Two parents (themselves parent=None), children nested under them →
@@ -166,26 +168,24 @@ class AggregateTests(TestCase):
             ],
         )
 
-    def test_group_by_keys_rows_by_requested_data_key_not_orm_target(self):
-        # ``id_alias_annt`` is the browser data key for a method backed by the
-        # ``id`` model field. The response must keep the requested data key,
-        # not expose the underlying ORM target.
+    def test_group_by_keys_rows_by_requested_name_not_orm_target(self):
+        # ``id_alias`` is a method field whose ORM identifier is the annotation
+        # alias ``id_alias_annt``. Grouping by it must still surface rows under
+        # the agent-facing name ``id_alias`` (what the caller asked for), not
+        # the internal target.
         ids = sorted(Folder.objects.create(name=n).pk for n in ("a", "b", "c"))
 
         result = self._tools().list_rows(
             "filer_folder",
             fields=["id", "name"],
-            group_by=["id_alias_annt"],
+            group_by=["id_alias"],
             aggregate=[{"fn": "count"}],
         )
 
         self.assertNotIn("aggregates", result)
         self.assertEqual(
             result["groups"],
-            [
-                {"group": {"id_alias_annt": pk}, "aggregates": {"count": 1}}
-                for pk in ids
-            ],
+            [{"group": {"id_alias": pk}, "aggregates": {"count": 1}} for pk in ids],
         )
 
     def test_group_by_annotated_field_with_nested_plugin(self):
@@ -233,19 +233,24 @@ class AggregateTests(TestCase):
 
         self.assertEqual(result["aggregates"], {"count_user_display": 2})
 
-    def test_method_group_key_and_aggregate_are_separate(self):
+    def test_group_key_equal_to_aggregate_alias_does_not_collide(self):
+        # ``count`` is a method field whose public name equals the derived
+        # ``count`` aggregate alias. Nesting the group column and the aggregate
+        # under separate keys means they no longer share a dict, so both
+        # survive — the group value under ``group.count`` and the metric under
+        # ``aggregates.count``.
         ids = sorted(Folder.objects.create(name=n).pk for n in ("a", "b", "c"))
 
         result = self._tools().list_rows(
             "filer_folder",
             fields=["id", "name"],
-            group_by=["count_annt"],
+            group_by=["count"],
             aggregate=[{"fn": "count"}],
         )
 
         self.assertEqual(
             result["groups"],
-            [{"group": {"count_annt": pk}, "aggregates": {"count": 1}} for pk in ids],
+            [{"group": {"count": pk}, "aggregates": {"count": 1}} for pk in ids],
         )
 
     def test_aggregate_without_group_by_still_returns_scalar_dict(self):
@@ -286,7 +291,7 @@ class AggregateTests(TestCase):
             "filer_folder",
             fields=["id", "name"],
             aggregate=[
-                {"fn": "count", "field": "children_annt"},
+                {"fn": "count", "field": "children"},
                 {"fn": "sum", "field": "id"},
             ],
         )
@@ -295,7 +300,7 @@ class AggregateTests(TestCase):
         # by the fan-out (a shared-query bug would give 3*p.pk + child sum).
         self.assertEqual(
             result["aggregates"],
-            {"count_children_annt": 3, "sum_id": sum(all_ids)},
+            {"count_children": 3, "sum_id": sum(all_ids)},
         )
 
     def test_invalid_group_by_specs_are_rejected(self):
@@ -310,11 +315,7 @@ class AggregateTests(TestCase):
             tools.list_rows(**base, group_by=["name"])
         # Grouping on a multi-valued relation fans the rows out → rejected.
         with self.assertRaises(ValueError):
-            tools.list_rows(
-                **base,
-                aggregate=[{"fn": "count"}],
-                group_by=["children_annt"],
-            )
+            tools.list_rows(**base, aggregate=[{"fn": "count"}], group_by=["children"])
 
     def test_invalid_aggregate_specs_are_rejected(self):
         tools = self._tools()

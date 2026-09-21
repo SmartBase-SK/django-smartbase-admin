@@ -106,7 +106,9 @@ class FolderPresetTestAdmin(SBAdmin):
             "url_params": {
                 "filterData": {
                     "parent": [{"value": 1, "label": "Parent"}],
-                }
+                },
+                # Browser presets persist the Tabulator data key.
+                "tableParams": {"sort": [{"field": "parent_annt", "dir": "desc"}]},
             },
         },
     ]
@@ -207,7 +209,7 @@ class FetchFilterPresetTests(TestCase):
         decoded_status = tools.fetch_filter_preset(
             view_id="filer_folder", name="By status", source="static"
         )
-        # The key is surfaced as the column data key (here it also equals
+        # The key is surfaced as the column name (here it also equals
         # filter_field == "status"), the identifier the agent uses everywhere;
         # on replay list_rows normalizes it back to the filter_field. Key
         # round-tripping when they differ is covered in test_filter_validation.
@@ -227,13 +229,16 @@ class FetchFilterPresetTests(TestCase):
             {"status": [{"value": "alpha", "label": "Alpha"}]},
         )
 
-        # 8. Presets are stored under the internal filter_field, but the
-        # fetched payload uses the same browser data key as list_admins and
-        # list_rows. The configured name is not exposed as a legacy alias.
+        # 8. Presets store internal filter and browser sort keys, but the
+        # fetched payload uses the public name advertised by list_admins.
         decoded_parent = tools.fetch_filter_preset(
             view_id="filer_folder", name="By parent", source="static"
         )
         self.assertEqual(
             decoded_parent["filter_data"],
-            {"parent_annt": [{"value": 1, "label": "Parent"}]},
+            {"parent": [{"value": 1, "label": "Parent"}]},
+        )
+        self.assertEqual(
+            decoded_parent["sort"],
+            [{"field": "parent", "dir": "desc"}],
         )
