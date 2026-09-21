@@ -140,47 +140,52 @@ def _validate_filter_data(
 
 def _normalize_filter_keys(filter_data: dict | None, field_map) -> dict | None:
     """Re-key ``filter_data`` to the ``filter_field`` the list pipeline uses,
-    accepting public column names (the same identifier ``fields`` and
-    ``sort`` take).
+    accepting either a column ``name`` (the same identifier ``fields`` and
+    ``sort`` take) or the ``filter_field`` itself.
 
     This lets the agent use one identifier — the column name — everywhere,
-    instead of tracking that a column's internal filter key often differs.
-    Stored presets are converted back to names before they leave
-    ``fetch_filter_preset``; raw ``filter_field`` keys are not a public alias.
+    instead of tracking that a column's filter key often differs. An exact
+    ``filter_field`` match wins, so saved presets (whose keys are already
+    ``filter_field``) replay unchanged and a column name that happens to
+    collide with another column's filter_field stays unambiguous.
+    Unrecognised keys pass through so ``_validate_filter_data`` reports them.
     """
     if not filter_data:
         return filter_data
     name_to_filter = {
-        name: (getattr(field, "filter_field", None) or name)
-        for name, field in (field_map or {}).items()
+        name: (getattr(f, "filter_field", None) or name)
+        for name, f in (field_map or {}).items()
     }
-    unknown = [key for key in filter_data if key not in name_to_filter]
-    if unknown:
-        raise ValueError(
-            f"Unknown filter key(s) {unknown!r}. "
-            f"Known list fields: {sorted(name_to_filter)}"
-        )
-    return {name_to_filter[key]: value for key, value in filter_data.items()}
+    filter_fields = set(name_to_filter.values())
+    normalized: dict = {}
+    for key, value in filter_data.items():
+        if key in filter_fields:
+            normalized[key] = value
+        elif key in name_to_filter:
+            normalized[name_to_filter[key]] = value
+        else:
+            normalized[key] = value
+    return normalized
 
 
 def _filter_keys_to_names(filter_data: dict | None, field_map) -> dict | None:
     """Inverse of :func:`_normalize_filter_keys`: re-key filter_data from the
-    stored ``filter_field`` form back to the public column name.
+    stored ``filter_field`` form back to the column ``name``.
 
     A decoded preset's keys are ``filter_field``-shaped (that's how the list
-    action stores them); rewriting them to ``field.name`` means a fetched
+    action stores them); rewriting them to the column ``name`` means a fetched
     preset speaks the same single identifier as the schema and ``list_rows``,
     so the agent never has to recognise a ``filter_field`` it can't find in
     ``list_admins``. A ``filter_field`` with no matching column is left as-is
-    so the bad preset remains inspectable (replay will reject it); when several
-    columns share one ``filter_field`` the first is used — they normalize back
-    to the same internal key, so the choice is immaterial.
+    (it still round-trips through ``_normalize_filter_keys`` unchanged); when
+    several columns share one ``filter_field`` the first is used — they
+    normalize back to the same key, so the choice is immaterial.
     """
     if not filter_data:
         return filter_data
     filter_to_name: dict = {}
-    for name, field in (field_map or {}).items():
-        filter_to_name.setdefault(getattr(field, "filter_field", None) or name, name)
+    for name, f in (field_map or {}).items():
+        filter_to_name.setdefault(getattr(f, "filter_field", None) or name, name)
     return {filter_to_name.get(key, key): value for key, value in filter_data.items()}
 
 
@@ -637,8 +642,8 @@ class SBAdminTools(MCPToolset):
 
         def decode(url_params):
             decoded = _decode_preset_url_params(url_params)
-            # Hand back public column names, the single identifier the agent
-            # uses everywhere else.
+            # Hand back column ``name`` keys, the single identifier the agent
+            # uses everywhere else (list_rows still accepts these on replay).
             if "filter_data" in decoded:
                 decoded["filter_data"] = _filter_keys_to_names(
                     decoded["filter_data"], field_map
@@ -1759,7 +1764,7 @@ class SBAdminTools(MCPToolset):
             view=admin.get_id(),
             method="GET",
         )
-        # Callers pass public column names (per the schema/presets), so re-key
+        # Callers pass column-name keys (per the schema/presets), so re-key
         # to the ``filter_field`` the list pipeline uses — same as
         # ``list_rows``, otherwise a filter-aware action gets the
         # wrong/unknown filter keys.

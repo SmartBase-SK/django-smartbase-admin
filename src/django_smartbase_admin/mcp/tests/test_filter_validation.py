@@ -105,10 +105,10 @@ class FilterValidationTests(TestCase):
 
     def test_filter_key_normalization_round_trips_name_and_filter_field(self):
         """The agent uses one identifier — the column ``name`` — everywhere.
-        ``_normalize_filter_keys`` accepts a column name and re-keys it to
-        ``filter_field`` for the pipeline; ``_filter_keys_to_names`` is its
-        inverse, used to hand a decoded preset back in column-name terms so
-        the agent never meets
+        ``_normalize_filter_keys`` accepts a column ``name`` (or a raw
+        ``filter_field``) on input and re-keys to ``filter_field`` for the
+        pipeline; ``_filter_keys_to_names`` is its inverse, used to hand a
+        decoded preset back in column-``name`` terms so the agent never meets
         a ``filter_field`` it can't find in the schema."""
         from types import SimpleNamespace
 
@@ -117,31 +117,34 @@ class FilterValidationTests(TestCase):
             _normalize_filter_keys,
         )
 
-        # The first column's public name differs from its filter_field; the
-        # second falls back to its own name.
+        # Column name differs from its filter_field; another column has no
+        # explicit filter_field (falls back to its own name).
         field_map = {
             "closed": SimpleNamespace(filter_field="status__is_closed"),
             "name": SimpleNamespace(filter_field=None),
         }
         v = ["x"]
 
-        # Input normalization: public name only. The internal filter_field is
-        # deliberately not a public alias.
+        # Input normalization: name | filter_field | unknown.
         self.assertEqual(
             _normalize_filter_keys({"closed": v}, field_map),
-            {"status__is_closed": v},
+            {"status__is_closed": v},  # name -> filter_field
         )
-        with self.assertRaises(ValueError):
-            _normalize_filter_keys({"status__is_closed": v}, field_map)
+        self.assertEqual(
+            _normalize_filter_keys({"status__is_closed": v}, field_map),
+            {"status__is_closed": v},  # exact filter_field left untouched
+        )
         self.assertEqual(
             _normalize_filter_keys({"name": v}, field_map),
-            {"name": v},
+            {"name": v},  # filter_field falls back to the column name
         )
-        with self.assertRaises(ValueError):
-            _normalize_filter_keys({"nope": v}, field_map)
+        self.assertEqual(
+            _normalize_filter_keys({"nope": v}, field_map),
+            {"nope": v},  # unknown passes through to be reported downstream
+        )
         self.assertIsNone(_normalize_filter_keys(None, field_map))
 
-        # Inverse (preset output): filter_field -> public name, and a
+        # Inverse (preset output): filter_field -> column name, and a
         # filter_field with no matching column is left as-is.
         self.assertEqual(
             _filter_keys_to_names({"status__is_closed": v}, field_map),

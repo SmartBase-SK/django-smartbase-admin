@@ -146,8 +146,8 @@ def _filter_info(field) -> dict | None:
     # The filter is keyed by the column ``name`` in list_rows filter_data
     # (the same identifier ``fields`` / ``sort`` use), so the internal
     # ``filter_field`` is deliberately not surfaced — one filter identifier,
-    # not two. Stored presets use ``filter_field`` internally, but fetched
-    # presets are converted back to the public name before reaching the caller.
+    # not two. list_rows still *accepts* a raw ``filter_field`` key (presets
+    # emit those), but the agent never needs to construct one.
     info: dict = {
         "widget": _widget_category(widget),
     }

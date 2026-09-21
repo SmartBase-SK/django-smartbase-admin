@@ -446,9 +446,7 @@ class AutocompleteTests(_ToolTestBase):
         returning an empty list."""
         user = MagicMock(is_authenticated=True, is_superuser=True)
         widget_id = self._filter_widget_id(
-            SBAdminTools(request=build_mcp_request(user)),
-            "filer_folder",
-            "parent",
+            SBAdminTools(request=build_mcp_request(user)), "filer_folder", "parent"
         )
 
         denied_user = MagicMock(is_authenticated=True, is_superuser=False)

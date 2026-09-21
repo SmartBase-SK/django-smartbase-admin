@@ -172,7 +172,8 @@ class AggregateTests(TestCase):
         # ``id_alias`` is a method field whose ORM identifier is the annotation
         # alias ``id_alias_annt``. Grouping by it must still surface rows under
         # the agent-facing name ``id_alias`` (what the caller asked for), not
-        # the internal target.
+        # the internal target — otherwise the group key the caller reads back
+        # doesn't match the field they grouped on.
         ids = sorted(Folder.objects.create(name=n).pk for n in ("a", "b", "c"))
 
         result = self._tools().list_rows(
