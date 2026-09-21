@@ -531,34 +531,41 @@ const modalBelow = (modalElement) => {
     return open[open.length - 1] || null
 }
 
-const focusTrapOf = (modalElement) =>
-    window.bootstrap5?.Modal.getInstance(modalElement)?._focustrap || null
-
 const tagBackdrop = () => {
     const backdrops = document.querySelectorAll('.modal-backdrop')
     backdrops[backdrops.length - 1]?.classList.add(NESTED_BACKDROP_CLASS)
 }
 
+const bodyScrollLock = () => ({
+    open: document.body.classList.contains('modal-open'),
+    overflow: document.body.style.overflow,
+    paddingRight: document.body.style.paddingRight,
+})
+
+const restoreBodyScrollLock = (lock) => {
+    document.body.classList.toggle('modal-open', lock.open)
+    document.body.style.overflow = lock.overflow
+    document.body.style.paddingRight = lock.paddingRight
+}
+
 const initializeNestedModal = () => {
     const modalElement = document.querySelector(MODAL_SELECTOR)
     if (!modalElement) return
-    let parentModal = null
+    let parentLock = null
 
     modalElement.addEventListener('show.bs.modal', () => {
-        parentModal = modalBelow(modalElement)
-        if (!parentModal) return
+        if (!modalBelow(modalElement)) return
+        // bootstrap unlocks the body when any modal hides, the one underneath still needs the lock
+        parentLock = bodyScrollLock()
         modalElement.classList.add(NESTED_MODAL_CLASS)
-        focusTrapOf(parentModal)?.deactivate()
         window.requestAnimationFrame(tagBackdrop)
     })
 
     modalElement.addEventListener('hidden.bs.modal', () => {
         modalElement.classList.remove(NESTED_MODAL_CLASS)
-        if (!parentModal) return
-        // bootstrap unlocks the body when any modal hides, the one underneath still needs the lock
-        document.body.classList.add('modal-open')
-        focusTrapOf(parentModal)?.activate()
-        parentModal = null
+        if (!parentLock) return
+        restoreBodyScrollLock(parentLock)
+        parentLock = null
     })
 }
 
