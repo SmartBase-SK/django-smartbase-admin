@@ -1,5 +1,7 @@
 const PICKER_TYPE_IMAGE = 'image'
-const MODAL_SELECTOR = '#sb-admin-modal'
+const MODAL_SELECTOR = '#sb-admin-media-picker-modal'
+const NESTED_MODAL_CLASS = 'sb-media-picker-modal--nested'
+const NESTED_BACKDROP_CLASS = 'sb-media-picker-backdrop--nested'
 const EMBEDDED_PICKER_SELECTOR = '[data-sb-media-picker-embed]'
 const MEDIA_PICKER_SELECTED_EVENT = 'sbadmin:media-picker:selected'
 const SET_PICKER_VALUE_EVENT = 'sbadmin:media-picker:set-value'
@@ -518,6 +520,46 @@ const initializePicker = (widget) => {
     if (!widget || !rootElement) return
     activePicker?.destroy()
     activePicker = new MediaPicker({widget, rootElement})
+    // bootstrap's data-api closes an already open modal, so the picker opens itself
+    window.bootstrap5?.Modal.getOrCreateInstance(rootElement).show()
+}
+
+const modalBelow = (modalElement) => {
+    const open = Array.from(document.querySelectorAll('.modal.show')).filter(
+        (element) => element !== modalElement,
+    )
+    return open[open.length - 1] || null
+}
+
+const focusTrapOf = (modalElement) =>
+    window.bootstrap5?.Modal.getInstance(modalElement)?._focustrap || null
+
+const tagBackdrop = () => {
+    const backdrops = document.querySelectorAll('.modal-backdrop')
+    backdrops[backdrops.length - 1]?.classList.add(NESTED_BACKDROP_CLASS)
+}
+
+const initializeNestedModal = () => {
+    const modalElement = document.querySelector(MODAL_SELECTOR)
+    if (!modalElement) return
+    let parentModal = null
+
+    modalElement.addEventListener('show.bs.modal', () => {
+        parentModal = modalBelow(modalElement)
+        if (!parentModal) return
+        modalElement.classList.add(NESTED_MODAL_CLASS)
+        focusTrapOf(parentModal)?.deactivate()
+        window.requestAnimationFrame(tagBackdrop)
+    })
+
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        modalElement.classList.remove(NESTED_MODAL_CLASS)
+        if (!parentModal) return
+        // bootstrap unlocks the body when any modal hides, the one underneath still needs the lock
+        document.body.classList.add('modal-open')
+        focusTrapOf(parentModal)?.activate()
+        parentModal = null
+    })
 }
 
 const initializeEmbeddedPicker = () => {
@@ -548,8 +590,13 @@ document.addEventListener(SET_PICKER_VALUE_EVENT, (event) => {
     )
 })
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeEmbeddedPicker, {once: true})
-} else {
+const initialize = () => {
     initializeEmbeddedPicker()
+    initializeNestedModal()
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize, {once: true})
+} else {
+    initialize()
 }

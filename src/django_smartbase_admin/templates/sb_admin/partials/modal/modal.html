@@ -1,6 +1,6 @@
 {% load i18n %}
 
-<div id="sb-admin-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+<div id="{{ modal_id|default:'sb-admin-modal' }}" class="modal fade {{ modal_class }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-body" style="min-height: 200px;">
@@ -11,12 +11,15 @@
 </div>
 <script>
     window.addEventListener("DOMContentLoaded", () => {
-        const modalId = "sb-admin-modal";
+        const modalId = "{{ modal_id|default:'sb-admin-modal' }}";
         const modalEl = document.getElementById(modalId);
         const modalLoadingInnerHTML = modalEl.querySelector('.sb-admin-modal-loading').parentElement.outerHTML;
 
         document.body.addEventListener("hideModal", (e) => {
             const modalEl = e.detail.elt.closest("#" + modalId);
+            if (!modalEl) {
+                return;
+            }
             const modalInstance = bootstrap5.Modal.getInstance(modalEl);
             if (modalInstance) {
                 modalInstance.hide();
