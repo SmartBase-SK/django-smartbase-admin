@@ -38,7 +38,7 @@ class MCPTranslatedArticleTranslation(models.Model):
     )
     language_code = models.CharField(max_length=15)
     title = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True)
 
     class Meta:
         app_label = "django_smartbase_admin"
@@ -244,3 +244,38 @@ class TranslationMCPTests(TransactionTestCase):
 
         german.refresh_from_db()
         self.assertEqual(german.title, "Browser-updated title")
+
+    def test_duplicate_unique_value_across_components_is_invalid(self):
+        german_name = f"{self.translation_table}:de"
+        french_name = f"{self.translation_table}:fr"
+
+        result = self.tools.update_detail(
+            self.view_id,
+            str(self.article.pk),
+            component_values={
+                german_name: {"slug": "duplicate-slug"},
+                french_name: {
+                    "title": "French title",
+                    "slug": "duplicate-slug",
+                },
+            },
+        )
+
+        self.assertEqual(result["status"], "invalid")
+        self.assertEqual(
+            result["errors"]["components"][french_name]["fields"]["slug"][0]["code"],
+            "unique",
+        )
+        self.assertEqual(
+            MCPTranslatedArticleTranslation.objects.get(
+                master=self.article,
+                language_code="de",
+            ).slug,
+            "german-title",
+        )
+        self.assertFalse(
+            MCPTranslatedArticleTranslation.objects.filter(
+                master=self.article,
+                language_code="fr",
+            ).exists()
+        )

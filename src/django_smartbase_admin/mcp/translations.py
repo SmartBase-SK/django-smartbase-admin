@@ -98,9 +98,22 @@ class SBAdminMCPTranslationService:
         if errors["global"] or errors["components"]:
             return {"status": "invalid", "errors": errors}
 
+        sequential_errors = None
         with transaction.atomic():
-            for form in bound_components.values():
+            for name, form in bound_components.items():
+                # Binding eagerly validated every component against the old
+                # database state. Re-run validation after prior component
+                # writes so uniqueness checks see those writes too.
+                form.full_clean()
+                current_errors = form_component_errors({name: form})
+                if current_errors["global"] or current_errors["components"]:
+                    sequential_errors = current_errors
+                    transaction.set_rollback(True)
+                    break
                 view.save_translation(request, form)
+
+        if sequential_errors:
+            return {"status": "invalid", "errors": sequential_errors}
 
         return {
             "status": "ok",
