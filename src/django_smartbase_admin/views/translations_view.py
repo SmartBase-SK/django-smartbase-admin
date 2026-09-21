@@ -305,6 +305,7 @@ class ModelTranslationView(
         translation_obj = form.save(commit=False)
         translation_obj.master_id = request.request_data.object_id
         translation_obj.save()
+        form.save_m2m()
         return translation_obj
 
     def get_translation_forms(self, request, object_id=None):

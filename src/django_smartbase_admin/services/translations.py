@@ -89,7 +89,7 @@ class SBAdminTranslationsService(object):
     def get_translation_field_value_condition(cls, annotate_name, model_field):
         field_name = f"{annotate_name}__{model_field.name}"
         condition = Q(**{f"{field_name}__isnull": False})
-        if model_field.empty_strings_allowed:
+        if model_field.empty_strings_allowed and not model_field.is_relation:
             condition &= ~Q(**{field_name: ""})
         return condition
 

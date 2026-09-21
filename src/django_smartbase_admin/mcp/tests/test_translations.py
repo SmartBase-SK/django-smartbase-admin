@@ -30,6 +30,16 @@ class MCPTranslatedArticle(models.Model):
         return str(self.pk)
 
 
+class MCPTranslationTag(models.Model):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "django_smartbase_admin"
+
+    def __str__(self):
+        return self.name
+
+
 class MCPTranslatedArticleTranslation(models.Model):
     master = models.ForeignKey(
         MCPTranslatedArticle,
@@ -39,6 +49,7 @@ class MCPTranslatedArticleTranslation(models.Model):
     language_code = models.CharField(max_length=15)
     title = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
+    tags = models.ManyToManyField(MCPTranslationTag, blank=True)
 
     class Meta:
         app_label = "django_smartbase_admin"
@@ -53,7 +64,7 @@ class _MCPTranslatedArticleParlerMeta:
         return SimpleNamespace(rel_name="translations")
 
     def get_model_by_field(self, field_name):
-        if field_name in {"title", "slug"}:
+        if field_name in {"title", "slug", "tags"}:
             return MCPTranslatedArticleTranslation
         raise FieldError(field_name)
 
@@ -76,12 +87,14 @@ class TranslationMCPTests(TransactionTestCase):
         super().setUpClass()
         with connection.schema_editor() as schema_editor:
             schema_editor.create_model(MCPTranslatedArticle)
+            schema_editor.create_model(MCPTranslationTag)
             schema_editor.create_model(MCPTranslatedArticleTranslation)
 
     @classmethod
     def tearDownClass(cls):
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(MCPTranslatedArticleTranslation)
+            schema_editor.delete_model(MCPTranslationTag)
             schema_editor.delete_model(MCPTranslatedArticle)
         super().tearDownClass()
 
@@ -94,7 +107,7 @@ class TranslationMCPTests(TransactionTestCase):
             translations_definition=[
                 {
                     "model_path": ("django_smartbase_admin.MCPTranslatedArticle"),
-                    "fields": ["title", "slug"],
+                    "fields": ["title", "slug", "tags"],
                 }
             ]
         )
@@ -105,18 +118,21 @@ class TranslationMCPTests(TransactionTestCase):
         MCPToolTestConfig.view_permission_for = None
 
         self.article = MCPTranslatedArticle.objects.create()
+        self.first_tag = MCPTranslationTag.objects.create(name="First")
+        self.second_tag = MCPTranslationTag.objects.create(name="Second")
         MCPTranslatedArticleTranslation.objects.create(
             master=self.article,
             language_code="en",
             title="Source title",
             slug="source-title",
         )
-        MCPTranslatedArticleTranslation.objects.create(
+        self.german_translation = MCPTranslatedArticleTranslation.objects.create(
             master=self.article,
             language_code="de",
             title="German title",
             slug="german-title",
         )
+        self.german_translation.tags.add(self.first_tag)
 
         self.view_id = SBAdminTranslationsService.get_translation_view_id(
             MCPTranslatedArticle
@@ -146,7 +162,7 @@ class TranslationMCPTests(TransactionTestCase):
         self.assertIn(self.view_id, {entry["view_id"] for entry in index})
 
         entry = self.tools.list_admins(view_id=self.view_id)["admin_views"][0]
-        self.assertEqual(entry["detail_fields"], ["title", "slug"])
+        self.assertEqual(entry["detail_fields"], ["title", "slug", "tags"])
         field_names = {field["name"] for field in entry["fields"]}
         source_title = f"{self.translation_table}_en__title"
         self.assertIn(source_title, field_names)
@@ -189,7 +205,10 @@ class TranslationMCPTests(TransactionTestCase):
             self.view_id,
             str(self.article.pk),
             component_values={
-                german_name: {"title": "Updated German title"},
+                german_name: {
+                    "title": "Updated German title",
+                    "tags": [self.first_tag.pk],
+                },
                 french_name: {
                     "title": "French title",
                     "slug": "french-title",
@@ -215,6 +234,25 @@ class TranslationMCPTests(TransactionTestCase):
                 master=self.article, language_code="en"
             ).title,
             "Source title",
+        )
+
+    def test_update_translation_persists_many_to_many_fields(self):
+        german_name = f"{self.translation_table}:de"
+
+        result = self.tools.update_detail(
+            self.view_id,
+            str(self.article.pk),
+            component_values={
+                german_name: {
+                    "tags": [self.second_tag.pk],
+                }
+            },
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(
+            list(self.german_translation.tags.values_list("pk", flat=True)),
+            [self.second_tag.pk],
         )
 
     def test_browser_detail_uses_shared_translation_forms(self):
