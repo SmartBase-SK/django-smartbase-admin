@@ -63,6 +63,11 @@ class FolderPresetTestAdmin(SBAdmin):
                 choices=[("alpha", "Alpha"), ("beta", "Beta")]
             ),
         ),
+        SBAdminField(
+            name="parent",
+            annotate=F("parent__name"),
+            filter_field="parent",
+        ),
     )
     sbadmin_list_view_config = [
         {
@@ -94,6 +99,16 @@ class FolderPresetTestAdmin(SBAdmin):
                 "filterData": {
                     "status": '[{"value": "alpha", "label": "Alpha"}]',
                 }
+            },
+        },
+        {
+            "name": "By parent",
+            "url_params": {
+                "filterData": {
+                    "parent": [{"value": 1, "label": "Parent"}],
+                },
+                # Browser presets persist the Tabulator data key.
+                "tableParams": {"sort": [{"field": "parent_annt", "dir": "desc"}]},
             },
         },
     ]
@@ -212,4 +227,18 @@ class FetchFilterPresetTests(TestCase):
         self.assertEqual(
             decoded_str["filter_data"],
             {"status": [{"value": "alpha", "label": "Alpha"}]},
+        )
+
+        # 8. Presets store internal filter and browser sort keys, but the
+        # fetched payload uses the public name advertised by list_admins.
+        decoded_parent = tools.fetch_filter_preset(
+            view_id="filer_folder", name="By parent", source="static"
+        )
+        self.assertEqual(
+            decoded_parent["filter_data"],
+            {"parent": [{"value": 1, "label": "Parent"}]},
+        )
+        self.assertEqual(
+            decoded_parent["sort"],
+            [{"field": "parent", "dir": "desc"}],
         )

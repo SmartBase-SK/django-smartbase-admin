@@ -218,6 +218,57 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
             raise ValueError(f"sort dir must be 'asc' or 'desc', got {entry['dir']!r}")
 
 
+def _sort_keys_to_fields(sort: list | None, field_map) -> list | None:
+    """Translate validated public sort names to browser data keys."""
+    if not sort:
+        return sort
+    return [{**entry, "field": field_map[entry["field"]].field} for entry in sort]
+
+
+def _sort_keys_to_names(sort: list | None, field_map) -> list | None:
+    """Translate browser sort keys from a stored preset to public names."""
+    if not sort:
+        return sort
+    field_to_name: dict = {}
+    for name, field in (field_map or {}).items():
+        field_to_name.setdefault(field.field, name)
+    return [
+        (
+            {**entry, "field": field_to_name.get(entry["field"], entry["field"])}
+            if isinstance(entry, dict) and "field" in entry
+            else entry
+        )
+        for entry in sort
+    ]
+
+
+def _row_keys_to_names(rows: list[dict], fields: list[str], field_map) -> None:
+    """Translate declared browser row keys back to MCP public field names."""
+    mappings = [
+        (name, field_map[name].field)
+        for name in fields
+        if name in field_map and field_map[name].field != name
+    ]
+    if not mappings:
+        return
+
+    public_names = set(fields)
+    internal_keys = {field_key for _name, field_key in mappings}
+
+    def translate(row):
+        translated = {
+            name: row[field_key] for name, field_key in mappings if field_key in row
+        }
+        for field_key in internal_keys - public_names:
+            row.pop(field_key, None)
+        row.update(translated)
+        for child in row.get("_children") or []:
+            translate(child)
+
+    for row in rows:
+        translate(row)
+
+
 def _decode_preset_url_params(url_params) -> dict:
     """Turn a preset's raw ``url_params`` blob (JSON string or dict) into
     the kwargs ``list_rows`` accepts: ``filter_data``,
@@ -464,14 +515,31 @@ class SBAdminTools(MCPToolset):
         if detail not in ("index", "full"):
             raise ValueError(f"detail must be 'index' or 'full', got {detail!r}.")
 
-        # Resolved against the same registry the unscoped call iterates, so
-        # scoping can only ever narrow that set — never reach a widget or
-        # inline view_id that ``admin_entry`` cannot describe.
-        candidates = [
-            admin
-            for admin in sb_admin_site._registry.values()
-            if isinstance(admin, SBAdminBaseListView)
-        ]
+        # Model admins live in the Django admin registry, while configured
+        # list views (notably ``ModelTranslationView``) live only in the
+        # role configuration.  Both are top-level MCP surfaces.  Do not walk
+        # ``view_map`` here: it also contains inlines and dashboard/detail
+        # widgets, which are discovered through their owning admin instead.
+        configured_views = getattr(
+            request.request_data.configuration, "registered_views", ()
+        )
+        candidates_by_id = {
+            candidate.get_id(): candidate
+            for candidate in configured_views
+            if isinstance(candidate, SBAdminBaseListView)
+            and candidate.model is not None
+        }
+        # Match ``SBAdminRoleConfiguration.init_view_map`` collision
+        # semantics: a real model admin wins over a configured view with the
+        # same id.
+        candidates_by_id.update(
+            {
+                admin.get_id(): admin
+                for admin in sb_admin_site._registry.values()
+                if isinstance(admin, SBAdminBaseListView)
+            }
+        )
+        candidates = list(candidates_by_id.values())
         if view_id:
             candidates = [admin for admin in candidates if admin.get_id() == view_id]
             if not candidates:
@@ -580,6 +648,8 @@ class SBAdminTools(MCPToolset):
                 decoded["filter_data"] = _filter_keys_to_names(
                     decoded["filter_data"], field_map
                 )
+            if "sort" in decoded:
+                decoded["sort"] = _sort_keys_to_names(decoded["sort"], field_map)
             return decoded
 
         if source == "static":
@@ -769,6 +839,7 @@ class SBAdminTools(MCPToolset):
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
         _validate_sort(admin, request, sort, field_map)
+        sort = _sort_keys_to_fields(sort, field_map)
         columns_data = build_columns_data(admin, request, fields, field_map)
 
         table_params: dict = {
@@ -832,6 +903,7 @@ class SBAdminTools(MCPToolset):
             if pk_attname != "id" and "id" not in row and pk_attname in row:
                 row["id"] = row[pk_attname]
         strip_html_cells(admin, request, rows)
+        _row_keys_to_names(rows, fields, field_map)
         if include_inlines:
             attach_inlines(admin, request, rows, include_inlines)
         if aggregates is not None:
@@ -854,7 +926,8 @@ class SBAdminTools(MCPToolset):
         )
         try:
             admin.init_view_dynamic(request, request.request_data)
-            result = SBAdminMCPDetailService.get_detail_data(
+            detail_service = SBAdminMCPDetailService.for_view(admin)
+            result = detail_service.get_detail_data(
                 admin, request, object_id, fields=fields
             )
             actions = detail_action_entries(admin, request, object_id=object_id)
@@ -1223,7 +1296,8 @@ class SBAdminTools(MCPToolset):
         )
         admin.init_view_dynamic(request, request.request_data)
         try:
-            return SBAdminMCPDetailService.update_detail_data(
+            detail_service = SBAdminMCPDetailService.for_view(admin)
+            return detail_service.update_detail_data(
                 admin,
                 request,
                 object_id,

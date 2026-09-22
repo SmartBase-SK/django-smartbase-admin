@@ -265,8 +265,11 @@ def _inline_entry(inline, request) -> dict:
 
 def _inline_entries(admin, request) -> list[dict]:
     """Real + fake inlines the user can view; broken inlines are skipped."""
-    inline_classes = list(admin.get_inlines(request, None) or [])
-    inline_classes.extend(admin.get_sbadmin_fake_inlines(request, obj=None) or [])
+    inline_classes = []
+    if hasattr(admin, "get_inlines"):
+        inline_classes.extend(admin.get_inlines(request, None) or [])
+    if hasattr(admin, "get_sbadmin_fake_inlines"):
+        inline_classes.extend(admin.get_sbadmin_fake_inlines(request, obj=None) or [])
 
     entries: list[dict] = []
     for inline_class in inline_classes:
@@ -344,9 +347,8 @@ def _detail_field_entries(admin, request) -> list[str]:
     truth instead of two.
     """
     try:
-        names = list(
-            SBAdminMCPDetailService.get_detail_fields(admin, request, None) or []
-        )
+        detail_service = SBAdminMCPDetailService.for_view(admin)
+        names = list(detail_service.get_detail_fields(admin, request, None) or [])
     except ImproperlyConfigured:
         # List-only admin with no detail page — no fieldsets by design.
         # Mirrors how get_form autocomplete registration treats this case.

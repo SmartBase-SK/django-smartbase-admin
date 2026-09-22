@@ -9,7 +9,7 @@ through ``MCPToolset._add_tools_to`` — minus the JSON-RPC framing.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.urls import path
@@ -27,6 +27,7 @@ from django_smartbase_admin.engine.filter_widgets import (
     MultipleChoiceFilterWidget,
 )
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.schema import _inline_entries
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -122,6 +123,38 @@ class ListAdminsTests(TestCase):
         # Default admin has no ``search_fields`` → empty list signals
         # that ``full_text_search`` is a no-op for this admin.
         self.assertEqual(entry["search_fields"], [])
+
+    def test_fake_inline_provider_does_not_require_real_inline_provider(self):
+        class FakeInline:
+            def __init__(self, model, admin_site):
+                self.model = model
+                self.admin_site = admin_site
+
+            def has_view_or_change_permission(self, request, obj):
+                return True
+
+        class FakeOnlyAdmin:
+            model = Folder
+            admin_site = sb_admin_site
+
+            def get_sbadmin_fake_inlines(self, request, obj=None):
+                return [FakeInline]
+
+        request = build_mcp_request(MagicMock(is_authenticated=True))
+        expected = {"inline_name": "FakeInline"}
+        with (
+            patch(
+                "django_smartbase_admin.mcp.schema.is_fake_inline_batch_safe",
+                return_value=True,
+            ),
+            patch(
+                "django_smartbase_admin.mcp.schema._inline_entry",
+                return_value=expected,
+            ),
+        ):
+            entries = _inline_entries(FakeOnlyAdmin(), request)
+
+        self.assertEqual(entries, [expected])
 
     def test_whoami_is_omitted_when_unconfigured(self):
         user = MagicMock(
@@ -364,7 +397,7 @@ class ListAdminsTests(TestCase):
         status = fields_by_name["status"]
         self.assertEqual(status["title"], "Status")
         self.assertEqual(status["filter"]["widget"], "MultipleChoiceFilterWidget")
-        # The filter is keyed by the column ``name`` in list_rows; the
+        # The filter is keyed by the column name in list_rows; the
         # internal ``filter_field`` is not surfaced.
         self.assertNotIn("filter_field", status["filter"])
         self.assertEqual(

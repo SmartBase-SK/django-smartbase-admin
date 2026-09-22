@@ -2,11 +2,10 @@ from collections import defaultdict
 
 from django import forms
 from django.apps import apps
-from django.contrib import messages
 from django.db.models import Case, When, F, Value, CharField
 from django.db.models.functions import Concat
 from django.forms import modelform_factory
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -19,7 +18,6 @@ from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.const import (
     TRANSLATION_MODEL_KEY,
-    Action,
     OBJECT_ID_PLACEHOLDER,
     TRANSLATIONS_SELECTED_LANGUAGES,
 )
@@ -57,9 +55,6 @@ class ModelTranslationView(
         result = []
         translated_fields_dict = self.get_translated_fields()
         for translation_model, translated_fields in translated_fields_dict.items():
-            main_lang_annotate_name = self.get_annotate_name(
-                translation_model, SBAdminTranslationsService.get_main_lang_code()
-            )
             for language_code in self.get_display_language_codes(
                 request, include_main=False
             ):
@@ -129,6 +124,13 @@ class ModelTranslationView(
         return context
 
     def get_selected_language_codes(self, request):
+        if getattr(request, "is_mcp", False):
+            return [
+                language_code
+                for language_code, _language_name in (
+                    SBAdminTranslationsService.get_translation_languages()
+                )
+            ]
         return SBAdminTranslationsService.get_selected_language_codes(request)
 
     def get_display_language_codes(self, request, include_main=True):
@@ -243,6 +245,13 @@ class ModelTranslationView(
             exclude_fields=self.exclude_fields,
         )
 
+    def get_mcp_detail_service(self):
+        from django_smartbase_admin.mcp.translations import (
+            SBAdminMCPTranslationService,
+        )
+
+        return SBAdminMCPTranslationService
+
     def handle_language_choice_change(self, request):
         if (
             request.request_data.request_method == "POST"
@@ -298,12 +307,12 @@ class ModelTranslationView(
         translation_obj.save()
         return translation_obj
 
-    @sbadmin_action
-    def detail(self, request, modifier, object_id=None):
+    def get_translation_forms(self, request, object_id=None):
+        """Build the language forms shared by the browser and MCP detail views."""
+        if object_id is None:
+            object_id = request.request_data.object_id
+
         main_language_code = SBAdminTranslationsService.get_main_lang_code()
-        language_choice_change_response = self.handle_language_choice_change(request)
-        if language_choice_change_response:
-            return language_choice_change_response
         translation_models = self.get_translation_models()
         translated_field_names = {
             SBAdminTranslationsService.get_translations_key(translation_model): [
@@ -354,7 +363,7 @@ class ModelTranslationView(
                         request.request_data,
                     )
                     .filter(
-                        master=request.request_data.object_id,
+                        master=object_id,
                         language_code=language_code,
                     )
                     .first()
@@ -371,19 +380,6 @@ class ModelTranslationView(
                         instance=translation_instance,
                         auto_id=auto_id,
                     )
-                    if translation_form.is_valid():
-                        translation_obj = self.save_translation(
-                            request, translation_form
-                        )
-                        msg_dict = {
-                            "name": f"{_('Translations')} / {self.model._meta.verbose_name_plural}",
-                            "obj": format_html(
-                                '<a href="{}">{}</a>',
-                                urlquote(request.path),
-                                f"{translation_obj.master} ({translation_obj})",
-                            ),
-                        }
-                        return self.get_detail_change_response(request, msg_dict)
                 elif translation_instance:
                     translation_form = translation_form_class(
                         instance=translation_instance, auto_id=auto_id
@@ -398,17 +394,41 @@ class ModelTranslationView(
                     SBAdminTranslationsService.get_translations_key(translated_model),
                 )
 
-                for field_name, field in translation_form.fields.items():
+                for field in translation_form.fields.values():
                     if language_code == main_language_code:
                         field.widget.attrs["readonly"] = True
                     field.widget.attrs["form"] = f"{self.FORM_BASE_ID}{language_code}"
 
                 translation_forms[language_code].append(translation_form)
+        return dict(translation_forms)
+
+    @sbadmin_action
+    def detail(self, request, modifier, object_id=None):
+        main_language_code = SBAdminTranslationsService.get_main_lang_code()
+        language_choice_change_response = self.handle_language_choice_change(request)
+        if language_choice_change_response:
+            return language_choice_change_response
+
+        translation_forms = self.get_translation_forms(request, object_id)
+        for forms_for_language in translation_forms.values():
+            for translation_form in forms_for_language:
+                if not translation_form.is_bound or not translation_form.is_valid():
+                    continue
+                translation_obj = self.save_translation(request, translation_form)
+                msg_dict = {
+                    "name": f"{_('Translations')} / {self.model._meta.verbose_name_plural}",
+                    "obj": format_html(
+                        '<a href="{}">{}</a>',
+                        urlquote(request.path),
+                        f"{translation_obj.master} ({translation_obj})",
+                    ),
+                }
+                return self.get_detail_change_response(request, msg_dict)
 
         context = self.get_global_context(request)
         context.update(
             {
-                "translation_forms": dict(translation_forms),
+                "translation_forms": translation_forms,
                 "title": f"{_('Translations')} / {self.model._meta.verbose_name}",
                 "TRANSLATION_MODEL_KEY": TRANSLATION_MODEL_KEY,
                 "FORM_BASE_ID": self.FORM_BASE_ID,

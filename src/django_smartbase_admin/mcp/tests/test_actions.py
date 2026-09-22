@@ -199,6 +199,45 @@ class ListRowsTests(_ToolTestBase):
                 "filer_folder", fields=["name"]
             )
 
+    def test_annotated_column_uses_public_name_everywhere(self):
+        first_parent = Folder.objects.create(name="a parent")
+        last_parent = Folder.objects.create(name="z parent")
+        Folder.objects.create(name="sort child a", parent=first_parent)
+        Folder.objects.create(name="sort child z", parent=last_parent)
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        tools = SBAdminTools(request=build_mcp_request(user))
+
+        entry = tools.list_admins(view_id="filer_folder")["admin_views"][0]
+        self.assertIn("parent", {field["name"] for field in entry["fields"]})
+        result = tools.list_rows(
+            "filer_folder",
+            fields=["parent"],
+            sort=[{"field": "parent", "dir": "desc"}],
+            full_text_search="sort child",
+        )
+
+        self.assertEqual(
+            [row["parent"] for row in result["data"]],
+            ["z parent", "a parent"],
+        )
+        self.assertNotIn("parent_annt", result["data"][0])
+        filtered = tools.list_rows(
+            "filer_folder",
+            fields=["parent"],
+            filter_data={"parent": [{"value": first_parent.pk, "label": "a parent"}]},
+        )
+        self.assertEqual(filtered["data"][0]["parent"], "a parent")
+        with self.assertRaises(LookupError):
+            tools.list_rows("filer_folder", fields=["parent_annt"])
+        with self.assertRaises(ValueError):
+            tools.list_rows(
+                "filer_folder",
+                fields=["name"],
+                filter_data={
+                    "parent_annt": [{"value": first_parent.pk, "label": "a parent"}]
+                },
+            )
+
     def test_list_rows_respects_action_permission(self):
         class FolderListActionDeniedAdmin(FolderActionsTestAdmin):
             def has_permission_for_action(self, request, action):

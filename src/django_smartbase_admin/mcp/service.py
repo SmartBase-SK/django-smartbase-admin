@@ -102,6 +102,12 @@ class SBAdminMCPDetailService:
     # -- public ----------------------------------------------------------
 
     @classmethod
+    def for_view(cls, view):
+        """Resolve a view-provided detail service, falling back to ModelAdmin."""
+        service_getter = getattr(view, "get_mcp_detail_service", None)
+        return service_getter() if service_getter else cls
+
+    @classmethod
     def get_detail_fields(cls, admin, request, obj=None) -> list[str]:
         """Flat field list (form + readonly) the change form would show.
 
