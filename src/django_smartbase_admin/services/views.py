@@ -250,8 +250,8 @@ class SBAdminViewService(object):
         getters built and ``has_permission_for_action`` accepted for this
         request, so a modal runs only if this request would render it.
         """
-        find_modal_action = getattr(view, "find_modal_action", None)
-        action = find_modal_action(request, action_id) if find_modal_action else None
+        find_action = getattr(view, "find_action", None)
+        action = find_action(request, action_id) if find_action else None
         if action is None:
             raise Http404(
                 f"Action {action_id!r} is not available on view {view.get_id()!r}."

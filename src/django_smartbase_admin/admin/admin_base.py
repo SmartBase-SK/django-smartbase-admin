@@ -156,7 +156,6 @@ from django_smartbase_admin.admin.widgets import (
     SBAdminDateTimeRangeWidget,
 )
 from django_smartbase_admin.engine.admin_base_view import (
-    KNOWN_MODAL_ACTION_IDS,
     SBAdminBaseListView,
     SBAdminBaseView,
     SBAdminBaseQuerysetMixin,
@@ -178,29 +177,6 @@ from django_smartbase_admin.services.translations import SBAdminTranslationsServ
 from django_smartbase_admin.services.views import SBAdminViewService
 
 logger = logging.getLogger(__name__)
-
-
-def _is_known_modal_action_id(action: str) -> bool:
-    """Whether ``action`` can be a modal id rather than a typo.
-
-    Accepts ids already seen while resolving modal action URLs and the
-    default ids of loaded view classes (class name or ``action_id``), which
-    covers links rendered before any getter resolved the modal. The class
-    scan is cached into the same set, so it only repeats on a miss.
-    """
-    if action in KNOWN_MODAL_ACTION_IDS:
-        return True
-    from django.views import View
-
-    pending = [View]
-    while pending:
-        view_class = pending.pop()
-        pending.extend(view_class.__subclasses__())
-        KNOWN_MODAL_ACTION_IDS.add(view_class.__name__)
-        action_id = getattr(view_class, "action_id", None)
-        if isinstance(action_id, str):
-            KNOWN_MODAL_ACTION_IDS.add(action_id)
-    return action in KNOWN_MODAL_ACTION_IDS
 
 
 def _iter_leaf_actions(actions):
@@ -1030,8 +1006,7 @@ class SBAdmin(
                 return []
         return self.get_inline_instances(request, obj=obj)
 
-    def _register_inline_actions(self, request) -> None:
-        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+    def _register_inline_actions(self, request, object_id=None) -> None:
         for inline in self._get_inline_instances_for_actions(request, object_id):
             inline.init_actions(request)
 
@@ -1093,11 +1068,6 @@ class SBAdmin(
         return self.menu_label or self.model._meta.verbose_name_plural
 
     def get_action_url(self, action, modifier="template", object_id=None) -> str:
-        # Modal ids are not attributes; whether a modal is dispatchable is
-        # decided per request by ``find_modal_action``. Here we only catch
-        # typos: the name must be a method or a known view class.
-        if not hasattr(self, action) and not _is_known_modal_action_id(action):
-            raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs=self.get_action_url_kwargs(action, modifier, object_id),
@@ -1494,15 +1464,24 @@ class SBAdminInline(
             )
         self.register_action_autocomplete_views(request, all_actions)
 
-    def _register_inline_actions(self, request) -> None:
+    def _action_registration_steps(self, request):
+        # Fieldset actions need the parent-bound inline, not the unbound
+        # instance registered for URL dispatch.
+        return [self._register_inline_actions, self._register_modal_actions]
+
+    def _register_inline_actions(self, request, object_id=None) -> None:
         # Dispatch on the inline's own view id: first the actions this inline
         # lists without a parent object, then the parent admin's pass, which
         # rebuilds the inline for the parent object in ``object_id``.
         self.get_sbadmin_inline_list_actions_processed(request)
+        parent_pk = getattr(self.parent_instance, "pk", None)
+        if parent_pk is not None:
+            self.get_sbadmin_fieldsets_actions_processed(request, parent_pk)
+            return
         parent_admin = self.admin_site._registry.get(self.parent_model)
         register_parent = getattr(parent_admin, "_register_inline_actions", None)
         if register_parent is not None:
-            register_parent(request)
+            register_parent(request, object_id)
 
     def _bind_parent_row_action_modals(self, actions: list) -> list:
         parent_admin = self.admin_site._registry.get(self.parent_model)

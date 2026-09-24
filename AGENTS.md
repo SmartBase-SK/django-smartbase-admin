@@ -2806,6 +2806,13 @@ it for this user and object, the response is a 404 that names the action. The pe
 check sees the same action object at render and at submit, including `target_view`,
 `permission` and custom attributes.
 
+Browser dispatch and MCP form lookup both use `view.find_action(request, action_id,
+object_id=None)`. On a registry miss it processes the view's action sources for the
+requested object. Detail and fieldset actions also work on custom `SBAdminView` classes
+without list views. Inline fieldset lookup rebuilds the parent-bound inline when a fresh
+request reaches the inline's URL. `get_action_url()` only builds a URL; availability and
+permissions are checked when the request is dispatched.
+
 Modals that a view opens from its own markup (a tree, a custom widget, a link rendered in a
 readonly field) have no button, so publish them through `get_sbadmin_modal_actions()`:
 

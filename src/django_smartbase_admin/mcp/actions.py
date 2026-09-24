@@ -612,65 +612,19 @@ class SBAdminMCPActionFormService:
         *,
         object_id: str | None = None,
     ):
-        """Search ``view``'s action sources for a modal action.
+        """Resolve a permitted modal through the browser dispatch registry.
 
-        ``view`` is either an admin (walks the four admin-level lists)
-        or an inline (walks ``get_sbadmin_inline_list_actions``).
-        Inlines register in ``view_map`` under their own ``get_id()``
-        and dispatch through their own URL namespace, so an inline
-        invocation lands here with the inline as ``view``.
+        ``view`` may be an admin, a custom view, or an inline. Shared lookup
+        includes custom-markup modals and inline fieldsets without maintaining
+        a separate list of action sources for MCP.
         """
-        for action_list in cls._action_sources(view, request, object_id=object_id):
-            for action in action_list or []:
-                found = cls._search_action_tree(action, action_id)
-                if found is not None:
-                    return found
-
-        raise LookupError(
-            f"No modal action {action_id!r} on view {view.get_id()!r}. "
-            f"action_id must be a target_view class name from list_admins()."
-        )
-
-    @classmethod
-    def _action_sources(cls, view, request, *, object_id=None):
-        """Yield the right action lists for ``view`` (admin vs. inline).
-
-        ``_processed`` variants run ``process_actions_permissions``, so
-        actions the user can't invoke don't get a form fetch — lookup
-        fails with the same ``LookupError`` as a missing action, and
-        permission is enforced consistently with the UI and the invoke
-        path.
-        """
-        if hasattr(view, "get_sbadmin_inline_list_actions_processed"):
-            yield view.get_sbadmin_inline_list_actions_processed(request)
-            return
-        yield view.get_sbadmin_row_actions_processed(request)
-        yield view.get_sbadmin_detail_actions_processed(request, object_id)
-        yield view.get_sbadmin_list_selection_actions_processed(request)
-        yield view.get_sbadmin_list_actions_processed(request)
-        # Fieldset-scoped actions dispatch through the same detail path.
-        yield view.get_sbadmin_fieldsets_actions_processed(request, object_id)
-        # Inline modals bound to the parent are detail actions of the parent.
-        if hasattr(view, "get_sbadmin_inline_parent_actions_processed"):
-            yield view.get_sbadmin_inline_parent_actions_processed(request, object_id)
-
-    @classmethod
-    def _search_action_tree(cls, action, action_id: str):
-        """DFS for a modal action whose ``get_action_id()`` matches.
-        Returns ``(action, target_view_class)`` or ``None``. Only modal
-        actions (those with a ``target_view``) are returned — method
-        actions with the same ``action_id`` aren't form-fetchable.
-        """
-        target_view = getattr(action, "target_view", None)
-        if target_view is not None and action.get_action_id() == action_id:
-            return action, target_view
-
-        for sub in getattr(action, "sub_actions", None) or []:
-            found = cls._search_action_tree(sub, action_id)
-            if found is not None:
-                return found
-
-        return None
+        action = view.find_action(request, action_id, object_id=object_id)
+        if action is None:
+            raise LookupError(
+                f"No modal action {action_id!r} on view {view.get_id()!r}. "
+                f"action_id must be a modal action id from list_admins() or fetch_detail()."
+            )
+        return action, action.target_view
 
 
 class SBAdminMCPActionInvokeService:

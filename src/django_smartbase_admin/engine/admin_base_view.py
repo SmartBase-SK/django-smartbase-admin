@@ -74,11 +74,6 @@ SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
 SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
 SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 
-# Modal action ids seen while building action URLs. Routing only (lets
-# ``get_action_url`` tell a modal id from a typo); whether a modal may run is
-# decided per request by ``find_modal_action``.
-KNOWN_MODAL_ACTION_IDS: set[str] = set()
-
 
 class SBAdminBaseView(object):
     global_filter_data_map = None
@@ -194,7 +189,6 @@ class SBAdminBaseView(object):
             action_id = self.get_form_view_action_id(
                 target_view, getattr(action, "action_id", None)
             )
-            KNOWN_MODAL_ACTION_IDS.add(action_id)
             resolved_action.action_id = action_id
             resolved_action.url = source_view.get_action_url(
                 action_id,
@@ -223,15 +217,25 @@ class SBAdminBaseView(object):
         """
         return [*(self.sbadmin_modal_actions or [])]
 
-    def get_sbadmin_modal_actions_processed(self, request) -> list[SBAdminCustomAction]:
+    def get_sbadmin_modal_actions_processed(
+        self, request, object_id: int | str | None = None
+    ) -> list[SBAdminCustomAction]:
+        if object_id is None:
+            object_id = getattr(
+                getattr(request, "request_data", None), "object_id", None
+            )
         return self.process_detail_actions(
             request,
             [*(self.get_sbadmin_modal_actions(request) or [])],
-            getattr(getattr(request, "request_data", None), "object_id", None),
+            object_id,
         )
 
-    def _register_modal_actions(self, request) -> None:
-        self.get_sbadmin_modal_actions_processed(request)
+    def _register_modal_actions(self, request, object_id=None) -> None:
+        self.get_sbadmin_modal_actions_processed(request, object_id)
+
+    def _register_detail_actions(self, request, object_id=None) -> None:
+        self.get_sbadmin_detail_actions_processed(request, object_id)
+        self.get_sbadmin_fieldsets_actions_processed(request, object_id)
 
     def _action_registration_steps(self, request):
         return [
@@ -245,13 +249,15 @@ class SBAdminBaseView(object):
             if step is not None
         ]
 
-    def find_modal_action(self, request, action_id):
+    def find_action(
+        self, request, action_id: str, object_id: int | str | None = None
+    ) -> SBAdminCustomAction | None:
         """Return the modal action this request lists under ``action_id``.
 
-        Getters record every modal they list (after the permission check)
-        into ``request.request_data.action_map``. Most dispatches find it
-        there already because ``init_actions`` ran; otherwise the
-        registration steps run until it appears, like autocompletes.
+        Browser dispatch and MCP share this lookup. Processed getters record
+        permitted modals in ``request.request_data.action_map``; on a miss,
+        rebuild the action sources for the requested object until one lists
+        the modal. The registry keeps the action that passed permission checks.
         """
         request_data = getattr(request, "request_data", None)
         if getattr(request_data, "action_map", None) is None:
@@ -260,8 +266,10 @@ class SBAdminBaseView(object):
         action = request_data.get_action(view_id, action_id)
         if action is not None:
             return action
+        if object_id is None:
+            object_id = request_data.object_id
         for step in self._action_registration_steps(request):
-            step(request)
+            step(request, object_id)
             action = request_data.get_action(view_id, action_id)
             if action is not None:
                 return action
@@ -910,11 +918,8 @@ class SBAdminBaseListView(SBAdminBaseView):
             *self.get_sbadmin_fieldsets_actions_processed(request, object_id),
         ]
 
-    def _register_list_actions(self, request) -> None:
+    def _register_list_actions(self, request, object_id=None) -> None:
         self._list_actions_processed(request)
-
-    def _register_detail_actions(self, request) -> None:
-        self._detail_actions_processed(request)
 
     def init_actions(self, request) -> None:
         # Processing the getters also records every permitted modal into
