@@ -368,7 +368,7 @@ def _sanitize_rich_text(value):
 
     The nh3 defaults provide the security allowlist, but omit ``style``, filer image
     IDs, image metadata, and table ``colwidth``. Those attributes are added above,
-    with CSS still restricted to the three properties supported by this editor.
+    with CSS still restricted to the properties supported by this editor.
     ``link_rel`` is disabled because Tiptap does not emit ``rel`` without ``target``.
     """
     if value is None or value == "":
@@ -377,7 +377,7 @@ def _sanitize_rich_text(value):
         str(value),
         tags=nh3.ALLOWED_TAGS,
         attributes=_RICH_TEXT_ALLOWED_ATTRIBUTES,
-        filter_style_properties={"color", "text-align", "width"},
+        filter_style_properties={"color", "text-align", "text-transform", "width"},
         link_rel=None,
     )
 
@@ -401,6 +401,10 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
             "name": "color",
             "label": _("Text color"),
             "template": "sb_admin/widgets/includes/richtext/color.html",
+        },
+        {
+            "name": "text-transform",
+            "template": "sb_admin/widgets/includes/richtext/text_transform.html",
         },
         {
             "name": "align-left",

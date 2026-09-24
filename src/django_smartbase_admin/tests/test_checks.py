@@ -10,7 +10,10 @@ from __future__ import annotations
 from unittest import TestCase
 
 from django.contrib import admin as django_admin
+from django.contrib.auth.models import Group
+from django.contrib.sessions.models import Session
 
+from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.checks import (
     check_admin_display_ordering_filter_field_for_admin,
     check_duplicate_filter_field_for_admin,
@@ -172,6 +175,40 @@ class TestW002ViewConfigFilterKeys(TestCase):
 
 
 class TestW003OrderingColumns(TestCase):
+    def test_automatic_primary_key_column_no_warning(self):
+        for model, display_field in ((Group, "name"), (Session, "expire_date")):
+            with self.subTest(model=model):
+                view = SBAdmin(model, django_admin.AdminSite())
+                view.sbadmin_list_display = (display_field,)
+                view.ordering = (f"-{model._meta.pk.name}",)
+                self.assertEqual(check_ordering_columns_for_admin(view), [])
+                self.assertEqual(view.sbadmin_list_display, (display_field,))
+
+    def test_list_display_fallback_no_warning(self):
+        view = SBAdmin(Group, django_admin.AdminSite())
+        view.list_display = ("name",)
+        view.ordering = ("name",)
+        self.assertEqual(check_ordering_columns_for_admin(view), [])
+
+    def test_sbadmin_list_display_takes_precedence(self):
+        view = SBAdmin(Group, django_admin.AdminSite())
+        view.list_display = ("name",)
+        view.sbadmin_list_display = ("id",)
+        view.ordering = ("name",)
+        result = check_ordering_columns_for_admin(view)
+        self.assertEqual([warning.id for warning in result], ["sbadmin.W003"])
+
+    def test_does_not_call_request_dependent_list_display(self):
+        class RequestDependentAdmin(SBAdmin):
+            sbadmin_list_display = ("name",)
+            ordering = ("-id",)
+
+            def get_sbadmin_list_display(self, request):
+                raise AssertionError("System checks must not require a request")
+
+        view = RequestDependentAdmin(Group, django_admin.AdminSite())
+        self.assertEqual(check_ordering_columns_for_admin(view), [])
+
     def test_known_field_in_ordering_no_warning(self):
         # Mix SBAdminField + plain-string entry; cover the "-" prefix strip.
         admin = _FakeAdmin(

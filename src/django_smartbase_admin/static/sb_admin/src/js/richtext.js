@@ -1,4 +1,4 @@
-import { Editor, Node, ResizableNodeView, mergeAttributes } from '@tiptap/core'
+import { Editor, Extension, Node, ResizableNodeView, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { Color } from '@tiptap/extension-color'
@@ -312,6 +312,26 @@ const RichTextTable = Table.extend({
     },
 })
 
+const TextTransform = Extension.create({
+    name: 'textTransform',
+    addGlobalAttributes() {
+        return [{
+            types: ['textStyle'],
+            attributes: {
+                textTransform: {
+                    default: null,
+                    parseHTML: (element) => element.style.textTransform || null,
+                    renderHTML: (attributes) => (
+                        attributes.textTransform
+                            ? {style: `text-transform: ${attributes.textTransform}`}
+                            : {}
+                    ),
+                },
+            },
+        }]
+    },
+})
+
 function editorExtensions(items, imageClass) {
     return [
         StarterKit.configure({
@@ -327,6 +347,7 @@ function editorExtensions(items, imageClass) {
         Underline,
         TextStyle,
         Color,
+        TextTransform,
         TextAlign.configure({types: ['heading', 'paragraph']}),
         Link.configure({
             openOnClick: false,
@@ -397,6 +418,7 @@ class RichTextWidgetController {
         this.handleClick = this.handleClick.bind(this)
         this.handleBlockChange = this.handleBlockChange.bind(this)
         this.handleColorChange = this.handleColorChange.bind(this)
+        this.handleTextTransformChange = this.handleTextTransformChange.bind(this)
         this.handleMediaSelection = this.handleMediaSelection.bind(this)
         this.handleSetValue = this.handleSetValue.bind(this)
         this.handleDocumentClick = this.handleDocumentClick.bind(this)
@@ -407,6 +429,7 @@ class RichTextWidgetController {
         root.addEventListener('click', this.handleClick)
         root.querySelector('[data-richtext-block]')?.addEventListener('change', this.handleBlockChange)
         root.querySelector('[data-richtext-color]')?.addEventListener('input', this.handleColorChange)
+        root.querySelector('[data-richtext-text-transform]')?.addEventListener('change', this.handleTextTransformChange)
         root.addEventListener(MEDIA_PICKER_SELECTED_EVENT, this.handleMediaSelection)
         root.addEventListener(SET_VALUE_EVENT, this.handleSetValue)
         root.addEventListener('keydown', this.handleKeydown)
@@ -499,6 +522,7 @@ class RichTextWidgetController {
             '[data-richtext-action]',
             '[data-richtext-block]',
             '[data-richtext-color]',
+            '[data-richtext-text-transform]',
             '[data-richtext-table-menu-trigger]',
         ].join(','))
         sourceModeControls.forEach((control) => {
@@ -555,6 +579,8 @@ class RichTextWidgetController {
         const color = editor.getAttributes('textStyle').color
         const colorInput = this.root.querySelector('[data-richtext-color]')
         if (colorInput && /^#[0-9a-f]{6}$/i.test(color || '')) colorInput.value = color
+        const textTransform = this.root.querySelector('[data-richtext-text-transform]')
+        if (textTransform) textTransform.value = editor.getAttributes('textStyle').textTransform || 'none'
     }
 
     toggleTableMenu() {
@@ -605,6 +631,15 @@ class RichTextWidgetController {
     handleColorChange(event) {
         if (this.sourceMode) return
         this.chain().setColor(event.target.value).run()
+    }
+
+    handleTextTransformChange(event) {
+        if (this.sourceMode) return
+        const value = event.target.value
+        this.chain()
+            .setMark('textStyle', {textTransform: value === 'none' ? null : value})
+            .removeEmptyTextStyle()
+            .run()
     }
 
     async openImagePicker() {
@@ -760,6 +795,7 @@ class RichTextWidgetController {
         this.root.removeEventListener('click', this.handleClick)
         this.root.querySelector('[data-richtext-block]')?.removeEventListener('change', this.handleBlockChange)
         this.root.querySelector('[data-richtext-color]')?.removeEventListener('input', this.handleColorChange)
+        this.root.querySelector('[data-richtext-text-transform]')?.removeEventListener('change', this.handleTextTransformChange)
         this.root.removeEventListener(MEDIA_PICKER_SELECTED_EVENT, this.handleMediaSelection)
         this.root.removeEventListener(SET_VALUE_EVENT, this.handleSetValue)
         this.root.removeEventListener('keydown', this.handleKeydown)

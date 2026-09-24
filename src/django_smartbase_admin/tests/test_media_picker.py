@@ -857,7 +857,7 @@ class MediaPickerViewTests(TestCase):
                     '<img src="/media/image.jpg" data-filer-image-id="12" '
                     'title="Image" loading="lazy" '
                     'style="width:100%;position:fixed" onerror="alert(1)">'
-                    '<span style="color:#123abc">Text</span>'
+                    '<span style="color:#123abc;text-transform:uppercase">Text</span>'
                 )
             }
         )
@@ -871,7 +871,7 @@ class MediaPickerViewTests(TestCase):
         self.assertIn('title="Image"', value)
         self.assertIn('loading="lazy"', value)
         self.assertIn('style="width:100%"', value)
-        self.assertIn('style="color:#123abc"', value)
+        self.assertIn('style="color:#123abc;text-transform:uppercase"', value)
         self.assertNotIn("script", value)
         self.assertNotIn("javascript:", value)
         self.assertNotIn("onclick", value)
@@ -941,6 +941,7 @@ class MediaPickerViewTests(TestCase):
                 "block",
                 "bold",
                 "color",
+                "text-transform",
                 "link",
                 "table",
                 "source",
@@ -952,6 +953,7 @@ class MediaPickerViewTests(TestCase):
         self.assertNotIn("data-richtext-block", html)
         self.assertNotIn('data-richtext-action="bold"', html)
         self.assertNotIn("data-richtext-color", html)
+        self.assertNotIn("data-richtext-text-transform", html)
         self.assertNotIn('data-richtext-action="link"', html)
         self.assertNotIn("data-richtext-link-dialog", html)
         self.assertNotIn('data-richtext-action="table"', html)
@@ -967,6 +969,7 @@ class MediaPickerViewTests(TestCase):
 
         self.assertIn('data-richtext-action="bold"', html)
         self.assertIn('data-richtext-action="table"', html)
+        self.assertIn("data-richtext-text-transform", html)
         self.assertNotIn('data-richtext-action="image"', html)
 
     def test_widget_hides_metadata_for_restricted_selected_item(self):

@@ -19,8 +19,9 @@ Currently checked:
   view tab renders with a spurious ``*``.
 
 * ``sbadmin.W003`` — a column-side name in ``ordering`` (after stripping the
-  ``-`` prefix) isn't present as an ``SBAdminField`` in
-  ``sbadmin_list_display``. Tabulator silently drops the entry from
+  ``-`` prefix) isn't present in the declared columns or as the automatic
+  primary-key column. The check also honors the ``list_display`` fallback.
+  Tabulator silently drops a genuinely missing column from
   ``tableInitialSort``, the actual sort then differs from initial,
   ``tableData.sort`` leaks into ``getUrlParamsForSave()``, and the view tab
   renders with a spurious ``*``. The check skips related lookups
@@ -221,8 +222,20 @@ def check_ordering_columns_for_admin(admin):
     ordering = getattr(admin, "ordering", None) or ()
     if not ordering:
         return warnings
+    list_display = list(
+        getattr(admin, "sbadmin_list_display", None)
+        or getattr(admin, "list_display", None)
+        or ()
+    )
+    # Match the runtime's automatic primary-key column without calling
+    # request-dependent get_sbadmin_list_display() overrides during startup.
+    build_pk_field = getattr(admin, "_build_synthetic_pk_field", None)
+    if build_pk_field is not None:
+        pk_field = build_pk_field(list_display)
+        if pk_field is not None:
+            list_display.append(pk_field)
     known_names: set[str] = set()
-    for entry in getattr(admin, "sbadmin_list_display", None) or ():
+    for entry in list_display:
         if isinstance(entry, SBAdminField):
             if entry.name:
                 known_names.add(entry.name)
@@ -244,7 +257,7 @@ def check_ordering_columns_for_admin(admin):
                 (
                     f"{admin.__class__.__name__}: ordering references "
                     f"{field!r} which has no matching SBAdminField (or "
-                    "plain field) in sbadmin_list_display. Tabulator "
+                    "plain field) in the effective list columns. Tabulator "
                     "drops it from tableInitialSort, the live sort differs "
                     "from initial, and the view tab renders with a "
                     "spurious '*'."
