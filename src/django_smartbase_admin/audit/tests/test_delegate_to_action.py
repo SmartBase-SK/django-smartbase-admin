@@ -89,26 +89,6 @@ class TestDelegateToAction(TestCase):
                 request, view="v", action="allowed_action", modifier="template"
             )
 
-    def test_dynamic_inner_view_is_marked(self):
-        from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
-
-        seen_kwargs = {}
-        mock_action = MagicMock()
-
-        def target_callable(request, **kwargs):
-            seen_kwargs.update(kwargs)
-            return HttpResponse("ok")
-
-        mock_action.target_view.as_view.return_value = target_callable
-
-        base_view = SBAdminBaseView.__new__(SBAdminBaseView)
-        inner = base_view.delegate_to_target_view(mock_action.target_view)
-        response = inner(self.factory.get("/"), "template", "123")
-
-        self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(seen_kwargs, {"modifier": "template", "object_id": "123"})
-
     @patch(PATCH_FROM_REQUEST)
     def test_decorator_permission_propagated_to_action(self, mock_from_request):
         @sbadmin_action(permission="delete")

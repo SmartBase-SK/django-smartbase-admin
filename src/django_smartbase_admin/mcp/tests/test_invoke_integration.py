@@ -252,6 +252,12 @@ class FolderFileInline(SBAdminTableInline):
                 title="Rename file",
                 view=self,
             ),
+            # No ``view``: a row modal on an inline runs against the parent.
+            SBAdminFormViewAction(
+                target_view=RenameFolderModalView,
+                title="Rename parent folder",
+                action_id="InlineRenameParentFolder",
+            ),
         ]
 
 
@@ -895,6 +901,48 @@ class IntegrationTests(_Base):
         self.assertEqual(second["status"], "ok")
         file_row.refresh_from_db()
         self.assertEqual(file_row.name, "renamed.txt")
+
+    def test_parent_bound_inline_modal_is_a_detail_action_of_the_parent(self):
+        """An inline modal bound to the parent runs against the parent object,
+        so MCP publishes and invokes it as a parent detail action — never
+        against the inline."""
+        folder = Folder.objects.create(name="parent")
+        file_row = File.objects.create(folder=folder, name="orig.txt")
+
+        folder_entry = next(
+            a
+            for a in self._tools().list_admins()["admin_views"]
+            if a["view_id"] == "filer_folder"
+        )
+        inline = next(
+            i for i in folder_entry["inlines"] if i["inline_name"] == "FolderFileInline"
+        )
+        inline_action_ids = {a["action_id"] for a in inline["inline_actions"]}
+        self.assertNotIn("InlineRenameParentFolder", inline_action_ids)
+
+        detail = self._tools().fetch_detail("filer_folder", str(folder.pk))
+        detail_action_ids = {a["action_id"] for a in detail["detail_actions"]}
+        self.assertIn("InlineRenameParentFolder", detail_action_ids)
+
+        with self.assertRaises(LookupError):
+            self._tools().invoke_inline_action(
+                inline["view_id"],
+                "InlineRenameParentFolder",
+                object_id=str(file_row.pk),
+                component_values={"main": {"name": "wrong"}},
+            )
+
+        result = self._tools().invoke_detail_action(
+            "filer_folder",
+            "InlineRenameParentFolder",
+            object_id=str(folder.pk),
+            component_values={"main": {"name": "renamed-parent"}},
+        )
+        self.assertEqual(result["status"], "ok")
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "renamed-parent")
+        file_row.refresh_from_db()
+        self.assertEqual(file_row.name, "orig.txt")
 
     def test_audit_history_scoped_to_object_and_gated_by_flag(self):
         """``get_audit_history`` returns log entries for the admin's model

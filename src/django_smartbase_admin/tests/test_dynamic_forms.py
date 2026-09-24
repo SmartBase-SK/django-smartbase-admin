@@ -51,6 +51,7 @@ from django_smartbase_admin.services.thread_local import (
     SBAdminThreadLocalService,
     sb_admin_request,
 )
+from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.templatetags.sb_admin_tags import get_tabular_context
 
@@ -417,6 +418,9 @@ class FakeFieldsetActionView(SBAdminBaseView):
     def __init__(self, denied_action_id=None):
         self.denied_action_id = denied_action_id
 
+    def get_id(self):
+        return "fake_fieldset_action_view"
+
     def get_action_url(self, action, modifier="template", object_id=None):
         url = f"/sb-admin/{action}/{modifier}"
         if object_id is not None:
@@ -679,6 +683,9 @@ class CompleteUnrelatedActionModal(CompleteActionModal):
 
 
 class CompleteActionRequestData(SimpleNamespace):
+    register_action = SBAdminViewRequestData.register_action
+    get_action = SBAdminViewRequestData.get_action
+
     def register_autocomplete_view(self, view):
         self.autocomplete_map[view.get_id()] = view
 
@@ -1452,10 +1459,15 @@ class DynamicFormTests(SimpleTestCase):
         FieldsetActionsForm.view = view
         form = FieldsetActionsForm(request=self.request)
         form.instance = SimpleNamespace(pk=42)
+        self.request.request_data = SBAdminViewRequestData(
+            view=view.get_id(), action=None, modifier=None, user=None
+        )
 
         html = self.render_fieldset(form)
 
-        self.assertTrue(hasattr(view, "FieldsetModalView"))
+        self.assertIsNotNone(
+            self.request.request_data.get_action(view.get_id(), "FieldsetModalView")
+        )
         self.assertIn("/sb-admin/FieldsetModalView/template/42", html)
         self.assertIn('data-bs-toggle="modal"', html)
 
@@ -1518,6 +1530,7 @@ class DynamicFormTests(SimpleTestCase):
             request_post=self.request.POST,
             configuration=CompleteActionConfiguration(),
             autocomplete_map={},
+            action_map={},
         )
 
         view.register_action_autocomplete_views(
@@ -1570,6 +1583,7 @@ class DynamicFormTests(SimpleTestCase):
             request_post=self.request.POST,
             configuration=CompleteActionConfiguration(),
             autocomplete_map={},
+            action_map={},
         )
 
         view.register_action_autocomplete_views(
@@ -1673,6 +1687,7 @@ class DynamicFormTests(SimpleTestCase):
             session=request.session,
             additional_data={},
             autocomplete_map={},
+            action_map={},
         )
         SBAdminThreadLocalService.set_request(request)
 

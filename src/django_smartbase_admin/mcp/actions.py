@@ -283,6 +283,8 @@ _INVOKE_TOOL_BY_GETTER: dict[str, ActionInvoker] = {
     "get_sbadmin_row_actions_processed": ActionInvoker.ROW,
     "get_sbadmin_detail_actions_processed": ActionInvoker.DETAIL,
     "get_sbadmin_fieldsets_actions_processed": ActionInvoker.DETAIL,
+    # Inline modals bound to the parent run against the parent object.
+    "get_sbadmin_inline_parent_actions_processed": ActionInvoker.DETAIL,
     "get_sbadmin_inline_list_actions_processed": ActionInvoker.INLINE,
     "get_sbadmin_list_actions_processed": ActionInvoker.LIST,
     "get_sbadmin_list_selection_actions_processed": ActionInvoker.SELECTION,
@@ -388,6 +390,7 @@ def validate_ui_action_invoker(
             if getter_name in {
                 "get_sbadmin_detail_actions_processed",
                 "get_sbadmin_fieldsets_actions_processed",
+                "get_sbadmin_inline_parent_actions_processed",
             }:
                 getter_kwargs["object_id"] = object_id
             entries.extend(
@@ -647,6 +650,9 @@ class SBAdminMCPActionFormService:
         yield view.get_sbadmin_list_actions_processed(request)
         # Fieldset-scoped actions dispatch through the same detail path.
         yield view.get_sbadmin_fieldsets_actions_processed(request, object_id)
+        # Inline modals bound to the parent are detail actions of the parent.
+        if hasattr(view, "get_sbadmin_inline_parent_actions_processed"):
+            yield view.get_sbadmin_inline_parent_actions_processed(request, object_id)
 
     @classmethod
     def _search_action_tree(cls, action, action_id: str):
@@ -942,10 +948,6 @@ class SBAdminMCPActionInvokeService:
             action_components = {}
         else:
             _action, target_view_cls = modal
-            # Wire up the synthetic @sbadmin_action wrapper if the UI
-            # render path hasn't already done so this process.
-            if not hasattr(admin, action_id):
-                admin._register_form_view_action(target_view_cls, action_id, _action)
             # Build the exact forms/formsets declared by the modal and encode
             # the structured MCP payload into their native POST prefixes.
             action_components = cls._build_unbound_components(
