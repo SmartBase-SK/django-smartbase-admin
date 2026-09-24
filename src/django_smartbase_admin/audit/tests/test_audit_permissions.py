@@ -4,6 +4,7 @@ Tests the permission logic documented in AGENTS.md "Access Control" section:
 - Superuser vs non-superuser visibility
 - object_history filter bypasses user filtering for non-superusers
 - restrict_queryset applied when filtering by content_type or object_history
+- models without view permission (per their registered admin) stay hidden
 - Unknown models and exceptions fail closed (entries excluded)
 
 Uses Django's built-in auth.User and Group models so the tests run
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import Group, User
 from django.contrib.contenttypes.models import ContentType
 
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.audit.models import AdminAuditLog
 from django_smartbase_admin.audit.sb_admin import AdminAuditLogAdmin
 from django_smartbase_admin.audit.tests.test_audit_integration import (
@@ -163,6 +165,41 @@ class TestRestrictedQueryset(BasePermissionsTest):
         )
         pks = self._get_pks(request)
         self.assertNotIn(self.entry_g2.pk, pks)
+
+
+class TestModelViewPermission(BasePermissionsTest):
+    """Filtered models are gated by the registered admin's view permission."""
+
+    def setUp(self):
+        super().setUp()
+        self.entry_by_a = self._create_entry(self.user_a, self.group_ct, self.group1.pk)
+        self.entry_by_b = self._create_entry(self.user_b, self.group_ct, self.group1.pk)
+
+    def _patch_group_admin(self, has_view):
+        group_admin = MagicMock()
+        group_admin.has_view_or_change_permission.return_value = has_view
+        return patch.dict(sb_admin_site._registry, {Group: group_admin})
+
+    def _object_history_request(self):
+        filter_data = {
+            "object_history": [
+                {"value": f"{self.group_ct.pk}:{self.group1.pk}", "label": "Group 1"}
+            ],
+        }
+        return self._build_request(self.user_a, filter_data)
+
+    def test_admin_denies_view_hides_model(self):
+        """Admin class decides, even when the configuration would allow."""
+        request = self._object_history_request()
+        with self._patch_group_admin(has_view=False):
+            self.assertEqual(self._get_pks(request), set())
+
+    def test_admin_allows_view_shows_entries(self):
+        request = self._object_history_request()
+        with self._patch_group_admin(has_view=True):
+            self.assertEqual(
+                self._get_pks(request), {self.entry_by_a.pk, self.entry_by_b.pk}
+            )
 
 
 class TestFailClosed(BasePermissionsTest):

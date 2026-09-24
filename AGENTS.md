@@ -5844,10 +5844,11 @@ The audit log access control is implemented in `AdminAuditLogAdmin.get_queryset(
 Applies **after** Step 1, for **all users** (including superusers). When `content_type` or `object_history` filters are active:
 
 1. Collects content type IDs from active `object_history` and/or `content_type` filters
-2. For each content type, calls `SBAdminViewService.get_restricted_queryset()` on the target model — this invokes the project's `restrict_queryset` from `SBAdminRoleConfiguration`
-3. Filters audit entries so only entries with `object_id` in the restricted queryset are shown
-4. Entries for non-filtered content types (e.g., parent context, affected objects in the same audit view) are **not** restricted
-5. If the model class is unknown or restriction fails → entries for that content type are **excluded** (fail-closed)
+2. Content types whose registered admin denies `has_view_or_change_permission` are excluded entirely (models without a registered admin fall back to the configuration's `view`/`change` model permissions)
+3. For each remaining content type, calls `SBAdminViewService.get_restricted_queryset()` on the target model — this invokes the project's `restrict_queryset` from `SBAdminRoleConfiguration`
+4. Filters audit entries so only entries with `object_id` in the restricted queryset are shown
+5. Entries for non-filtered content types (e.g., parent context, affected objects in the same audit view) are **not** restricted
+6. If the model class is unknown or restriction fails → entries for that content type are **excluded** (fail-closed)
 
 **Result by scenario:**
 

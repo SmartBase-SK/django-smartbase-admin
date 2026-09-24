@@ -16,6 +16,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
+from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
 from django_smartbase_admin.engine.field import SBAdminField
@@ -429,6 +430,10 @@ class AdminAuditLogAdmin(SBAdmin):
                 model_class = ct.model_class()
                 if not model_class:
                     continue
+                # Without view (or change) permission the model stays hidden,
+                # its entries are excluded below like for unknown models.
+                if not self._has_model_view_permission(request, model_class):
+                    continue
 
                 restricted_qs = SBAdminViewService.get_restricted_queryset(
                     model_class, request, request.request_data
@@ -456,6 +461,24 @@ class AdminAuditLogAdmin(SBAdmin):
             qs = qs.exclude(content_type_id__in=content_type_ids)
 
         return qs
+
+    @staticmethod
+    def _has_model_view_permission(request, model_class):
+        """View or change permission on model_class as its registered admin decides.
+
+        Projects may implement permissions in admin classes instead of Django
+        model permissions. Models without a registered admin (e.g. inline-only)
+        fall back to the configuration's model permissions.
+        """
+        model_admin = sb_admin_site._registry.get(model_class)
+        if model_admin is not None:
+            return model_admin.has_view_or_change_permission(request)
+        return any(
+            SBAdminViewService.has_permission(
+                request, model=model_class, permission=permission
+            )
+            for permission in ("view", "change")
+        )
 
     def get_change_view_context(self, request, object_id):
         ctx = super().get_change_view_context(request, object_id)
