@@ -222,7 +222,19 @@ class SBAdminViewService(object):
         if not action_function or not getattr(
             action_function, "_is_sbadmin_action", False
         ):
-            raise Http404
+            # Modal actions run only when this request lists them, with the
+            # listed action's ``target_view`` (see ``find_action``).
+            action = view.find_action(request, action_name)
+            if action is None:
+                raise Http404(
+                    f"Action {action_name!r} is not available on view "
+                    f"{view.get_id()!r}."
+                )
+            return action.target_view.as_view(view=view)(
+                request,
+                modifier=request_data.modifier,
+                object_id=request_data.object_id,
+            )
 
         action_attrs = getattr(action_function, "_sbadmin_action_attrs", {}) or {}
         if not cls.has_action_permission(
@@ -232,7 +244,9 @@ class SBAdminViewService(object):
             modifier=request_data.modifier,
             action_attrs=action_attrs,
         ):
-            raise PermissionDenied
+            raise PermissionDenied(
+                f"No permission to run action {action_name!r} on view {view.get_id()!r}."
+            )
 
         return action_function(
             request,

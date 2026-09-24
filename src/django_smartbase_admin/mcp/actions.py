@@ -122,7 +122,9 @@ def get_mcp_action_components(
         modifier=modifier,
         action_attrs=attrs,
     ):
-        raise PermissionDenied
+        raise PermissionDenied(
+            f"No permission to run action {action_id!r} on view {view.get_id()!r}."
+        )
     result = _resolve_mcp_action_components(view, request, attrs["mcp_components"])
     if result is None:
         raise LookupError(
@@ -191,6 +193,14 @@ def _filename_from_disposition(header: str) -> str | None:
     if match:
         return match.group(1).strip()
     return None
+
+
+def _permission_denied_message(exc, action_id: str, view) -> str:
+    """``PermissionDenied`` text, or a named fallback when it was raised bare
+    (for example by the action's own view)."""
+    return str(exc).strip() or (
+        f"Permission denied running action {action_id!r} on view {view.get_id()!r}."
+    )
 
 
 def action_kind(action) -> str:
@@ -283,6 +293,7 @@ _INVOKE_TOOL_BY_GETTER: dict[str, ActionInvoker] = {
     "get_sbadmin_row_actions_processed": ActionInvoker.ROW,
     "get_sbadmin_detail_actions_processed": ActionInvoker.DETAIL,
     "get_sbadmin_fieldsets_actions_processed": ActionInvoker.DETAIL,
+    "get_sbadmin_inline_bound_actions_processed": ActionInvoker.DETAIL,
     "get_sbadmin_inline_list_actions_processed": ActionInvoker.INLINE,
     "get_sbadmin_list_actions_processed": ActionInvoker.LIST,
     "get_sbadmin_list_selection_actions_processed": ActionInvoker.SELECTION,
@@ -388,6 +399,7 @@ def validate_ui_action_invoker(
             if getter_name in {
                 "get_sbadmin_detail_actions_processed",
                 "get_sbadmin_fieldsets_actions_processed",
+                "get_sbadmin_inline_bound_actions_processed",
             }:
                 getter_kwargs["object_id"] = object_id
             entries.extend(
@@ -609,62 +621,21 @@ class SBAdminMCPActionFormService:
         *,
         object_id: str | None = None,
     ):
-        """Search ``view``'s action sources for a modal action.
+        """Return ``(action, target_view_class)`` for a modal action ``view``
+        lists for this request.
 
-        ``view`` is either an admin (walks the four admin-level lists)
-        or an inline (walks ``get_sbadmin_inline_list_actions``).
-        Inlines register in ``view_map`` under their own ``get_id()``
-        and dispatch through their own URL namespace, so an inline
-        invocation lands here with the inline as ``view``.
+        Resolves through ``view.find_action``, the same registry URL dispatch
+        uses, so MCP reaches exactly the modals the UI renders for this user.
+        ``view`` is an admin or an inline (inlines register in ``view_map``
+        under their own ``get_id()``).
         """
-        for action_list in cls._action_sources(view, request, object_id=object_id):
-            for action in action_list or []:
-                found = cls._search_action_tree(action, action_id)
-                if found is not None:
-                    return found
-
-        raise LookupError(
-            f"No modal action {action_id!r} on view {view.get_id()!r}. "
-            f"action_id must be a target_view class name from list_admins()."
-        )
-
-    @classmethod
-    def _action_sources(cls, view, request, *, object_id=None):
-        """Yield the right action lists for ``view`` (admin vs. inline).
-
-        ``_processed`` variants run ``process_actions_permissions``, so
-        actions the user can't invoke don't get a form fetch — lookup
-        fails with the same ``LookupError`` as a missing action, and
-        permission is enforced consistently with the UI and the invoke
-        path.
-        """
-        if hasattr(view, "get_sbadmin_inline_list_actions_processed"):
-            yield view.get_sbadmin_inline_list_actions_processed(request)
-            return
-        yield view.get_sbadmin_row_actions_processed(request)
-        yield view.get_sbadmin_detail_actions_processed(request, object_id)
-        yield view.get_sbadmin_list_selection_actions_processed(request)
-        yield view.get_sbadmin_list_actions_processed(request)
-        # Fieldset-scoped actions dispatch through the same detail path.
-        yield view.get_sbadmin_fieldsets_actions_processed(request, object_id)
-
-    @classmethod
-    def _search_action_tree(cls, action, action_id: str):
-        """DFS for a modal action whose ``get_action_id()`` matches.
-        Returns ``(action, target_view_class)`` or ``None``. Only modal
-        actions (those with a ``target_view``) are returned — method
-        actions with the same ``action_id`` aren't form-fetchable.
-        """
-        target_view = getattr(action, "target_view", None)
-        if target_view is not None and action.get_action_id() == action_id:
-            return action, target_view
-
-        for sub in getattr(action, "sub_actions", None) or []:
-            found = cls._search_action_tree(sub, action_id)
-            if found is not None:
-                return found
-
-        return None
+        action = view.find_action(request, action_id, object_id=object_id)
+        if action is None:
+            raise LookupError(
+                f"No modal action {action_id!r} on view {view.get_id()!r}. "
+                f"action_id must be a target_view class name from list_admins()."
+            )
+        return action, action.target_view
 
 
 class SBAdminMCPActionInvokeService:
@@ -719,7 +690,9 @@ class SBAdminMCPActionInvokeService:
                 object_id=object_id,
             )
         except PermissionDenied as exc:
-            raise PermissionError(str(exc)) from exc
+            raise PermissionError(
+                _permission_denied_message(exc, action_id, view)
+            ) from exc
         except Http404 as exc:
             raise LookupError(
                 f"No invocable MCP action {action_id!r} on view {view.get_id()!r}."
@@ -942,10 +915,6 @@ class SBAdminMCPActionInvokeService:
             action_components = {}
         else:
             _action, target_view_cls = modal
-            # Wire up the synthetic @sbadmin_action wrapper if the UI
-            # render path hasn't already done so this process.
-            if not hasattr(admin, action_id):
-                admin._register_form_view_action(target_view_cls, action_id, _action)
             # Build the exact forms/formsets declared by the modal and encode
             # the structured MCP payload into their native POST prefixes.
             action_components = cls._build_unbound_components(
@@ -980,7 +949,9 @@ class SBAdminMCPActionInvokeService:
                 object_id=object_id,
             )
         except PermissionDenied as exc:
-            raise PermissionError(str(exc)) from exc
+            raise PermissionError(
+                _permission_denied_message(exc, action_id, admin)
+            ) from exc
         except Http404:
             # Unknown action_id falls through dispatch to a bare
             # (empty-message) Http404; give a clear, named error instead.

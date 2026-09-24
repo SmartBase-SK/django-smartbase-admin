@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 from django import forms
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import File, Folder
@@ -35,8 +35,14 @@ from django_smartbase_admin.engine.modal_view import (
     RowActionModalView,
     SBAdminActionError,
 )
+from django_smartbase_admin.mcp.bridge import (
+    ensure_messages_storage,
+    set_request_payload,
+    unwrap_drf_request,
+)
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.actions import get_declared_mcp_actions
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
@@ -996,4 +1002,122 @@ class IntegrationTests(_Base):
         self.assertTrue(Folder.objects.filter(pk=bystander.pk).exists())
         self.assertTrue(
             any("Deleted 1 Folder." in m["message"] for m in commit["messages"])
+        )
+
+
+class ParentBoundRenameModalView(RowActionModalView):
+    """Inline modal without ``view``. The inline binds it to the parent
+    admin, which registers and dispatches it with the parent's pk."""
+
+    form_class = _InlineNoteForm
+    modal_title = "Rename folder"
+
+    def process_form_valid(self, request, form):
+        obj = self.get_object()
+        obj.name = form.cleaned_data["note"]
+        obj.save()
+        return super().process_form_valid(request, form)
+
+
+class ParentBoundActionInline(FolderFileInline):
+    show_action = True
+
+    def get_sbadmin_inline_list_actions(self, request):
+        if not self.show_action:
+            return []
+        return [
+            SBAdminFormViewAction(
+                target_view=ParentBoundRenameModalView,
+                title="Rename folder",
+            )
+        ]
+
+
+class ParentBoundActionAdmin(FolderInvokeTestAdmin):
+    inlines = [ParentBoundActionInline]
+
+
+class ParentBoundInlineModalTests(_Base):
+    """Dispatch allows a modal only when the current request lists it, also
+    when an inline lists it on behalf of the parent admin."""
+
+    def setUp(self):
+        super().setUp()
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, ParentBoundActionAdmin)
+        config = MCPToolTestConfig()
+        config.init_view_map()
+        config.init_model_admin_view_map()
+        ParentBoundActionInline.show_action = True
+        self.folder = Folder.objects.create(name="orig")
+
+    def tearDown(self):
+        ParentBoundActionInline.show_action = True
+        super().tearDown()
+
+    def _submit(self):
+        request = unwrap_drf_request(build_mcp_request(self.user))
+        set_request_payload(request, post={"note": "renamed"}, method="POST")
+        ensure_messages_storage(request)
+        return SBAdminViewService.delegate_to_action(
+            request,
+            view="filer_folder",
+            action="ParentBoundRenameModalView",
+            modifier="template",
+            object_id=str(self.folder.pk),
+        )
+
+    def test_inline_modal_bound_to_parent_dispatches_on_parent(self):
+        self._submit()
+
+        self.folder.refresh_from_db()
+        self.assertEqual(self.folder.name, "renamed")
+
+    def test_modal_is_not_available_when_request_does_not_list_it(self):
+        self._submit()  # an earlier request listed and ran it
+        self.folder.name = "orig"
+        self.folder.save()
+        ParentBoundActionInline.show_action = False
+
+        with self.assertRaisesMessage(
+            Http404,
+            "Action 'ParentBoundRenameModalView' is not available on view "
+            "'filer_folder'.",
+        ):
+            self._submit()
+        self.folder.refresh_from_db()
+        self.assertEqual(self.folder.name, "orig")
+
+    def test_mcp_reaches_inline_modal_bound_to_parent_as_detail_action(self):
+        detail = self._tools().fetch_detail("filer_folder", str(self.folder.pk))
+        self.assertIn(
+            "ParentBoundRenameModalView",
+            [a["action_id"] for a in detail.get("detail_actions", [])],
+        )
+
+        result = self._tools().invoke_detail_action(
+            "filer_folder",
+            "ParentBoundRenameModalView",
+            object_id=str(self.folder.pk),
+            component_values={"main": {"note": "via-mcp"}},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.folder.refresh_from_db()
+        self.assertEqual(self.folder.name, "via-mcp")
+
+    def test_inline_without_parent_does_not_offer_parent_bound_modal(self):
+        folder_entry = next(
+            a
+            for a in self._tools().list_admins()["admin_views"]
+            if a["view_id"] == "filer_folder"
+        )
+        inline = next(
+            i
+            for i in folder_entry["inlines"]
+            if i["inline_name"] == "ParentBoundActionInline"
+        )
+        self.assertNotIn(
+            "ParentBoundRenameModalView",
+            [a["action_id"] for a in inline.get("inline_actions", [])],
         )

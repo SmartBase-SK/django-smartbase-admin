@@ -21,6 +21,7 @@ class SBAdminViewRequestData(object):
     session = None
     additional_data = None
     autocomplete_map = None
+    action_map = None
 
     def __init__(
         self,
@@ -50,9 +51,15 @@ class SBAdminViewRequestData(object):
         self.session = session or {}
         self.additional_data = {}
         self.autocomplete_map = {}
+        self.action_map = {}
 
     def register_autocomplete_view(self, view) -> None:
         self.autocomplete_map[view.get_id()] = view
+
+    def register_action(self, view_id, action) -> None:
+        """Record a modal action listed for this request, keyed by the view
+        whose URL dispatches it."""
+        self.action_map[(view_id, action.action_id)] = action
 
     def refresh_selected_view(self, request):
         self.configuration = SBAdminConfigurationService.get_configuration(self)
@@ -64,6 +71,7 @@ class SBAdminViewRequestData(object):
             raise Http404
         self.configuration.init_configuration_dynamic(request, self)
         self.autocomplete_map = {}
+        self.action_map = {}
 
     @classmethod
     def from_request_and_kwargs(cls, request, **kwargs):

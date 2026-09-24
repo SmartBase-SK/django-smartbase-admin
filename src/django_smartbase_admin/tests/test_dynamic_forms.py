@@ -7,7 +7,7 @@ from django.contrib.admin.helpers import AdminForm
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.db import models
-from django.http import HttpResponse, JsonResponse, QueryDict
+from django.http import Http404, HttpResponse, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import path
@@ -682,6 +682,9 @@ class CompleteActionRequestData(SimpleNamespace):
     def register_autocomplete_view(self, view):
         self.autocomplete_map[view.get_id()] = view
 
+    def register_action(self, view_id, action):
+        self.action_map[(view_id, action.action_id)] = action
+
 
 class CompleteActionConfiguration(DynamicRegionTestConfiguration):
     plugins = []
@@ -874,6 +877,63 @@ class CompleteParentActionView(CompleteActionSourceView):
                 self.get_sbadmin_fieldsets_actions_processed(request, object_id)
             )
         self.register_action_autocomplete_views(request, all_actions)
+
+
+COMPLETE_MODAL_ACTION_IDS = {
+    modal.__name__
+    for modal in (*COMPLETE_ACTION_MODALS.values(), CompleteUnrelatedActionModal)
+}
+
+
+def _modal_action_has_target_view(action):
+    """Permission rule that needs ``target_view`` on modal actions."""
+    target_view = getattr(action, "target_view", None)
+    if action.get_action_id() not in COMPLETE_MODAL_ACTION_IDS:
+        return True
+    return target_view is not None and target_view.__name__ == action.get_action_id()
+
+
+class TargetViewAwareParentActionView(CompleteParentActionView):
+    view_id = "target_view_aware_parent_actions"
+
+    def has_permission_for_action(self, request, action):
+        return _modal_action_has_target_view(action)
+
+
+class TargetViewAwareInlineActionView(CompleteInlineActionView):
+    view_id = "target_view_aware_inline_actions"
+
+    def has_permission_for_action(self, request, action):
+        return _modal_action_has_target_view(action)
+
+
+class RequestScopedRowActionView(CompleteParentActionView):
+    """Row modal whose ``permission`` depends on the requesting user."""
+
+    view_id = "request_scoped_row_actions"
+
+    def get_sbadmin_row_actions(self, request):
+        return [
+            SBAdminRowAction(
+                target_view=COMPLETE_ACTION_MODALS["row"],
+                title="row target",
+                view=self,
+                permission=request.user.action_permission,
+            )
+        ]
+
+    def has_permission_for_action(self, request, action):
+        if action.get_action_id() == COMPLETE_ACTION_MODALS["row"].__name__:
+            return action.permission == request.user.action_permission
+        return True
+
+
+class DeniedDispatchActionView(CompleteParentActionView):
+    view_id = "denied_dispatch_actions"
+    deny = False
+
+    def has_permission_for_action(self, request, action):
+        return not self.deny
 
 
 class AdminFieldsetsDynamicRegionAdmin(SBAdmin):
@@ -1455,7 +1515,6 @@ class DynamicFormTests(SimpleTestCase):
 
         html = self.render_fieldset(form)
 
-        self.assertTrue(hasattr(view, "FieldsetModalView"))
         self.assertIn("/sb-admin/FieldsetModalView/template/42", html)
         self.assertIn('data-bs-toggle="modal"', html)
 
@@ -1641,6 +1700,70 @@ class DynamicFormTests(SimpleTestCase):
             self.assertEqual(autocomplete_payload["object_id"], "42")
             self.assertEqual(autocomplete_payload["modifier"], action_widget_id)
 
+    def test_modal_dispatch_checks_the_listed_action_from_every_source(self):
+        """``has_permission_for_action`` gets the listed action, ``target_view``
+        included, both when rendering the button and when submitting it."""
+        parent_view = TargetViewAwareParentActionView()
+        inline_view = TargetViewAwareInlineActionView()
+        source_views = {
+            "list_selection": parent_view,
+            "list": parent_view,
+            "row": parent_view,
+            "detail": parent_view,
+            "fieldset": parent_view,
+            "inline": inline_view,
+        }
+
+        for source_name, source_view in source_views.items():
+            with self.subTest(source=source_name):
+                response = self.dispatch_complete_action_request(
+                    source_view,
+                    action=COMPLETE_ACTION_MODALS[source_name].__name__,
+                    modifier="template",
+                    object_id="42",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                payload = json.loads(response.content.decode())
+                self.assertEqual(payload["source"], source_name)
+
+    def test_modal_dispatch_uses_the_current_request_action(self):
+        """An earlier request with other action attributes does not leak into
+        dispatch: the registry is per request."""
+        view = RequestScopedRowActionView()
+        pm = SimpleNamespace(is_anonymous=False, action_permission="change")
+        developer = SimpleNamespace(is_anonymous=False, action_permission="view")
+        view.get_sbadmin_row_actions_processed(SimpleNamespace(user=pm))
+
+        response = self.dispatch_complete_action_request(
+            view,
+            action=COMPLETE_ACTION_MODALS["row"].__name__,
+            modifier="template",
+            object_id="42",
+            user=developer,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_unlisted_modal_dispatch_names_the_action(self):
+        view = DeniedDispatchActionView()
+        view.get_sbadmin_row_actions_processed(
+            SimpleNamespace(user=SimpleNamespace(is_anonymous=True))
+        )
+        view.deny = True
+        action_id = COMPLETE_ACTION_MODALS["row"].__name__
+
+        with self.assertRaisesMessage(
+            Http404,
+            f"Action {action_id!r} is not available on view {view.get_id()!r}.",
+        ):
+            self.dispatch_complete_action_request(
+                view,
+                action=action_id,
+                modifier="template",
+                object_id="42",
+            )
+
     def dispatch_complete_action_request(
         self,
         source_view,
@@ -1650,13 +1773,14 @@ class DynamicFormTests(SimpleTestCase):
         object_id=None,
         method="get",
         data=None,
+        user=None,
     ):
         request_method = getattr(RequestFactory(), method)
         request = request_method(
             source_view.get_action_url(action, modifier, object_id),
             data=data or {},
         )
-        request.user = SimpleNamespace(is_anonymous=True)
+        request.user = user or SimpleNamespace(is_anonymous=True)
         request.session = {}
         request.request_data = CompleteActionRequestData(
             view=source_view.get_id(),
@@ -1673,6 +1797,7 @@ class DynamicFormTests(SimpleTestCase):
             session=request.session,
             additional_data={},
             autocomplete_map={},
+            action_map={},
         )
         SBAdminThreadLocalService.set_request(request)
 

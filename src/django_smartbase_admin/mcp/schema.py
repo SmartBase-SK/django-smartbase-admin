@@ -325,8 +325,10 @@ def _fieldset_action_entries(admin, request, object_id=None) -> list[dict]:
 
 
 def detail_action_entries(admin, request, object_id=None) -> list[dict]:
-    """Detail and fieldset actions available in the given object context."""
-    return [
+    """Detail, fieldset and inline-bound actions available in the given
+    object context. Inline modals bound to the parent act on the parent
+    object, so they are invoked like detail actions."""
+    entries = [
         *collect_action_entries(
             admin,
             "get_sbadmin_detail_actions_processed",
@@ -335,6 +337,16 @@ def detail_action_entries(admin, request, object_id=None) -> list[dict]:
         ),
         *_fieldset_action_entries(admin, request, object_id=object_id),
     ]
+    if hasattr(admin, "get_sbadmin_inline_bound_actions_processed"):
+        entries.extend(
+            collect_action_entries(
+                admin,
+                "get_sbadmin_inline_bound_actions_processed",
+                request,
+                object_id=object_id,
+            )
+        )
+    return entries
 
 
 def _detail_field_entries(admin, request) -> list[str]:

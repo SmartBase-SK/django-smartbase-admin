@@ -19,6 +19,7 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseView,
 )
 from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     RowActionModalView,
@@ -152,9 +153,16 @@ class RowList:
         return iter(self.rows)
 
 
+def _with_request_data(request):
+    request.request_data = SBAdminViewRequestData(
+        view=None, action=None, modifier=None, user=getattr(request, "user", None)
+    )
+    return request
+
+
 class RowActionIntegrationTests(TestCase):
     def setUp(self):
-        self.request = RequestFactory().get("/")
+        self.request = _with_request_data(RequestFactory().get("/"))
 
     def test_permission_gated_target_view_row_action_is_materialized(self):
         class ArticleAdmin(FakeAdminView, SBAdminBaseListView):
@@ -179,8 +187,10 @@ class RowActionIntegrationTests(TestCase):
         allowed_request.user = SimpleNamespace(
             has_perm=lambda perm: perm == "blog.publish_article"
         )
+        _with_request_data(allowed_request)
         denied_request = RequestFactory().get("/")
         denied_request.user = SimpleNamespace(has_perm=lambda perm: False)
+        _with_request_data(denied_request)
 
         view = ArticleAdmin()
         view.init_actions(denied_request)
@@ -192,7 +202,11 @@ class RowActionIntegrationTests(TestCase):
             allowed_first_view, denied_request
         ).get_template_data()
 
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        # Registration is per request: the denied request lists nothing, the
+        # allowed one lists the modal even after a denied request came first.
+        key = ("articles", "PublishArticleView")
+        self.assertNotIn(key, denied_request.request_data.action_map)
+        self.assertIn(key, allowed_request.request_data.action_map)
         self.assertNotIn(
             "_row_actions",
             [
@@ -467,9 +481,6 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_detail_actions(self.request, [action], object_id=123)
 
         self.assertEqual(processed[0].permission, "delete")
-        self.assertEqual(
-            view.PublishArticleView._sbadmin_action_attrs["permission"], "delete"
-        )
 
     def test_detail_action_without_object_modifier_keeps_template_modifier(self):
         view = FakeAdminView()
@@ -495,7 +506,7 @@ class RowActionIntegrationTests(TestCase):
 
         self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
 
-    def test_form_view_actions_are_registered_before_permission_filtering(self):
+    def test_form_view_actions_denied_by_permission_are_not_registered(self):
         view = FakeAdminView(has_action_permission=False)
         action = SBAdminFormViewAction(
             target_view=PublishArticleView,
@@ -506,7 +517,8 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_list_actions(self.request, [action])
 
         self.assertEqual(processed, [])
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertEqual(self.request.request_data.action_map, {})
+        self.assertFalse(hasattr(view, "PublishArticleView"))
         self.assertIsNone(action.url)
 
     def test_form_view_action_uses_declared_action_id(self):
@@ -523,7 +535,10 @@ class RowActionIntegrationTests(TestCase):
 
         processed = view.process_list_actions(self.request, [action])
 
-        self.assertTrue(hasattr(view, "custom_action_id"))
+        self.assertIs(
+            self.request.request_data.action_map[("articles", "custom_action_id")],
+            processed[0],
+        )
         self.assertEqual(processed[0].action_id, "custom_action_id")
         self.assertEqual(processed[0].url, "/actions/custom_action_id/template/")
         self.assertIsNone(action.action_id)
@@ -562,7 +577,10 @@ class RowActionIntegrationTests(TestCase):
             processed[0].sub_actions[0].url,
             "/actions/PublishArticleView/template/123/",
         )
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertIs(
+            self.request.request_data.action_map[("articles", "PublishArticleView")],
+            processed[0].sub_actions[0],
+        )
 
     def test_row_action_rejects_missing_or_ambiguous_interaction_modes(self):
         with self.assertRaises(ImproperlyConfigured):

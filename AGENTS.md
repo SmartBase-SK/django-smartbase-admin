@@ -2604,6 +2604,9 @@ class ArticleAdmin(SBAdmin):
 - Use `has_permission_for_action` when an action should be hidden for some users or request states
 - The default `has_permission_for_action` delegates to `SBAdminRoleConfiguration.has_permission()`
 - `SBAdminFormViewAction` modal views are automatically URL-callable — no extra decoration needed
+- A modal action runs only when the current request lists it. Processing an action list registers every permitted modal action in `request.request_data.action_map`, and dispatch (UI and MCP) runs the listed action's `target_view`. So `has_permission_for_action` sees the same action object, `target_view` included, when the button renders and when its form is submitted. A modal the request does not list returns 404
+- Every modal an admin can run must come from its action getters (`get_sbadmin_row_actions`, `get_sbadmin_list_actions`, `get_sbadmin_list_selection_actions`, `get_sbadmin_detail_actions`, fieldset `actions`, `get_sbadmin_inline_list_actions`). A modal passed only to `action_list(list_actions=...)` renders but cannot be dispatched
+- Inline modals without `view` whose `target_view` is a `RowActionModalView` are bound to the parent admin and act on the parent object. MCP publishes them in the parent's `detail_actions` (`invoke_detail_action` with the parent pk)
 - When using `SBAdminCustomAction` with `action_id` pointing to a method, that method must be decorated with [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action)
 - Modal views can usually do their work in `process_form_valid_list_selection_queryset()` and let `ActionModalView` build the success response with notifications, modal close, and table reload events
 
@@ -5576,7 +5579,7 @@ class ArticleAdmin(SBAdmin):
 - `SBAdminCustomAction` or `SBAdminRowAction` with direct `action_id` requires the decorator on the target method
 - Non-modal methods that mutate data should usually return `self.build_action_response(request)` so notifications render and the table reloads
 - Subclasses that override decorated methods inherit the marker
-- `delegate_to_action` checks `has_permission_for_action` for every dispatched action, which delegates to `SBAdminRoleConfiguration.has_action_permission()` (see [Custom Permission System](#custom-permission-system-has_permission))
+- `delegate_to_action` checks `has_permission_for_action` for every dispatched `@sbadmin_action` method, which delegates to `SBAdminRoleConfiguration.has_action_permission()` (see [Custom Permission System](#custom-permission-system-has_permission)). Modal actions are checked when their list is processed and dispatched from `request.request_data.action_map` (see [Per-Action Permissions](#per-action-permissions-has_permission_for_action))
 
 **Source:** `django_smartbase_admin/engine/actions.py` — `sbadmin_action`, `SBAdminCustomAction.permission`; `django_smartbase_admin/services/views.py` — `SBAdminViewService.delegate_to_action`; `django_smartbase_admin/engine/configuration.py` — `SBAdminRoleConfiguration.has_action_permission`
 

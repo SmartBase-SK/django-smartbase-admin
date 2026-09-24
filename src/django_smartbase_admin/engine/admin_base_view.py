@@ -129,19 +129,6 @@ class SBAdminBaseView(object):
             request, obj
         )
 
-    def delegate_to_target_view(self, target_view, action=None):
-        def inner_view(request, modifier, object_id):
-            return target_view.as_view(view=self)(
-                request, modifier=modifier, object_id=object_id
-            )
-
-        inner_view._is_sbadmin_action = True
-        if action is not None:
-            inner_view._sbadmin_action_attrs = {
-                "permission": getattr(action, "permission", None)
-            }
-        return inner_view
-
     def process_list_actions(
         self,
         request,
@@ -198,8 +185,8 @@ class SBAdminBaseView(object):
         source_view = getattr(action, "view", None) or self
         if target_view is not None:
             resolved_action = copy(action)
-            action_id = source_view._register_form_view_action(
-                target_view, getattr(action, "action_id", None), action
+            action_id = self.get_form_view_action_id(
+                target_view, getattr(action, "action_id", None)
             )
             resolved_action.action_id = action_id
             resolved_action.url = source_view.get_action_url(
@@ -220,25 +207,57 @@ class SBAdminBaseView(object):
             return resolved_action
         return action
 
-    def _register_form_view_action(
-        self, target_view, action_id=None, action=None
-    ) -> str:
-        # Mutates the admin singleton: attaches a synthetic delegate
-        # method named after the modal's ``action_id`` so URL dispatch
-        # (and MCP invocation) can reach it via ``getattr(admin,
-        # action_id)``. Idempotent — the ``hasattr`` guard skips
-        # already-registered ids on subsequent calls.
-        action_id = action_id or getattr(target_view, "action_id", None)
-        action_id = action_id or target_view.__name__
-        if not hasattr(self, action_id):
-            setattr(self, action_id, self.delegate_to_target_view(target_view, action))
-        return action_id
-
     def process_actions(
         self, request, actions: list[SBAdminCustomAction]
     ) -> list[SBAdminCustomAction]:
         resolved_actions = self._resolve_action_urls(actions)
         return self.process_actions_permissions(request, resolved_actions)
+
+    def find_action(
+        self, request, action_id: str, object_id: int | str | None = None
+    ) -> SBAdminCustomAction | None:
+        """Return the modal action this view lists as ``action_id`` for
+        ``request``, or ``None``.
+
+        Works like ``action_autocomplete``: processing an action list (render,
+        ``init_actions``) registers its permitted modal actions in
+        ``request_data.action_map``. On a miss the registration steps run until
+        one of them lists the action. Dispatch and MCP both resolve modal
+        actions here, so a modal runs only if this request lists it, and
+        ``has_permission_for_action`` sees the same action object in both.
+        """
+        request_data = request.request_data
+        key = (self.get_id(), action_id)
+        if key not in request_data.action_map:
+            if object_id is None:
+                object_id = request_data.object_id
+            for step in self._action_registration_steps(request):
+                step(request, object_id)
+                if key in request_data.action_map:
+                    break
+        return request_data.action_map.get(key)
+
+    def _action_registration_steps(self, request):
+        return [
+            step
+            for step in (
+                getattr(self, "_register_list_actions", None),
+                getattr(self, "_register_detail_actions", None),
+                getattr(self, "_register_inline_actions", None),
+            )
+            if step is not None
+        ]
+
+    def _register_detail_actions(self, request, object_id=None) -> None:
+        self.get_sbadmin_detail_actions_processed(request, object_id)
+        self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+
+    def _register_action(self, request, action) -> None:
+        # Keyed by the view the action's URL points to (``_resolve_action_url``).
+        request_data = getattr(request, "request_data", None)
+        if request_data is not None:
+            source_view = getattr(action, "view", None) or self
+            request_data.register_action(source_view.get_id(), action)
 
     def process_actions_permissions(
         self, request, actions: list[SBAdminCustomAction]
@@ -247,6 +266,8 @@ class SBAdminBaseView(object):
         for action in actions:
             if not self.has_permission_for_action(request, action):
                 continue
+            if getattr(action, "target_view", None) is not None:
+                self._register_action(request, action)
             if action.sub_actions:
                 sub_actions = self.process_actions_permissions(
                     request, action.sub_actions
@@ -858,6 +879,11 @@ class SBAdminBaseListView(SBAdminBaseView):
                 self.get_sbadmin_fieldsets_actions_processed(request, object_id)
             )
         self.register_action_autocomplete_views(request, all_actions)
+
+    def _register_list_actions(self, request, object_id=None) -> None:
+        self.get_sbadmin_row_actions_processed(request)
+        self.get_sbadmin_list_selection_actions_processed(request)
+        self.get_sbadmin_list_actions_processed(request)
 
     def init_view_dynamic(self, request, request_data=None, **kwargs) -> None:
         super().init_view_dynamic(request, request_data, **kwargs)

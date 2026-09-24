@@ -42,6 +42,7 @@ def _make_view(*, has_permission=True):
     view.unmarked_method = unmarked_method
     view.has_permission_for_action.return_value = has_permission
     view.init_view_dynamic = MagicMock()
+    view.find_action.return_value = None
     return view
 
 
@@ -89,24 +90,33 @@ class TestDelegateToAction(TestCase):
                 request, view="v", action="allowed_action", modifier="template"
             )
 
-    def test_dynamic_inner_view_is_marked(self):
-        from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
-
+    @patch(PATCH_FROM_REQUEST)
+    def test_listed_modal_action_runs_its_target_view(self, mock_from_request):
         seen_kwargs = {}
-        mock_action = MagicMock()
 
         def target_callable(request, **kwargs):
             seen_kwargs.update(kwargs)
             return HttpResponse("ok")
 
-        mock_action.target_view.as_view.return_value = target_callable
+        view = _make_view()
+        view.PublishModalView = None  # modals are not attributes on the admin
+        listed_action = MagicMock()
+        listed_action.target_view.as_view.return_value = target_callable
+        view.find_action.return_value = listed_action
+        rd = _make_request_data("PublishModalView")
+        rd.object_id = "123"
+        rd.selected_view = view
+        mock_from_request.return_value = rd
 
-        base_view = SBAdminBaseView.__new__(SBAdminBaseView)
-        inner = base_view.delegate_to_target_view(mock_action.target_view)
-        response = inner(self.factory.get("/"), "template", "123")
+        response = SBAdminViewService.delegate_to_action(
+            self.factory.get("/"),
+            view="v",
+            action="PublishModalView",
+            modifier="template",
+        )
 
-        self.assertTrue(getattr(inner, "_is_sbadmin_action", False))
         self.assertEqual(response.status_code, 200)
+        listed_action.target_view.as_view.assert_called_once_with(view=view)
         self.assertEqual(seen_kwargs, {"modifier": "template", "object_id": "123"})
 
     @patch(PATCH_FROM_REQUEST)

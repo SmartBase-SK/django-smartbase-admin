@@ -136,11 +136,10 @@ class SBAdminCustomAction(object):
     def get_action_id(self):
         """Dispatch handle for this action.
 
-        Modal actions resolve to ``target_view.__name__`` — the same
-        value ``_register_form_view_action`` assigns at registration
-        time, so callers don't need to know whether registration has
-        run yet. Returns ``None`` for plain-URL actions that have no
-        server-side handle.
+        Modal actions resolve to ``target_view.__name__`` until
+        ``_resolve_action_url`` sets the final id (which also honours
+        ``target_view.action_id``). Returns ``None`` for plain-URL actions
+        that have no server-side handle.
         """
         if self.action_id:
             return self.action_id
