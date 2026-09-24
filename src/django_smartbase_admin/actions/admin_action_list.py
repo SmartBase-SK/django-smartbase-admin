@@ -764,9 +764,10 @@ class SBAdminListAction(SBAdminAction):
     def validate_aggregate(self, aggregate, field_map=None) -> list[dict]:
         """Validate / normalize an ``aggregate`` request into specs.
 
-        ``aggregate`` is a list of ``{"fn", "field"}`` dicts. ``fn`` must be
-        a key of :data:`LIST_AGGREGATE_FUNCTIONS`; ``field`` must name a
-        declared :class:`SBAdminField` (``list_visible`` irrelevant), never
+        ``aggregate`` is a list of ``{"fn", "field"}`` dicts whose shape (the
+        two keys only, ``fn`` a key of :data:`LIST_AGGREGATE_FUNCTIONS`) is
+        enforced by the MCP argument schema (``AggregateSpec``). ``field``
+        must name a declared :class:`SBAdminField` (``list_visible`` irrelevant), never
         an arbitrary ORM path. ``count`` may omit ``field`` (row count);
         ``sum/avg/min/max`` require a numeric field. Aliases are derived
         (``f"{fn}_{field}"`` or ``"count"``) — no override is accepted.
@@ -776,26 +777,11 @@ class SBAdminListAction(SBAdminAction):
         """
         if field_map is None:
             field_map = self.view.get_field_map(self.threadsafe_request)
-        if not isinstance(aggregate, list):
-            raise ValueError("aggregate must be a list of {'fn', 'field'} specs.")
 
         specs: list[dict] = []
         seen: set[str] = set()
         for spec in aggregate:
-            if not isinstance(spec, dict):
-                raise ValueError(f"Each aggregate spec must be a dict, got {spec!r}.")
-            extra_keys = set(spec) - {"fn", "field"}
-            if extra_keys:
-                raise ValueError(
-                    f"Unsupported aggregate key(s) {sorted(extra_keys)}; only "
-                    "'fn' and 'field' are allowed (aliases are derived)."
-                )
-            fn = spec.get("fn")
-            if fn not in LIST_AGGREGATE_FUNCTIONS:
-                raise ValueError(
-                    f"Unknown aggregate fn {fn!r}; allowed: "
-                    f"{sorted(LIST_AGGREGATE_FUNCTIONS)}."
-                )
+            fn = spec["fn"]
             field_name = spec.get("field")
             sbfield = None
             if field_name is None:
@@ -841,8 +827,6 @@ class SBAdminListAction(SBAdminAction):
         """
         if not group_by:
             return []
-        if not isinstance(group_by, list):
-            raise ValueError("group_by must be a list of declared field names.")
         if field_map is None:
             field_map = self.view.get_field_map(self.threadsafe_request)
 

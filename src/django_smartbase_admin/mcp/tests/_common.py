@@ -16,7 +16,21 @@ from django_smartbase_admin.engine.request import SBAdminViewRequestData
 
 from tests.sbadmin_config import MCPToolTestConfig
 
-__all__ = ["MCPToolTestConfig", "build_mcp_request"]
+__all__ = ["MCPToolTestConfig", "build_mcp_request", "call_mcp_tool"]
+
+
+def call_mcp_tool(tools, tool_name: str, **arguments):
+    """Call a tool the way the MCP and REST transports do.
+
+    Arguments are validated against the tool's schema first, so a malformed
+    call fails with ``pydantic.ValidationError`` (a ``ValueError``, which the
+    REST view maps to 400) before any tool code runs. Tests of malformed
+    input go through here: calling the method directly skips that step.
+    """
+    from django_smartbase_admin.mcp.tool_arguments import validate_tool_arguments
+
+    method = getattr(tools, tool_name)
+    return method(**validate_tool_arguments(method, arguments))
 
 
 def build_mcp_request(user, *, path: str = "/mcp/"):

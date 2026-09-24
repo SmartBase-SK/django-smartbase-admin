@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 
 def attach_inlines(admin, request, rows: list[dict], include_inlines) -> None:
     """Mutate ``rows`` in place: add ``_inlines[<name>]`` and, when capped,
-    ``_truncated_inlines: [<name>, ...]``. Each spec must be
-    ``{"inline_name": "...", "fields": [...]}``.
+    ``_truncated_inlines: [<name>, ...]``. Each spec is an ``InlineSpec``
+    (``{"inline_name": "...", "fields": [...]}``), shape-checked by the
+    tool's argument schema.
 
     Inline class lookup is restricted to inlines the admin actually declares
     (real or fake) — agent cannot reach an arbitrary inline class.
@@ -40,20 +41,8 @@ def attach_inlines(admin, request, rows: list[dict], include_inlines) -> None:
         return
 
     for spec in include_inlines:
-        if not isinstance(spec, dict):
-            raise TypeError(
-                "Inline specs must be objects like "
-                "{'inline_name': 'InlineClassName', 'fields': ['field_name']}."
-            )
-        inline_name = spec.get("inline_name")
-        fields = spec.get("fields")
-        if not inline_name:
-            raise TypeError("Inline spec requires 'inline_name'.")
-        if not isinstance(fields, list) or not fields:
-            raise TypeError(
-                f"Inline spec {inline_name!r} requires a non-empty 'fields' list."
-            )
-
+        inline_name = spec["inline_name"]
+        fields = spec["fields"]
         inline_class = available.get(inline_name)
         if inline_class is None:
             raise LookupError(

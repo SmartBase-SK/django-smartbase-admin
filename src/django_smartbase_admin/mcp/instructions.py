@@ -1,73 +1,37 @@
 """Default MCP server instructions for host projects.
 
 Set ``DJANGO_MCP_GLOBAL_SERVER_CONFIG["instructions"]`` to
-``SBADMIN_MCP_SERVER_INSTRUCTIONS``. Host projects may append their own
-deployment-specific text to that setting if needed.
+``SBADMIN_MCP_SERVER_INSTRUCTIONS``. Clients may truncate instructions
+(Claude Code keeps 2048 characters), so keep any host appendix short and put
+per-view rules into that view's ``mcp_description``, which ``list_admins``
+returns in full.
 """
 
 SBADMIN_MCP_SERVER_INSTRUCTIONS = """\
-SBAdmin MCP — read and manage admin records with the same permissions and
-validation as the UI. You only ever see and act on what the user's account is
-allowed to.
+SBAdmin MCP: read and manage admin records with the user's own permissions
+and the same validation as the UI. You only see what their account may.
 
-What you can do:
-* Discover the available admin views and, per view, their columns, filters,
-  detail fields, inlines, filter presets, and actions (``list_admins``).
-  Scope it: start with ``list_admins(detail="index")`` for the list of
-  ``view_id``s, then ``list_admins(view_id="...")`` for that one view in full.
-  Reading every view in full can exceed your result budget, and post-filtering
-  an oversized payload silently drops keys you need — ``mcp_actions`` first.
-* Browse: filter (text, choice, boolean, number range, date range,
-  related-record), full-text search, sort, and paginate (``list_rows``).
-* Apply a named or saved filter preset and replay it (``fetch_filter_preset``).
-* Read one record in full, with related (inline) rows and detail widgets
-  (``fetch_detail``).
-* Read parent-scoped list widgets with ``list_rows`` using the widget
-  ``view_id`` and ``parent_object_id`` from ``fetch_detail.widgets``; read
-  non-list widgets with ``fetch_widget_data``.
-* Look up a related record by name to get its id — for filtering by it or
-  setting it on a create/update form (``autocomplete``). Raise its
-  ``page_size`` (default 100, max 1000) to read a whole option list in one
-  call instead of paging through it.
-* Create, update, and delete records — including their related rows
-  (``create_object`` / ``update_detail`` / ``delete_objects``).
-* Run actions on a row, a detail page, the whole list, a selection, or an
-  inline row (``invoke_*_action``); inspect a modal action's form first with
-  ``fetch_action_form``. Object-only fieldset actions are discovered from
-  ``fetch_detail.detail_actions``, and actions with no UI button from
-  ``mcp_actions`` (on ``fetch_detail`` or ``list_admins``) — those are run with
-  ``invoke_action``. Submit forms and formsets through ``component_values``
-  using the names returned under ``components``.
-* Export a list or selection to a file.
+Workflow:
+1. ``list_admins(detail="index")`` to find the ``view_id``, then
+   ``list_admins(view_id=...)`` for its columns, filters, presets and
+   actions. Never read every view in full: the payload is huge.
+2. Read with ``list_rows`` or ``fetch_detail``. ``autocomplete`` turns a
+   name into an id for a filter or a form field.
+3. Write with ``create_object`` (after ``fetch_add_form``) or
+   ``update_detail``. Run actions with the ``invoke_*_action`` tools,
+   calling ``fetch_action_form`` first for ``kind == "modal"``. Methods
+   listed only under ``mcp_actions`` run with ``invoke_action``.
 
-Safety: deletes and impactful actions return ``needs_confirmation`` with a
-preview first; re-call with ``confirmed=True`` to commit.
+Rules:
+* Deletes and impactful actions answer ``needs_confirmation`` with a preview
+  first. Show it to the user, then repeat the call with ``confirmed=true``.
+* Copy ``view_id``, ``widget_id``, ``action_id`` and ``inline_name`` from
+  tool output. Never construct them.
+* Send nested arguments as JSON objects and arrays, not strings, and ids as
+  JSON numbers exactly as returned (``174``, not ``"174"``).
+* ``{"status": "invalid"}`` means nothing was written. Fix and retry.
+* ``value_available=false`` means a value was withheld. ``write_only=true``
+  means you may set it but must not read the returned ``null`` as its value.
 
-Workflow: ``list_admins(detail="index")`` (find the ``view_id``) →
-``list_admins(view_id=...)`` (its columns, filters, inlines, actions) →
-``list_rows`` / ``fetch_detail`` / ``fetch_add_form`` → ``autocomplete`` for
-labels → ``create_object`` or ``update_detail``.
-
-Rules: copy ``widget_id`` only from prior tool output (never invent it).
-``list_rows`` requires non-empty ``fields``. Write results:
-``{"status": "ok", ...}`` or ``{"status": "invalid", "errors": ...}`` (no DB change).
-Form fields with ``value_available=false`` have intentionally redacted values;
-``write_only=true`` means callers may submit a replacement but must not infer
-the stored value from the returned ``null``.
-Formset component keys use ``inline_name`` from ``list_admins`` when they
-represent admin inlines. Send nested arguments (``component_values``,
-``object_ids``, ``filter_data``, ``sort``) as real JSON objects/arrays, never
-stringified JSON; pass ids as JSON numbers exactly as returned (e.g. ``174``,
-not ``"174"``) so rows match.
-Create flow: ``fetch_add_form`` then ``create_object``; inline FK ids on add often
-need ``autocomplete`` on another admin with the same ``filter.target_model``.
-
-Custom dashboard: to build a local, single-user dashboard — any creative live
-view of this data (metrics, tables, charts/graphs) — read the
-``dashboard://blueprint`` resource (setup is in its description). If the host
-also exposes the MCP-endpoint-prefixed REST route, e.g.
-``POST mcp/rest/tools/list_rows/``, and an authenticated probe succeeds, the
-dashboard can use that REST endpoint for live list data. If the probe
-returns 401 or the URL is unavailable, do not propose the REST dashboard path;
-``SBADMIN_MCP_REST_AUTHENTICATOR`` is probably not configured for that project.
+Local live dashboards: read the ``dashboard://blueprint`` resource.
 """

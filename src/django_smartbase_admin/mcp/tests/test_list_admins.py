@@ -17,6 +17,8 @@ from filer.models import Folder, FolderPermission
 
 from django.db.models import F
 
+from pydantic import ValidationError
+
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminRowAction, sbadmin_action
@@ -31,6 +33,7 @@ from django_smartbase_admin.mcp.schema import _inline_entries
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
+    call_mcp_tool,
 )
 
 FOLDER_STATUS_CHOICES = (
@@ -569,8 +572,8 @@ class ListAdminsScopingTests(TestCase):
             tools.list_admins(view_id="filer_folder")
 
     def test_invalid_detail_is_rejected(self):
-        with self.assertRaises(ValueError):
-            self._tools().list_admins(detail="everything")
+        with self.assertRaisesRegex(ValidationError, r"detail\n.*'index' or 'full'"):
+            call_mcp_tool(self._tools(), "list_admins", detail="everything")
 
     def test_whoami_survives_an_index_call(self):
         folder = Folder.objects.create(name="profile")

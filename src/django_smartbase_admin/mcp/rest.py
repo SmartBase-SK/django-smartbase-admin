@@ -1,7 +1,8 @@
 """REST dispatch helpers for SBAdmin MCP tools.
 
 Host projects provide authentication and then call the same guarded tool
-methods used by the MCP transport.
+methods used by the MCP transport, validated against the same argument
+schema.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.tool_arguments import validate_tool_arguments
 from rest_framework import status
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed, ParseError
@@ -81,7 +83,7 @@ def call_sbadmin_mcp_tool(
 
     toolset = toolset_cls(request=request)
     method = resolve_guarded_mcp_tool(toolset, tool_name)
-    return method(**arguments)
+    return method(**validate_tool_arguments(method, arguments))
 
 
 class SBAdminMCPToolAPIView(APIView):

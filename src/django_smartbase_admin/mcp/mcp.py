@@ -16,11 +16,12 @@ is whoever ``DJANGO_MCP_AUTHENTICATION_CLASSES`` resolved.
 from __future__ import annotations
 
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from mcp_server import MCPToolset, mcp_server as global_mcp_server
+from pydantic import Field
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
@@ -62,6 +63,21 @@ from django_smartbase_admin.mcp.bridge import (
 )
 from django_smartbase_admin.mcp.inlines import attach_inlines
 from django_smartbase_admin.mcp.resolvers import resolve_admin
+from django_smartbase_admin.mcp.tool_arguments import (
+    ActionComponentValues,
+    AggregateSpec,
+    Confirmed,
+    DetailFields,
+    FilterData,
+    FullTextSearch,
+    InlineSpec,
+    Modifier,
+    ObjectId,
+    ObjectIds,
+    Page,
+    SortSpec,
+    ViewId,
+)
 from django_smartbase_admin.mcp.actions import ACTION_INVOKERS
 from django_smartbase_admin.mcp.schema import (
     admin_entry,
@@ -194,6 +210,9 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
     error ``filter_data`` / ``fields`` give. Without this an unknown
     column falls through to the ORM and surfaces a raw Django
     ``FieldError`` that leaks internal model field names.
+
+    The entry shape (``field`` plus ``dir`` of ``asc`` / ``desc``) is
+    enforced by the tool's argument schema (``SortSpec``).
     """
     if not sort:
         return
@@ -201,21 +220,12 @@ def _validate_sort(admin, request, sort, field_map=None) -> None:
         field_map = admin.get_field_map(request)
     field_map = field_map or {}
     for entry in sort:
-        # ``dir`` is required, not defaulted — the list pipeline reads
-        # ``sort['dir']`` directly, so a missing key must fail clearly here.
-        if not isinstance(entry, dict) or "field" not in entry or "dir" not in entry:
-            raise ValueError(
-                "Each sort entry must be {'field': <name>, 'dir': "
-                f"'asc'|'desc'}}, got {entry!r}"
-            )
         name = entry["field"]
         if name not in field_map:
             raise LookupError(
                 f"Admin {admin.get_id()!r} cannot sort by {name!r}; "
                 f"sortable fields: {sorted(field_map)}."
             )
-        if entry["dir"] not in ("asc", "desc"):
-            raise ValueError(f"sort dir must be 'asc' or 'desc', got {entry['dir']!r}")
 
 
 def _sort_keys_to_fields(sort: list | None, field_map) -> list | None:
@@ -420,100 +430,54 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def list_admins(
         self,
-        view_id: str | None = None,
-        detail: Literal["index", "full"] = "full",
+        view_id: Annotated[
+            str | None,
+            Field(
+                description="Return only this admin, in full. Unknown or "
+                "invisible ids raise instead of returning an empty list."
+            ),
+        ] = None,
+        detail: Annotated[
+            Literal["index", "full"],
+            Field(
+                description="index: view_id, app_label, model, verbose names and "
+                "description per admin, nothing else. full: the whole schema."
+            ),
+        ] = "full",
     ) -> dict[str, list[dict] | dict[str, dict] | dict[str, str]]:
         """List the admins the current user can view.
 
-        Use this to discover the handles every other tool accepts —
-        ``view_id``, field/filter names, ``widget_id``s, inline names,
-        and ``action_id``s.
+        Discovers the handles every other tool accepts: ``view_id``,
+        field and filter names, ``widget_id``s, inline names, ``action_id``s.
 
-        Scope the response instead of reading every admin in full. A
-        deployment with dozens of admins returns tens of thousands of
-        characters, which can exceed a caller's result budget and force
-        lossy post-filtering — projecting away keys that turn out to
-        matter. Prefer two cheap calls:
+        Scope it: an unscoped full call can return tens of thousands of
+        characters. Call ``list_admins(detail="index")`` to choose the view,
+        then ``list_admins(view_id=...)`` for that one view in full.
 
-          1. ``list_admins(detail="index")`` — ``view_id``, model and
-             display names for every visible admin, and nothing else.
-             Enough to choose the target.
-          2. ``list_admins(view_id="<chosen>")`` — that one admin's
-             complete record, typically an order of magnitude smaller
-             than the unscoped call.
+        Full mode adds two legends. ``widget_shapes`` maps each filter
+        ``widget`` to ``{"value_shape", "example"}`` for ``filter_data``.
+        ``action_invokers`` maps each action list to its invoke tool.
 
-        Args:
-          view_id: return only this admin (still subject to view
-            permission). ``None`` returns every visible admin. An
-            unknown or invisible ``view_id`` raises ``LookupError``
-            rather than returning an empty list, so a typo is not
-            mistaken for "no such data".
-          detail: ``"full"`` (default) returns the schema documented
-            below; ``"index"`` returns only ``view_id``, ``app_label``,
-            ``model``, ``verbose_name``, ``verbose_name_plural`` and
-            ``description`` per admin. The ``widget_shapes`` and
-            ``action_invokers`` legends are omitted in ``"index"`` mode,
-            since the keys they explain are not returned.
+        Per admin:
+          - ``fields``: columns ``{"name", "title"}`` plus a ``filter``
+            block when filterable (widget, choices, ``widget_id``,
+            ``target_model``).
+          - ``search_fields``: what ``full_text_search`` matches.
+          - ``detail_fields``: field names for ``fetch_detail``.
+          - ``inlines``: ``inline_name``, own ``view_id``, fields, actions
+            and ``relations``.
+          - ``filter_presets``: for ``fetch_filter_preset``.
+          - ``row_actions``, ``detail_actions``, ``list_actions``,
+            ``selection_actions``: ``{"title", "kind", "action_id"}``.
+            For ``kind == "modal"`` call ``fetch_action_form`` first.
+          - ``mcp_actions``: methods with no UI button, run with
+            ``invoke_action``. Listed nowhere else, so keep this key.
 
-        Returns ``{"admin_views": [...], "widget_shapes": {...}}``.
-        ``widget_shapes`` is a legend keyed by widget category (the
-        ``widget`` value on every filter entry); each value is
-        ``{"value_shape": str, "example": <example value>}`` describing
-        the expected ``filter_data`` value shape. Subclassed widgets
-        (e.g. ``FromValuesAutocompleteWidget``) are reported as their
-        base category — only the base controls the ``filter_data``
-        contract.
-
-        Schema per admin entry:
-          - ``view_id``: pass to other tools as ``view_id``.
-          - ``app_label``, ``model``: match against ``target_model`` on
-            filter widgets.
-          - ``verbose_name``, ``verbose_name_plural``: display names.
-          - ``fields``: list-view columns. Each is
-            ``{"name", "title", "list_visible"}`` plus an optional
-            ``"filter"`` block — present when the column is filterable.
-            The filter block carries the widget kind plus any extras
-            needed to build a ``filter_data`` value (``"choices"`` for
-            choice widgets, ``"multiselect"`` and ``"target_model"``
-            for autocomplete widgets).
-          - ``search_fields``: columns the ``full_text_search`` arg on
-            ``list_rows`` matches against. Empty list means free-text
-            search is a no-op on this admin.
-          - ``detail_fields``: detail-page field names, in display
-            order. Pass to ``fetch_detail(fields=...)`` to project a
-            subset; per-field metadata ships with the values.
-          - ``inlines``: related formset components reachable from the
-            detail page. Each entry has ``inline_name`` (the key in
-            ``fetch_detail.components``), ``view_id`` (for
-            ``invoke_inline_action``), model metadata, fields, actions,
-            and relation targets. ``list_rows(include_inlines=...)`` returns
-            related ids as bare pks, while ``fetch_detail`` returns relation
-            values as ``{"value", "label"}`` envelopes.
-
-        Action lists contain ``{"title", "kind", "action_id",
-        "requires_confirmation"?}``. ``kind`` is ``"method"`` or ``"modal"``;
-        fetch modal components with ``fetch_action_form`` before invocation.
-        The top-level ``action_invokers`` legend maps each action-list name to
-        its invoke tool. Sub-actions are flattened to siblings.
-
-          - ``row_actions``: per-row list buttons.
-          - ``detail_actions``: change/detail form buttons.
-          - ``list_actions``: global list buttons with no row context.
-          - ``selection_actions``: bulk buttons over selected rows.
-
-        Methods explicitly decorated with ``mcp_components=...`` are reported
-        separately under ``mcp_actions`` — an action listed there and nowhere
-        else has no UI counterpart and is invoked with ``invoke_action``. This
-        is the key most easily lost to post-filtering, which is what the
-        ``view_id`` / ``detail`` scoping above exists to avoid.
-
-        When configured by the host project, the top-level ``whoami`` entry
-        points at the current user's profile target: ``{"view_id", "object_id"}``.
+        ``whoami``, when configured, points at the current user's profile
+        as ``{"view_id", "object_id"}``.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
-        if detail not in ("index", "full"):
-            raise ValueError(f"detail must be 'index' or 'full', got {detail!r}.")
 
         # Model admins live in the Django admin registry, while configured
         # list views (notably ``ModelTranslationView``) live only in the
@@ -595,10 +559,27 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_filter_preset(
         self,
-        view_id: str,
-        name: str | None = None,
-        source: str = "static",
-        id: int | None = None,
+        view_id: ViewId,
+        name: Annotated[
+            str | None,
+            Field(
+                description="Preset name from list_admins filter_presets[].name. "
+                "Required for static presets, a fallback for saved ones."
+            ),
+        ] = None,
+        source: Annotated[
+            Literal["static", "saved"],
+            Field(
+                description="static: admin-defined, including the implicit All "
+                "reset. saved: the user's own."
+            ),
+        ] = "static",
+        id: Annotated[
+            int | None,
+            Field(
+                description="Saved preset id from filter_presets[].id. Prefer it over name."
+            ),
+        ] = None,
     ) -> dict:
         """Resolve a filter preset (static or saved) into ready-to-use
         ``list_rows`` kwargs.
@@ -612,20 +593,6 @@ class SBAdminTools(MCPToolset):
         overrides. ``page`` is intentionally not returned — a saved page
         number is session state, not part of the preset, so replay
         always starts on page 1.
-
-        Args:
-          view_id: admin handle from ``list_admins[].view_id``.
-          source: ``"static"`` (admin-defined preset, including the
-            implicit ``"All"`` reset) or ``"saved"`` (per-user). Defaults
-            to ``"static"`` because saved presets always have an ``id``
-            and agents typically discover those first.
-          name: preset name as it appears in
-            ``list_admins[].filter_presets[].name``. Required for static
-            presets; for saved presets, used as a fallback when ``id`` is
-            omitted (the name is user-editable so prefer ``id``).
-          id: saved preset primary key from
-            ``list_admins[].filter_presets[].id``. Ignored for static
-            presets.
 
         Raises ``LookupError`` when no preset matches, ``PermissionError``
         if the user can't see the admin, ``ValueError`` for bad input.
@@ -673,133 +640,104 @@ class SBAdminTools(MCPToolset):
                 f"No static filter preset named {name!r} on {view_id!r}. "
                 f"Known: {[str(p.get('name', '')) for p in raw_presets]}"
             )
-        if source == "saved":
-            saved = (
-                SBAdminUserConfigurationService.get_saved_views(
-                    request, view_id=view_id
-                )
-                or []
-            )
-            for preset in saved:
-                # ``id`` is the stable handle; ``name`` is a fallback for
-                # callers that don't have the id cached.
-                if id is not None and preset.get("id") == id:
-                    return decode(preset.get("url_params"))
-                if id is None and name and str(preset.get("name", "")) == name:
-                    return decode(preset.get("url_params"))
-            raise LookupError(
-                f"No saved filter preset matching id={id!r} name={name!r} "
-                f"on {view_id!r}"
-            )
-        raise ValueError(f"source must be 'static' or 'saved', got {source!r}")
+        saved = (
+            SBAdminUserConfigurationService.get_saved_views(request, view_id=view_id)
+            or []
+        )
+        for preset in saved:
+            # ``id`` is the stable handle; ``name`` is a fallback for
+            # callers that don't have the id cached.
+            if id is not None and preset.get("id") == id:
+                return decode(preset.get("url_params"))
+            if id is None and name and str(preset.get("name", "")) == name:
+                return decode(preset.get("url_params"))
+        raise LookupError(
+            f"No saved filter preset matching id={id!r} name={name!r} "
+            f"on {view_id!r}"
+        )
 
     @_guarded_tool_call
     def list_rows(
         self,
-        view_id: str,
-        fields: list[str],
-        filter_data: dict | None = None,
-        page: int = 1,
-        page_size: int = 20,
-        sort: list | None = None,
-        full_text_search: str | None = None,
-        include_inlines: list | None = None,
-        aggregate: list | None = None,
-        group_by: list | None = None,
-        parent_object_id: str | None = None,
+        view_id: Annotated[
+            str,
+            Field(
+                description="Admin handle from list_admins, or a list widget's "
+                "view_id from fetch_detail widgets."
+            ),
+        ],
+        fields: Annotated[
+            list[str],
+            Field(
+                min_length=1,
+                description="Columns to return, from list_admins fields[].name. "
+                "Every row also carries a normalized id key, and id is itself "
+                "selectable, sortable and filterable (one id or a list).",
+            ),
+        ],
+        filter_data: FilterData = None,
+        page: Page = 1,
+        page_size: Annotated[
+            int,
+            Field(
+                description="Rows per page. No maximum: size it from last_row to "
+                "pull a whole filtered set in one call, minding context cost."
+            ),
+        ] = 20,
+        sort: Annotated[
+            list[SortSpec] | None,
+            Field(description="Applied in order. Unknown columns are rejected."),
+        ] = None,
+        full_text_search: FullTextSearch = None,
+        include_inlines: Annotated[
+            list[InlineSpec] | None,
+            Field(
+                description="Inlines to hydrate beside each row, under "
+                "row['_inlines'][inline_name]. Relation columns come back as "
+                "bare pks (map them with the inline's relations entry, or read "
+                "one parent with fetch_detail for labels). A capped inline is "
+                "listed in row['_truncated_inlines']."
+            ),
+        ] = None,
+        aggregate: Annotated[
+            list[AggregateSpec] | None,
+            Field(
+                description="Totals over the whole filtered set, independent of "
+                "paging. Each result is keyed f'{fn}_{field}', or 'count' for a "
+                "bare count. Without group_by they land under aggregates."
+            ),
+        ] = None,
+        group_by: Annotated[
+            list[str] | None,
+            Field(
+                description="Declared columns to break aggregate down by (SQL "
+                "GROUP BY). Requires aggregate. Relation columns are rejected. "
+                "Results land under groups as [{group: {...}, aggregates: "
+                "{...}}]; a foreign key groups as its bare pk."
+            ),
+        ] = None,
+        parent_object_id: Annotated[
+            str | None,
+            Field(
+                description="Required for parent-scoped detail widgets: the "
+                "parent_object_id from the fetch_detail widget entry."
+            ),
+        ] = None,
     ) -> dict:
-        """List rows for one admin — same data the UI list shows.
+        """List rows for one admin, same data the UI list shows.
 
-        Note: ``fields`` is required (non-empty list of column names from
-        ``list_admins``). Autocomplete filters need ``[{"value", "label"}, ...]``.
+        Permissions, row isolation, filters, ordering and column formatting
+        match the admin's list page. Cells come back as plain values, not HTML.
 
-        Permissions, row isolation, filters, ordering, and column
-        formatting all match what the user would see browsing the
-        admin's list page. Cells come back as plain values, not HTML.
+        Get column and filter names from ``list_admins(view_id=...)``. For a
+        related-record filter, resolve the name to an id with
+        ``autocomplete`` first. Replay a preset by passing the
+        ``fetch_filter_preset`` result as kwargs.
 
-        Args:
-          view_id: handle from ``list_admins``.
-            For detail widgets, use the widget ``view_id`` from
-            ``fetch_detail(...).widgets``.
-          parent_object_id: required for parent-scoped detail widgets.
-            Pass the ``parent_object_id`` returned with the widget entry so
-            the widget sees the same object context it has in the browser.
-          fields: non-empty list of column names to return, drawn from
-            ``list_admins["admin_views"][].fields[].name``. Every row also
-            carries a normalized ``"id"`` key for row identity, regardless
-            of the model's pk field name (so ``row["id"]`` is always safe).
-            ``"id"`` is itself a selectable, sortable, and filterable column
-            — filter it with one id or a list of ids to re-fetch the exact
-            rows behind ids you already saw.
-          filter_data: ``{field: value}`` mapping. Each **key** is a column
-            ``name`` from ``list_admins["admin_views"][].fields[].name`` —
-            the same identifier ``fields`` and ``sort`` use. (Keys returned
-            by ``fetch_filter_preset`` are also accepted as-is, so a preset
-            replays unchanged.) Per filter, read the widget category from
-            ``list_admins["admin_views"][].fields[].filter.widget`` and
-            copy its ``value_shape`` / ``example`` from
-            ``list_admins["widget_shapes"]`` literally — that legend is
-            the single source of truth for the per-widget value shape. For
-            an autocomplete (related-record) filter, resolve the name to an
-            id with the ``autocomplete`` tool first; pass that id as the
-            entry ``value`` (a free-text name/email is not a valid id).
-            Unknown keys are rejected — misspellings raise instead of
-            silently returning every row.
-          page: 1-indexed page number (default 1).
-          page_size: rows per page (default 20). No enforced maximum —
-            set it high to pull the whole filtered set in one call (use
-            ``last_row`` from a first probe to size it). Mind context cost
-            on large sets.
-          sort: list of ``{"field": <name>, "dir": "asc"|"desc"}``
-            entries, applied in order. ``field`` is a column name from
-            ``list_admins["admin_views"][].fields[].name``; unknown
-            fields are rejected with the list of sortable names.
-          full_text_search: cross-column free text term — no-op on
-            admins whose ``search_fields`` is empty.
-          include_inlines: optional list of inline specs to hydrate
-            beside each parent row. Each item:
-            ``{"inline_name": "...", "fields": [...]}`` where
-            ``inline_name`` and ``fields`` are taken from
-            ``list_admins["admin_views"][].inlines``.
-
-            Hydrated rows arrive at
-            ``row["_inlines"][<inline_name>]``, each with a normalized
-            ``"id"`` key. Inline FK / M2M columns come back as bare pks
-            (e.g. ``{"work": 443}``); map each to its target model via
-            the inline's ``relations`` entry in ``list_admins`` and
-            resolve names with ``autocomplete`` (or read one parent in
-            full via ``fetch_detail``, which labels inline FKs as
-            ``{"value", "label"}``). When a parent has more related rows
-            than the inline's pagination cap, the response includes that
-            inline name in ``row["_truncated_inlines"]`` and only the
-            first page is attached.
-
-          aggregate: optional list of ``{"fn", "field"}`` specs, each a
-            total over the WHOLE filtered set (independent of paging).
-            ``fn`` is one of ``sum / avg / min / max / count``; ``field``
-            must be a declared column from ``list_admins`` —
-            ``sum/avg/min/max`` need a numeric one, ``count`` may omit
-            ``field`` for a row count. Each result is keyed by a derived
-            alias — ``f"{fn}_{field}"`` (or ``"count"`` for a bare count);
-            aliases can't be overridden. Without ``group_by`` the results
-            land under ``aggregates`` as a flat ``{alias: value}`` dict.
-          group_by: optional list of declared column names to break the
-            ``aggregate`` totals down by (SQL ``GROUP BY``) — e.g.
-            ``group_by=["queue"]`` with ``aggregate=[{"fn": "count"}]`` for
-            tickets-per-queue in one call instead of one call per queue.
-            Multi-valued (relation) columns are rejected. Requires
-            ``aggregate``. Results land under ``groups`` as a list of
-            ``{"group": {column: value, ...}, "aggregates": {alias: value,
-            ...}}`` rows ordered by the group columns — group columns and
-            aggregate aliases are nested under separate keys so a column whose
-            name equals an aggregate alias can't collide. A column grouped on a
-            foreign key comes back as the bare pk (resolve names with
-            ``autocomplete``).
-
-        Returns ``{"data": [...], "last_page": int, "last_row": int}``
-        plus any pagination metadata the list view emits, ``aggregates``
-        when ``aggregate`` is supplied without ``group_by``, and ``groups``
-        when ``group_by`` is supplied.
+        Returns ``{"data": [...], "last_page": int, "last_row": int}`` plus
+        any pagination metadata the list view emits, ``aggregates`` when
+        ``aggregate`` is given without ``group_by``, and ``groups`` when
+        ``group_by`` is given.
         """
         request = self.request
         parent_object_id = (
@@ -829,12 +767,7 @@ class SBAdminTools(MCPToolset):
                 }
             if sort:
                 sort = [
-                    (
-                        {**s, "field": pk_name}
-                        if isinstance(s, dict) and s.get("field") == "id"
-                        else s
-                    )
-                    for s in sort
+                    {**s, "field": pk_name} if s["field"] == "id" else s for s in sort
                 ]
         filter_data = _normalize_filter_keys(filter_data, field_map)
         _validate_filter_data(admin, request, filter_data, field_map)
@@ -951,70 +884,42 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_detail(
         self,
-        view_id: str,
-        object_id: str,
-        fields: list[str] | None = None,
+        view_id: ViewId,
+        object_id: ObjectId,
+        fields: DetailFields = None,
     ) -> dict:
         """Fetch detail-page data for one object.
 
-        Permissions and row isolation match the UI detail page (an
-        object the user wouldn't see there is reported missing). All
-        inlines the user can view are always hydrated, and detail widgets
-        rendered by the page are advertised under ``widgets``.
+        Permissions and row isolation match the UI detail page (an object
+        the user wouldn't see there is reported missing). Every inline the
+        user can view is hydrated with all its fields. HTML display fields
+        keep structural markup but lose styling and scripts. Inline FK / M2M
+        values come back as ``{"value", "label"}``, unlike the bare pks of
+        ``list_rows(include_inlines)``.
 
-        Display fields that render HTML in the UI are sanitized for the
-        agent: structural markup (tables, lists, links, ``div`` / ``span``)
-        is kept, but styling, classes, and ``<script>`` / ``<style>`` are
-        stripped. Inline FK / M2M values are resolved to
-        ``{"value", "label"}`` here (unlike ``list_rows(include_inlines)``,
-        which returns bare pks).
+        Returns ``{"id", "components": {<name>: <component>}}``. ``main`` is
+        the admin form. Each inline is a formset component with ``fields``
+        (the schema of a writable new row), ``rows`` as ``{"id", "fields"}``,
+        cardinality controls and ``truncated``. Per field:
 
-        Args:
-          view_id: handle from ``list_admins``.
-          object_id: target row id (as a string).
-          fields: optional subset of ``list_admins["admin_views"][].detail_fields``.
-            ``None`` returns every detail field; unknown names raise
-            ``LookupError``. Inline rows always come back with every
-            field the inline declares.
+        * ``value``: scalar, or ``{"value", "label"}`` (a list for
+          multi-select) for related selections.
+        * ``value_available``: ``False`` when a sensitive value is withheld,
+          as opposed to a disclosed null.
+        * ``write_only``: accepts a new value, never discloses the current one.
+        * ``readonly``, ``required`` (always ``False`` when readonly), and
+          ``widget``: an input-family hint, ``None`` when readonly.
+        * ``widget_id``: on autocomplete fields, for ``autocomplete``.
 
-        Returns ``{"id": <id>, "components": {<name>: <component>, ...}}``.
-        The ``main`` form component contains the admin fields; every inline is
-        a named formset component with ``fields``, ``rows``, cardinality
-        controls, and ``truncated``. Field metadata contains ``value``,
-        ``value_available``, ``write_only``, ``readonly``, ``required``, and
-        ``widget``:
+        Also returned when present:
 
-        * ``value`` — scalar, or ``{"value": <id>, "label": <display>}``
-          (list of those for multi-select) for related selections.
-        * ``value_available`` — distinguishes a disclosed null value from a
-          sensitive value that was intentionally not returned.
-        * ``write_only`` — the field accepts a new value but never discloses
-          its current value. Such fields have ``value_available=False``.
-        * ``readonly`` — ``True`` for static fields.
-        * ``required`` — would the form reject a blank submission.
-          Always ``False`` for readonly fields.
-        * ``widget`` — opaque input-family hint
-          (text / select / date / ...), ``None`` when readonly.
-        * ``widget_id`` — present on autocomplete-backed fields; pass to
-          ``autocomplete`` (never construct by hand).
-
-        Existing formset rows use ``{"id", "fields"}``; the component-level
-        ``fields`` describe a writable new row even when ``rows`` is empty.
-
-        ``detail_actions`` contains the actions available for this specific
-        object, including actions declared on object-dependent fieldsets.
-        Invoke them with ``invoke_detail_action``.
-
-        ``mcp_actions`` contains this admin's methods exposed through
-        ``mcp_components`` — operations with no UI button, which therefore
-        appear in no other action list. Invoke them with ``invoke_action``,
-        passing this ``object_id``. Read them here rather than hunting for
-        them in a full ``list_admins``.
-
-        ``widgets`` contains detail/dashboard widgets rendered in the
-        detail fieldsets. Use each widget's ``data_tool`` to choose the
-        next MCP call: ``list_rows`` with the widget ``view_id`` and
-        ``parent_object_id``, or ``fetch_widget_data`` for non-list data.
+        * ``detail_actions``: actions for this object, run with
+          ``invoke_detail_action``.
+        * ``mcp_actions``: methods with no UI button, run with
+          ``invoke_action`` and this ``object_id``.
+        * ``widgets``: detail widgets. Each ``data_tool`` names the next call,
+          ``list_rows`` (with ``view_id`` and ``parent_object_id``) or
+          ``fetch_widget_data``.
 
         Raises ``LookupError`` if the object isn't visible,
         ``PermissionError`` if permission is denied.
@@ -1024,7 +929,12 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_whoami(
         self,
-        fields: list[str] | None = None,
+        fields: Annotated[
+            list[str] | None,
+            Field(
+                description="Subset of the profile admin's detail_fields. Omit for all."
+            ),
+        ] = None,
     ) -> dict:
         """Fetch the current authenticated user's configured profile detail.
 
@@ -1032,10 +942,6 @@ class SBAdminTools(MCPToolset):
         ``SBAdminRoleConfiguration(mcp_whoami_sbadmin=SBAdminWhoamiConfig(...))``.
         The result is the same shape as ``fetch_detail`` with ``view_id`` and
         ``object_id`` included so callers can reuse the regular detail tools.
-
-        Args:
-          fields: optional subset of the configured profile admin's
-            ``detail_fields``.
 
         Raises ``LookupError`` when no profile admin is configured or the
         target object is not visible, ``PermissionError`` if permission is
@@ -1061,20 +967,25 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_widget_data(
         self,
-        view_id: str,
-        parent_object_id: str | None = None,
-        params: dict | None = None,
+        view_id: Annotated[
+            str, Field(description="Widget handle from fetch_detail widgets.")
+        ],
+        parent_object_id: Annotated[
+            str | None,
+            Field(
+                description="Object id from the widget entry, when "
+                "requires_parent_object_id is true."
+            ),
+        ] = None,
+        params: Annotated[
+            dict | None,
+            Field(description="Optional widget filter or settings query params."),
+        ] = None,
     ):
         """Fetch data for a non-list detail/dashboard widget.
 
         For widgets with ``data_tool == "list_rows"`` use ``list_rows`` instead; table
         widgets load through the list JSON pipeline, not ``get_data()``.
-
-        Args:
-          view_id: widget handle from ``fetch_detail(...).widgets``.
-          parent_object_id: object id from the widget entry when
-            ``requires_parent_object_id`` is true.
-          params: optional widget filter/settings query params.
 
         Returns the JSON payload from the widget's regular AJAX data path.
         """
@@ -1117,8 +1028,8 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_add_form(
         self,
-        view_id: str,
-        fields: list[str] | None = None,
+        view_id: ViewId,
+        fields: DetailFields = None,
     ) -> dict:
         """Fetch the add page's empty form — schema for ``create_object``.
 
@@ -1148,18 +1059,24 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def fetch_action_form(
         self,
-        view_id: str,
-        action_id: str,
-        object_id: str | None = None,
+        view_id: ViewId,
+        action_id: Annotated[
+            str,
+            Field(
+                description="action_id of a kind == modal action from list_admins "
+                "or fetch_detail detail_actions."
+            ),
+        ],
+        object_id: Annotated[
+            str | None,
+            Field(
+                description="Row id for row or detail actions, so the form is "
+                "pre-filled with that row's values. Omit for list and selection "
+                "modals."
+            ),
+        ] = None,
     ) -> dict:
         """Fetch the form schema for a modal action — prerequisite for invoking it.
-
-        Works for any action with ``kind == "modal"`` in ``list_admins`` or
-        ``fetch_detail.detail_actions``. ``action_id`` always comes from discovery.
-
-        Pass ``object_id`` when the action is row- or detail-scoped so
-        the form is pre-populated with that row's current values. Omit
-        for list-level / selection modals that have no single-row context.
 
         Returns ``{"title": "…", "components": {<name>: <component>, …}}``.
         The modal declares those names through ``get_form_components()`` and
@@ -1205,23 +1122,22 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def create_object(
         self,
-        view_id: str,
-        component_values: dict | None = None,
+        view_id: ViewId,
+        component_values: Annotated[
+            dict | None,
+            Field(
+                description="Keyed like fetch_add_form.components: main takes a "
+                "field dict, formsets take row lists. Values accept raw "
+                "scalars/pks or {value, label}. New rows must not carry id or "
+                "_delete."
+            ),
+        ] = None,
     ) -> dict:
         """Create one object — symmetric with ``update_detail``.
 
-        Same permission model and POST pipeline as the UI add page.
-        ``component_values`` is keyed exactly like ``fetch_add_form.components``:
-        ``main`` receives a field dictionary and formsets receive row lists.
-        New formset rows must not include ``id`` or ``_delete``.
-
-        Call ``fetch_add_form`` first to discover the field shape and
+        Same permission model and POST pipeline as the UI add page. Call
+        ``fetch_add_form`` first to discover the field shape and
         ``widget_id`` values for autocomplete-backed fields.
-
-        Args:
-          view_id: handle from ``list_admins``.
-          component_values: named form patches and formset row lists. Values
-            accept raw scalars/pks or ``{"value", "label"}`` envelopes.
 
         Returns ``{"status": "ok", "id": <new_pk>, "components": ...}``
         mirroring ``fetch_detail`` after the save, or component-keyed errors
@@ -1246,31 +1162,25 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def update_detail(
         self,
-        view_id: str,
-        object_id: str,
-        component_values: dict | None = None,
+        view_id: ViewId,
+        object_id: ObjectId,
+        component_values: Annotated[
+            dict | None,
+            Field(
+                description="Keyed like fetch_detail.components. Forms are sparse "
+                "patches. Formset rows: {id, ...overrides} updates, {id, "
+                "_delete: true} deletes, no id creates. id is the integer pk as "
+                'fetch_detail returns it (174, not "174"). Inlines not '
+                "mentioned stay unchanged."
+            ),
+        ] = None,
     ) -> dict:
         """Write detail-page data for one object — symmetric with ``fetch_detail``.
 
         Same permission gates and row isolation as the UI change form,
         and the same component shape as ``fetch_detail`` returns. Unspecified
         form fields and existing formset rows keep their current values.
-
-        Args:
-          view_id: handle from ``list_admins``.
-          object_id: target row id (as a string).
-          component_values: keyed like ``fetch_detail.components``. Form
-            values are sparse patches. Formset values are row operations:
-
-            * ``{"id": <pk>, ...overrides}`` — update an existing row.
-            * ``{"id": <pk>, "_delete": true}`` — delete the row.
-            * ``{...field values}`` (no ``id``) — create a new row.
-
-            ``id`` is the **integer** pk exactly as ``fetch_detail``
-            returns it — send it as a JSON number (``174``), not a string
-            (``"174"``), or the row won't match. Inlines not mentioned are
-            passed through unchanged. Unknown inline names or row ids raise
-            ``LookupError``.
+        Unknown inline names or row ids raise ``LookupError``.
 
         Returns ``{"status": "ok", "id": ..., "components": ...}``
         mirroring ``fetch_detail`` after the save, or component-keyed errors
@@ -1309,27 +1219,28 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def get_audit_history(
         self,
-        view_id: str,
-        object_id: str | None = None,
-        page: int = 1,
-        page_size: int = 20,
+        view_id: ViewId,
+        object_id: Annotated[
+            str | None,
+            Field(
+                description="Scope to one object's history. Omit for the whole model."
+            ),
+        ] = None,
+        page: Page = 1,
+        page_size: Annotated[
+            int,
+            Field(
+                description="Rows per page. No maximum: size it from last_row "
+                "to pull the full history in one call."
+            ),
+        ] = 20,
     ) -> dict:
         """Audit log entries for an admin's model, paginated newest-first.
 
         Same data the "History" button on the list / detail page would
-        show. Pass ``object_id`` to scope to one object's history; omit
-        for everything on the model. Only available when the admin has
+        show. Only available when the admin has
         ``sbadmin_list_history_enabled`` (the default) and the audit app
         is installed.
-
-        Args:
-          view_id: handle from ``list_admins``.
-          object_id: optional row id; ``None`` returns all entries for
-            the model.
-          page: 1-indexed page number (default 1).
-          page_size: rows per page (default 20). No enforced maximum —
-            set it high to pull the full history in one call (use
-            ``last_row`` to size it).
 
         Returns ``{"data": [<entry>, ...], "page": int, "page_size": int,
         "last_row": int}`` where each ``<entry>`` is ``{"id", "timestamp",
@@ -1365,9 +1276,9 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def delete_objects(
         self,
-        view_id: str,
-        object_ids: list,
-        confirmed: bool = False,
+        view_id: ViewId,
+        object_ids: ObjectIds,
+        confirmed: Confirmed = False,
     ) -> dict:
         """Delete one or more objects on an admin.
 
@@ -1387,19 +1298,12 @@ class SBAdminTools(MCPToolset):
           2. Confirm the affected ids + count with the user before
              passing ``confirmed=True``.
 
-        Args:
-          view_id: handle from ``list_admins``.
-          object_ids: non-empty list of row ids (as strings).
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
-
         Returns ``{"status": "ok", "messages": [...]}`` after delete,
         ``{"status": "needs_confirmation", ...}`` on the first call, or
         ``{"status": "invalid", "errors": {"global": [...],
         "components": {}}}`` if a protected ForeignKey blocks the delete.
 
-        Raises ``ValueError`` if ``object_ids`` is empty,
-        ``PermissionError`` if delete permission is missing.
+        Raises ``PermissionError`` if delete permission is missing.
         """
         request = self.request
         ensure_sbadmin_request_data(request)
@@ -1415,22 +1319,30 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_action(
         self,
-        view_id: str,
-        action_id: str,
-        component_values: dict | None = None,
-        object_id: str | None = None,
-        modifier: str | None = None,
+        view_id: ViewId,
+        action_id: Annotated[
+            str, Field(description="action_id from an mcp_actions entry.")
+        ],
+        component_values: Annotated[
+            dict | None,
+            Field(
+                description="Values for the components the mcp_actions entry declares."
+            ),
+        ] = None,
+        object_id: Annotated[
+            str | None,
+            Field(
+                description="Object context. For a detail-mounted widget, its "
+                "parent_object_id."
+            ),
+        ] = None,
+        modifier: Modifier = None,
     ) -> dict:
         """Invoke a method explicitly exposed through ``mcp_actions``.
 
-        The action's request-aware ``components`` come from ``list_admins`` or
-        a detail widget's discovery entry. Supply matching
-        ``component_values``; unknown components/fields and invalid values are
-        rejected before dispatch.
-
-        For a detail-mounted widget, pass its discovered
-        ``parent_object_id`` as ``object_id``. For a regular view, ``object_id``
-        is the optional object context passed to the action URL.
+        The action's request-aware ``components`` come from ``list_admins``,
+        ``fetch_detail`` or a detail widget's discovery entry. Unknown
+        components/fields and invalid values are rejected before dispatch.
 
         Execution always routes through ``delegate_to_action``, including the
         normal ``has_permission_for_action`` check. Only methods explicitly
@@ -1465,11 +1377,14 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_row_action(
         self,
-        view_id: str,
-        action_id: str,
-        object_id: str,
-        component_values: dict | None = None,
-        confirmed: bool = False,
+        view_id: ViewId,
+        action_id: Annotated[
+            str,
+            Field(description="action_id from list_admins admin_views[].row_actions."),
+        ],
+        object_id: ObjectId,
+        component_values: ActionComponentValues = None,
+        confirmed: Confirmed = False,
     ) -> dict:
         """Invoke a row action against one object.
 
@@ -1481,15 +1396,6 @@ class SBAdminTools(MCPToolset):
           2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
              action_id, object_id)`` for the form schema, then use
              ``autocomplete`` for any ``target_model`` FK fields.
-
-        Args:
-          view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins["admin_views"][].row_actions``.
-          object_id: target row id (as a string).
-          component_values: named forms and formset rows returned by
-            ``fetch_action_form.components``; absent for method actions.
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
 
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
@@ -1511,11 +1417,14 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_detail_action(
         self,
-        view_id: str,
-        action_id: str,
-        object_id: str,
-        component_values: dict | None = None,
-        confirmed: bool = False,
+        view_id: ViewId,
+        action_id: Annotated[
+            str,
+            Field(description="action_id from fetch_detail detail_actions."),
+        ],
+        object_id: ObjectId,
+        component_values: ActionComponentValues = None,
+        confirmed: Confirmed = False,
     ) -> dict:
         """Invoke a detail-page action against one object.
 
@@ -1527,15 +1436,6 @@ class SBAdminTools(MCPToolset):
           2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
              action_id, object_id)`` for the form schema, then use
              ``autocomplete`` for any ``target_model`` FK fields.
-
-        Args:
-          view_id: admin handle from ``list_admins``.
-          action_id: ``action_id`` from ``list_admins["admin_views"][].detail_actions``.
-          object_id: target row id (as a string).
-          component_values: named forms and formset rows returned by
-            ``fetch_action_form.components``; absent for method actions.
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
 
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
@@ -1557,11 +1457,20 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_inline_action(
         self,
-        view_id: str,
-        action_id: str,
-        object_id: str,
-        component_values: dict | None = None,
-        confirmed: bool = False,
+        view_id: Annotated[
+            str,
+            Field(
+                description="The inline's own view_id from list_admins "
+                "inlines[].view_id, not the parent's."
+            ),
+        ],
+        action_id: Annotated[
+            str,
+            Field(description="action_id from list_admins inlines[].inline_actions."),
+        ],
+        object_id: Annotated[str, Field(description="Inline row pk, as a string.")],
+        component_values: ActionComponentValues = None,
+        confirmed: Confirmed = False,
     ) -> dict:
         """Invoke an inline-list action against one inline row.
 
@@ -1574,17 +1483,6 @@ class SBAdminTools(MCPToolset):
           2. For ``kind == "modal"``: call ``fetch_action_form(view_id,
              action_id, object_id)`` for the form schema, then use
              ``autocomplete`` for any ``target_model`` FK fields.
-
-        Args:
-          view_id: inline's ``view_id`` from
-            ``list_admins[<parent>].inlines[].view_id`` (not the parent's).
-          action_id: ``action_id`` from
-            ``list_admins[<parent>].inlines[].inline_actions``.
-          object_id: inline row pk (as a string).
-          component_values: named forms and formset rows returned by
-            ``fetch_action_form.components``; absent for method actions.
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
 
         Returns ``{"status": "ok", "messages": [...]}``,
         ``{"status": "invalid", "errors": {...}}``, or
@@ -1640,12 +1538,17 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_selection_action(
         self,
-        view_id: str,
-        action_id: str,
-        object_ids: list,
-        component_values: dict | None = None,
-        confirmed: bool = False,
-        modifier: str | None = None,
+        view_id: ViewId,
+        action_id: Annotated[
+            str,
+            Field(
+                description="action_id from list_admins admin_views[].selection_actions."
+            ),
+        ],
+        object_ids: ObjectIds,
+        component_values: ActionComponentValues = None,
+        confirmed: Confirmed = False,
+        modifier: Modifier = None,
     ) -> dict:
         """Invoke a selection (bulk) action over an explicit id list.
 
@@ -1665,16 +1568,6 @@ class SBAdminTools(MCPToolset):
         ``object_ids`` is the explicit, canonical selection. Empty lists
         are rejected so accidental "operate on everything" is impossible.
 
-        Args:
-          view_id: handle from ``list_admins``.
-          action_id: ``action_id`` from
-            ``list_admins["admin_views"][].selection_actions``.
-          object_ids: non-empty list of row ids (as strings).
-          component_values: named forms and formset rows returned by
-            ``fetch_action_form.components``; absent for method actions.
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
-
         Returns ``{"status": "ok", "messages": [...]}`` on success
         (``messages`` typically carries the affected-row count from the
         view), ``{"status": "invalid", "errors": {...}}`` on modal
@@ -1683,8 +1576,7 @@ class SBAdminTools(MCPToolset):
         confirmation. Form-wide errors appear under the component's
         ``non_field`` list.
 
-        Raises ``ValueError`` if ``object_ids`` is empty,
-        ``PermissionError`` if access is denied.
+        Raises ``PermissionError`` if access is denied.
         """
 
         request = self.request
@@ -1716,13 +1608,22 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def invoke_list_action(
         self,
-        view_id: str,
-        action_id: str,
-        component_values: dict | None = None,
-        filter_data: dict | None = None,
-        full_text_search: str | None = None,
-        confirmed: bool = False,
-        modifier: str | None = None,
+        view_id: ViewId,
+        action_id: Annotated[
+            str,
+            Field(description="action_id from list_admins admin_views[].list_actions."),
+        ],
+        component_values: ActionComponentValues = None,
+        filter_data: Annotated[
+            dict | None,
+            Field(
+                description="Optional scope for filter-aware actions, same shape "
+                "as list_rows filter_data."
+            ),
+        ] = None,
+        full_text_search: FullTextSearch = None,
+        confirmed: Confirmed = False,
+        modifier: Modifier = None,
     ) -> dict:
         """Invoke a list-level action (no row context).
 
@@ -1736,17 +1637,6 @@ class SBAdminTools(MCPToolset):
              ``fetch_action_form(view_id, action_id)`` for the form
              shape, then use ``autocomplete`` for any ``target_model``
              FK fields.
-
-        Args:
-          view_id: handle from ``list_admins``.
-          action_id: ``action_id`` from
-            ``list_admins["admin_views"][].list_actions``.
-          component_values: named forms and formset rows returned by
-            ``fetch_action_form.components``; absent for method actions.
-          filter_data, full_text_search: optional scope, same shapes as
-            ``list_rows`` — only used by filter-aware actions.
-          confirmed: set to ``True`` on the second call after a
-            ``needs_confirmation`` response.
 
         Returns ``{"status": "ok", "messages": [...]}`` on success,
         ``{"status": "invalid", "errors": {...}}`` on modal validation
@@ -1800,11 +1690,32 @@ class SBAdminTools(MCPToolset):
     @_guarded_tool_call
     def autocomplete(
         self,
-        view_id: str,
-        widget_id: str,
-        search: str = "",
-        page: int = 1,
-        page_size: int = AUTOCOMPLETE_MCP_PAGE_SIZE,
+        view_id: ViewId,
+        widget_id: Annotated[
+            str,
+            Field(
+                description="Copied verbatim from list_admins fields[].filter.widget_id "
+                "or from a fetch_detail / fetch_add_form / fetch_action_form field. "
+                "Never construct it. Inline FK fields on add usually lack one: use "
+                "another admin's filter with the same target_model."
+            ),
+        ],
+        search: Annotated[
+            str,
+            Field(
+                description="Free text. Empty returns the first page of all options."
+            ),
+        ] = "",
+        page: Annotated[
+            int, Field(description="1-indexed, in units of page_size.")
+        ] = 1,
+        page_size: Annotated[
+            int,
+            Field(
+                description="Entries per call, clamped to 1000. Pass 1000 to read a "
+                "whole option list in one call."
+            ),
+        ] = AUTOCOMPLETE_MCP_PAGE_SIZE,
     ) -> list[dict]:
         """Search an autocomplete-backed field — same dropdown the UI shows.
 
@@ -1812,25 +1723,8 @@ class SBAdminTools(MCPToolset):
         action by widget id, so list-filter dropdowns and detail-form
         pickers go through one path. Use this to turn a human-readable
         name into a row id before calling ``list_rows`` (filter) or
-        before writing a value (form field).
-
-        Args:
-          view_id: handle from ``list_admins``.
-          widget_id: opaque widget identifier from
-            ``list_admins["admin_views"][].fields[].filter.widget_id`` (list filters)
-            or ``fetch_detail`` / ``fetch_add_form`` →
-            ``components.<name>.fields.<field>.widget_id`` (inline FK fields on
-            add usually lack ``widget_id`` — use another admin's filter
-            with the same ``filter.target_model`` instead).
-            Never construct by hand; unauthorised fields omit ``widget_id``.
-            Action permission and ``restrict_queryset`` are enforced
-            inside ``action_autocomplete`` itself.
-          search: free text term — empty string returns the first page
-            of all matches.
-          page: 1-indexed page number, in units of ``page_size``.
-          page_size: entries per call, default 100, clamped to 1000.
-            Pass 1000 to pull a whole option list in one call instead of
-            paging through it.
+        before writing a value (form field). Action permission and
+        ``restrict_queryset`` apply as in the UI.
 
         Returns ``[{"value": ..., "label": ...}, ...]`` ready to drop
         into ``filter_data`` (or into a write call for form fields).

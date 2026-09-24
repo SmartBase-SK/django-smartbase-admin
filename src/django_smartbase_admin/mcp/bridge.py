@@ -139,9 +139,6 @@ def build_columns_data(admin, request, fields: list[str], field_map=None) -> dic
     ``field_map`` lets the caller reuse an already-built map instead of
     rebuilding it (``get_field_map`` clones every field on each call).
     """
-    if not isinstance(fields, list) or not fields:
-        raise TypeError("list_rows requires a non-empty 'fields' list.")
-
     if field_map is None:
         field_map = admin.get_field_map(request)
     unknown = [name for name in fields if name not in field_map]

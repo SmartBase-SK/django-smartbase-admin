@@ -18,6 +18,8 @@ from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
+from pydantic import ValidationError
+
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.const import (
@@ -37,6 +39,7 @@ from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
+    call_mcp_tool,
 )
 
 # Local URLconf so ``reverse("sb_admin:...")`` works inside tests —
@@ -182,9 +185,12 @@ class ListRowsTests(_ToolTestBase):
                 "does_not_exist", fields=["name"]
             )
 
-        with self.assertRaises(TypeError):
-            SBAdminTools(request=build_mcp_request(user)).list_rows(
-                "filer_folder", fields=[]
+        with self.assertRaisesRegex(ValidationError, r"fields\n.*at least 1 item"):
+            call_mcp_tool(
+                SBAdminTools(request=build_mcp_request(user)),
+                "list_rows",
+                view_id="filer_folder",
+                fields=[],
             )
 
         with self.assertRaises(LookupError):

@@ -8,6 +8,8 @@ from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
+from pydantic import ValidationError
+
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.field import SBAdminField
@@ -20,6 +22,7 @@ from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
+    call_mcp_tool,
 )
 
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
@@ -250,24 +253,44 @@ class FilterValidationTests(TestCase):
 
 class ValidateSortTests(TestCase):
     """``dir`` is required (not defaulted): the list pipeline reads
-    ``sort['dir']`` directly, so a bad/missing one must be caught in
-    validation, not surface as a ``KeyError`` mid-query."""
+    ``sort['dir']`` directly, so a bad/missing one must be rejected by the
+    argument schema, not surface as a ``KeyError`` mid-query. Unknown sort
+    columns fail with the list of sortable names."""
 
     def _validate(self, sort):
         from django_smartbase_admin.mcp.mcp import _validate_sort
 
-        # ``field_map`` provided, so ``admin``/``request`` go unused.
-        _validate_sort(None, None, sort, field_map={"name": object()})
+        admin = MagicMock(get_id=MagicMock(return_value="filer_folder"))
+        _validate_sort(admin, None, sort, field_map={"name": object()})
+
+    def _list_rows(self, sort):
+        user = MagicMock(is_authenticated=True, is_superuser=True)
+        call_mcp_tool(
+            SBAdminTools(request=build_mcp_request(user)),
+            "list_rows",
+            view_id="filer_folder",
+            fields=["name"],
+            sort=sort,
+        )
 
     def test_missing_dir_raises_clear_error(self):
-        with self.assertRaises(ValueError) as ctx:
-            self._validate([{"field": "name"}])
-        self.assertIn("dir", str(ctx.exception))
+        with self.assertRaisesRegex(ValidationError, r"sort\.0\.dir\n.*Field required"):
+            self._list_rows([{"field": "name"}])
 
     def test_invalid_dir_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            self._validate([{"field": "name", "dir": "up"}])
-        self.assertIn("asc", str(ctx.exception))
+        with self.assertRaisesRegex(
+            ValidationError, r"sort\.0\.dir\n.*'asc' or 'desc'"
+        ):
+            self._list_rows([{"field": "name", "dir": "up"}])
+
+    def test_non_object_entry_raises(self):
+        with self.assertRaisesRegex(ValidationError, r"sort\.0\n.*dictionary"):
+            self._list_rows(["name"])
+
+    def test_unknown_field_lists_sortable_fields(self):
+        with self.assertRaises(LookupError) as ctx:
+            self._validate([{"field": "nope", "dir": "asc"}])
+        self.assertIn("'name'", str(ctx.exception))
 
     def test_valid_sort_passes(self):
         self._validate([{"field": "name", "dir": "desc"}])  # no raise

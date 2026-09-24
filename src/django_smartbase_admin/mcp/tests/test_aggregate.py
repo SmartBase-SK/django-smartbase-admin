@@ -11,6 +11,8 @@ from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
 
+from pydantic import ValidationError
+
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.field import SBAdminField
@@ -18,6 +20,7 @@ from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
+    call_mcp_tool,
 )
 from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
 
@@ -311,6 +314,11 @@ class AggregateTests(TestCase):
         # Undeclared group field.
         with self.assertRaises(LookupError):
             tools.list_rows(**base, aggregate=[{"fn": "count"}], group_by=["nope"])
+        # group_by must be a list of names.
+        with self.assertRaisesRegex(ValidationError, r"group_by\n.*valid list"):
+            call_mcp_tool(
+                tools, "list_rows", **base, aggregate=[{"fn": "count"}], group_by="name"
+            )
         # group_by without aggregate is meaningless.
         with self.assertRaises(ValueError):
             tools.list_rows(**base, group_by=["name"])
@@ -323,8 +331,20 @@ class AggregateTests(TestCase):
         base = dict(view_id="filer_folder", fields=["id", "name"])
 
         # Non-whitelisted function.
-        with self.assertRaises(ValueError):
-            tools.list_rows(**base, aggregate=[{"fn": "median", "field": "id"}])
+        with self.assertRaisesRegex(ValidationError, r"aggregate\.0\.fn\n.*'sum'"):
+            call_mcp_tool(
+                tools, "list_rows", **base, aggregate=[{"fn": "median", "field": "id"}]
+            )
+        # Misspelled key: no fn, and the extra key is refused.
+        with self.assertRaisesRegex(
+            ValidationError, r"aggregate\.0\.function\n.*not permitted"
+        ):
+            call_mcp_tool(
+                tools,
+                "list_rows",
+                **base,
+                aggregate=[{"function": "sum", "field": "id"}],
+            )
         # sum on a non-numeric (CharField) declared field.
         with self.assertRaises(ValueError):
             tools.list_rows(**base, aggregate=[{"fn": "sum", "field": "name"}])
@@ -332,5 +352,12 @@ class AggregateTests(TestCase):
         with self.assertRaises(LookupError):
             tools.list_rows(**base, aggregate=[{"fn": "sum", "field": "nope"}])
         # Alias override is not allowed.
-        with self.assertRaises(ValueError):
-            tools.list_rows(**base, aggregate=[{"fn": "sum", "field": "id", "as": "x"}])
+        with self.assertRaisesRegex(
+            ValidationError, r"aggregate\.0\.as\n.*not permitted"
+        ):
+            call_mcp_tool(
+                tools,
+                "list_rows",
+                **base,
+                aggregate=[{"fn": "sum", "field": "id", "as": "x"}],
+            )

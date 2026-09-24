@@ -15,6 +15,8 @@ from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder, FolderPermission
 
+from pydantic import ValidationError
+
 from django_smartbase_admin.admin.admin_base import (
     SBAdmin,
     SBAdminTableInline,
@@ -27,6 +29,7 @@ from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
+    call_mcp_tool,
 )
 
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
@@ -91,8 +94,12 @@ class _InlineDataTestBase(TestCase):
 
     def _list(self, include_inlines, *, user=None):
         user = user or MagicMock(is_authenticated=True, is_superuser=True)
-        return SBAdminTools(request=build_mcp_request(user)).list_rows(
-            "filer_folder", fields=["name"], include_inlines=include_inlines
+        return call_mcp_tool(
+            SBAdminTools(request=build_mcp_request(user)),
+            "list_rows",
+            view_id="filer_folder",
+            fields=["name"],
+            include_inlines=include_inlines,
         )
 
 
@@ -144,19 +151,29 @@ class IncludeInlinesTests(_InlineDataTestBase):
         self.assertNotIn("type", sample_narrow)
 
     def test_error_paths_surface_clear_exceptions(self):
-        """Three malformed calls must each raise a distinct, actionable
-        exception so the agent can tell the cases apart: unknown inline
-        handle, unknown column, denied inline access."""
+        """Malformed calls must each raise a distinct, actionable exception
+        so the agent can tell the cases apart: unknown inline handle,
+        malformed spec (rejected by the argument schema), unknown column,
+        denied inline access."""
         with self.assertRaises(LookupError):
             self._list(
                 [{"inline_name": "NotARegisteredInline", "fields": ["everybody"]}]
             )
 
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(
+            ValidationError, r"include_inlines\.0\n.*dictionary"
+        ):
             self._list(["FolderPermissionInline"])
 
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(
+            ValidationError, r"include_inlines\.0\.fields\n.*Field required"
+        ):
             self._list([{"inline_name": "FolderPermissionInline"}])
+
+        with self.assertRaisesRegex(
+            ValidationError, r"include_inlines\.0\.fields\n.*at least 1 item"
+        ):
+            self._list([{"inline_name": "FolderPermissionInline", "fields": []}])
 
         with self.assertRaises(LookupError):
             self._list([{"inline_name": "FolderPermissionInline", "fields": ["bogus"]}])

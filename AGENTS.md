@@ -6094,6 +6094,8 @@ DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
 DJANGO_MCP_ENDPOINT = "mcp"
 ```
 
+Clients truncate server instructions and tool descriptions (Claude Code keeps 2048 characters of each). `SBADMIN_MCP_SERVER_INSTRUCTIONS` stays well under that, so keep a deployment appendix to a few lines and put per-view rules into that view's `mcp_description`, which `list_admins` returns in full.
+
 This targets native/CLI MCP clients (Claude Code, Cursor desktop). Browser-hosted clients (claude.ai Cowork, cursor.com web) additionally need CORS on the MCP + OAuth paths — not bundled; add your own CORS handling if you target them.
 
 ### OAuth Auth
@@ -6128,6 +6130,8 @@ Custom auth: drop `oauth2_provider` + `mcp.oauth.urls`; set `DJANGO_MCP_AUTHENTI
   "page_size": 20
 }
 ```
+
+Arguments are validated against the same schema the MCP transport uses (`validate_tool_arguments`), so a malformed call returns 400 before the tool runs.
 
 Authentication is configured once via `SBADMIN_MCP_REST_AUTHENTICATOR`; host projects should not subclass the REST API views just to attach an authenticator. The authenticator may be an import path, class, or instance extending `SBAdminMCPRestAuthenticator` / DRF `BaseAuthentication`. Return `(user, auth)` when credentials are valid and `None` when invalid.
 
@@ -6378,6 +6382,10 @@ process arbitrary context rather than following the MCP component contract.
 Object-dependent fieldset actions are discovered from `fetch_detail`, not the
 global `list_admins` response. Pass that object's id to `fetch_action_form` and
 `invoke_detail_action`.
+
+### Writing tool arguments
+
+Tool arguments are documented in the schema, not in an `Args:` docstring section: annotate each one as `Annotated[type, Field(description=...)]`, reusing the aliases in `mcp/tool_arguments.py` (`ViewId`, `ObjectId`, `Confirmed`, ...). Nested shapes get a `TypedDict` with `extra="forbid"` (`SortSpec`, `AggregateSpec`, `InlineSpec`), so the client sees the exact keys and FastMCP rejects a malformed call. Keep only checks that need the admin (unknown columns, numeric fields) in the tool code. The docstring says what the tool does and what it returns, within 2048 characters as published on Python 3.12 (indentation included); `test_tool_arguments` enforces both limits.
 
 ### Verify
 
