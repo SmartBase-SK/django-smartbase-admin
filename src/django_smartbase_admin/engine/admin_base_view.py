@@ -314,6 +314,15 @@ class SBAdminBaseView(object):
                     action = copy(action)
                     action.sub_actions = sub_actions
             else:
+                # Modals bound to another view need permission on that view
+                # too, e.g. an inline action that changes its parent object.
+                action_view = getattr(action, "view", None) or self
+                if (
+                    getattr(action, "target_view", None) is not None
+                    and action_view is not self
+                    and not action_view.has_permission_for_action(request, action)
+                ):
+                    continue
                 self._record_listed_action(request, action)
             result.append(action)
         return result
