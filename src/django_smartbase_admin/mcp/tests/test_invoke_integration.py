@@ -18,7 +18,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Permission, User
 from django.http import Http404, HttpResponseRedirect
 from django.test import RequestFactory, TestCase, override_settings
-from django.urls import path
+from django.urls import path, reverse
 from filer.models import File, Folder
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
@@ -1114,8 +1114,18 @@ class ParentBoundInlinePermissionTests(_Base):
         self.user = User.objects.get(pk=self.user.pk)
 
     def browser_submit(self, name="browser-renamed"):
+        # Submit directly even when this user cannot render the modal link.
+        # URL generation rejects modal IDs not listed in the current request.
         request = RequestFactory().post(
-            self.admin.get_action_url(self.action_id, object_id=self.folder.pk),
+            reverse(
+                "sb_admin:sb_admin_base",
+                kwargs={
+                    "view": self.admin.get_id(),
+                    "action": self.action_id,
+                    "modifier": "template",
+                    "object_id": self.folder.pk,
+                },
+            ),
             {"name": name},
         )
         request.user = self.user

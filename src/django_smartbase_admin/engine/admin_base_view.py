@@ -2,6 +2,7 @@ import json
 import urllib.parse
 from collections import defaultdict
 from collections.abc import Iterable
+from contextvars import ContextVar
 from copy import copy
 from typing import Any, TYPE_CHECKING
 
@@ -51,6 +52,7 @@ from django_smartbase_admin.engine.inline_pagination import SBADMIN_INLINE_PREFI
 from django_smartbase_admin.services.configuration import (
     SBAdminUserConfigurationService,
 )
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.services.xlsx_export import (
     SBAdminXLSXExportService,
@@ -73,6 +75,12 @@ SBADMIN_PARENT_INSTANCE_MODEL_VAR = "sbadmin_parent_instance_model"
 SBADMIN_PARENT_INSTANCE_PK_VAR = "sbadmin_parent_instance_pk"
 SBADMIN_PARENT_INSTANCE_LABEL_VAR = "sbadmin_parent_instance_label"
 SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
+
+# A declared modal may build its URL before permission processing registers it.
+# Keep that allowance local to this call, including custom get_action_url hooks.
+_resolving_modal_action_url = ContextVar(
+    "sbadmin_resolving_modal_action_url", default=None
+)
 
 
 class SBAdminBaseView(object):
@@ -189,11 +197,15 @@ class SBAdminBaseView(object):
                 target_view, getattr(action, "action_id", None)
             )
             resolved_action.action_id = action_id
-            resolved_action.url = source_view.get_action_url(
-                action_id,
-                modifier=getattr(action, "action_modifier", None) or "template",
-                object_id=object_id,
-            )
+            token = _resolving_modal_action_url.set((source_view, action_id))
+            try:
+                resolved_action.url = source_view.get_action_url(
+                    action_id,
+                    modifier=getattr(action, "action_modifier", None) or "template",
+                    object_id=object_id,
+                )
+            finally:
+                _resolving_modal_action_url.reset(token)
             return resolved_action
         if action.url:
             return action
@@ -370,6 +382,16 @@ class SBAdminBaseView(object):
             field.init_field_static(self, configuration)
             field_cache[field.name] = field
         return field_cache
+
+    def _validate_action_url(self, action) -> None:
+        if hasattr(self, action) or _resolving_modal_action_url.get() == (self, action):
+            return
+        request = SBAdminThreadLocalService.get_request()
+        request_data = getattr(request, "request_data", None)
+        action_map = getattr(request_data, "action_map", None) or {}
+        if (self.get_id(), action) in action_map:
+            return
+        raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
 
     def get_action_url_kwargs(
         self, action, modifier="template", object_id=None
