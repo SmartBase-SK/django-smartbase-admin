@@ -23,6 +23,7 @@ class SBAdminViewRequestData(object):
     additional_data = None
     autocomplete_map = None
     action_map = None
+    inline_instances_cache = None
 
     def __init__(
         self,
@@ -53,6 +54,7 @@ class SBAdminViewRequestData(object):
         self.additional_data = {}
         self.autocomplete_map = {}
         self.action_map = {}
+        self.inline_instances_cache = {}
 
     def register_autocomplete_view(self, view) -> None:
         self.autocomplete_map[view.get_id()] = view
@@ -91,6 +93,7 @@ class SBAdminViewRequestData(object):
         self.configuration.init_configuration_dynamic(request, self)
         self.autocomplete_map = {}
         self.action_map = {}
+        self.inline_instances_cache = {}
 
     @classmethod
     def from_request_and_kwargs(cls, request, **kwargs):

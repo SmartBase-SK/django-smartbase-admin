@@ -990,6 +990,19 @@ class SBAdmin(
     def _get_inline_instances_for_actions(self, request, object_id) -> list:
         if object_id is None:
             return []
+        # Action init, MCP discovery and ``find_action`` all ask for the same
+        # parent-bound inlines; build them once per bound ``request_data``.
+        cache = getattr(
+            getattr(request, "request_data", None), "inline_instances_cache", None
+        )
+        if cache is None:
+            return self._build_inline_instances_for_actions(request, object_id)
+        key = (self.get_id(), str(object_id))
+        if key not in cache:
+            cache[key] = self._build_inline_instances_for_actions(request, object_id)
+        return cache[key]
+
+    def _build_inline_instances_for_actions(self, request, object_id) -> list:
         try:
             obj = self.get_object(request, object_id)
         except PermissionDenied:

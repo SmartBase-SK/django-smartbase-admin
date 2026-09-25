@@ -951,6 +951,32 @@ class IntegrationTests(_Base):
         file_row.refresh_from_db()
         self.assertEqual(file_row.name, "orig.txt")
 
+    def test_parent_bound_inlines_built_once_per_request_binding(self):
+        """Action init, discovery and dispatch share the parent-bound inlines
+        instead of reloading the object and rebuilding them each time."""
+        folder = Folder.objects.create(name="parent")
+        File.objects.create(folder=folder, name="orig.txt")
+
+        with patch.object(
+            FolderInvokeTestAdmin,
+            "_build_inline_instances_for_actions",
+            autospec=True,
+            side_effect=SBAdmin._build_inline_instances_for_actions,
+        ) as build:
+            self._tools().fetch_detail("filer_folder", str(folder.pk))
+            self.assertEqual(build.call_count, 1)
+
+            build.reset_mock()
+            result = self._tools().invoke_detail_action(
+                "filer_folder",
+                "InlineRenameParentFolder",
+                object_id=str(folder.pk),
+                component_values={"main": {"name": "renamed-parent"}},
+            )
+            self.assertEqual(result["status"], "ok")
+            # The tool binding, then the fresh binding in ``delegate_to_action``.
+            self.assertEqual(build.call_count, 2)
+
     def test_audit_history_scoped_to_object_and_gated_by_flag(self):
         """``get_audit_history`` returns log entries for the admin's model
         (optionally narrowed to one object). Disabled when
