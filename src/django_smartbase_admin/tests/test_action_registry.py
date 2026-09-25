@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from django.contrib.admin import AdminSite
 from django.contrib.auth.models import Group, User
-from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import path
@@ -95,9 +94,10 @@ class RegistryMembershipInline(SBAdminTableInline):
 class RegistryGroupAdmin(SBAdmin):
     inlines = [RegistryMembershipInline]
 
+    def has_view_or_change_permission(self, request, obj=None):
+        return request.allow_parent
+
     def get_object(self, request, object_id, from_field=None):
-        if not request.allow_parent:
-            raise PermissionDenied
         if str(object_id) == "7":
             return Group(pk=7, name="Registry group")
         return None

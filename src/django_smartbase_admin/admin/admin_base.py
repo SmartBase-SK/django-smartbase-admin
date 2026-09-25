@@ -1002,7 +1002,8 @@ class SBAdmin(
                 obj = self.get_object(request, object_id)
             except PermissionDenied:
                 return []
-            if obj is None:
+            # Loading the parent does not check its admin permissions.
+            if obj is None or not self.has_view_or_change_permission(request, obj):
                 return []
         return self.get_inline_instances(request, obj=obj)
 
