@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import base64
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django import forms
 from django.contrib import messages
-from django.http import HttpResponseRedirect
-from django.test import TestCase, override_settings
+from django.contrib.auth.models import Permission, User
+from django.http import Http404, HttpResponseRedirect
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import path
 from filer.models import File, Folder
 
@@ -29,6 +30,7 @@ from django_smartbase_admin.engine.actions import (
     sbadmin_action,
 )
 from django_smartbase_admin.engine.const import BASE_PARAMS_NAME
+from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     ListActionModalView,
@@ -37,10 +39,15 @@ from django_smartbase_admin.engine.modal_view import (
 )
 from django_smartbase_admin.mcp.mcp import SBAdminTools
 from django_smartbase_admin.mcp.actions import get_declared_mcp_actions
+from django_smartbase_admin.mcp.bridge import (
+    ensure_messages_storage,
+    unwrap_drf_request,
+)
 from django_smartbase_admin.mcp.tests._common import (
     MCPToolTestConfig,
     build_mcp_request,
 )
+from django_smartbase_admin.services.views import SBAdminViewService
 
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
@@ -251,6 +258,12 @@ class FolderFileInline(SBAdminTableInline):
                 target_view=InlineRowRenameModalView,
                 title="Rename file",
                 view=self,
+            ),
+            # No ``view``: a row modal on an inline runs against the parent.
+            SBAdminFormViewAction(
+                target_view=RenameFolderModalView,
+                title="Rename parent folder",
+                action_id="InlineRenameParentFolder",
             ),
         ]
 
@@ -896,6 +909,74 @@ class IntegrationTests(_Base):
         file_row.refresh_from_db()
         self.assertEqual(file_row.name, "renamed.txt")
 
+    def test_parent_bound_inline_modal_is_a_detail_action_of_the_parent(self):
+        """An inline modal bound to the parent runs against the parent object,
+        so MCP publishes and invokes it as a parent detail action — never
+        against the inline."""
+        folder = Folder.objects.create(name="parent")
+        file_row = File.objects.create(folder=folder, name="orig.txt")
+
+        folder_entry = next(
+            a
+            for a in self._tools().list_admins()["admin_views"]
+            if a["view_id"] == "filer_folder"
+        )
+        inline = next(
+            i for i in folder_entry["inlines"] if i["inline_name"] == "FolderFileInline"
+        )
+        inline_action_ids = {a["action_id"] for a in inline["inline_actions"]}
+        self.assertNotIn("InlineRenameParentFolder", inline_action_ids)
+
+        detail = self._tools().fetch_detail("filer_folder", str(folder.pk))
+        detail_action_ids = {a["action_id"] for a in detail["detail_actions"]}
+        self.assertIn("InlineRenameParentFolder", detail_action_ids)
+
+        with self.assertRaises(LookupError):
+            self._tools().invoke_inline_action(
+                inline["view_id"],
+                "InlineRenameParentFolder",
+                object_id=str(file_row.pk),
+                component_values={"main": {"name": "wrong"}},
+            )
+
+        result = self._tools().invoke_detail_action(
+            "filer_folder",
+            "InlineRenameParentFolder",
+            object_id=str(folder.pk),
+            component_values={"main": {"name": "renamed-parent"}},
+        )
+        self.assertEqual(result["status"], "ok")
+        folder.refresh_from_db()
+        self.assertEqual(folder.name, "renamed-parent")
+        file_row.refresh_from_db()
+        self.assertEqual(file_row.name, "orig.txt")
+
+    def test_parent_bound_inlines_built_once_per_request_binding(self):
+        """Action init, discovery and dispatch share the parent-bound inlines
+        instead of reloading the object and rebuilding them each time."""
+        folder = Folder.objects.create(name="parent")
+        File.objects.create(folder=folder, name="orig.txt")
+
+        with patch.object(
+            FolderInvokeTestAdmin,
+            "_build_inline_instances_for_actions",
+            autospec=True,
+            side_effect=SBAdmin._build_inline_instances_for_actions,
+        ) as build:
+            self._tools().fetch_detail("filer_folder", str(folder.pk))
+            self.assertEqual(build.call_count, 1)
+
+            build.reset_mock()
+            result = self._tools().invoke_detail_action(
+                "filer_folder",
+                "InlineRenameParentFolder",
+                object_id=str(folder.pk),
+                component_values={"main": {"name": "renamed-parent"}},
+            )
+            self.assertEqual(result["status"], "ok")
+            # The tool binding, then the fresh binding in ``delegate_to_action``.
+            self.assertEqual(build.call_count, 2)
+
     def test_audit_history_scoped_to_object_and_gated_by_flag(self):
         """``get_audit_history`` returns log entries for the admin's model
         (optionally narrowed to one object). Disabled when
@@ -997,3 +1078,148 @@ class IntegrationTests(_Base):
         self.assertTrue(
             any("Deleted 1 Folder." in m["message"] for m in commit["messages"])
         )
+
+
+class ParentBoundInlinePermissionTests(_Base):
+    action_id = "InlineRenameParentFolder"
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create(username="inline-editor", is_staff=True)
+        self.user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="filer",
+                codename__in=("view_folder", "view_file", "change_file"),
+            )
+        )
+        # Keep the test configuration's view registry, but use real Django
+        # permissions instead of its default allow-all policy.
+        permissions = patch.object(
+            MCPToolTestConfig,
+            "has_permission",
+            SBAdminRoleConfiguration.has_permission,
+        )
+        permissions.start()
+        self.addCleanup(permissions.stop)
+        self.folder = Folder.objects.create(name="original-parent")
+        self.file = File.objects.create(folder=self.folder, name="original-file")
+        self.admin = sb_admin_site._registry[Folder]
+
+    def grant_parent_change(self):
+        self.user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="filer", codename="change_folder"
+            )
+        )
+        self.user = User.objects.get(pk=self.user.pk)
+
+    def browser_submit(self, name="browser-renamed"):
+        request = RequestFactory().post(
+            self.admin.get_action_url(self.action_id, object_id=self.folder.pk),
+            {"name": name},
+        )
+        request.user = self.user
+        request.session = {}
+        ensure_messages_storage(request)
+        return SBAdminViewService.delegate_to_action(
+            request,
+            view=self.admin.get_id(),
+            action=self.action_id,
+            modifier="template",
+            object_id=str(self.folder.pk),
+        )
+
+    def mcp_submit(self):
+        return self._tools().invoke_detail_action(
+            "filer_folder",
+            self.action_id,
+            object_id=str(self.folder.pk),
+            component_values={"main": {"name": "mcp-renamed"}},
+        )
+
+    def assert_objects_unchanged(self):
+        self.folder.refresh_from_db()
+        self.file.refresh_from_db()
+        self.assertEqual(self.folder.name, "original-parent")
+        self.assertEqual(self.file.name, "original-file")
+
+    def test_inline_change_without_parent_change_cannot_dispatch(self):
+        self.assertTrue(self.user.has_perm("filer.view_folder"))
+        self.assertTrue(self.user.has_perm("filer.change_file"))
+        self.assertFalse(self.user.has_perm("filer.change_folder"))
+
+        with self.assertRaises(Http404):
+            self.browser_submit()
+
+        self.assert_objects_unchanged()
+
+    def test_parent_denial_hides_action_from_ui_and_mcp(self):
+        request = unwrap_drf_request(build_mcp_request(self.user))
+        inline = self.admin.get_inline_instances(request, obj=self.folder)[0]
+        actions = inline.get_sbadmin_inline_list_actions_processed(request)
+        self.assertNotIn(self.action_id, [action.get_action_id() for action in actions])
+        self.assertIsNone(
+            request.request_data.get_action(self.admin.get_id(), self.action_id)
+        )
+
+        detail = self._tools().fetch_detail("filer_folder", str(self.folder.pk))
+        self.assertNotIn(
+            self.action_id,
+            [action["action_id"] for action in detail.get("detail_actions", [])],
+        )
+        with self.assertRaises(LookupError):
+            self._tools().fetch_action_form(
+                "filer_folder", self.action_id, object_id=str(self.folder.pk)
+            )
+        with self.assertRaises(LookupError):
+            self.mcp_submit()
+        self.assert_objects_unchanged()
+
+    def test_parent_and_inline_change_allow_browser_and_mcp(self):
+        self.grant_parent_change()
+
+        self.assertEqual(self.browser_submit().status_code, 200)
+        self.folder.refresh_from_db()
+        self.assertEqual(self.folder.name, "browser-renamed")
+
+        self.assertEqual(self.mcp_submit()["status"], "ok")
+        self.folder.refresh_from_db()
+        self.file.refresh_from_db()
+        self.assertEqual(self.folder.name, "mcp-renamed")
+        self.assertEqual(self.file.name, "original-file")
+
+    def test_parent_change_still_requires_inline_change(self):
+        self.grant_parent_change()
+        self.user.user_permissions.remove(
+            Permission.objects.get(
+                content_type__app_label="filer", codename="change_file"
+            )
+        )
+        self.user = User.objects.get(pk=self.user.pk)
+
+        with self.assertRaises(Http404):
+            self.browser_submit()
+        with self.assertRaises(LookupError):
+            self.mcp_submit()
+        self.assert_objects_unchanged()
+
+    def test_parent_custom_action_permission_is_enforced(self):
+        self.grant_parent_change()
+        with patch.object(
+            self.admin, "has_permission_for_action", return_value=False
+        ) as permission_check:
+            with self.assertRaises(Http404):
+                self.browser_submit()
+            with self.assertRaises(LookupError):
+                self.mcp_submit()
+
+        checked_actions = [call.args[1] for call in permission_check.call_args_list]
+        self.assertTrue(
+            any(
+                action.get_action_id() == self.action_id
+                and action.target_view is RenameFolderModalView
+                and action.view is self.admin
+                for action in checked_actions
+            )
+        )
+        self.assert_objects_unchanged()

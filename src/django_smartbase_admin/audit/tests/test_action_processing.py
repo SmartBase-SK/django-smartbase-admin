@@ -5,8 +5,10 @@ from unittest.mock import patch
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.http import Http404, HttpResponse
 from django.test import RequestFactory, TestCase
 from django.utils.translation import gettext_lazy as _
+from django.views import View
 
 from django_smartbase_admin.actions.admin_action_list import SBAdminListAction
 from django_smartbase_admin.engine.actions import (
@@ -19,6 +21,8 @@ from django_smartbase_admin.engine.admin_base_view import (
     SBAdminBaseView,
 )
 from django_smartbase_admin.engine.const import MODIFIER_OBJECT_ID
+from django_smartbase_admin.engine.request import SBAdminViewRequestData
+from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.engine.modal_view import (
     ActionModalView,
     RowActionModalView,
@@ -152,9 +156,23 @@ class RowList:
         return iter(self.rows)
 
 
+def _request_with_data(user=None):
+    request = RequestFactory().get("/")
+    if user is not None:
+        request.user = user
+    request.request_data = SBAdminViewRequestData(
+        view="articles", action=None, modifier=None, user=user
+    )
+    return request
+
+
 class RowActionIntegrationTests(TestCase):
     def setUp(self):
-        self.request = RequestFactory().get("/")
+        self.request = _request_with_data()
+
+    def listed(self, action_id, request=None):
+        request = request or self.request
+        return request.request_data.get_action("articles", action_id)
 
     def test_permission_gated_target_view_row_action_is_materialized(self):
         class ArticleAdmin(FakeAdminView, SBAdminBaseListView):
@@ -175,12 +193,12 @@ class RowActionIntegrationTests(TestCase):
                     request, self.get_sbadmin_row_actions(request)
                 )
 
-        allowed_request = RequestFactory().get("/")
-        allowed_request.user = SimpleNamespace(
-            has_perm=lambda perm: perm == "blog.publish_article"
+        allowed_request = _request_with_data(
+            SimpleNamespace(has_perm=lambda perm: perm == "blog.publish_article")
         )
-        denied_request = RequestFactory().get("/")
-        denied_request.user = SimpleNamespace(has_perm=lambda perm: False)
+        denied_request = _request_with_data(
+            SimpleNamespace(has_perm=lambda perm: False)
+        )
 
         view = ArticleAdmin()
         view.init_actions(denied_request)
@@ -192,7 +210,11 @@ class RowActionIntegrationTests(TestCase):
             allowed_first_view, denied_request
         ).get_template_data()
 
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        # The modal is dispatchable only for the request that listed it; an
+        # earlier permitted request does not leave it reachable for others.
+        self.assertIsNotNone(self.listed("PublishArticleView", allowed_request))
+        self.assertIsNone(self.listed("PublishArticleView", denied_request))
+        self.assertFalse(hasattr(view, "PublishArticleView"))
         self.assertNotIn(
             "_row_actions",
             [
@@ -467,9 +489,7 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_detail_actions(self.request, [action], object_id=123)
 
         self.assertEqual(processed[0].permission, "delete")
-        self.assertEqual(
-            view.PublishArticleView._sbadmin_action_attrs["permission"], "delete"
-        )
+        self.assertEqual(self.listed("PublishArticleView").permission, "delete")
 
     def test_detail_action_without_object_modifier_keeps_template_modifier(self):
         view = FakeAdminView()
@@ -495,7 +515,7 @@ class RowActionIntegrationTests(TestCase):
 
         self.assertEqual(processed[0].url, "/actions/PublishArticleView/template/123/")
 
-    def test_form_view_actions_are_registered_before_permission_filtering(self):
+    def test_form_view_actions_denied_by_permission_are_not_registered(self):
         view = FakeAdminView(has_action_permission=False)
         action = SBAdminFormViewAction(
             target_view=PublishArticleView,
@@ -506,7 +526,8 @@ class RowActionIntegrationTests(TestCase):
         processed = view.process_list_actions(self.request, [action])
 
         self.assertEqual(processed, [])
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertIsNone(self.listed("PublishArticleView"))
+        self.assertFalse(hasattr(view, "PublishArticleView"))
         self.assertIsNone(action.url)
 
     def test_form_view_action_uses_declared_action_id(self):
@@ -523,7 +544,7 @@ class RowActionIntegrationTests(TestCase):
 
         processed = view.process_list_actions(self.request, [action])
 
-        self.assertTrue(hasattr(view, "custom_action_id"))
+        self.assertIsNotNone(self.listed("custom_action_id"))
         self.assertEqual(processed[0].action_id, "custom_action_id")
         self.assertEqual(processed[0].url, "/actions/custom_action_id/template/")
         self.assertIsNone(action.action_id)
@@ -562,7 +583,7 @@ class RowActionIntegrationTests(TestCase):
             processed[0].sub_actions[0].url,
             "/actions/PublishArticleView/template/123/",
         )
-        self.assertTrue(hasattr(view, "PublishArticleView"))
+        self.assertIsNotNone(self.listed("PublishArticleView"))
 
     def test_row_action_rejects_missing_or_ambiguous_interaction_modes(self):
         with self.assertRaises(ImproperlyConfigured):
@@ -620,6 +641,116 @@ class ModalActionIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.content, b"Not found.")
+
+
+class EchoModalView(View):
+    view = None
+
+    def get(self, request, *args, **kwargs):
+        return HttpResponse(f"ran {kwargs.get('object_id')}")
+
+
+class OtherEchoModalView(EchoModalView):
+    pass
+
+
+class ModalActionDispatchTests(TestCase):
+    """A modal runs only if the dispatching request itself lists it."""
+
+    def request_for(self, user, object_id="7"):
+        request = _request_with_data(user)
+        request.request_data.modifier = "template"
+        request.request_data.object_id = object_id
+        return request
+
+    def make_view(self):
+        class ArticleAdmin(FakeAdminView):
+            def get_sbadmin_detail_actions(self, request, object_id=None):
+                if not request.user.can_echo:
+                    return []
+                return [
+                    SBAdminFormViewAction(
+                        target_view=EchoModalView,
+                        title="Echo",
+                        view=self,
+                        permission=request.user.permission,
+                    )
+                ]
+
+            def has_permission_for_action(self, request, action):
+                # Sees the real action, including target_view and the
+                # per-request permission.
+                return (
+                    action.target_view is EchoModalView
+                    and action.permission == "change"
+                )
+
+        return ArticleAdmin()
+
+    def test_listed_modal_dispatches(self):
+        view = self.make_view()
+        request = self.request_for(SimpleNamespace(can_echo=True, permission="change"))
+
+        response = SBAdminViewService.delegate_to_modal_action(
+            request, view, "EchoModalView"
+        )
+
+        self.assertEqual(response.content, b"ran 7")
+
+    def test_modal_listed_for_another_request_is_not_dispatchable(self):
+        view = self.make_view()
+        allowed = self.request_for(SimpleNamespace(can_echo=True, permission="change"))
+        hidden = self.request_for(SimpleNamespace(can_echo=False, permission="change"))
+        other_permission = self.request_for(
+            SimpleNamespace(can_echo=True, permission="delete")
+        )
+
+        SBAdminViewService.delegate_to_modal_action(allowed, view, "EchoModalView")
+
+        for request in (hidden, other_permission):
+            with self.assertRaisesMessage(
+                Http404, "Action 'EchoModalView' is not available on view 'articles'."
+            ):
+                SBAdminViewService.delegate_to_modal_action(
+                    request, view, "EchoModalView"
+                )
+        self.assertFalse(hasattr(view, "EchoModalView"))
+
+    def test_sbadmin_detail_actions_attribute_publishes_modal(self):
+        view = FakeAdminView()
+        view.sbadmin_detail_actions = [
+            SBAdminFormViewAction(target_view=EchoModalView, title="Echo", view=view)
+        ]
+
+        response = SBAdminViewService.delegate_to_modal_action(
+            self.request_for(SimpleNamespace()), view, "EchoModalView"
+        )
+
+        self.assertEqual(response.content, b"ran 7")
+        self.assertFalse(hasattr(view, "EchoModalView"))
+
+    def test_published_modal_still_goes_through_permission_check(self):
+        view = FakeAdminView(has_action_permission=False)
+        view.sbadmin_detail_actions = [
+            SBAdminFormViewAction(target_view=EchoModalView, title="Echo", view=view)
+        ]
+
+        with self.assertRaises(Http404):
+            SBAdminViewService.delegate_to_modal_action(
+                self.request_for(SimpleNamespace()), view, "EchoModalView"
+            )
+
+    def test_two_modal_views_with_one_action_id_are_rejected(self):
+        view = FakeAdminView()
+        actions = [
+            SBAdminFormViewAction(
+                target_view=target_view, title="Echo", view=view, action_id="echo"
+            )
+            for target_view in (EchoModalView, OtherEchoModalView)
+        ]
+
+        with self.assertRaises(ImproperlyConfigured):
+            view.process_actions(self.request_for(SimpleNamespace()), actions)
 
 
 class ListRowClassTests(TestCase):

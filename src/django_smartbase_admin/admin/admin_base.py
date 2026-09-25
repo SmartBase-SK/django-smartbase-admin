@@ -179,6 +179,15 @@ from django_smartbase_admin.services.views import SBAdminViewService
 logger = logging.getLogger(__name__)
 
 
+def _iter_leaf_actions(actions):
+    for action in actions or []:
+        sub_actions = getattr(action, "sub_actions", None)
+        if sub_actions:
+            yield from _iter_leaf_actions(sub_actions)
+        else:
+            yield action
+
+
 class SBAdminFormFieldWidgetsMixin:
     formfield_widgets = {
         forms.DateTimeField: SBAdminDateTimeWidget,
@@ -976,15 +985,63 @@ class SBAdmin(
     def init_actions(self, request) -> None:
         super().init_actions(request)
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        self._register_inline_actions(request, object_id)
+
+    def _get_inline_instances_for_actions(self, request, object_id) -> list:
         if object_id is None:
-            return
+            return []
+        # Action init, MCP discovery and ``find_action`` all ask for the same
+        # parent-bound inlines; build them once per bound ``request_data``.
+        cache = getattr(
+            getattr(request, "request_data", None), "inline_instances_cache", None
+        )
+        if cache is None:
+            return self._build_inline_instances_for_actions(request, object_id)
+        key = (self.get_id(), str(object_id))
+        if key not in cache:
+            cache[key] = self._build_inline_instances_for_actions(request, object_id)
+        return cache[key]
+
+    def _build_inline_instances_for_actions(self, request, object_id) -> list:
         try:
             obj = self.get_object(request, object_id)
         except PermissionDenied:
-            return
-        inline_instances = self.get_inline_instances(request, obj=obj)
-        for inline in inline_instances:
+            return []
+        # Loading the parent does not check its admin permissions.
+        if obj is None or not self.has_view_or_change_permission(request, obj):
+            return []
+        return self.get_inline_instances(request, obj=obj)
+
+    def _register_inline_actions(self, request, object_id=None) -> None:
+        for inline in self._get_inline_instances_for_actions(request, object_id):
             inline.init_actions(request)
+
+    def get_sbadmin_inline_parent_actions_processed(
+        self, request, object_id: int | str | None = None
+    ) -> list:
+        """Inline header modals that run against this admin's object.
+
+        ``RowActionModalView`` actions declared on an inline without an
+        explicit ``view`` are bound to the parent admin; in the UI they are
+        detail actions of the parent object, so MCP publishes them the same
+        way.
+        """
+        if object_id is None:
+            return []
+        parent_id = self.get_id()
+        actions = []
+        for inline in self._get_inline_instances_for_actions(request, object_id):
+            for action in _iter_leaf_actions(
+                inline.get_sbadmin_inline_list_actions_processed(request)
+            ):
+                view = getattr(action, "view", None)
+                if (
+                    getattr(action, "target_view", None) is not None
+                    and view is not None
+                    and view.get_id() == parent_id
+                ):
+                    actions.append(action)
+        return actions
 
     def get_sbadmin_tabs(self, request, object_id) -> Iterable:
         return self.sbadmin_tabs
@@ -1017,8 +1074,6 @@ class SBAdmin(
         return self.menu_label or self.model._meta.verbose_name_plural
 
     def get_action_url(self, action, modifier="template", object_id=None) -> str:
-        if not hasattr(self, action):
-            raise ImproperlyConfigured(f"Action {action} does not exist on {self}")
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs=self.get_action_url_kwargs(action, modifier, object_id),
@@ -1401,32 +1456,70 @@ class SBAdminInline(
             object_id=object_id,
         )
 
-    def init_actions(self, request) -> None:
-        # inline supports only own sbadmin_inline_list_actions but also sbadmin_fieldsets_actions
-        object_id = (
-            self.parent_instance.pk
-            if self.parent_instance is not None and self.parent_instance.pk is not None
-            else None
-        )
+    def _inline_actions_processed(self, request, object_id: int | str | None) -> list:
+        parent_pk = getattr(self.parent_instance, "pk", None)
+        if parent_pk is None and object_id is None:
+            return []
         all_actions = [*self.get_sbadmin_inline_list_actions_processed(request)]
-        if object_id is not None:
+        if parent_pk is not None:
             all_actions.extend(
-                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+                self.get_sbadmin_fieldsets_actions_processed(request, parent_pk)
             )
-        self.register_action_autocomplete_views(request, all_actions)
+        return all_actions
+
+    def init_actions(self, request) -> None:
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        self.register_action_autocomplete_views(
+            request, self._inline_actions_processed(request, object_id)
+        )
+
+    def _action_registration_steps(self, request):
+        # Fieldset actions need the parent-bound inline, not the unbound
+        # instance registered for URL dispatch.
+        return [self._register_inline_actions]
+
+    def _register_inline_actions(self, request, object_id=None) -> None:
+        # Dispatch on the inline's own view id: first the actions this inline
+        # lists without a parent object, then the parent admin's pass, which
+        # rebuilds the inline for the parent object in ``object_id``.
+        self._inline_actions_processed(request, object_id)
+        if getattr(self.parent_instance, "pk", None) is not None:
+            return
+        parent_admin = self.admin_site._registry.get(self.parent_model)
+        register_parent = getattr(parent_admin, "_register_inline_actions", None)
+        if register_parent is not None:
+            register_parent(request, object_id)
 
     def _bind_parent_row_action_modals(self, actions: list) -> list:
-        if self.parent_instance is None:
-            return actions
         parent_admin = self.admin_site._registry.get(self.parent_model)
         if parent_admin is None:
             return actions
-        return [
-            self._bind_parent_row_action_modal(action, parent_admin)
-            for action in actions
-        ]
+        result = []
+        for action in actions:
+            action = self._bind_parent_row_action_modal(action, parent_admin)
+            if action is not None:
+                result.append(action)
+        return result
+
+    @staticmethod
+    def _is_parent_bound_modal(action) -> bool:
+        if getattr(action, "view", None) is not None:
+            return False
+        target_view = getattr(action, "target_view", None)
+        if target_view is None:
+            return False
+        from django_smartbase_admin.engine.modal_view import RowActionModalView
+
+        try:
+            return issubclass(target_view, RowActionModalView)
+        except TypeError:
+            return False
 
     def _bind_parent_row_action_modal(self, action, parent_admin):
+        # A ``RowActionModalView`` declared on an inline without ``view``
+        # runs against the parent object, so it is bound to the parent admin.
+        # Without a parent object (add view) it has nothing to run against
+        # and is dropped (returns ``None``).
         # we need to add view on action to be parent_admin
         # this ->
         #         SBAdminFormViewAction(
@@ -1444,26 +1537,25 @@ class SBAdminInline(
         sub_actions = getattr(action, "sub_actions", None)
         if sub_actions:
             resolved_sub_actions = [
-                self._bind_parent_row_action_modal(sub_action, parent_admin)
+                resolved
                 for sub_action in sub_actions
+                if (
+                    resolved := self._bind_parent_row_action_modal(
+                        sub_action, parent_admin
+                    )
+                )
+                is not None
             ]
+            if not resolved_sub_actions:
+                return None
             if resolved_sub_actions != sub_actions:
                 action = copy(action)
                 action.sub_actions = resolved_sub_actions
             return action
-        if getattr(action, "view", None) is not None:
+        if not self._is_parent_bound_modal(action):
             return action
-        target_view = getattr(action, "target_view", None)
-        if target_view is None:
-            return action
-        from django_smartbase_admin.engine.modal_view import RowActionModalView
-
-        try:
-            is_row_action_modal = issubclass(target_view, RowActionModalView)
-        except TypeError:
-            is_row_action_modal = False
-        if not is_row_action_modal:
-            return action
+        if self.parent_instance is None or self.parent_instance.pk is None:
+            return None
         action = copy(action)
         action.view = parent_admin
         return action

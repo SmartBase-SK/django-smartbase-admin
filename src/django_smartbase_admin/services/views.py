@@ -219,10 +219,12 @@ class SBAdminViewService(object):
         action_name = request_data.action
 
         action_function = getattr(view, action_name, None)
-        if not action_function or not getattr(
-            action_function, "_is_sbadmin_action", False
-        ):
-            raise Http404
+        if action_function is None:
+            return cls.delegate_to_modal_action(request, view, action_name)
+        if not getattr(action_function, "_is_sbadmin_action", False):
+            raise Http404(
+                f"{action_name!r} on view {view.get_id()!r} is not an action."
+            )
 
         action_attrs = getattr(action_function, "_sbadmin_action_attrs", {}) or {}
         if not cls.has_action_permission(
@@ -238,6 +240,27 @@ class SBAdminViewService(object):
             request,
             request_data.modifier,
             request_data.object_id,
+        )
+
+    @classmethod
+    def delegate_to_modal_action(cls, request, view, action_id):
+        """Run the modal this request lists under ``action_id``.
+
+        Routing and authorization come from the same action object the
+        getters built and ``has_permission_for_action`` accepted for this
+        request, so a modal runs only if this request would render it.
+        """
+        find_action = getattr(view, "find_action", None)
+        action = find_action(request, action_id) if find_action else None
+        if action is None:
+            raise Http404(
+                f"Action {action_id!r} is not available on view {view.get_id()!r}."
+            )
+        request_data = request.request_data
+        return action.target_view.as_view(view=action.view or view)(
+            request,
+            modifier=request_data.modifier,
+            object_id=request_data.object_id,
         )
 
     @classmethod

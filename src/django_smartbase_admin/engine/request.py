@@ -1,3 +1,4 @@
+from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
 
 from django_smartbase_admin.engine.const import GLOBAL_FILTER_DATA_KEY
@@ -21,6 +22,8 @@ class SBAdminViewRequestData(object):
     session = None
     additional_data = None
     autocomplete_map = None
+    action_map = None
+    inline_instances_cache = None
 
     def __init__(
         self,
@@ -50,9 +53,34 @@ class SBAdminViewRequestData(object):
         self.session = session or {}
         self.additional_data = {}
         self.autocomplete_map = {}
+        self.action_map = {}
+        self.inline_instances_cache = {}
 
     def register_autocomplete_view(self, view) -> None:
         self.autocomplete_map[view.get_id()] = view
+
+    def register_action(self, view_id, action_id, action) -> None:
+        """Record a modal action this request listed and permitted.
+
+        Keyed by the view its URL points to, so dispatch on that view finds
+        the same action object the permission check saw. Lives for one
+        request only, like ``autocomplete_map``.
+        """
+        key = (view_id, action_id)
+        registered = self.action_map.get(key)
+        if registered is None:
+            self.action_map[key] = action
+            return
+        if registered.target_view is not action.target_view:
+            raise ImproperlyConfigured(
+                f"Action id {action_id!r} on view {view_id!r} is used by two "
+                f"modal views: {registered.target_view.__name__} and "
+                f"{action.target_view.__name__}. Give one of them a distinct "
+                "action_id."
+            )
+
+    def get_action(self, view_id, action_id):
+        return self.action_map.get((view_id, action_id))
 
     def refresh_selected_view(self, request):
         self.configuration = SBAdminConfigurationService.get_configuration(self)
@@ -64,6 +92,8 @@ class SBAdminViewRequestData(object):
             raise Http404
         self.configuration.init_configuration_dynamic(request, self)
         self.autocomplete_map = {}
+        self.action_map = {}
+        self.inline_instances_cache = {}
 
     @classmethod
     def from_request_and_kwargs(cls, request, **kwargs):
