@@ -105,8 +105,8 @@ class RegistryGroupAdmin(SBAdmin):
 
 @override_settings(ROOT_URLCONF=__name__)
 class ActionRegistryTests(SimpleTestCase):
-    def request_for(self, view, *, object_id="7"):
-        request = RequestFactory().get("/")
+    def request_for(self, view, *, object_id="7", method="get"):
+        request = getattr(RequestFactory(), method)("/")
         request.allow_actions = True
         request.publish_actions = True
         request.allow_parent = True
@@ -153,6 +153,18 @@ class ActionRegistryTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_modal_without_explicit_view_uses_dispatching_view(self):
+        view = RegistryCustomView()
+        action = SBAdminFormViewAction(
+            title="Registry modal", target_view=RegistryModal
+        )
+
+        with patch.object(view, "get_sbadmin_detail_actions", return_value=[action]):
+            response = self.dispatch(self.request_for(view))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"registry_custom_view:7")
+
     def test_mcp_discovers_custom_view_actions_and_honors_explicit_object(self):
         for source in ("detail", "fieldset", "markup"):
             with self.subTest(source=source):
@@ -187,13 +199,25 @@ class ActionRegistryTests(SimpleTestCase):
                     )
 
     def test_inline_fieldset_dispatch_rebuilds_parent_context(self):
-        view = self.inline_view()
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                view = self.inline_view()
+                request = self.request_for(view, method=method)
 
-        response = self.dispatch(self.request_for(view))
+                def render_parent(modal, request, *args, **kwargs):
+                    parent = modal.view.parent_instance
+                    response = HttpResponse(f"{modal.view.get_id()}:{parent.pk}")
+                    self.assertIs(
+                        modal.view, view.find_action(request, "RegistryModal").view
+                    )
+                    return response
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content.decode(), f"{view.get_id()}:7")
-        self.assertIsNone(view.parent_instance)
+                with patch.object(RegistryModal, method, render_parent, create=True):
+                    response = self.dispatch(request)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content.decode(), f"{view.get_id()}:7")
+                self.assertIsNone(view.parent_instance)
 
     def test_mcp_finds_inline_fieldset_with_fresh_and_registered_actions(self):
         for bound in (False, True):

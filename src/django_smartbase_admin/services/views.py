@@ -257,7 +257,7 @@ class SBAdminViewService(object):
                 f"Action {action_id!r} is not available on view {view.get_id()!r}."
             )
         request_data = request.request_data
-        return action.target_view.as_view(view=view)(
+        return action.target_view.as_view(view=action.view or view)(
             request,
             modifier=request_data.modifier,
             object_id=request_data.object_id,
