@@ -12,6 +12,7 @@ from django.views import View
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
 from django_smartbase_admin.mcp.actions import SBAdminMCPActionFormService
@@ -59,6 +60,16 @@ class RegistryCustomView(SBAdminView):
 
     def get_sbadmin_modal_actions(self, request):
         return self.modal_actions(request, "markup")
+
+
+class RegistryListView(RegistryCustomView, SBAdminBaseListView):
+    sbadmin_list_history_enabled = False
+
+    def get_sbadmin_list_selection_actions(self, request):
+        return []
+
+    def get_sbadmin_list_actions(self, request):
+        return self.modal_actions(request, "list")
 
 
 class RegistryMembershipInline(SBAdminTableInline):
@@ -145,13 +156,54 @@ class ActionRegistryTests(SimpleTestCase):
                 self.assertEqual(response.content, b"registry_custom_view:7")
                 self.assertFalse(hasattr(view, "RegistryModal"))
 
-    def test_custom_view_detail_modal_without_object_dispatches(self):
-        view = RegistryCustomView()
-        view.expected_object_id = None
+    def test_detail_and_fieldset_lookup_without_object_skips_getters(self):
+        for view_class in (RegistryCustomView, RegistryListView):
+            for source in ("detail", "fieldset"):
+                with self.subTest(view=view_class.__name__, source=source):
+                    view = view_class()
+                    view.source = source
+                    view.expected_object_id = None
+                    with (
+                        patch.object(
+                            view,
+                            "get_sbadmin_detail_actions",
+                            wraps=view.get_sbadmin_detail_actions,
+                        ) as detail_actions,
+                        patch.object(
+                            view,
+                            "get_sbadmin_fieldsets",
+                            wraps=view.get_sbadmin_fieldsets,
+                        ) as fieldsets,
+                    ):
+                        with self.assertRaises(Http404):
+                            self.dispatch(self.request_for(view, object_id=None))
+                        with self.assertRaises(LookupError):
+                            SBAdminMCPActionFormService._find_modal_action(
+                                view,
+                                "RegistryModal",
+                                self.request_for(view, object_id=None),
+                            )
 
-        response = self.dispatch(self.request_for(view, object_id=None))
+                        detail_actions.assert_not_called()
+                        fieldsets.assert_not_called()
 
-        self.assertEqual(response.status_code, 200)
+    def test_list_and_markup_modals_without_object_dispatch(self):
+        for source in ("list", "markup"):
+            with self.subTest(source=source):
+                view = RegistryListView()
+                view.source = source
+
+                response = self.dispatch(self.request_for(view, object_id=None))
+                action, target = SBAdminMCPActionFormService._find_modal_action(
+                    view,
+                    "RegistryModal",
+                    self.request_for(view, object_id=None),
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, b"registry_custom_view:None")
+                self.assertIs(target, RegistryModal)
+                self.assertEqual(action.url, view.get_action_url("RegistryModal"))
 
     def test_modal_without_explicit_view_uses_dispatching_view(self):
         view = RegistryCustomView()
@@ -197,6 +249,72 @@ class ActionRegistryTests(SimpleTestCase):
                     SBAdminMCPActionFormService._find_modal_action(
                         view, "RegistryModal", request, object_id="7"
                     )
+
+    def test_list_view_lookup_honors_explicit_object_after_initialization(self):
+        for source in ("detail", "fieldset"):
+            with self.subTest(source=source):
+                view = RegistryListView()
+                view.source = source
+                request = self.request_for(view, object_id=None)
+                view.init_actions(request)
+
+                action, target = SBAdminMCPActionFormService._find_modal_action(
+                    view, "RegistryModal", request, object_id="7"
+                )
+
+                self.assertIs(target, RegistryModal)
+                self.assertEqual(
+                    action.url, view.get_action_url("RegistryModal", object_id="7")
+                )
+
+    def test_parent_inline_registration_requires_accessible_object(self):
+        view = RegistryGroupAdmin(Group, AdminSite())
+        for object_id, allow_parent in ((None, True), ("8", True), ("7", False)):
+            with self.subTest(object_id=object_id, allow_parent=allow_parent):
+                request = self.request_for(view, object_id=object_id)
+                request.allow_parent = allow_parent
+                with (
+                    patch.object(view, "_list_actions_processed", return_value=[]),
+                    patch.object(view, "get_sbadmin_fieldsets", return_value=[]),
+                    patch.object(
+                        view, "get_inline_instances", return_value=[]
+                    ) as inline_instances,
+                ):
+                    view.init_actions(request)
+                    with self.assertRaises(Http404):
+                        SBAdminViewService.delegate_to_modal_action(
+                            request, view, "MissingModal"
+                        )
+
+                    inline_instances.assert_not_called()
+
+    def test_inline_lookup_without_object_skips_getters_and_parent_inlines(self):
+        view = self.inline_view()
+        parent_admin = view.admin_site._registry[Group]
+        with (
+            patch.object(parent_admin, "get_inline_instances") as inline_instances,
+            patch.object(
+                view,
+                "get_sbadmin_inline_list_actions",
+                wraps=view.get_sbadmin_inline_list_actions,
+            ) as inline_actions,
+            patch.object(
+                view, "get_sbadmin_fieldsets", wraps=view.get_sbadmin_fieldsets
+            ) as fieldsets,
+        ):
+            view.init_actions(self.request_for(view, object_id=None))
+            with self.assertRaises(Http404):
+                self.dispatch(self.request_for(view, object_id=None))
+            with self.assertRaises(LookupError):
+                SBAdminMCPActionFormService._find_modal_action(
+                    view,
+                    "RegistryModal",
+                    self.request_for(view, object_id=None),
+                )
+
+            inline_instances.assert_not_called()
+            inline_actions.assert_not_called()
+            fieldsets.assert_not_called()
 
     def test_inline_fieldset_dispatch_rebuilds_parent_context(self):
         for method in ("get", "post"):

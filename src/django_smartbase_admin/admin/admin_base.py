@@ -985,26 +985,18 @@ class SBAdmin(
     def init_actions(self, request) -> None:
         super().init_actions(request)
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        self._register_inline_actions(request, object_id)
+
+    def _get_inline_instances_for_actions(self, request, object_id) -> list:
         if object_id is None:
-            return
+            return []
         try:
             obj = self.get_object(request, object_id)
         except PermissionDenied:
-            return
-        inline_instances = self.get_inline_instances(request, obj=obj)
-        for inline in inline_instances:
-            inline.init_actions(request)
-
-    def _get_inline_instances_for_actions(self, request, object_id) -> list:
-        obj = None
-        if object_id is not None:
-            try:
-                obj = self.get_object(request, object_id)
-            except PermissionDenied:
-                return []
-            # Loading the parent does not check its admin permissions.
-            if obj is None or not self.has_view_or_change_permission(request, obj):
-                return []
+            return []
+        # Loading the parent does not check its admin permissions.
+        if obj is None or not self.has_view_or_change_permission(request, obj):
+            return []
         return self.get_inline_instances(request, obj=obj)
 
     def _register_inline_actions(self, request, object_id=None) -> None:
@@ -1451,19 +1443,22 @@ class SBAdminInline(
             object_id=object_id,
         )
 
-    def init_actions(self, request) -> None:
-        # inline supports only own sbadmin_inline_list_actions but also sbadmin_fieldsets_actions
-        object_id = (
-            self.parent_instance.pk
-            if self.parent_instance is not None and self.parent_instance.pk is not None
-            else None
-        )
+    def _inline_actions_processed(self, request, object_id: int | str | None) -> list:
+        parent_pk = getattr(self.parent_instance, "pk", None)
+        if parent_pk is None and object_id is None:
+            return []
         all_actions = [*self.get_sbadmin_inline_list_actions_processed(request)]
-        if object_id is not None:
+        if parent_pk is not None:
             all_actions.extend(
-                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+                self.get_sbadmin_fieldsets_actions_processed(request, parent_pk)
             )
-        self.register_action_autocomplete_views(request, all_actions)
+        return all_actions
+
+    def init_actions(self, request) -> None:
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        self.register_action_autocomplete_views(
+            request, self._inline_actions_processed(request, object_id)
+        )
 
     def _action_registration_steps(self, request):
         # Fieldset actions need the parent-bound inline, not the unbound
@@ -1474,10 +1469,8 @@ class SBAdminInline(
         # Dispatch on the inline's own view id: first the actions this inline
         # lists without a parent object, then the parent admin's pass, which
         # rebuilds the inline for the parent object in ``object_id``.
-        self.get_sbadmin_inline_list_actions_processed(request)
-        parent_pk = getattr(self.parent_instance, "pk", None)
-        if parent_pk is not None:
-            self.get_sbadmin_fieldsets_actions_processed(request, parent_pk)
+        self._inline_actions_processed(request, object_id)
+        if getattr(self.parent_instance, "pk", None) is not None:
             return
         parent_admin = self.admin_site._registry.get(self.parent_model)
         register_parent = getattr(parent_admin, "_register_inline_actions", None)

@@ -29,10 +29,7 @@ from django_smartbase_admin.engine.actions import (
     SBAdminRowAction,
     sbadmin_action,
 )
-from django_smartbase_admin.engine.admin_base_view import (
-    SBAdminBaseListView,
-    SBAdminBaseView,
-)
+from django_smartbase_admin.engine.admin_base_view import SBAdminBaseView
 from django_smartbase_admin.engine.const import (
     ACTION_AUTOCOMPLETE_MODIFIER_SEPARATOR,
     Action,
@@ -778,7 +775,7 @@ class CompleteInlineActionView(CompleteActionSourceView):
         )
 
 
-class CompleteParentActionView(CompleteActionSourceView, SBAdminBaseListView):
+class CompleteParentActionView(CompleteActionSourceView):
     view_id = "complete_parent_actions"
 
     def get_sbadmin_list_display(self, request):
@@ -857,6 +854,33 @@ class CompleteParentActionView(CompleteActionSourceView, SBAdminBaseListView):
         self, request, fieldset, fieldset_data, object_id=None
     ):
         return fieldset_data.get("actions")
+
+    def init_view_dynamic(self, request, request_data=None, **kwargs):
+        super().init_view_dynamic(request, request_data, **kwargs)
+        self.get_sbadmin_list_selection_actions_processed(request)
+        self.get_sbadmin_list_actions_processed(request)
+        self.get_sbadmin_row_actions_processed(request)
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        if object_id is not None:
+            self.get_sbadmin_detail_actions_processed(request, object_id)
+            self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+        self._register_action_autocomplete(request)
+
+    def _register_action_autocomplete(self, request):
+        object_id = getattr(getattr(request, "request_data", None), "object_id", None)
+        all_actions = [
+            *self.get_sbadmin_list_selection_actions_processed(request),
+            *self.get_sbadmin_list_actions_processed(request),
+            *self.get_sbadmin_row_actions_processed(request),
+        ]
+        if object_id is not None:
+            all_actions.extend(
+                self.get_sbadmin_detail_actions_processed(request, object_id)
+            )
+            all_actions.extend(
+                self.get_sbadmin_fieldsets_actions_processed(request, object_id)
+            )
+        self.register_action_autocomplete_views(request, all_actions)
 
 
 class AdminFieldsetsDynamicRegionAdmin(SBAdmin):
@@ -1630,39 +1654,6 @@ class DynamicFormTests(SimpleTestCase):
             self.assertEqual(autocomplete_payload["view"], source_view.get_id())
             self.assertEqual(autocomplete_payload["object_id"], "42")
             self.assertEqual(autocomplete_payload["modifier"], action_widget_id)
-
-    def test_detail_and_fieldset_action_autocomplete_without_object(self):
-        source_view = CompleteParentActionView()
-        for source_name in ("detail", "fieldset"):
-            with self.subTest(source=source_name):
-                modal_class = COMPLETE_ACTION_MODALS[source_name]
-                action_response = self.dispatch_complete_action_request(
-                    source_view,
-                    action=modal_class.__name__,
-                    modifier="template",
-                    object_id=None,
-                )
-                self.assertEqual(action_response.status_code, 200)
-                action_payload = json.loads(action_response.content)
-                self.assertIsNone(action_payload["object_id"])
-                self.assertEqual(len(action_payload["autocomplete_ids"]), 1)
-
-                autocomplete_response = self.dispatch_complete_action_request(
-                    source_view,
-                    action=Action.AUTOCOMPLETE.value,
-                    modifier=action_payload["autocomplete_ids"][0],
-                    object_id=None,
-                    method="post",
-                    data={"autocomplete_term": "abc"},
-                )
-
-                self.assertEqual(autocomplete_response.status_code, 200)
-                autocomplete_payload = json.loads(autocomplete_response.content)[
-                    "data"
-                ][0]
-                self.assertEqual(autocomplete_payload["source"], source_name)
-                self.assertEqual(autocomplete_payload["field"], "lookup")
-                self.assertIsNone(autocomplete_payload["object_id"])
 
     def dispatch_complete_action_request(
         self,
