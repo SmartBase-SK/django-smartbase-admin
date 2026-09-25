@@ -284,7 +284,9 @@ class SBAdminListAction(SBAdminAction):
         for sort in self.table_params.get("sort", []):
             if not isinstance(sort, dict) or sort.get("field") not in sortable:
                 continue
-            order_by.append(f"{'-' if sort.get('dir') == 'desc' else ''}{sort['field']}")
+            order_by.append(
+                f"{'-' if sort.get('dir') == 'desc' else ''}{sort['field']}"
+            )
         if len(order_by) == 0:
             order_by = self.view.get_list_ordering(self.threadsafe_request) or [
                 self.get_pk_field().name
