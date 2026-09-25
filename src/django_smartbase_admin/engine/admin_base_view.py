@@ -78,7 +78,6 @@ SBADMIN_RELOAD_ON_SAVE_VAR = "sbadmin_reload_on_save"
 class SBAdminBaseView(object):
     global_filter_data_map = None
     sbadmin_detail_actions = None
-    sbadmin_modal_actions = None
     menu_label: str | None = None
     add_label: str | None = None
     change_label: str | None = None
@@ -208,31 +207,6 @@ class SBAdminBaseView(object):
             return resolved_action
         return action
 
-    def get_sbadmin_modal_actions(self, request) -> list[SBAdminCustomAction]:
-        """Modals a view opens from its own markup, without a rendered button.
-
-        Dispatch runs a modal only when some getter lists it for the
-        current request; return such modals here so they go through the
-        same ``has_permission_for_action`` check as buttons.
-        """
-        return [*(self.sbadmin_modal_actions or [])]
-
-    def get_sbadmin_modal_actions_processed(
-        self, request, object_id: int | str | None = None
-    ) -> list[SBAdminCustomAction]:
-        if object_id is None:
-            object_id = getattr(
-                getattr(request, "request_data", None), "object_id", None
-            )
-        return self.process_detail_actions(
-            request,
-            [*(self.get_sbadmin_modal_actions(request) or [])],
-            object_id,
-        )
-
-    def _register_modal_actions(self, request, object_id=None) -> None:
-        self.get_sbadmin_modal_actions_processed(request, object_id)
-
     def _detail_actions_processed(
         self, request, object_id: int | str | None
     ) -> list[SBAdminCustomAction]:
@@ -254,7 +228,6 @@ class SBAdminBaseView(object):
                 getattr(self, "_register_list_actions", None),
                 getattr(self, "_register_detail_actions", None),
                 getattr(self, "_register_inline_actions", None),
-                self._register_modal_actions,
             )
             if step is not None
         ]
@@ -938,7 +911,6 @@ class SBAdminBaseListView(SBAdminBaseView):
         all_actions = [
             *self._list_actions_processed(request),
             *self._detail_actions_processed(request, object_id),
-            *self.get_sbadmin_modal_actions_processed(request),
         ]
         self.register_action_autocomplete_views(request, all_actions)
 

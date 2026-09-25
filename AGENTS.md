@@ -18,7 +18,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
-| [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement; modal dispatch rule and `get_sbadmin_modal_actions` |
+| [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement; modal dispatch and custom markup actions |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options, automatic choice formatting |
 | [XLSX Export Field Formatting](#xlsx-export-field-formatting) | Per-column Excel cell formats via `XLSXFieldOptions.cell_format` (named, dict, or `SBAdminXLSXFormat`) |
 | [View on Site link in list](#view-on-site-link-in-list) | List column with "View on site" icon via admin method, redirect view, `view_on_site_link_formatter` |
@@ -69,7 +69,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Full-text search config?** → [Full-text search (`search_fields`)](#full-text-search-search_fields)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
-- **Modal opened from custom markup, or a modal returning 404?** → [Modal Dispatch](#modal-dispatch-get_sbadmin_modal_actions)
+- **Modal opened from custom markup, or a modal returning 404?** → [Modal Dispatch](#modal-dispatch)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
 - **Per-action permissions?** → [Per-Action Permissions](#per-action-permissions-has_permission_for_action)
 - **Manual audit log entries?** → [Programmatic Audit Entries](#programmatic-audit-entries-_create_audit_log)
@@ -2787,7 +2787,6 @@ Framework consumers call processed getters, not raw getters:
 | Row buttons | `get_sbadmin_row_actions()` | `get_sbadmin_row_actions_processed()` |
 | Detail buttons | `get_sbadmin_detail_actions()` | `get_sbadmin_detail_actions_processed()` |
 | Inline row buttons | `get_sbadmin_inline_list_actions()` | `get_sbadmin_inline_list_actions_processed()` |
-| Modals opened from custom markup (no button) | `get_sbadmin_modal_actions()` | `get_sbadmin_modal_actions_processed()` |
 
 **Key points:**
 - Use `get_sbadmin_row_actions()` when the action needs `view=self`. URL-only actions can also be declared in the `sbadmin_row_actions` class attribute.
@@ -2796,7 +2795,7 @@ Framework consumers call processed getters, not raw getters:
 - Row actions are injected after list plugins reshape final data. `TabulatorNestedPlugin` injects actions into hydrated child rows too.
 - Methods referenced by `action_id` must be decorated with `@sbadmin_action`; non-modal methods can return `self.build_action_response(request)` to render notifications and trigger table reloads.
 
-### Modal Dispatch (`get_sbadmin_modal_actions`)
+### Modal Dispatch
 
 A modal action (`target_view=...`) runs only if **the dispatching request itself lists it**.
 Every processed getter records each modal that passes `has_permission_for_action` into a
@@ -2813,16 +2812,16 @@ without list views. Inline fieldset lookup rebuilds the parent-bound inline when
 request reaches the inline's URL. `get_action_url()` only builds a URL; availability and
 permissions are checked when the request is dispatched.
 
-Modals that a view opens from its own markup (a tree, a custom widget, a link rendered in a
-readonly field) have no button, so publish them through `get_sbadmin_modal_actions()`:
+For standalone actions opened from custom markup (a tree, a custom widget, a link rendered
+in a readonly field), define an `@sbadmin_action` method. It can delegate to a separate
+view class while retaining the action's permission checks and URL context:
 
 ```python
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
 
 from django_smartbase_admin.admin.admin_base import SBAdmin
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.actions import sbadmin_action
 from django_smartbase_admin.engine.modal_view import RowActionModalView
 
 from blog.models import Article
@@ -2834,29 +2833,32 @@ class RemoveCommentView(RowActionModalView):
 
 @admin.register(Article, site=sb_admin_site)
 class ArticleAdmin(SBAdmin):
-    def get_sbadmin_modal_actions(self, request):
-        return [
-            SBAdminFormViewAction(
-                target_view=RemoveCommentView,
-                title=_("Remove comment"),
-                view=self,
-                permission="change",
-            ),
-        ]
+    @sbadmin_action(permission="change")
+    def action_remove_comment(self, request, modifier, object_id):
+        return RemoveCommentView.as_view(view=self)(
+            request, modifier=modifier, object_id=object_id
+        )
 
     def comments_tree(self, obj):
-        # Custom markup may link to the modal by its action id.
-        url = self.get_action_url("RemoveCommentView", modifier="comment-5", object_id=obj.pk)
+        url = self.get_action_url(
+            "action_remove_comment", modifier="comment-5", object_id=obj.pk
+        )
         ...
 ```
 
+The decorator authorizes the endpoint independently of button placement. Hiding its
+custom link does not revoke access; enforce any additional availability rules in the
+action or its handler. To expose this method through MCP, declare its named inputs with
+`mcp_components` and use `invoke_action`; its schema is published under `mcp_actions`.
+Wrapping a view does not automatically expose its form through `fetch_action_form`.
+
 **Key points:**
-- A modal hidden from a user (getter returns nothing, or `has_permission_for_action` denies it) is not dispatchable for that user — hiding the button is enough; the modal no longer needs its own permission check for that.
+- For actions declared with `target_view`, a modal hidden from a user (getter returns nothing, or `has_permission_for_action` denies it) is not dispatchable for that user. Standalone decorated actions use their own permission checks, as described above.
 - Getters run on the dispatch request too, with the same `request_data.object_id` the URL carries. A getter that depends on render-only state (request path, GET params, template context) must also return the modal on the modal's own URL.
 - `RowActionModalView` actions declared on an inline without `view` are bound to the parent admin and run against the parent object. Without a parent object (add view) they are not rendered. MCP publishes them in the parent's `fetch_detail.detail_actions` (invoke with `invoke_detail_action` and the parent pk), not as inline actions.
 - A modal bound to another view must pass `has_permission_for_action(request, action)` on both the declaring view and the destination view before it is rendered or registered. For parent-bound inline modals, parent view permission alone does not authorize a change action; the parent admin must also approve the action, including its declared `permission` and any custom permission rules.
 - Two different modal views may not share one action id on one view — this raises `ImproperlyConfigured`. A decorated method with the same name as a modal id wins, as before.
-- `_register_form_view_action()` was removed. Modals are no longer attached to the admin as methods (`hasattr(admin, "XModalView")` is `False`); publish button-less modals through `get_sbadmin_modal_actions()` and build their URLs with `get_action_url("XModalView", ...)`.
+- `_register_form_view_action()` was removed. Modals declared with `target_view` are no longer attached to the admin as methods (`hasattr(admin, "XModalView")` is `False`). For custom markup, define an explicit decorated handler and build its URL with `get_action_url("action_remove_comment", ...)`.
 - `enabled_if` / `enabled_field` on row actions only hide the button. Re-check row state inside the modal when it matters.
 
 ---
@@ -5663,7 +5665,6 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `sbadmin_list_selection_actions` | list | Custom bulk actions (override `get_sbadmin_list_selection_actions()`) |
 | `sbadmin_list_actions` | list | List-level actions (not selection-based) |
 | `sbadmin_row_actions` | list | Per-row icon actions rendered in the list table (override `get_sbadmin_row_actions()`) |
-| `sbadmin_modal_actions` | list | Modals opened from custom markup without a button; required for them to be dispatchable (override `get_sbadmin_modal_actions()`, see [Modal Dispatch](#modal-dispatch-get_sbadmin_modal_actions)) |
 | `sbadmin_list_reorder_field` | str | Field name for drag-and-drop row reordering |
 | `sbadmin_xlsx_options` | dict | Excel export configuration options |
 | `sbadmin_table_history_enabled` | bool | Enable/disable table state history (default: `True`) |

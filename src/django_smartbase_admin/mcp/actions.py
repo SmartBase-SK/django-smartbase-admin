@@ -615,8 +615,8 @@ class SBAdminMCPActionFormService:
         """Resolve a permitted modal through the browser dispatch registry.
 
         ``view`` may be an admin, a custom view, or an inline. Shared lookup
-        includes custom-markup modals and inline fieldsets without maintaining
-        a separate list of action sources for MCP.
+        includes detail and inline fieldsets without maintaining a separate
+        list of action sources for MCP.
         """
         action = view.find_action(request, action_id, object_id=object_id)
         if action is None:

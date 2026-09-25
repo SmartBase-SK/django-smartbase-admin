@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.admin import AdminSite
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import path
@@ -11,7 +12,7 @@ from django.views import View
 
 from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminTableInline
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.engine.actions import SBAdminFormViewAction
+from django_smartbase_admin.engine.actions import SBAdminFormViewAction, sbadmin_action
 from django_smartbase_admin.engine.admin_base_view import SBAdminBaseListView
 from django_smartbase_admin.engine.admin_view import SBAdminView
 from django_smartbase_admin.engine.request import SBAdminViewRequestData
@@ -58,9 +59,6 @@ class RegistryCustomView(SBAdminView):
             return []
         return [(None, {"actions": self.modal_actions(request, "fieldset")})]
 
-    def get_sbadmin_modal_actions(self, request):
-        return self.modal_actions(request, "markup")
-
 
 class RegistryListView(RegistryCustomView, SBAdminBaseListView):
     sbadmin_list_history_enabled = False
@@ -70,6 +68,19 @@ class RegistryListView(RegistryCustomView, SBAdminBaseListView):
 
     def get_sbadmin_list_actions(self, request):
         return self.modal_actions(request, "list")
+
+
+class RegistryStandaloneActionView(RegistryCustomView):
+    source = "standalone"
+
+    def has_permission_for_action(self, request, action):
+        return request.allow_actions and action.permission == "change"
+
+    @sbadmin_action(permission="change")
+    def open_modal(self, request, modifier, object_id):
+        return RegistryModal.as_view(view=self)(
+            request, modifier=modifier, object_id=object_id
+        )
 
 
 class RegistryMembershipInline(SBAdminTableInline):
@@ -144,8 +155,8 @@ class ActionRegistryTests(SimpleTestCase):
         site.register(Group, RegistryGroupAdmin)
         return RegistryMembershipInline(Group, site)
 
-    def test_custom_view_dispatch_discovers_detail_fieldset_and_markup_modals(self):
-        for source in ("detail", "fieldset", "markup"):
+    def test_custom_view_dispatch_discovers_detail_and_fieldset_modals(self):
+        for source in ("detail", "fieldset"):
             with self.subTest(source=source):
                 view = RegistryCustomView()
                 view.source = source
@@ -187,23 +198,55 @@ class ActionRegistryTests(SimpleTestCase):
                         detail_actions.assert_not_called()
                         fieldsets.assert_not_called()
 
-    def test_list_and_markup_modals_without_object_dispatch(self):
-        for source in ("list", "markup"):
-            with self.subTest(source=source):
-                view = RegistryListView()
-                view.source = source
+    def test_list_modal_without_object_dispatches(self):
+        view = RegistryListView()
+        view.source = "list"
 
-                response = self.dispatch(self.request_for(view, object_id=None))
-                action, target = SBAdminMCPActionFormService._find_modal_action(
-                    view,
-                    "RegistryModal",
-                    self.request_for(view, object_id=None),
-                )
+        response = self.dispatch(self.request_for(view, object_id=None))
+        action, target = SBAdminMCPActionFormService._find_modal_action(
+            view,
+            "RegistryModal",
+            self.request_for(view, object_id=None),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"registry_custom_view:None")
+        self.assertIs(target, RegistryModal)
+        self.assertEqual(action.url, view.get_action_url("RegistryModal"))
+
+    def test_standalone_action_dispatches_view_with_request_context(self):
+        view = RegistryStandaloneActionView()
+
+        def render_context(modal, request, **kwargs):
+            self.assertIs(modal.view, view)
+            self.assertEqual(kwargs, {"modifier": "node-5", "object_id": "7"})
+            return HttpResponse(request.method)
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                request = self.request_for(view, method=method)
+                request.request_data.action = "open_modal"
+                request.request_data.modifier = "node-5"
+
+                with patch.object(RegistryModal, method, render_context, create=True):
+                    response = self.dispatch(request)
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.content, b"registry_custom_view:None")
-                self.assertIs(target, RegistryModal)
-                self.assertEqual(action.url, view.get_action_url("RegistryModal"))
+                self.assertEqual(response.content.decode(), method.upper())
+
+    def test_standalone_action_checks_permission_before_dispatching_view(self):
+        view = RegistryStandaloneActionView()
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                request = self.request_for(view, method=method)
+                request.request_data.action = "open_modal"
+                request.allow_actions = False
+
+                with patch.object(RegistryModal, "as_view") as as_view:
+                    with self.assertRaises(PermissionDenied):
+                        self.dispatch(request)
+
+                    as_view.assert_not_called()
 
     def test_modal_without_explicit_view_uses_dispatching_view(self):
         view = RegistryCustomView()
@@ -218,7 +261,7 @@ class ActionRegistryTests(SimpleTestCase):
         self.assertEqual(response.content, b"registry_custom_view:7")
 
     def test_mcp_discovers_custom_view_actions_and_honors_explicit_object(self):
-        for source in ("detail", "fieldset", "markup"):
+        for source in ("detail", "fieldset"):
             with self.subTest(source=source):
                 view = RegistryCustomView()
                 view.source = source
@@ -236,7 +279,6 @@ class ActionRegistryTests(SimpleTestCase):
 
     def test_hidden_or_denied_modals_are_unavailable_to_browser_and_mcp(self):
         view = RegistryCustomView()
-        view.source = "markup"
         self.dispatch(self.request_for(view))
 
         for denied_attribute in ("allow_actions", "publish_actions"):

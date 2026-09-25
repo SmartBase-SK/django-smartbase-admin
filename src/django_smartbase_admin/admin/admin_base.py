@@ -1463,7 +1463,7 @@ class SBAdminInline(
     def _action_registration_steps(self, request):
         # Fieldset actions need the parent-bound inline, not the unbound
         # instance registered for URL dispatch.
-        return [self._register_inline_actions, self._register_modal_actions]
+        return [self._register_inline_actions]
 
     def _register_inline_actions(self, request, object_id=None) -> None:
         # Dispatch on the inline's own view id: first the actions this inline

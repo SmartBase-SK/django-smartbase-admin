@@ -665,7 +665,7 @@ class ModalActionDispatchTests(TestCase):
 
     def make_view(self):
         class ArticleAdmin(FakeAdminView):
-            def get_sbadmin_modal_actions(self, request):
+            def get_sbadmin_detail_actions(self, request, object_id=None):
                 if not request.user.can_echo:
                     return []
                 return [
@@ -716,9 +716,9 @@ class ModalActionDispatchTests(TestCase):
                 )
         self.assertFalse(hasattr(view, "EchoModalView"))
 
-    def test_sbadmin_modal_actions_attribute_publishes_modal(self):
+    def test_sbadmin_detail_actions_attribute_publishes_modal(self):
         view = FakeAdminView()
-        view.sbadmin_modal_actions = [
+        view.sbadmin_detail_actions = [
             SBAdminFormViewAction(target_view=EchoModalView, title="Echo", view=view)
         ]
 
@@ -731,7 +731,7 @@ class ModalActionDispatchTests(TestCase):
 
     def test_published_modal_still_goes_through_permission_check(self):
         view = FakeAdminView(has_action_permission=False)
-        view.sbadmin_modal_actions = [
+        view.sbadmin_detail_actions = [
             SBAdminFormViewAction(target_view=EchoModalView, title="Echo", view=view)
         ]
 
