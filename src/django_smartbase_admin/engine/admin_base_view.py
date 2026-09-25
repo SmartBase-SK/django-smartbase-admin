@@ -920,8 +920,6 @@ class SBAdminBaseListView(SBAdminBaseView):
 
     def _detail_actions_processed(self, request) -> list[SBAdminCustomAction]:
         object_id = getattr(getattr(request, "request_data", None), "object_id", None)
-        if object_id is None:
-            return []
         return [
             *self.get_sbadmin_detail_actions_processed(request, object_id),
             *self.get_sbadmin_fieldsets_actions_processed(request, object_id),
