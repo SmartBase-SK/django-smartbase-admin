@@ -2809,10 +2809,7 @@ Browser dispatch and MCP form lookup both use `view.find_action(request, action_
 object_id=None)`. On a registry miss it processes the view's action sources for the
 requested object. Detail and fieldset actions also work on custom `SBAdminView` classes
 without list views. Inline fieldset lookup rebuilds the parent-bound inline when a fresh
-request reaches the inline's URL. `SBAdmin.get_action_url()` raises
-`ImproperlyConfigured` for unknown method names or modal IDs that have not been listed
-in the current request. Declared `target_view` actions can build their URLs before
-registration; use the processed action's `url` for modal links. Availability and
+request reaches the inline's URL. `get_action_url()` only builds a URL; availability and
 permissions are checked when the request is dispatched.
 
 For standalone actions opened from custom markup (a tree, a custom widget, a link rendered

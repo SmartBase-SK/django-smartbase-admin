@@ -1074,7 +1074,6 @@ class SBAdmin(
         return self.menu_label or self.model._meta.verbose_name_plural
 
     def get_action_url(self, action, modifier="template", object_id=None) -> str:
-        self._validate_action_url(action)
         return reverse(
             "sb_admin:sb_admin_base",
             kwargs=self.get_action_url_kwargs(action, modifier, object_id),
