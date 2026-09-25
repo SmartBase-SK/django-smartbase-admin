@@ -379,7 +379,11 @@ class SBAdminBaseView(object):
             "action": action,
             "modifier": modifier,
         }
-        if object_id is not None:
+        # Action routes use ``<str:object_id>`` (no slashes). Change URLs use
+        # ``<path:object_id>``, so malformed paths like ``1/change/None`` can
+        # land here — omit them so reverse still succeeds and changeform can
+        # show Django's missing-object message.
+        if object_id is not None and "/" not in str(object_id):
             kwargs["object_id"] = object_id
         return kwargs
 
