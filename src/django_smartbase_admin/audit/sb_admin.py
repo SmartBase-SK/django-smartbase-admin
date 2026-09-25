@@ -45,6 +45,25 @@ def _user_filter(request, search_term, forward_data):
     return Q(pk__in=user_ids)
 
 
+def _user_search_query(request, qs, model, search_term, lang):
+    """Username, e-mail and name only: the default search matches every text field,
+    the password hash included, so a search term could probe it."""
+    if not search_term:
+        return qs
+    field_names = {field.name for field in model._meta.get_fields()}
+    names = (
+        model.USERNAME_FIELD,
+        model.get_email_field_name(),
+        "first_name",
+        "last_name",
+    )
+    query = Q()
+    for name in dict.fromkeys(names):
+        if name in field_names:
+            query |= Q(**{f"{name}__icontains": search_term})
+    return qs.filter(query)
+
+
 class ObjectHistoryFilterWidget(AutocompleteParseMixin, SBAdminFilterWidget):
     """
     Filter for viewing all changes related to a specific object.
@@ -190,6 +209,7 @@ class AdminAuditLogAdmin(SBAdmin):
                 value_field="id",
                 label_lambda=lambda request, item: item.email or str(item),
                 filter_search_lambda=_user_filter,
+                search_query_lambda=_user_search_query,
             ),
         ),
         SBAdminField(
