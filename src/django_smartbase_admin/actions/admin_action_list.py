@@ -275,9 +275,16 @@ class SBAdminListAction(SBAdminAction):
         return context_data
 
     def get_order_by_from_request(self) -> list[str]:
+        # The sort field goes straight into order_by: only declared columns (and the
+        # pk) may be used, else a request could order by a hidden field (e.g. a
+        # related salary) and read its ranking. Unknown fields are dropped.
+        sortable = {field.field for field in self.column_fields}
+        sortable.add(self.get_pk_field().name)
         order_by = []
         for sort in self.table_params.get("sort", []):
-            order_by.append(f"{'-' if sort['dir'] == 'desc' else ''}{sort['field']}")
+            if not isinstance(sort, dict) or sort.get("field") not in sortable:
+                continue
+            order_by.append(f"{'-' if sort.get('dir') == 'desc' else ''}{sort['field']}")
         if len(order_by) == 0:
             order_by = self.view.get_list_ordering(self.threadsafe_request) or [
                 self.get_pk_field().name
