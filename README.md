@@ -57,10 +57,10 @@ Want to see it in action?
 Begin by installing the Smartbase Admin package using `pip`:
 
 ```bash
-pip install django-smartbase-admin "psycopg[binary]"
+pip install django-smartbase-admin
 ```
 
-SmartBase Admin imports `django.contrib.postgres`, so `psycopg` has to be installed even if you develop on SQLite. PostgreSQL is the recommended database.
+PostgreSQL is the recommended database (install `psycopg` for it). SQLite works without it, and Postgres-only features such as array fields are then unavailable.
 
 Ensure that django-smartbase-admin and its dependencies are included in your Django settings. Open your `settings.py` file and add the following to `INSTALLED_APPS`:
 ```python

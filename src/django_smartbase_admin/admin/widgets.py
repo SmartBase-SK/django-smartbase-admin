@@ -11,7 +11,6 @@ from django.contrib.admin.widgets import (
     AdminURLFieldWidget,
 )
 from django.contrib.auth.forms import ReadOnlyPasswordHashWidget
-from django.contrib.postgres.forms import RangeWidget
 from django.core.exceptions import (
     FieldDoesNotExist,
     ImproperlyConfigured,
@@ -66,6 +65,12 @@ try:
     from django.contrib.admin.exceptions import NotRegistered
 except ImportError:
     from django.contrib.admin.sites import NotRegistered
+
+try:
+    from django.contrib.postgres.forms import RangeWidget
+except ImportError:
+    # psycopg not installed: SBAdminDateTimeRangeWidget is defined but never registered
+    RangeWidget = forms.MultiWidget
 
 
 def get_datetime_placeholder(lang=None):

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.contrib.postgres.fields import ArrayField
 from django.db.models import Field, Q, fields, FilteredRelation, Count
 from django.http import JsonResponse
 from django.utils import timezone
@@ -37,6 +36,12 @@ from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.templatetags.sb_admin_tags import SBAdminJSONEncoder
 from django_smartbase_admin.utils import JSONSerializableMixin
 from typing_extensions import Self
+
+try:
+    from django.contrib.postgres.fields import ArrayField
+except ImportError:
+    # psycopg not installed: no model has an ArrayField, isinstance(x, ()) is False
+    ArrayField = ()
 
 if TYPE_CHECKING:
     from django_smartbase_admin.engine.field import SBAdminField
