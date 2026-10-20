@@ -57,8 +57,10 @@ Want to see it in action?
 Begin by installing the Smartbase Admin package using `pip`:
 
 ```bash
-pip install django-smartbase-admin
+pip install django-smartbase-admin "psycopg[binary]"
 ```
+
+SmartBase Admin imports `django.contrib.postgres`, so `psycopg` has to be installed even if you develop on SQLite. PostgreSQL is the recommended database.
 
 Ensure that django-smartbase-admin and its dependencies are included in your Django settings. Open your `settings.py` file and add the following to `INSTALLED_APPS`:
 ```python
@@ -69,7 +71,13 @@ INSTALLED_APPS = [
     "widget_tweaks",
     "ckeditor",
     "ckeditor_uploader",
+    "nested_admin",
 ]
+```
+
+`ckeditor_uploader` requires an upload directory, relative to `MEDIA_ROOT`:
+```python
+CKEDITOR_UPLOAD_PATH = "uploads/"
 ```
 
 ### 2. Add Admin URL Configuration
@@ -85,7 +93,7 @@ urlpatterns = [
 This makes the Smartbase Admin interface accessible at `/sb-admin/`
 
 ### 3. Define the SmartBase Admin Configuration
-In your project, for example in `config` package create a file called `sbadmin_config.py` with the following content:
+Create a file called `sbadmin_config.py` in your project package, next to `settings.py` (for example `mysite/sbadmin_config.py`), with the following content:
 ```python
 from django_smartbase_admin.engine.configuration import SBAdminConfigurationBase, SBAdminRoleConfiguration
 from django_smartbase_admin.views.dashboard_view import SBAdminDashboardView
@@ -107,9 +115,11 @@ class SBAdminConfiguration(SBAdminConfigurationBase):
 ```
 
 ### 4. Reference the Configuration in `settings.py`
+Use the dotted path of the file you created in step 3. With `mysite/sbadmin_config.py`:
 ```python
-SB_ADMIN_CONFIGURATION = "config.sbadmin_config.SBAdminConfiguration"
+SB_ADMIN_CONFIGURATION = "mysite.sbadmin_config.SBAdminConfiguration"
 ```
+If the path is wrong, `manage.py check` reports `sbadmin.E001`.
 
 ### 5. Add Locale Middleware
 Add the following middleware to support internationalization:

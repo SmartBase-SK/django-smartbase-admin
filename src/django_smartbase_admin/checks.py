@@ -48,11 +48,17 @@ Currently checked:
 
 All warnings rather than errors; misconfigured admins still render, just with
 the symptoms above.
+
+* ``sbadmin.E001`` — ``SB_ADMIN_CONFIGURATION`` can't be imported. Without
+  this check the wrong path surfaces only on the first admin request, as a
+  ``ModuleNotFoundError`` 500. An error, because no admin page can render.
 """
 
 from __future__ import annotations
 
-from django.core.checks import Tags, Warning, register
+from django.conf import settings
+from django.core.checks import Error, Tags, Warning, register
+from django.utils.module_loading import import_string
 
 from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.fake_inline import (
@@ -391,3 +397,26 @@ def check_sbadmin_list_view_config(app_configs, **kwargs):
         for check in _PER_ADMIN_CHECKS:
             warnings.extend(check(admin))
     return warnings
+
+
+@register(Tags.admin)
+def check_sbadmin_configuration_importable(app_configs, **kwargs):
+    """``sbadmin.E001``: ``SB_ADMIN_CONFIGURATION`` must resolve to a class."""
+    path = settings.SB_ADMIN_CONFIGURATION
+    if not path:
+        return []
+    try:
+        import_string(path)
+    except ImportError as exc:
+        return [
+            Error(
+                f"SB_ADMIN_CONFIGURATION {path!r} cannot be imported: {exc}",
+                hint=(
+                    "Set it to the dotted path of your SBAdminConfigurationBase "
+                    "subclass, for example "
+                    "'mysite.sbadmin_config.SBAdminConfiguration'."
+                ),
+                id="sbadmin.E001",
+            )
+        ]
+    return []
