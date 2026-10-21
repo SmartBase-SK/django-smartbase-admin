@@ -60,6 +60,7 @@ from django_smartbase_admin.audit.views import (
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+from django_smartbase_admin.engine.inline_formset import LoadedRowsPkFormsetMixin
 from django_smartbase_admin.engine.inline_pagination import (
     TabularInlinePaginated,
     get_inline_admin_formset_by_prefix,
@@ -875,7 +876,7 @@ class SBAdminTranslationStatusMixin:
         return mark_safe(result)
 
 
-class SBAdminInlineFormSetMixin:
+class SBAdminInlineFormSetMixin(LoadedRowsPkFormsetMixin):
     @classmethod
     def get_default_prefix(cls):
         view = getattr(cls.form, "view", None)

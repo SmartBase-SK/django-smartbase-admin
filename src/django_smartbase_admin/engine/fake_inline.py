@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import F
 from django.forms import BaseInlineFormSet
 
+from django_smartbase_admin.engine.inline_formset import LoadedRowsPkFormsetMixin
 from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.services.views import SBAdminViewService
 from django_smartbase_admin.utils import is_modal
@@ -31,7 +32,7 @@ class FakeQueryset(models.QuerySet):
         return qs
 
 
-class SBAdminFakeInlineFormset(BaseInlineFormSet):
+class SBAdminFakeInlineFormset(LoadedRowsPkFormsetMixin, BaseInlineFormSet):
     original_model = None
     inline_instance = None
 
