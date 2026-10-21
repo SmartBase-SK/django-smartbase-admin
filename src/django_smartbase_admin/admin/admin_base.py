@@ -45,7 +45,7 @@ from django.utils.translation import gettext_lazy as _
 from django_htmx.http import trigger_client_event
 from filer.fields.file import FilerFileField
 from filer.fields.image import AdminImageFormField, FilerImageField
-from nested_admin.formsets import NestedInlineFormSet
+from nested_admin.formsets import NestedInlineFormSet, get_base_polymorphic_model
 from nested_admin.nested import (
     NestedModelAdmin,
     NestedTabularInline,
@@ -60,6 +60,7 @@ from django_smartbase_admin.audit.views import (
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+from django_smartbase_admin.engine.inline_formset import LoadedRowsPkFormsetMixin
 from django_smartbase_admin.engine.inline_pagination import (
     TabularInlinePaginated,
     get_inline_admin_formset_by_prefix,
@@ -875,7 +876,7 @@ class SBAdminTranslationStatusMixin:
         return mark_safe(result)
 
 
-class SBAdminInlineFormSetMixin:
+class SBAdminInlineFormSetMixin(LoadedRowsPkFormsetMixin):
     @classmethod
     def get_default_prefix(cls):
         view = getattr(cls.form, "view", None)
@@ -916,7 +917,44 @@ class SBAdminGenericInlineFormSet(SBAdminInlineFormSetMixin, BaseGenericInlineFo
 
 
 class SBAdminNestedInlineFormSet(SBAdminInlineFormSetMixin, NestedInlineFormSet):
-    pass
+    """nested_admin loads posted rows regardless of their parent and re-reads each
+    one twice on save, so it can follow a row dragged between parent rows. Only
+    a formset nested in another inline can receive such a row; a top-level one
+    has the edited object as its sole parent and saves the way Django's
+    formset does."""
+
+    def _saves_like_django(self) -> bool:
+        return not self.is_nested and get_base_polymorphic_model(self.model) is None
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.data and self._saves_like_django():
+            # A posted pk of another parent's row is ignored, as in Django.
+            if self.instance.pk is None:
+                return queryset.none()
+            queryset = queryset.filter(**{self.fk.name: self.instance})
+        return queryset
+
+    def save_existing_objects(self, initial_forms=None, commit=True):
+        if not self._saves_like_django():
+            return super().save_existing_objects(initial_forms, commit)
+        saved_instances = []
+        forms_to_delete = self.deleted_forms
+        for form in initial_forms or []:
+            obj = form.instance
+            # nested_admin copies the posted pk onto a row the formset did not load,
+            # so only the instances it loaded are saved, like Django's formset does.
+            if obj.pk is None or self._existing_object(obj.pk) is not obj:
+                continue
+            if form in forms_to_delete:
+                self.deleted_objects.append(obj)
+                self.delete_existing(obj, commit=commit)
+            elif form.has_changed():
+                self.changed_objects.append((obj, form.changed_data))
+                saved_instances.append(self.save_existing(form, obj, commit=commit))
+                if not commit:
+                    self.saved_forms.append(form)
+        return saved_instances
 
 
 class SBAdmin(
