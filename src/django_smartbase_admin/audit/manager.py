@@ -254,6 +254,8 @@ def _get_object_repr(model, object_id) -> str:
 def _get_parent_repr(request, model, object_id) -> str:
     # Every entry a request logs names the same parent, so it is read once per request
     # instead of once per entry; _forget_parent_reprs drops it when the parent is written.
+    # Accepted edge case: a parent whose __str__ reads a related object keeps its old
+    # name for later entries if only that related object is renamed in the same request.
     cache = getattr(request, _AUDIT_PARENT_REPR_CACHE_REQUEST_ATTR, None)
     if not isinstance(cache, dict):
         cache = {}

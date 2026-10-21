@@ -7,11 +7,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-from django_smartbase_admin.admin.admin_base import (
-    SBAdminGenericInlineFormSet,
-    SBAdminNestedInlineFormSet,
-)
-from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineFormset
+from django_smartbase_admin.admin.admin_base import SBAdminNestedInlineFormSet
 from django_smartbase_admin.engine.inline_formset import LoadedRowsPkFormsetMixin
 
 _PERMISSION_BY_PK = re.compile(
@@ -85,15 +81,6 @@ class LoadedRowsPkFormsetMixinTests(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn("id", formset.forms[1].errors)
 
-    def test_sbadmin_inline_formsets_resolve_loaded_rows(self):
-        for formset_class in (
-            SBAdminNestedInlineFormSet,
-            SBAdminGenericInlineFormSet,
-            SBAdminFakeInlineFormset,
-        ):
-            with self.subTest(formset_class=formset_class.__name__):
-                self.assertTrue(issubclass(formset_class, LoadedRowsPkFormsetMixin))
-
 
 NestedPermissionFormset = inlineformset_factory(
     ContentType,
@@ -122,7 +109,7 @@ class SBAdminNestedInlineFormSetSaveTests(TestCase):
             content_type=self.other_content_type, codename="foreign", name="Foreign"
         )
 
-    def _formset(self, rows, *, is_nested=False):
+    def _data(self, rows):
         prefix = NestedPermissionFormset.get_default_prefix()
         data = {
             f"{prefix}-TOTAL_FORMS": str(len(rows)),
@@ -134,10 +121,36 @@ class SBAdminNestedInlineFormSetSaveTests(TestCase):
             data[f"{prefix}-{index}-codename"] = permission.codename
             if delete:
                 data[f"{prefix}-{index}-DELETE"] = "on"
-        formset = NestedPermissionFormset(data, instance=self.content_type)
+        return data
+
+    def _formset(self, rows, *, is_nested=False):
+        formset = NestedPermissionFormset(self._data(rows), instance=self.content_type)
         formset.is_nested = is_nested
         self.assertTrue(formset.is_valid(), formset.errors)
         return formset
+
+    def test_validation_reads_no_row_by_pk(self):
+        formset = NestedPermissionFormset(
+            self._data(
+                [
+                    (permission, permission.name, False)
+                    for permission in self.permissions
+                ]
+            ),
+            instance=self.content_type,
+        )
+
+        with CaptureQueriesContext(connection) as captured:
+            self.assertTrue(formset.is_valid(), formset.errors)
+
+        self.assertEqual(
+            [
+                q["sql"]
+                for q in captured.captured_queries
+                if _PERMISSION_BY_PK.search(q["sql"])
+            ],
+            [],
+        )
 
     def test_top_level_save_reads_no_row_again(self):
         unchanged, renamed, deleted = self.permissions
@@ -185,18 +198,20 @@ class SBAdminNestedInlineFormSetSaveTests(TestCase):
         self.foreign.refresh_from_db()
         self.assertEqual(self.foreign.content_type, self.content_type)
 
-    def test_top_level_formset_of_an_unsaved_parent_loads_no_rows(self):
-        prefix = NestedPermissionFormset.get_default_prefix()
+    def test_add_view_ignores_a_posted_row_of_another_parent(self):
+        # The admin add flow: inlines are validated against the unsaved parent,
+        # which is saved before them.
+        parent = ContentType(app_label="sb_test", model="unsaved")
         formset = NestedPermissionFormset(
-            {
-                f"{prefix}-TOTAL_FORMS": "1",
-                f"{prefix}-INITIAL_FORMS": "1",
-                f"{prefix}-0-id": str(self.foreign.pk),
-                f"{prefix}-0-name": "Taken over",
-                f"{prefix}-0-codename": self.foreign.codename,
-            },
-            instance=ContentType(app_label="sb_test", model="unsaved"),
+            self._data([(self.foreign, "Taken over", False)]), instance=parent
         )
+        self.assertTrue(formset.is_valid(), formset.errors)
+        parent.save()
 
-        self.assertFalse(formset.get_queryset().exists())
-        formset.is_valid()
+        formset.save()
+
+        self.foreign.refresh_from_db()
+        self.assertEqual(
+            (self.foreign.content_type, self.foreign.name),
+            (self.other_content_type, "Foreign"),
+        )
