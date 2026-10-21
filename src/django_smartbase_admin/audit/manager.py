@@ -20,6 +20,7 @@ from django_smartbase_admin.audit.utils.serialization import serialize_instance
 logger = logging.getLogger(__name__)
 
 _AUDIT_PARENT_CONTEXT_REQUEST_ATTR = "_sbadmin_audit_parent_context"
+_AUDIT_PARENT_REPR_CACHE_REQUEST_ATTR = "_sbadmin_audit_parent_repr_cache"
 
 
 @dataclass(frozen=True)
@@ -250,6 +251,41 @@ def _get_object_repr(model, object_id) -> str:
         return f"{model.__name__} #{object_id}"
 
 
+def _get_parent_repr(request, model, object_id) -> str:
+    # Every entry a request logs names the same parent, so it is read once per request
+    # instead of once per entry; _forget_parent_reprs drops it when the parent is written.
+    cache = getattr(request, _AUDIT_PARENT_REPR_CACHE_REQUEST_ATTR, None)
+    if not isinstance(cache, dict):
+        cache = {}
+        setattr(request, _AUDIT_PARENT_REPR_CACHE_REQUEST_ATTR, cache)
+    key = (model._meta.label, str(object_id))
+    if key not in cache:
+        cache[key] = _get_object_repr(model, object_id)
+    return cache[key]
+
+
+def _forget_parent_reprs(model, object_id=None) -> None:
+    """Drop the cached parent reprs of ``model``: the one for ``object_id``, or all of them."""
+    try:
+        from django_smartbase_admin.services.thread_local import (
+            SBAdminThreadLocalService,
+        )
+
+        request = SBAdminThreadLocalService.get_request()
+    except Exception:
+        return
+    cache = getattr(request, _AUDIT_PARENT_REPR_CACHE_REQUEST_ATTR, None)
+    if not isinstance(cache, dict) or not cache:
+        return
+    label = model._meta.label
+    for key in [
+        key
+        for key in cache
+        if key[0] == label and (object_id is None or key[1] == str(object_id))
+    ]:
+        del cache[key]
+
+
 def _get_parent_context() -> tuple[type | None, str, str]:
     """
     Get parent context from SBAdmin request_data.
@@ -273,7 +309,9 @@ def _get_parent_context() -> tuple[type | None, str, str]:
             return (
                 context.parent_model,
                 str(context.parent_object_id),
-                _get_object_repr(context.parent_model, context.parent_object_id),
+                _get_parent_repr(
+                    request, context.parent_model, context.parent_object_id
+                ),
             )
 
         request_data = getattr(request, "request_data", None)
@@ -294,7 +332,7 @@ def _get_parent_context() -> tuple[type | None, str, str]:
         return (
             parent_model,
             str(parent_object_id),
-            _get_object_repr(parent_model, parent_object_id),
+            _get_parent_repr(request, parent_model, parent_object_id),
         )
 
     except Exception:
@@ -421,6 +459,7 @@ def create_audit_log(
 def audited_qs_update(self, **kwargs):
     """Audited version of QuerySet.update()."""
     model = self.model
+    _forget_parent_reprs(model)
 
     if not _should_audit_model(model):
         return _original_qs_update(self, **kwargs)
@@ -625,6 +664,7 @@ def audited_qs_bulk_create(self, objs, *args, **kwargs):
 def audited_qs_bulk_update(self, objs, fields, *args, **kwargs):
     """Audited version of QuerySet.bulk_update()."""
     model = self.model
+    _forget_parent_reprs(model)
 
     if not _should_audit_model(model):
         return _original_qs_bulk_update(self, objs, fields, *args, **kwargs)
@@ -688,6 +728,7 @@ def audited_qs_bulk_update(self, objs, fields, *args, **kwargs):
 def audited_model_save(self, *args, **kwargs):
     """Audited version of Model.save()."""
     model = self.__class__
+    _forget_parent_reprs(model, self.pk)
 
     if not _should_audit_model(model):
         return _original_model_save(self, *args, **kwargs)

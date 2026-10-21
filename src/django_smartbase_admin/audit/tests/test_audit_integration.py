@@ -9,7 +9,9 @@ from unittest.mock import MagicMock, patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.test import RequestFactory, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils.translation import gettext_lazy as _
 from django_smartbase_admin.audit.manager import (
     AuditParentContext,
@@ -417,6 +419,54 @@ class TestInlineFormset(BaseAuditTest):
         self.assertEqual(log.object_id, str(group_pk))
         self.assertEqual(log.snapshot_before["name"], "To Delete")
         self.assertEqual(log.parent_content_type, self.user_ct)
+
+    def test_parent_repr_is_read_once_per_request(self):
+        with CaptureQueriesContext(connection) as captured:
+            self._save_formset(
+                MockFormset(instances=[Group(name=f"Inline {i}") for i in range(3)])
+            )
+
+        parent_reads = [
+            query
+            for query in captured.captured_queries
+            if 'FROM "auth_user"' in query["sql"]
+        ]
+        self.assertEqual(len(parent_reads), 1)
+        self.assertEqual(
+            set(AdminAuditLog.objects.values_list("parent_object_repr", flat=True)),
+            {str(self.admin_user)},
+        )
+
+    def test_parent_renamed_mid_request_is_logged_with_its_new_name(self):
+        renames = {
+            "save": lambda username: (
+                setattr(self.admin_user, "username", username),
+                self.admin_user.save(),
+            ),
+            "update": lambda username: User.objects.filter(
+                pk=self.admin_user.pk
+            ).update(username=username),
+        }
+        for how, rename in renames.items():
+            with self.subTest(how=how):
+                AdminAuditLog.objects.all().delete()
+                with MockSBAdminContext(
+                    user=self.admin_user,
+                    parent_model=User,
+                    parent_object_id=self.parent_id,
+                ):
+                    Group.objects.create(name=f"Before {how}")
+                    rename(f"renamed-by-{how}")
+                    Group.objects.create(name=f"After {how}")
+
+                parent_reprs = {
+                    log.changes["name"]["new"]: log.parent_object_repr
+                    for log in AdminAuditLog.objects.filter(
+                        content_type=ContentType.objects.get_for_model(Group)
+                    )
+                }
+                self.assertEqual(parent_reprs[f"After {how}"], f"renamed-by-{how}")
+                self.assertNotEqual(parent_reprs[f"Before {how}"], f"renamed-by-{how}")
 
 
 class TestRequestIdGrouping(BaseAuditTest):
