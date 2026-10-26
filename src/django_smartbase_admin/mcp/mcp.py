@@ -1185,11 +1185,24 @@ class SBAdminTools(MCPToolset):
         Returns ``{"status": "ok", "id": ..., "components": ...}``
         mirroring ``fetch_detail`` after the save, or component-keyed errors
         when validation fails (no DB write happens — the agent can
-        retry with corrected values).
+        retry with corrected values). Without ``component_values`` (a
+        misspelled argument is dropped before it gets here) it is
+        ``invalid`` too: there is nothing to write.
 
         Raises ``LookupError`` if the object isn't visible,
         ``PermissionError`` if change permission is denied.
         """
+        if not component_values:
+            return {
+                "status": "invalid",
+                "errors": {
+                    "global": [
+                        "Nothing to write: pass the changes as component_values, "
+                        'e.g. {"main": {"field": value}}.'
+                    ],
+                    "components": {},
+                },
+            }
         request = self.request
         ensure_sbadmin_request_data(request)
         admin = resolve_admin(view_id, request=request)

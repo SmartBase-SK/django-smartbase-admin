@@ -773,10 +773,10 @@ class DateFilterWidget(SBAdminFilterWidget):
         if date_from is not None:
             query &= Q(**{f"{self.field.filter_field}__gte": date_from})
         if date_to is not None:
-            # add one day to include all 'to' date hours, this is needed
-            # instead of casting datetime to date in DB
+            # before the next day: all of the 'to' day on a datetime field, without
+            # casting it to a date in the DB, and not the next day on a date field
             query &= Q(
-                **{f"{self.field.filter_field}__lte": date_to + timedelta(days=1)}
+                **{f"{self.field.filter_field}__lt": date_to + timedelta(days=1)}
             )
         return query
 

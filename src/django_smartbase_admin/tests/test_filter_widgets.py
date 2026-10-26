@@ -1,7 +1,9 @@
 from datetime import datetime
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
+from django.db.models import Q
 from django.utils import timezone
 
 from django_smartbase_admin.engine.filter_widgets import (
@@ -22,6 +24,18 @@ class TestDateFilterWidget(TestCase):
 
         self.assertEqual(date_from, timezone.make_aware(datetime(2026, 5, 23, 0, 0, 0)))
         self.assertEqual(date_to, timezone.make_aware(datetime(2026, 6, 22, 0, 0, 0)))
+
+    def test_range_ends_before_the_day_after_its_last_day(self):
+        widget = DateFilterWidget()
+        widget.field = SimpleNamespace(filter_field="posted")
+        query = widget.get_base_filter_query_for_parsed_value(
+            None, DateFilterWidget.get_range_from_value(["2026-09-01", "2026-09-30"])
+        )
+
+        self.assertEqual(
+            query,
+            Q(posted__gte=datetime(2026, 9, 1)) & Q(posted__lt=datetime(2026, 10, 1)),
+        )
 
 
 class TestBooleanFilterWidget(TestCase):
