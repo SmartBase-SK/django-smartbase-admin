@@ -5,6 +5,7 @@ import { Color } from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
+import Mention from '@tiptap/extension-mention'
 import {
     Table,
     TableCell,
@@ -332,7 +333,94 @@ const TextTransform = Extension.create({
     },
 })
 
-function editorExtensions(items, imageClass) {
+const MENTION_DEBOUNCE_MS = 150
+
+// The mention URL answers ``?q=<text>`` with ``{"results": [{"id": ..., "label": ...}]}``.
+async function fetchMentionItems(url, query, signal) {
+    const requestUrl = new URL(url, window.location.origin)
+    requestUrl.searchParams.set('q', query)
+    const response = await fetch(requestUrl, {headers: {Accept: 'application/json'}, signal})
+    if (!response.ok) return []
+    const data = await response.json()
+    return Array.isArray(data.results) ? data.results : []
+}
+
+// The suggestion list looks like the autocomplete dropdown (dropdown-menu with choices items).
+// Tiptap positions it (props.mount) and closes it on Escape and on a click outside.
+function mentionDropdown() {
+    let menu = null
+    let unmount = null
+    let props = null
+    let highlighted = 0
+
+    const select = (index) => {
+        const item = props?.items[index]
+        if (item) props.command({id: String(item.id), label: item.label})
+    }
+
+    const render = () => {
+        menu.querySelector('[role="listbox"]').replaceChildren(...props.items.map((item, index) => {
+            const option = document.createElement('div')
+            option.className = 'choices__item choices__item--choice'
+            option.classList.toggle('is-highlighted', index === highlighted)
+            option.setAttribute('role', 'option')
+            option.textContent = item.label
+            option.addEventListener('mousedown', (event) => event.preventDefault())
+            option.addEventListener('click', () => select(index))
+            return option
+        }))
+        menu.classList.toggle('show', props.items.length > 0)
+    }
+
+    return {
+        onStart(startProps) {
+            props = startProps
+            highlighted = 0
+            menu = document.createElement('div')
+            menu.className = 'dropdown-menu sbadmin-richtext__mentions'
+            menu.innerHTML = '<div class="px-12"><div class="choices__list choices__list--dropdown">'
+                + '<div class="choices__list" role="listbox"></div></div></div>'
+            unmount = props.mount(menu)
+            render()
+        },
+        onUpdate(updateProps) {
+            props = updateProps
+            highlighted = 0
+            render()
+        },
+        onKeyDown({event}) {
+            if (!props?.items.length) return false
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                const step = event.key === 'ArrowDown' ? 1 : -1
+                highlighted = (highlighted + step + props.items.length) % props.items.length
+                render()
+                return true
+            }
+            if (event.key === 'Enter' || event.key === 'Tab') {
+                select(highlighted)
+                return true
+            }
+            return false
+        },
+        onExit() {
+            unmount?.()
+            unmount = null
+            menu = null
+        },
+    }
+}
+
+function mentionExtension(url) {
+    return Mention.configure({
+        suggestion: {
+            items: ({query, signal}) => fetchMentionItems(url, query, signal),
+            debounce: MENTION_DEBOUNCE_MS,
+            render: mentionDropdown,
+        },
+    })
+}
+
+function editorExtensions(items, imageClass, mentionUrl) {
     return [
         StarterKit.configure({
             blockquote: false,
@@ -362,6 +450,7 @@ function editorExtensions(items, imageClass) {
         TableCell,
         filerImage(items, imageClass),
         OrdinaryImage,
+        ...(mentionUrl ? [mentionExtension(mentionUrl)] : []),
     ]
 }
 
@@ -379,6 +468,7 @@ function createEditor({
     content = '',
     items = {},
     imageClass = 'sbadmin-richtext__image',
+    mentionUrl = null,
     editable = true,
     attributes = {},
     onUpdate,
@@ -388,7 +478,7 @@ function createEditor({
 }) {
     return new Editor({
         element,
-        extensions: editorExtensions(items, imageClass),
+        extensions: editorExtensions(items, imageClass, mentionUrl),
         content,
         editable,
         editorProps: {attributes},
@@ -476,6 +566,7 @@ class RichTextWidgetController {
             element: this.editorElement,
             content: this.textarea.value || '',
             items: this.items,
+            mentionUrl: this.root.dataset.richtextMentionUrl || null,
             editable: !this.readonly,
             attributes: {
                 class: 'sbadmin-richtext__content',

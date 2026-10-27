@@ -85,6 +85,10 @@
             @apply mt-8 mb-4 text-12 leading-20;
         }
 
+        span[data-type="mention"] {
+            @apply rounded bg-primary-50 px-2 font-medium text-primary-700;
+        }
+
         a {
             @apply cursor-pointer text-primary-700 underline decoration-primary-300 transition-colors;
             text-underline-offset: 2px;
@@ -219,6 +223,14 @@
 
         > button {
             @apply w-full justify-start whitespace-nowrap rounded px-8 py-6 text-left text-12 text-dark-900 hover:bg-dark-100;
+        }
+    }
+
+    .sbadmin-richtext__mentions {
+        @apply z-50 min-w-224;
+
+        .choices__item.is-highlighted {
+            @apply bg-dark-100;
         }
     }
 }

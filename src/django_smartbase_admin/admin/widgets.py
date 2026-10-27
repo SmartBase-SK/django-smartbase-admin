@@ -366,13 +366,16 @@ _RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("img", set()).update(
 )
 _RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("td", set()).add("colwidth")
 _RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("th", set()).add("colwidth")
+_RICH_TEXT_ALLOWED_ATTRIBUTES.setdefault("span", set()).update(
+    {"data-type", "data-id", "data-label", "data-mention-suggestion-char"}
+)
 
 
 def _sanitize_rich_text(value):
     """Sanitize submitted HTML while preserving the attributes Tiptap emits.
 
     The nh3 defaults provide the security allowlist, but omit ``style``, filer image
-    IDs, image metadata, and table ``colwidth``. Those attributes are added above,
+    IDs, image metadata, table ``colwidth`` and the data of mentions. Those attributes are added above,
     with CSS still restricted to the properties supported by this editor.
     ``link_rel`` is disabled because Tiptap does not emit ``rel`` without ``target``.
     """
@@ -488,6 +491,7 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         *,
         is_public=True,
         disabled_actions=(),
+        mention_url=None,
     ):
         self.form = None
         self.field_name = None
@@ -495,6 +499,7 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         self.request = None
         self.is_public = is_public
         self.disabled_actions = tuple(disabled_actions)
+        self.mention_url = mention_url
         attrs = attrs or {}
         super().__init__(
             form_field=form_field,
@@ -566,6 +571,14 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
             actions.append(action)
         return tuple(actions)
 
+    def get_mention_url(self):
+        """URL of the @mention suggestions, None turns mentions off.
+
+        It answers ``?q=<text>`` with ``{"results": [{"id": ..., "label": ...}]}``. A
+        picked person is stored as ``<span data-type="mention" data-id data-label>``.
+        """
+        return self.mention_url
+
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         widget = context["widget"]
@@ -579,6 +592,7 @@ class SBAdminRichTextWidget(SBAdminTextareaWidget):
         widget["attrs"].pop("required", None)
         widget["disabled_actions"] = self.disabled_actions
         widget["toolbar_actions"] = self.get_toolbar_actions()
+        widget["mention_url"] = self.get_mention_url()
         return context
 
 
