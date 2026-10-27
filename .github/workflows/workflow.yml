@@ -3,8 +3,14 @@ name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
 on: push
 
 jobs:
+  test:
+    name: Tests
+    uses: ./.github/workflows/tests.yml
+
   build:
     name: Build distribution 📦
+    needs:
+    - test
     runs-on: ubuntu-latest
 
     steps:

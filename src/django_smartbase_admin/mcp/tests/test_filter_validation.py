@@ -241,12 +241,12 @@ class FilterValidationTests(TestCase):
 
         self.assertEqual(q([None, None]), [("pk__in", [])])
         self.assertEqual(q([d1, None]), [("uploaded_at__gte", d1)])
-        self.assertEqual(q([None, d2]), [("uploaded_at__lte", d2 + timedelta(days=1))])
+        self.assertEqual(q([None, d2]), [("uploaded_at__lt", d2 + timedelta(days=1))])
         self.assertEqual(
             q([d1, d2]),
             [
                 ("uploaded_at__gte", d1),
-                ("uploaded_at__lte", d2 + timedelta(days=1)),
+                ("uploaded_at__lt", d2 + timedelta(days=1)),
             ],
         )
 
