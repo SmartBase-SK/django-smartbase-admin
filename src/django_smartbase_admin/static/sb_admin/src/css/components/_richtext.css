@@ -227,7 +227,9 @@
     }
 
     .sbadmin-richtext__mentions {
-        @apply z-50 min-w-224;
+        @apply min-w-224;
+        /* Above SBAdmin modals (1010), the list is mounted on body. */
+        z-index: 1100;
 
         .choices__item.is-highlighted {
             @apply bg-dark-100;

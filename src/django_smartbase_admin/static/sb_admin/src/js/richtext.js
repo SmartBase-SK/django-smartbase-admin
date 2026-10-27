@@ -410,13 +410,15 @@ function mentionDropdown() {
     }
 }
 
+// Mentions always parse and render, so an editor without the URL keeps them on save.
+// Only an editor with a mention URL suggests people.
 function mentionExtension(url) {
     return Mention.configure({
-        suggestion: {
+        suggestion: url ? {
             items: ({query, signal}) => fetchMentionItems(url, query, signal),
             debounce: MENTION_DEBOUNCE_MS,
             render: mentionDropdown,
-        },
+        } : {allow: () => false},
     })
 }
 
@@ -450,7 +452,7 @@ function editorExtensions(items, imageClass, mentionUrl) {
         TableCell,
         filerImage(items, imageClass),
         OrdinaryImage,
-        ...(mentionUrl ? [mentionExtension(mentionUrl)] : []),
+        mentionExtension(mentionUrl),
     ]
 }
 
