@@ -6,10 +6,13 @@ from unittest.mock import patch
 from django.db.models import Q
 from django.utils import timezone
 
+from django_smartbase_admin.engine.field import SBAdminField
 from django_smartbase_admin.engine.filter_widgets import (
     BooleanFilterWidget,
     DateFilterWidget,
+    StringFilterWidget,
 )
+from django_smartbase_admin.services.views import SBAdminViewService
 
 
 class TestDateFilterWidget(TestCase):
@@ -59,3 +62,28 @@ class TestBooleanFilterWidget(TestCase):
 
         self.assertIsNone(widget.parse_value_from_input(None, None))
         self.assertEqual(widget.parse_value_from_input(None, ""), "")
+
+
+class TestFilterFromRequest(TestCase):
+    def test_a_column_without_a_filter_widget_ignores_its_key(self):
+        message_widget = StringFilterWidget()
+        message = SBAdminField(
+            name="message", filter_field="message", filter_widget=message_widget
+        )
+        message_widget.field = message
+        balance = SBAdminField(
+            name="balance", filter_field="balance", filter_disabled=True
+        )
+        filter_data = {"message": "refund", "balance": "0"}
+
+        fields_and_values = (
+            SBAdminViewService.get_filter_fields_and_values_from_request(
+                None, [message, balance], filter_data
+            )
+        )
+        query = SBAdminViewService.get_filter_from_request(
+            None, [message, balance], filter_data
+        )
+
+        self.assertEqual(fields_and_values, {message: "refund"})
+        self.assertEqual(query, Q() & Q(message__icontains="refund"))

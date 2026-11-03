@@ -337,6 +337,8 @@ class SBAdminViewService(object):
     ) -> dict["SBAdminField", Any]:
         filter_fields_and_value = {}
         for field in available_filters:
+            if field.filter_widget is None:
+                continue
             filter_value = filter_data.get(field.filter_field, None)
             if filter_value is not None:
                 try:
