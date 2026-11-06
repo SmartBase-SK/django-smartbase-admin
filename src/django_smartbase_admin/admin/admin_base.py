@@ -780,6 +780,10 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
 
 
 class SBAdminTranslationStatusMixin:
+    sbadmin_translation_status_row_template = (
+        "sb_admin/actions/partials/translations_status_row.html"
+    )
+
     def sbadmin_translation_status_row_context(
         self,
         language,
@@ -787,6 +791,7 @@ class SBAdminTranslationStatusMixin:
         main_language_code,
         current_lang_code,
         translations_edit_url,
+        obj=None,
     ) -> dict[str, Any]:
         language_code = language[0]
         language_title = language[1]
@@ -820,6 +825,7 @@ class SBAdminTranslationStatusMixin:
             "flag_url": f"sb_admin/images/flags/{language_code}.png",
             "translations_edit_url": translations_edit_url,
             "TRANSLATIONS_SELECTED_LANGUAGES": TRANSLATIONS_SELECTED_LANGUAGES,
+            "obj": obj,
         }
 
     @classmethod
@@ -864,13 +870,14 @@ class SBAdminTranslationStatusMixin:
         main_lang_code = SBAdminTranslationsService.get_main_lang_code()
         for index, lang in enumerate(languages):
             result += render_to_string(
-                "sb_admin/actions/partials/translations_status_row.html",
+                self.sbadmin_translation_status_row_template,
                 context=self.sbadmin_translation_status_row_context(
                     lang,
                     translation_counts,
                     main_lang_code,
                     main_lang_code,
                     translations_edit_url,
+                    obj=obj,
                 ),
             )
         return mark_safe(result)

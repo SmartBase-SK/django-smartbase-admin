@@ -12,6 +12,7 @@ from django.test import RequestFactory, SimpleTestCase
 from filer.fields.image import FilerImageField
 from filer.models import Image
 
+from django_smartbase_admin.admin.admin_base import SBAdminTranslationStatusMixin
 from django_smartbase_admin.admin.widgets import (
     SBAdminCKEditorUploadingWidget,
     SBAdminFilerImagePickerWidget,
@@ -112,7 +113,52 @@ class _ChoicesProtocolWidget(forms.TextInput):
         super().__init__(attrs)
 
 
+class _CustomRowTranslationStatusAdmin(SBAdminTranslationStatusMixin):
+    model = TranslationCountArticle
+    sbadmin_translation_status_row_template = "custom/translation_status_row.html"
+
+
 class TranslationWidgetTests(SimpleTestCase):
+    def test_translation_status_renders_rows_with_admin_template_and_object(self):
+        obj = TranslationCountArticle(id=7)
+        translation_service = (
+            "django_smartbase_admin.admin.admin_base.SBAdminTranslationsService"
+        )
+        queryset = mock.Mock()
+        queryset.values.return_value.first.return_value = {"translations_en_count": 1}
+
+        with (
+            mock.patch(f"{translation_service}.is_i18n_enabled", return_value=True),
+            mock.patch(f"{translation_service}.get_translation_view_id"),
+            mock.patch(
+                f"{translation_service}.get_model_translation_detail_url",
+                return_value="/translations/7/",
+            ),
+            mock.patch(
+                f"{translation_service}.get_all_languages",
+                return_value=(("en", "English"),),
+            ),
+            mock.patch(
+                f"{translation_service}.annotate_queryset_with_translations_count",
+                return_value=queryset,
+            ),
+            mock.patch(f"{translation_service}.get_main_lang_code", return_value="en"),
+            mock.patch(
+                "django_smartbase_admin.admin.admin_base.SBAdminThreadLocalService.get_request",
+                return_value=None,
+            ),
+            mock.patch(
+                "django_smartbase_admin.admin.admin_base.render_to_string",
+                return_value="",
+            ) as render,
+        ):
+            _CustomRowTranslationStatusAdmin().sbadmin_translation_status(obj)
+
+        template_name = render.call_args.args[0]
+        context = render.call_args.kwargs["context"]
+        self.assertEqual(template_name, "custom/translation_status_row.html")
+        self.assertIs(context["obj"], obj)
+
     def test_translation_count_is_zero_when_all_fields_are_excluded(self):
         translation_model = TranslationCountArticleTranslation
         annotate_name = SBAdminTranslationsService.get_annotate_name(
