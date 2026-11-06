@@ -117,9 +117,27 @@ class _CustomRowTranslationStatusAdmin(SBAdminTranslationStatusMixin):
     model = TranslationCountArticle
     sbadmin_translation_status_row_template = "custom/translation_status_row.html"
 
+    def sbadmin_translation_status_row_context(
+        self,
+        language,
+        languages_count,
+        main_language_code,
+        current_lang_code,
+        translations_edit_url,
+    ):
+        context = super().sbadmin_translation_status_row_context(
+            language,
+            languages_count,
+            main_language_code,
+            current_lang_code,
+            translations_edit_url,
+        )
+        context["custom"] = True
+        return context
+
 
 class TranslationWidgetTests(SimpleTestCase):
-    def test_translation_status_renders_rows_with_admin_template_and_object(self):
+    def test_translation_status_renders_custom_rows_with_the_object(self):
         obj = TranslationCountArticle(id=7)
         translation_service = (
             "django_smartbase_admin.admin.admin_base.SBAdminTranslationsService"
@@ -158,6 +176,7 @@ class TranslationWidgetTests(SimpleTestCase):
         context = render.call_args.kwargs["context"]
         self.assertEqual(template_name, "custom/translation_status_row.html")
         self.assertIs(context["obj"], obj)
+        self.assertTrue(context["custom"])
 
     def test_translation_count_is_zero_when_all_fields_are_excluded(self):
         translation_model = TranslationCountArticleTranslation

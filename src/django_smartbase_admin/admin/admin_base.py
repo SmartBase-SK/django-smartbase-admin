@@ -791,7 +791,6 @@ class SBAdminTranslationStatusMixin:
         main_language_code,
         current_lang_code,
         translations_edit_url,
-        obj=None,
     ) -> dict[str, Any]:
         language_code = language[0]
         language_title = language[1]
@@ -825,7 +824,6 @@ class SBAdminTranslationStatusMixin:
             "flag_url": f"sb_admin/images/flags/{language_code}.png",
             "translations_edit_url": translations_edit_url,
             "TRANSLATIONS_SELECTED_LANGUAGES": TRANSLATIONS_SELECTED_LANGUAGES,
-            "obj": obj,
         }
 
     @classmethod
@@ -869,16 +867,16 @@ class SBAdminTranslationStatusMixin:
                         translation_counts[lang[0]] = value
         main_lang_code = SBAdminTranslationsService.get_main_lang_code()
         for index, lang in enumerate(languages):
+            context = self.sbadmin_translation_status_row_context(
+                lang,
+                translation_counts,
+                main_lang_code,
+                main_lang_code,
+                translations_edit_url,
+            )
+            context["obj"] = obj
             result += render_to_string(
-                self.sbadmin_translation_status_row_template,
-                context=self.sbadmin_translation_status_row_context(
-                    lang,
-                    translation_counts,
-                    main_lang_code,
-                    main_lang_code,
-                    translations_edit_url,
-                    obj=obj,
-                ),
+                self.sbadmin_translation_status_row_template, context=context
             )
         return mark_safe(result)
 
