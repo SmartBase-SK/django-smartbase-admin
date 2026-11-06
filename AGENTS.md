@@ -5680,6 +5680,7 @@ Quick reference for all `sbadmin_` prefixed class attributes available in `SBAdm
 | `widgets` | list | Dashboard-style widgets registered on this admin; place them in fieldsets by widget class (see [Detail View Widgets](#detail-view-widgets)) |
 | `sbadmin_previous_next_buttons_enabled` | bool | Show prev/next navigation buttons (default: `False`) |
 | `sbadmin_is_generic_model` | bool | Mark as generic model for special handling (default: `False`) |
+| `sbadmin_translation_status_row_template` | str | Template of one language row in the Translations sidebar; extend `sb_admin/actions/partials/translations_status_row.html` and override `{% block edit_link %}`. The row context includes `obj` |
 
 ### Inline Attributes (SBAdminTableInline/SBAdminStackedInline)
 
