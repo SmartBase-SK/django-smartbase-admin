@@ -4,10 +4,17 @@ import {choicesJSListeners, choicesJSOptions} from "./choices"
 import {sanitizeHtml} from "./sanitize"
 import debounce from "lodash/debounce"
 
+const RELATED_BUTTON_URL_ATTRIBUTES = ['hx-get', 'data-add-url']
+
 export default class Autocomplete {
     constructor() {
+        // Capture phase: main.js runs htmx.process() on the added row, which reads hx-get only once, so the
+        // related add/edit buttons must point at the row's field (sb_admin_source_field) before that.
         document.addEventListener('formset:added', (event) => {
-            const totalFormsCount = document.querySelector(`#id_${event.detail.formsetName}-TOTAL_FORMS`).value - 1
+            this.replaceRelatedButtonsPrefix(event.target, event.detail?.formsetName)
+        }, true)
+        document.addEventListener('formset:added', (event) => {
+            const totalFormsCount = this.getAddedFormIndex(event.detail.formsetName)
             const formsetElements = document.querySelectorAll(`#${event.target.id} *`)
             formsetElements.forEach((formsetElement) => {
                 const id_value = formsetElement.getAttribute('id')
@@ -25,6 +32,30 @@ export default class Autocomplete {
         document.body.addEventListener('sbadmin:modal-change-form-response', (event) => {
             const {field, id, label} = event.detail
             this.selectAutocompleteItem(field, id, label)
+        })
+    }
+
+    getAddedFormIndex(formsetName) {
+        return document.querySelector(`#id_${formsetName}-TOTAL_FORMS`).value - 1
+    }
+
+    replaceRelatedButtonsPrefix(row, formsetName) {
+        if (!(row instanceof HTMLElement) || !formsetName) {
+            return
+        }
+        const selector = RELATED_BUTTON_URL_ATTRIBUTES.map((name) => `[${name}*="__prefix__"]`).join(',')
+        const buttons = row.querySelectorAll(selector)
+        if (!buttons.length) {
+            return
+        }
+        const totalFormsCount = this.getAddedFormIndex(formsetName)
+        buttons.forEach((button) => {
+            RELATED_BUTTON_URL_ATTRIBUTES.forEach((name) => {
+                const value = button.getAttribute(name)
+                if (value?.includes('__prefix__')) {
+                    button.setAttribute(name, value.replaceAll('__prefix__', totalFormsCount))
+                }
+            })
         })
     }
 
