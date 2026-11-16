@@ -15,7 +15,7 @@
                         <span>{% translate "Expand" %}</span>&nbsp;
                     </a>
                 {% endif %}
-                {% if has_delete_permission %}
+                {% if has_delete_permission and sbadmin_is_modal %}
                     {% with del_name=request.current_app|add:":"|add:opts.app_label|add:"_"|add:opts.model_name|add:"_delete" %}
                     <a href="{% url del_name object_id|admin_urlquote %}" class="btn btn-destructive">
                         <svg class="w-20 h-20 md:mr-8">
