@@ -1405,6 +1405,9 @@ msgstr "Má alternativní text"
 msgid "File name"
 msgstr "Název souboru"
 
+msgid "Metadata"
+msgstr "Metadata"
+
 msgid "Language"
 msgstr "Jazyk"
 

@@ -1342,3 +1342,6 @@ msgstr ""
 
 msgid "File name"
 msgstr ""
+
+msgid "Metadata"
+msgstr ""

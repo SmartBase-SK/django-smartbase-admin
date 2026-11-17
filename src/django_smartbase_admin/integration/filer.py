@@ -234,17 +234,11 @@ class SBAdminFilerImageAdmin(SBAdminFilerFileAdmin):
     search_fields = [*FileAdmin.search_fields, "default_alt_text"]
     readonly_fields = [*SBAdminFilerFileAdmin.readonly_fields, "preview", "dimensions"]
     fieldsets = [
-        (None, {"fields": ["preview", ("name", "default_alt_text")]}),
+        (None, {"fields": ["preview"]}),
         (
-            _("Details"),
+            _("Metadata"),
             {
-                "fields": [
-                    ("mime_type", "dimensions", "file_size"),
-                    "uploaded_at",
-                    "modified_at",
-                    "sha1",
-                    "display_canonical",
-                ],
+                "fields": ["name", "default_alt_text"],
                 "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
             },
         ),
@@ -255,6 +249,19 @@ class SBAdminFilerImageAdmin(SBAdminFilerFileAdmin):
                 "description": _(
                     "The new image replaces this one everywhere it is used."
                 ),
+                "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
+            },
+        ),
+        (
+            _("Details"),
+            {
+                "fields": [
+                    ("mime_type", "dimensions", "file_size"),
+                    "uploaded_at",
+                    "modified_at",
+                    "sha1",
+                    "display_canonical",
+                ],
                 "classes": [DETAIL_STRUCTURE_RIGHT_CLASS],
             },
         ),
