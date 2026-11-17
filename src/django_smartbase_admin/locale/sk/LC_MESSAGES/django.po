@@ -1380,6 +1380,9 @@ msgstr "Má alternatívny text"
 msgid "File name"
 msgstr "Názov súboru"
 
+msgid "Metadata"
+msgstr "Metadáta"
+
 msgid "Language"
 msgstr "Jazyk"
 
