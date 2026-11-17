@@ -3,7 +3,7 @@ import copy
 from django.contrib import admin
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.template.defaultfilters import filesizeformat
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
@@ -40,6 +40,7 @@ def filer_canonical_url_enabled():
 class SBAdminFilerFolderAdmin(SBAdminThirdParty, FolderAdmin):
     directory_listing_template = "sb_admin/integrations/filer/folder_list.html"
     change_form_template = "sb_admin/actions/change_form.html"
+    autocomplete_fields = []
 
     def directory_listing(self, request, folder_id=None, viewtype=None):
         return redirect_to_sb_admin(
@@ -158,9 +159,8 @@ class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, File
         """Back → folder listing for ``logical_folder`` (same path as filer breadcrumbs; no breadcrumb UI)."""
         ctx = super().get_change_view_context(request, object_id)
         ctx["show_save_and_add_another"] = False
-        try:
-            obj = self.get_object(request, unquote(object_id))
-        except (self.model.DoesNotExist, Http404):
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None:
             return ctx
         ctx["back_url"] = sb_admin_filer_directory_listing_url_for_file(obj)
         ctx["back_url_add_preserved_filters"] = False

@@ -108,6 +108,15 @@ class FilerIntegrationTests(TestCase):
         self.assertNotContains(response, 'name="_addanother"')
         self.assertNotContains(response, "field-display_canonical")
 
+    def test_missing_image_redirects_instead_of_failing(self):
+        response = self.client.get(
+            reverse("sb_admin:filer_image_change", args=(self.image.pk + 1000,))
+        )
+
+        self.assertRedirects(
+            response, reverse("sb_admin:index"), fetch_redirect_response=False
+        )
+
     def test_canonical_url_shows_when_filer_urls_are_routed(self):
         with mock.patch(
             "django_smartbase_admin.integration.filer.filer_canonical_url_enabled",
