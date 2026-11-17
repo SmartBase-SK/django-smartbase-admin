@@ -2,6 +2,7 @@ import copy
 
 from django.contrib import admin
 from django.contrib.admin.utils import unquote
+from django.db.models import BooleanField, Case, Q, Value, When
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseRedirect
 from django.template.defaultfilters import filesizeformat
@@ -12,9 +13,12 @@ from filer.admin import FileAdmin, FolderAdmin
 from filer.admin.fileadmin import FileAdminChangeFrom
 from filer.models import File, Folder, Image
 
-from django_smartbase_admin.admin.admin_base import SBAdminThirdParty
+from django_smartbase_admin.admin.admin_base import SBAdmin, SBAdminThirdParty
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
 from django_smartbase_admin.engine.const import DETAIL_STRUCTURE_RIGHT_CLASS
+from django_smartbase_admin.engine.field import SBAdminField
+from django_smartbase_admin.engine.field_formatter import boolean_formatter
+from django_smartbase_admin.engine.filter_widgets import BooleanFilterWidget
 from django_smartbase_admin.utils import (
     SBAdminNoHistoryDetailMixin,
     sb_admin_filer_directory_listing_url_for_file,
@@ -41,6 +45,10 @@ class SBAdminFilerFolderAdmin(SBAdminThirdParty, FolderAdmin):
     directory_listing_template = "sb_admin/integrations/filer/folder_list.html"
     change_form_template = "sb_admin/actions/change_form.html"
     autocomplete_fields = []
+
+    def get_autocomplete_fields(self, request):
+        # filer's version looks up the User admin on this site, which may not exist.
+        return []
 
     def directory_listing(self, request, folder_id=None, viewtype=None):
         return redirect_to_sb_admin(
@@ -87,10 +95,16 @@ class SBAdminFilerImageForm(SBAdminFilerFileForm):
         }
 
 
-class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, FileAdmin):
-    change_form_template = "sb_admin/actions/change_form.html"
+class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdmin, FileAdmin):
     form = SBAdminFilerFileForm
     autocomplete_fields = []
+    sbadmin_list_display = (
+        SBAdminField(name="original_filename", title=_("File name")),
+        SBAdminField(name="name", title=_("Name")),
+        SBAdminField(name="mime_type", title=_("File type")),
+        SBAdminField(name="uploaded_at", title=_("Created")),
+    )
+    ordering = ("-uploaded_at",)
     readonly_fields = [
         *FileAdmin.readonly_fields,
         "mime_type",
@@ -125,8 +139,8 @@ class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, File
         ),
     ]
 
-    def get_fieldsets(self, request, obj=None):
-        fieldsets = super().get_fieldsets(request, obj)
+    def get_sbadmin_fieldsets(self, request, object_id=None):
+        fieldsets = super().get_sbadmin_fieldsets(request, object_id)
         if filer_canonical_url_enabled():
             return fieldsets
         return [
@@ -144,16 +158,13 @@ class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, File
             for name, options in fieldsets
         ]
 
+    def get_autocomplete_fields(self, request):
+        # filer's version looks up the User admin on this site, which may not exist.
+        return []
+
     @admin.display(description=_("Size"))
     def file_size(self, obj):
         return filesizeformat(obj.size)
-
-    def get_form(self, request, obj=None, **kwargs):
-        """SBAdminReadonlyField monkeypatch expects all_base_fields_form (SBAdmin.get_form initializes it)."""
-        self.initialize_all_base_fields_form(request)
-        form_class = super().get_form(request, obj, **kwargs)
-        self.initialize_form_class(form_class, request)
-        return form_class
 
     def get_change_view_context(self, request, object_id):
         """Back → folder listing for ``logical_folder`` (same path as filer breadcrumbs; no breadcrumb UI)."""
@@ -185,9 +196,42 @@ class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, File
             super().delete_view(request, object_id, extra_context)
         )
 
+    def add_view(self, request, form_url="", extra_context=None):
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+        return HttpResponseRedirect(reverse("sb_admin:filer-directory_listing-root"))
+
 
 class SBAdminFilerImageAdmin(SBAdminFilerFileAdmin):
+    mcp_description = (
+        "Images in the media library (django-filer). default_alt_text is the "
+        "image's alt text, used wherever the image has no alt text of its own; "
+        "set it with update_detail. Find images without one with list_rows "
+        "and filter_data {'has_alt_text': False}."
+    )
     form = SBAdminFilerImageForm
+    sbadmin_list_display = (
+        SBAdminField(name="original_filename", title=_("File name")),
+        SBAdminField(name="name", title=_("Name")),
+        SBAdminField(name="default_alt_text", title=_("Alt text")),
+        SBAdminField(
+            name="has_alt_text",
+            title=_("Has alt text"),
+            annotate=Case(
+                When(
+                    Q(default_alt_text__isnull=True) | Q(default_alt_text=""),
+                    then=Value(False),
+                ),
+                default=Value(True),
+                output_field=BooleanField(),
+            ),
+            filter_widget=BooleanFilterWidget(),
+            python_formatter=boolean_formatter,
+        ),
+        SBAdminField(name="uploaded_at", title=_("Created")),
+    )
+    sbadmin_list_filter = ("has_alt_text",)
+    search_fields = [*FileAdmin.search_fields, "default_alt_text"]
     readonly_fields = [*SBAdminFilerFileAdmin.readonly_fields, "preview", "dimensions"]
     fieldsets = [
         (None, {"fields": ["preview", ("name", "default_alt_text")]}),
@@ -229,11 +273,6 @@ class SBAdminFilerImageAdmin(SBAdminFilerFileAdmin):
     @admin.display(description=_("Dimensions"))
     def dimensions(self, obj):
         return f"{obj.width:g}×{obj.height:g} px"
-
-    def add_view(self, request, form_url="", extra_context=None):
-        if not self.has_add_permission(request):
-            raise PermissionDenied
-        return HttpResponseRedirect(reverse("sb_admin:filer-directory_listing-root"))
 
 
 def register_filer_admins(site):

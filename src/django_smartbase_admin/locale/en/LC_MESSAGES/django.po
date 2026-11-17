@@ -1336,3 +1336,9 @@ msgstr ""
 
 msgid "Dimensions"
 msgstr ""
+
+msgid "Has alt text"
+msgstr ""
+
+msgid "File name"
+msgstr ""

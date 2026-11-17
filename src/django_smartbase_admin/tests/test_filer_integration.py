@@ -16,6 +16,12 @@ from django_smartbase_admin.engine.configuration import (
     SBAdminRoleConfiguration,
 )
 from django_smartbase_admin.engine.menu_item import SBAdminMenuItem
+from django_smartbase_admin.mcp.mcp import SBAdminTools
+from django_smartbase_admin.mcp.tests._common import (
+    MCPToolTestConfig,
+    build_mcp_request,
+)
+from django_smartbase_admin.services.thread_local import SBAdminThreadLocalService
 from django_smartbase_admin.integration.filer import (
     SBAdminFilerFileAdmin,
     SBAdminFilerFolderAdmin,
@@ -153,3 +159,57 @@ class FilerIntegrationTests(TestCase):
         )
         self.document.refresh_from_db()
         self.assertEqual(self.document.name, "Conditions")
+
+
+@override_settings(
+    ROOT_URLCONF=__name__,
+    SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
+)
+class FilerImageMCPTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        SBAdminThreadLocalService.clear_request()
+        cls.user = get_user_model().objects.create_superuser(
+            username="mcp-filer", email="mcp-filer@example.com", password="password"
+        )
+
+    def setUp(self):
+        SBAdminThreadLocalService.clear_request()
+        self.with_alt = self.create_image("with-alt.png", default_alt_text="Described")
+        self.without_alt = self.create_image("without-alt.png")
+        MCPToolTestConfig().init_view_map()
+        MCPToolTestConfig.view_permission_for = None
+        self.tools = SBAdminTools(request=build_mcp_request(self.user))
+
+    def create_image(self, filename, **fields):
+        content = BytesIO()
+        PILImage.new("RGB", (3, 2)).save(content, format="PNG")
+        image = Image.objects.create(
+            original_filename=filename,
+            file=SimpleUploadedFile(filename, content.getvalue()),
+            **fields,
+        )
+        self.addCleanup(image.file.delete, save=False)
+        return image
+
+    def test_lists_images_without_alt_text(self):
+        result = self.tools.list_rows(
+            "filer_image",
+            fields=["original_filename", "default_alt_text"],
+            filter_data={"has_alt_text": False},
+        )
+
+        self.assertEqual(
+            [row["original_filename"] for row in result["data"]], ["without-alt.png"]
+        )
+
+    def test_update_detail_sets_alt_text(self):
+        result = self.tools.update_detail(
+            "filer_image",
+            str(self.without_alt.pk),
+            component_values={"main": {"default_alt_text": "Now described"}},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.without_alt.refresh_from_db()
+        self.assertEqual(self.without_alt.default_alt_text, "Now described")

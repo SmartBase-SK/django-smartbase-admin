@@ -1374,6 +1374,12 @@ msgstr "Obrázok"
 msgid "Dimensions"
 msgstr "Rozmery"
 
+msgid "Has alt text"
+msgstr "Má alternatívny text"
+
+msgid "File name"
+msgstr "Názov súboru"
+
 msgid "Language"
 msgstr "Jazyk"
 
