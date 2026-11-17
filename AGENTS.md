@@ -38,7 +38,6 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Detail View Tabs](#detail-view-tabs-sbadmin_tabs) | Organizing fieldsets and inlines into tabs with `sbadmin_tabs` |
 | [Dashboard Widgets](#dashboard-widgets) | Standalone dashboards: simple widgets, lightweight subwidgets, real subwidgets with separate or grouped AJAX |
 | [Detail View Widgets](#detail-view-widgets) | Embedding dashboard-style list/chart widgets inside detail fieldsets |
-| [Filer Integration](#filer-integration) | Ready-made SBAdmin classes for django-filer folders, files and images |
 | [Logo Customization](#logo-customization) | Override logo via static files |
 | [URL-Callable Action Methods (`@sbadmin_action`)](#url-callable-action-methods-sbadmin_action) | `@sbadmin_action` decorator for URL-callable view methods |
 | [SBAdmin Attribute Reference](#sbadmin-attribute-reference) | Quick reference for all `sbadmin_` prefixed attributes |
@@ -5525,41 +5524,6 @@ class ArticleAdmin(SBAdmin):
 - Widget action methods follow the same [`@sbadmin_action`](#url-callable-action-methods-sbadmin_action) contract as other actions: `(request, modifier, object_id)`.
 
 **Source:** `django_smartbase_admin/engine/admin_base_view.py` — widget registration on admins; `django_smartbase_admin/engine/dynamic_forms.py` — fieldset widget placement; `django_smartbase_admin/engine/dashboard.py` — dashboard list/chart widgets and parent filtering; `django_smartbase_admin/admin/admin_base.py` — change-view widget media collection
-
----
-
-## Filer Integration
-
-`django_smartbase_admin.integration.filer` ships SBAdmin classes for django-filer. When `filer` is in `INSTALLED_APPS`, SBAdmin registers them on `sb_admin_site` after autodiscovering `sb_admin` modules, so no project code is needed.
-
-To customize, subclass and register your own admin in an `sb_admin.py` module; SBAdmin only registers the models that are still unregistered:
-
-```python
-from filer.models import Image
-
-from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.integration.filer import SBAdminFilerImageAdmin
-
-
-class ImageAdmin(SBAdminFilerImageAdmin):
-    fieldsets = [
-        (
-            None,
-            {"fields": ["preview", ("name", "default_alt_text"), "default_caption"]},
-        ),
-        *SBAdminFilerImageAdmin.fieldsets[1:],
-    ]
-
-
-sb_admin_site.register(Image, ImageAdmin)
-```
-
-**Key points:**
-- File and image details use the standard change form: editable fields on the left, a `Details` sidebar fieldset, a `Change file` / `Change image` sidebar fieldset with the SB file widget, and a `Download` detail action.
-- The image detail edits only the name and alt text and shows a preview; add view redirects to the folder listing.
-- The file field is required, so the widget cannot clear the file of an image that is referenced elsewhere. Uploading a new file replaces it in place.
-- filer's own redirects point at `admin:` URLs; `redirect_to_sb_admin()` rewrites them to `sb_admin:` after save, delete and folder listing. filer's `/admin/` must stay mounted for those reverses.
-- The canonical URL row is shown only when `filer.urls` is routed (`filer_canonical_url_enabled()`).
 
 ---
 
