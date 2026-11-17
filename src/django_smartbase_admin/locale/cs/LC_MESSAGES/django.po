@@ -1366,6 +1366,45 @@ msgstr "Přeloženo"
 msgid "Status"
 msgstr "Stav"
 
+msgid "Name"
+msgstr "Název"
+
+msgid "File type"
+msgstr "Typ souboru"
+
+msgid "SHA-1"
+msgstr "SHA-1"
+
+msgid "Canonical URL"
+msgstr "Kanonická URL"
+
+msgid "Shown in the media library instead of the file name."
+msgstr "Zobrazí se v knihovně médií místo názvu souboru."
+
+msgid "Alt text"
+msgstr "Alternativní text"
+
+msgid "Describes the image for screen readers and search engines. Used wherever the image has no alt text of its own."
+msgstr "Popisuje obrázek pro čtečky obrazovky a vyhledávače. Použije se všude, kde obrázek nemá vlastní alternativní text."
+
+msgid "The new file replaces this one everywhere it is used."
+msgstr "Nový soubor nahradí tento všude, kde se používá."
+
+msgid "The new image replaces this one everywhere it is used."
+msgstr "Nový obrázek nahradí tento všude, kde se používá."
+
+msgid "Image"
+msgstr "Obrázek"
+
+msgid "Dimensions"
+msgstr "Rozměry"
+
+msgid "Has alt text"
+msgstr "Má alternativní text"
+
+msgid "File name"
+msgstr "Název souboru"
+
 msgid "Language"
 msgstr "Jazyk"
 
