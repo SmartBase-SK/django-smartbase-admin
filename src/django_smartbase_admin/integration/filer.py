@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from filer.admin import FileAdmin, FolderAdmin
 from filer.admin.fileadmin import FileAdminChangeFrom
+from filer.models import File, Folder, Image
 
 from django_smartbase_admin.admin.admin_base import SBAdminThirdParty
 from django_smartbase_admin.engine.actions import SBAdminCustomAction
@@ -88,6 +89,7 @@ class SBAdminFilerImageForm(SBAdminFilerFileForm):
 class SBAdminFilerFileAdmin(SBAdminNoHistoryDetailMixin, SBAdminThirdParty, FileAdmin):
     change_form_template = "sb_admin/actions/change_form.html"
     form = SBAdminFilerFileForm
+    autocomplete_fields = []
     readonly_fields = [
         *FileAdmin.readonly_fields,
         "mime_type",
@@ -232,3 +234,13 @@ class SBAdminFilerImageAdmin(SBAdminFilerFileAdmin):
         if not self.has_add_permission(request):
             raise PermissionDenied
         return HttpResponseRedirect(reverse("sb_admin:filer-directory_listing-root"))
+
+
+def register_filer_admins(site):
+    for model, model_admin in (
+        (Folder, SBAdminFilerFolderAdmin),
+        (File, SBAdminFilerFileAdmin),
+        (Image, SBAdminFilerImageAdmin),
+    ):
+        if not site.is_registered(model):
+            site.register(model, model_admin)

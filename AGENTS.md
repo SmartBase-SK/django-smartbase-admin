@@ -5530,21 +5530,28 @@ class ArticleAdmin(SBAdmin):
 
 ## Filer Integration
 
-`django_smartbase_admin.integration.filer` ships SBAdmin classes for django-filer. They are not registered automatically; register them on `sb_admin_site` in the host project:
+`django_smartbase_admin.integration.filer` ships SBAdmin classes for django-filer. When `filer` is in `INSTALLED_APPS`, SBAdmin registers them on `sb_admin_site` after autodiscovering `sb_admin` modules, so no project code is needed.
+
+To customize, subclass and register your own admin in an `sb_admin.py` module; SBAdmin only registers the models that are still unregistered:
 
 ```python
-from filer.models import File, Folder, Image
+from filer.models import Image
 
 from django_smartbase_admin.admin.site import sb_admin_site
-from django_smartbase_admin.integration.filer import (
-    SBAdminFilerFileAdmin,
-    SBAdminFilerFolderAdmin,
-    SBAdminFilerImageAdmin,
-)
+from django_smartbase_admin.integration.filer import SBAdminFilerImageAdmin
 
-sb_admin_site.register(Folder, SBAdminFilerFolderAdmin)
-sb_admin_site.register(File, SBAdminFilerFileAdmin)
-sb_admin_site.register(Image, SBAdminFilerImageAdmin)
+
+class ImageAdmin(SBAdminFilerImageAdmin):
+    fieldsets = [
+        (
+            None,
+            {"fields": ["preview", ("name", "default_alt_text"), "default_caption"]},
+        ),
+        *SBAdminFilerImageAdmin.fieldsets[1:],
+    ]
+
+
+sb_admin_site.register(Image, ImageAdmin)
 ```
 
 **Key points:**

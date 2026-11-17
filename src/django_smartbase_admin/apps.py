@@ -1,4 +1,4 @@
-from django.apps import AppConfig
+from django.apps import AppConfig, apps
 from django.utils.module_loading import autodiscover_modules
 from django.conf import settings
 
@@ -16,6 +16,12 @@ class SBAdminConfig(AppConfig):
 
         if settings.SB_ADMIN_CONFIGURATION:
             autodiscover_modules("sb_admin", register_to=sb_admin_site)
+            if apps.is_installed("filer"):
+                from django_smartbase_admin.integration.filer import (
+                    register_filer_admins,
+                )
+
+                register_filer_admins(sb_admin_site)
 
         # Register Django system checks (sbadmin.W001..W003). Imported after
         # autodiscover so the checks see every registered admin.
