@@ -775,7 +775,7 @@ class SBAdminThirdParty(SBAdminInlineAndAdminCommon, SBAdminBaseView):
     def _register_form_autocomplete(self, request) -> None:
         object_id = getattr(request.request_data, "object_id", None)
         obj = self.get_object(request, object_id) if object_id is not None else None
-        self.get_form(request, obj)()
+        self.get_form(request, obj, change=obj is not None)()
 
     def get_action_url(self, action, modifier="template", object_id=None) -> str:
         return reverse(
