@@ -1,5 +1,9 @@
 {% extends "sb_admin/actions/change_form.html" %}
-{% load static filer_admin_tags %}
+{% load static i18n admin_urls admin_modify filer_admin_tags sb_admin_tags %}
+
+{% block extrahead %}
+    {{ block.super }}
+{% endblock %}
 
 {% block style_init %}
     {{ block.super }}
@@ -19,14 +23,76 @@
     </style>
 {% endblock %}
 
-{% block before_detail_tabs %}
-    {% if original %}
-        <div class="filer-sb-image-preview pt-20 mb-24">
-            {% include "sb_admin/integrations/filer/image_detail_panel.html" %}
-        </div>
-    {% endif %}
-{% endblock %}
+{% block form %}
+    <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post"
+          id="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form" class="flex flex-col{% if sbadmin_is_modal %} min-h-0{% else %} detail-view-form flex-grow w-full max-w-1180 mx-auto{% endif %}" novalidate>
+        <div{% if sbadmin_is_modal %} class="modal-body"{% endif %}>
+            {% csrf_token %}
+            {% if errors %}
+                {% include "sb_admin/includes/form_error_alert.html" with errors_count=errors|length non_field_errors=adminform.form.non_field_errors %}
+            {% endif %}
+            {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+            {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
 
-{% block action_bar %}
-    {% with show_save_and_add_another=False %}{{ block.super }}{% endwith %}
+            <div class="filer-sb-image-preview pt-20">
+                {% include "sb_admin/integrations/filer/image_detail_panel.html" %}
+            </div>
+
+            {% block admin_change_form_document_ready %}
+                <script type="text/javascript"
+                        id="django-admin-form-add-constants"
+                        src="{% static 'admin/js/change_form.js' %}"
+                    {% if adminform and add %}
+                        data-model-name="{{ opts.model_name }}"
+                    {% endif %}>
+                </script>
+            {% endblock %}
+        </div>
+        {% if sbadmin_is_modal %}
+            <div class="modal-footer">
+                {% if original %}
+                    {% url opts|admin_urlname:'change' original.pk|admin_urlquote as post_url %}
+                {% else %}
+                    {% url opts|admin_urlname:'add' as post_url %}
+                {% endif %}
+                {% if has_change_permission %}
+                    <button
+                            form="{% if sbadmin_is_modal %}modal_{% endif %}{{ opts.model_name }}_form"
+                            hx-post="{{ post_url }}"
+                            hx-target="#sb-admin-modal"
+                            hx-swap="innerHTML"
+                            hx-select="#modal-content"
+                            hx-encoding="multipart/form-data"
+                            hx-vals='{
+                                "sbadmin_is_modal": 1,
+                                "sb_admin_source_field": "{{ request.GET.sb_admin_source_field|escapejs }}",
+                                "sbadmin_reload_on_save": {% if sbadmin_reload_on_save %}1{% else %}0{% endif %},
+                                "sbadmin_parent_instance_field": "{{ request.GET.sbadmin_parent_instance_field|escapejs }}",
+                                "sbadmin_parent_instance_pk": "{{ request.GET.sbadmin_parent_instance_pk|default:""|escapejs }}",
+                                "sbadmin_parent_instance_label": "{{ request.GET.sbadmin_parent_instance_label|escapejs }}"
+                            }'
+                            class="btn btn-primary flex-grow flex items-center justify-center">
+                        <svg class="w-20 h-20 mr-8">
+                            <use xlink:href="#Save"></use>
+                        </svg>
+                        {% trans 'Save' %}
+                    </button>
+                {% endif %}
+                <button type="button"
+                        class="btn flex-grow"
+                        data-bs-dismiss="modal" aria-label="Close">
+                    {% trans 'Close' %}
+                </button>
+            </div>
+        {% else %}
+            {# Sticky bar: other models show submit_row; image preview has no editable fields. #}
+            {% block action_bar %}{% endblock %}
+        {% endif %}
+    </form>
+    {% sb_admin_prepopulated_fields_init %}
+    {% if sbadmin_is_modal %}
+        <script>
+            init_prepopulate(document.getElementById("modal-content"));
+        </script>
+    {% endif %}
 {% endblock %}

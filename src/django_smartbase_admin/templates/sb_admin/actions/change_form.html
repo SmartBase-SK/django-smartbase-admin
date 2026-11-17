@@ -171,7 +171,6 @@
             {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
             {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
             {% if save_on_top %}{% block submit_buttons_top %}{% submit_row %}{% endblock %}{% endif %}
-            {% block before_detail_tabs %}{% endblock %}
 
             {% if not tabular_context.default_tabs and tabular_context.context.keys|length > 1 %}
                 <ul class="saved-filters" role="tablist">

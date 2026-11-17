@@ -1303,3 +1303,36 @@ msgstr ""
 
 msgid "Language"
 msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "File type"
+msgstr ""
+
+msgid "SHA-1"
+msgstr ""
+
+msgid "Canonical URL"
+msgstr ""
+
+msgid "Shown in the media library instead of the file name."
+msgstr ""
+
+msgid "Alt text"
+msgstr ""
+
+msgid "Describes the image for screen readers and search engines. Used wherever the image has no alt text of its own."
+msgstr ""
+
+msgid "The new file replaces this one everywhere it is used."
+msgstr ""
+
+msgid "The new image replaces this one everywhere it is used."
+msgstr ""
+
+msgid "Image"
+msgstr ""
+
+msgid "Dimensions"
+msgstr ""

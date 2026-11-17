@@ -1027,10 +1027,8 @@ msgstr "Nahrať súbory"
 msgid "You have to select a folder first"
 msgstr "Najprv si vyberte priečinok"
 
-#, fuzzy
-#| msgid "Download XLSX"
 msgid "Download"
-msgstr "Stiahnuť XLSX"
+msgstr "Stiahnuť"
 
 msgid "Expand"
 msgstr "Rozbaliť"
@@ -1342,6 +1340,39 @@ msgstr "Preložené"
 
 msgid "Status"
 msgstr "Stav"
+
+msgid "Name"
+msgstr "Názov"
+
+msgid "File type"
+msgstr "Typ súboru"
+
+msgid "SHA-1"
+msgstr "SHA-1"
+
+msgid "Canonical URL"
+msgstr "Kanonická URL"
+
+msgid "Shown in the media library instead of the file name."
+msgstr "Zobrazí sa v knižnici médií namiesto názvu súboru."
+
+msgid "Alt text"
+msgstr "Alternatívny text"
+
+msgid "Describes the image for screen readers and search engines. Used wherever the image has no alt text of its own."
+msgstr "Popisuje obrázok pre čítačky obrazovky a vyhľadávače. Použije sa všade, kde obrázok nemá vlastný alternatívny text."
+
+msgid "The new file replaces this one everywhere it is used."
+msgstr "Nový súbor nahradí tento všade, kde sa používa."
+
+msgid "The new image replaces this one everywhere it is used."
+msgstr "Nový obrázok nahradí tento všade, kde sa používa."
+
+msgid "Image"
+msgstr "Obrázok"
+
+msgid "Dimensions"
+msgstr "Rozmery"
 
 msgid "Language"
 msgstr "Jazyk"
