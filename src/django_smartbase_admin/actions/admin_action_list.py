@@ -892,9 +892,13 @@ class SBAdminListAction(SBAdminAction):
                 getattr(resolved.get(name), "contains_aggregate", False)
                 for name in field_annotations
             ):
+                # Drop any ordering ``get_queryset()`` brings: ordering over a
+                # to-many path would join into the GROUP BY and split the
+                # per-object total, and ``[:1]`` would return one part.
                 field_annotations = {
                     target: Subquery(
                         self.view.get_queryset(request)
+                        .order_by()
                         .filter(pk=OuterRef("pk"))
                         .annotate(**field_annotations)
                         .values(target)[:1]

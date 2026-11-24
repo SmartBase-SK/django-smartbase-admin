@@ -69,6 +69,13 @@ class _Admin(SBAdmin):
         return obj.id
 
 
+class _ChildOrderedAdmin(_Admin):
+    # A project ``get_queryset()`` ordered over a to-many path, like
+    # ``order_by("lines__position")``.
+    def get_queryset(self, request=None):
+        return super().get_queryset(request).order_by("children__name")
+
+
 @override_settings(
     ROOT_URLCONF=__name__,
     SB_ADMIN_CONFIGURATION="tests.sbadmin_config.MCPSBAdminConfiguration",
@@ -395,6 +402,26 @@ class AggregateTests(TestCase):
                 {"group": {"children_total": 3}, "aggregates": {"count": 1}},
             ],
         )
+
+    def test_aggregated_column_ignores_admin_ordering_over_relation(self):
+        # The per-object subquery starts from ``get_queryset()``. Keeping its
+        # ``children__name`` ordering there would add that column to the
+        # subquery's GROUP BY, split p's total into one row per child and
+        # return 1.
+        p = Folder.objects.create(name="p")
+        for n in ("p1", "p2", "p3"):
+            Folder.objects.create(name=n, parent=p)
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, _ChildOrderedAdmin)
+        MCPToolTestConfig().init_view_map()
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            aggregate=[{"fn": "sum", "field": "children_total"}],
+        )
+
+        self.assertEqual(result["aggregates"], {"sum_children_total": 3})
 
     def test_invalid_group_by_specs_are_rejected(self):
         tools = self._tools()
