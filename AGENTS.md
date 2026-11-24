@@ -4445,7 +4445,7 @@ Hooks are called in this order by `SBAdminListAction`:
 |---|------|---------|
 | 1 | `modify_tabulator_definition(view, request, definition)` | Inject Tabulator options (dataTree, custom modules, etc.) into the JSON sent to the client. |
 | 2 | `modify_count_queryset(action, request, qs)` | Reshape the qs `.count()` runs on. Used by the nested plugin to group by parent id so pagination counts parent groups. |
-| 3 | `modify_aggregate_queryset(action, request, qs)` | Reshape the qs list aggregates run on. Defaults to `modify_count_queryset`, preserving existing plugin behavior; override when aggregate SQL needs a different shape from pagination counts. |
+| 3 | `modify_aggregate_queryset(action, request, qs)` | Reshape the qs whose rows list aggregates cover. Only its primary keys are used (aggregates run on a fresh qs filtered `pk__in` them), so it must support `.values(pk)`. Defaults to `modify_count_queryset`, preserving existing plugin behavior; override when aggregate rows need a different shape from pagination counts. |
 | 4 | `modify_base_queryset(action, request, qs, values)` | **Store-only**. Observe the unfiltered `.values()`-applied qs. Reshaping here leaks into the visible page — return `qs` unchanged. |
 | 5 | `modify_data_queryset(action, request, qs, page_num, page_size)` | Reshape the unsliced, filtered, ordered data qs. Caller slices `[from:to]` on the return value. |
 | 6 | `modify_final_data(action, request, data)` | Reshape already-formatted row dicts (e.g. assemble `_children` from group metadata). Runs **after** column formatters. |
