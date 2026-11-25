@@ -262,23 +262,20 @@ class QuickSearchService:
             if not url:
                 continue
             add_label = view.get_add_label(self.request, None)
-            title = (
-                f"{_('Add')} {add_label}"
-                if add_label
-                else f"{_('Add')}: {view.model._meta.verbose_name}"
-            )
-            actions.append((title, url, entry))
+            name = str(add_label or view.model._meta.verbose_name)
+            title = f"{_('Add')} {name}" if add_label else f"{_('Add')}: {name}"
+            actions.append((title, name, url, entry))
         return actions
 
     def search_actions(self, terms, entries) -> list[QuickSearchItem]:
         ranked = []
-        for title, url, entry in self.add_actions(entries):
+        for title, name, url, entry in self.add_actions(entries):
             rank = text_rank(f"{title} {entry.breadcrumb}", terms) if terms else 2
             if rank is not None:
                 ranked.append(
                     (
                         rank,
-                        title,
+                        name,
                         QuickSearchItem(
                             title=title,
                             url=url,
@@ -288,7 +285,7 @@ class QuickSearchService:
                     )
                 )
         ranked.sort(key=lambda row: (row[0], normalize_text(row[1])))
-        return [item for _rank, _title, item in ranked[:QUICK_SEARCH_ACTIONS_LIMIT]]
+        return [item for _rank, _name, item in ranked[:QUICK_SEARCH_ACTIONS_LIMIT]]
 
     def search_pages(self, terms, entries) -> list[QuickSearchItem]:
         ranked = []

@@ -116,6 +116,12 @@ class QuickSearchServiceTest(SimpleTestCase):
         self.assertNotIn("Hidden", titles)
         self.assertEqual(titles, ["Products", "Gift vouchers", "Settings"])
 
+    def test_add_actions_are_sorted_by_name_not_by_add_prefix(self):
+        self.vouchers.add_label = None
+        self.products.add_label = "zebra product"
+        titles = [a["title"] for a in self.search("")["actions"]]
+        self.assertEqual(titles, ["Add: vouchers item", "Add zebra product"])
+
     def test_add_actions_need_add_permission(self):
         actions = self.search("")["actions"]
         self.assertEqual(
