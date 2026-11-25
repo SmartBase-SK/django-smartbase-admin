@@ -30,9 +30,15 @@ export default class QuickSearch {
 
     bindEvents() {
         document.addEventListener('keydown', (event) => {
-            if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
-                event.preventDefault()
-                this.isOpen() ? this.close() : this.open()
+            if (!this.isShortcut(event)) {
+                return
+            }
+            event.preventDefault()
+            this.isOpen() ? this.close() : this.open()
+        })
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                this.close()
             }
         })
         document.querySelectorAll('.js-quick-search-open').forEach((button) => {
@@ -57,6 +63,16 @@ export default class QuickSearch {
                 this.setActive(Number(item.dataset.index), false)
             }
         })
+    }
+
+    isShortcut(event) {
+        if (event.defaultPrevented || event.altKey || event.shiftKey) {
+            return false
+        }
+        if (!(event.metaKey || event.ctrlKey) || event.key?.toLowerCase() !== 'k') {
+            return false
+        }
+        return !(event.target?.isContentEditable && !this.root.contains(event.target))
     }
 
     isOpen() {
@@ -152,7 +168,7 @@ export default class QuickSearch {
         if (!this.items.length && query) {
             const empty = document.createElement('div')
             empty.className = 'quick-search-empty'
-            empty.textContent = window.sb_admin_translation_strings?.no_results || 'No results found'
+            empty.textContent = window.sb_admin_translation_strings?.["no_results"] || 'No results found'
             this.results.appendChild(empty)
         }
         this.setActive(this.items.length ? 0 : -1)

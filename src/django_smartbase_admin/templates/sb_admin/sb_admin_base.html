@@ -32,7 +32,7 @@
             </div>
         {% endif %}
     </div>
-    {% if not sbadmin_is_modal and request.request_data.configuration.quick_search_enabled %}
+    {% if not sbadmin_is_modal and quick_search_enabled %}
         {% if not sec_fetch_site or request.META.HTTP_SEC_FETCH_DEST == 'document' %}
             {% include "sb_admin/includes/quick_search.html" %}
         {% endif %}

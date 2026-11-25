@@ -106,7 +106,7 @@
             </div>
             {% block before_footer %}{% endblock %}
             <footer class="mt-auto border-t border-dark-200">
-                {% if request.request_data.configuration.quick_search_enabled %}
+                {% if quick_search_enabled %}
                     <button type="button" class="js-quick-search-open flex items-center p-16 gap-x-8 border-b border-dark-200 w-full text-left hover:bg-dark-100">
                         <span class="flex gap-x-4">
                             <span class="key js-quick-search-modifier">Ctrl</span>
