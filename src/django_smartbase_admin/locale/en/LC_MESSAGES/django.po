@@ -1345,3 +1345,18 @@ msgstr ""
 
 msgid "Metadata"
 msgstr ""
+
+msgid "Quick navigation"
+msgstr ""
+
+msgid "Search pages, actions and records"
+msgstr ""
+
+msgid "Quick actions"
+msgstr ""
+
+msgid "Pages"
+msgstr ""
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr ""

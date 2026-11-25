@@ -1455,3 +1455,18 @@ msgstr "Jazyk"
 
 #~ msgid "Detail inline rows"
 #~ msgstr "Riadky inlinov detailu"
+
+msgid "Quick navigation"
+msgstr "Rýchla navigácia"
+
+msgid "Search pages, actions and records"
+msgstr "Hľadať stránky, akcie a záznamy"
+
+msgid "Quick actions"
+msgstr "Rýchle akcie"
+
+msgid "Pages"
+msgstr "Stránky"
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr "Stlačte <span class=\"key\">Enter</span> pre výber, <span class=\"key\">↑</span> <span class=\"key\">↓</span> alebo <span class=\"key\">Tab</span> pre navigáciu, <span class=\"key\">Esc</span> pre zatvorenie"

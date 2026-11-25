@@ -17,6 +17,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 | [Dynamic Regions](#dynamic-regions-sbdynamicregion) | HTMX-refreshed form regions, trigger fields, active fields, inactive field policies, modal usage, custom templates |
 | [Admin Registration](#admin-registration) | `@admin.register` with `sb_admin_site`, `sbadmin_list_filter` vs `list_filter` |
 | [Full-text search (`search_fields`)](#full-text-search-search_fields) | How `search_fields` maps SBAdmin names to ORM lookups and how to avoid duplicate rows |
+| [Quick Search (Ctrl/Cmd + K)](#quick-search-ctrlcmd--k) | Global search dialog over menu pages, add actions and records (`search_fields` by default, `sbadmin_quick_search_fields`, hooks) |
 | [Selection Actions](#selection-actions-bulk-actions) | Modal forms for bulk operations, `ListActionModalView`, confirmation modals, `SBAdminCustomAction` params, per-action permissions, success/error handling |
 | [Row Actions](#row-actions-per-row-list-buttons) | Per-row icon buttons with `SBAdminRowAction`, `RowActionModalView`, and row-aware enablement; modal dispatch and custom markup actions |
 | [Field Formatters](#field-formatters) | Badge formatters, `array_badge_formatter`, `BadgeType` options, automatic choice formatting |
@@ -68,6 +69,7 @@ This document provides key patterns and gotchas for developers and AI assistants
 - **Dynamic regions in custom form views?** → [Dynamic regions in custom views](#dynamic-regions-in-custom-views)
 - **Bulk action with modal?** → [Selection Actions](#selection-actions-bulk-actions)
 - **Full-text search config?** → [Full-text search (`search_fields`)](#full-text-search-search_fields)
+- **Global search / Ctrl+K dialog over records?** → [Quick Search (Ctrl/Cmd + K)](#quick-search-ctrlcmd--k)
 - **Per-row icon action?** → [Row Actions](#row-actions-per-row-list-buttons)
 - **Modal opened from custom markup, or a modal returning 404?** → [Modal Dispatch](#modal-dispatch)
 - **Confirmation dialog (no form)?** → [Confirmation-Only Modals](#confirmation-only-modals-no-form-fields)
@@ -2394,6 +2396,52 @@ sbadmin_list_display = (
 sbadmin_list_filter = ("title", "status", "author_name")
 # OR
 list_filter = ("title", "status", "author__email")
+
+---
+
+## Quick Search (Ctrl/Cmd + K)
+
+Every SBAdmin page has a quick search dialog. It opens with `Ctrl + K` (`⌘ + K` on macOS) or with the **Quick navigation** button at the bottom of the sidebar, and searches three groups:
+
+| Group | Source | Shown when |
+|-------|--------|------------|
+| Quick actions | "Add ..." links of menu views whose model admin grants `add` permission | always (empty query lists them as suggestions) |
+| Pages | Menu items the user can open, with the menu path as breadcrumb | always |
+| One group per admin | Records of every admin in the menu with `search_fields` (or `sbadmin_quick_search_fields`) | query has at least 3 characters |
+
+Matching ignores case and diacritics, and every word of the query has to match. Keyboard: `↑` / `↓` or `Tab` / `Shift + Tab` move, `Enter` opens (`Ctrl/Cmd + Enter` in a new tab), `Esc` closes.
+
+### Searching records
+
+Without any configuration every admin in the user's menu that has `search_fields` is searched with the same full-text search as its list (SBAdmin field names are mapped through `filter_field`, annotations included). The group is titled by the menu item and keeps the admin's ordering.
+
+`sbadmin_quick_search_fields` replaces that with a lighter query and ranks the results; `sbadmin_quick_search = False` leaves the admin out:
+
+```python
+@admin.register(Article, site=sb_admin_site)
+class ArticleAdmin(SBAdmin):
+    sbadmin_quick_search_fields = ("title", "slug", "author__name")
+    sbadmin_quick_search_limit = 5            # results shown for this admin (default 5)
+    sbadmin_quick_search_icon = "Table-report"  # sprite icon (default "Box")
+
+    def get_quick_search_description(self, request, obj):
+        return f"{obj.category} · {obj.author}"
+
+
+@admin.register(AuditEntry, site=sb_admin_site)
+class AuditEntryAdmin(SBAdmin):
+    sbadmin_quick_search = False   # large table, not worth a query on every keystroke
+```
+
+**Key points:**
+- `sbadmin_quick_search_fields` are ORM lookups (not `SBAdminField` names), the `^`, `=` and `@` prefixes work as in `search_fields`. With `django.contrib.postgres` and the `unaccent` extension the lookups are accent-insensitive. The first field ranks the results: exact match, then prefix match, then the admin's ordering.
+- `sbadmin_quick_search`: `None` (default) follows `quick_search_use_search_fields` on the role configuration (default `True`), `True` searches `search_fields` even when that is off, `False` never searches the admin.
+- Each searched admin costs one query per request (the dialog debounces typing and cancels the previous request), so turn it off on admins over very large tables or give them `sbadmin_quick_search_fields` with indexed columns.
+- Results come from `get_queryset(request)`, so `restrict_queryset` and the global filter apply, and the admin must grant view permission (`has_quick_search`).
+- Hooks for customisation: `get_quick_search_fields`, `get_quick_search_queryset(request, term)` (e.g. add trigram similarity), `get_quick_search_title`, `get_quick_search_description`, `get_quick_search_url`, `get_quick_search_section_title` (defaults to the label of the menu item).
+- An exception in one admin is logged and the other groups are still returned.
+- Turn the whole feature off per role with `quick_search_enabled = False` on `SBAdminRoleConfiguration` (or override `is_quick_search_enabled(request)`).
+- Endpoint: `GET sb_admin:quick_search?q=...` returns `{"query": ..., "sections": [{"key", "title", "items": [{"title", "description", "url", "icon"}]}]}`.
 
 ---
 

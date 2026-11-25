@@ -106,21 +106,15 @@
             </div>
             {% block before_footer %}{% endblock %}
             <footer class="mt-auto border-t border-dark-200">
-                {#            Global Search #}
-                {#            <div class="flex p-16 gap-x-8 border-b border-dark-200 w-full">#}
-                {#                <div class="flex gap-x-4">#}
-                {#                    <div class="key">#}
-                {#                        ⌘#}
-                {#                    </div>#}
-                {#                    <div class="key">#}
-                {#                        K#}
-                {#                    </div>#}
-                {#                </div>#}
-                {##}
-                {#                <div class="text-dark">#}
-                {#                    Rýchla navigácia#}
-                {#                </div>#}
-                {#            </div>#}
+                {% if request.request_data.configuration.quick_search_enabled %}
+                    <button type="button" class="js-quick-search-open flex items-center p-16 gap-x-8 border-b border-dark-200 w-full text-left hover:bg-dark-100">
+                        <span class="flex gap-x-4">
+                            <span class="key js-quick-search-modifier">Ctrl</span>
+                            <span class="key">K</span>
+                        </span>
+                        <span class="text-dark">{% trans 'Quick navigation' %}</span>
+                    </button>
+                {% endif %}
                 <div class="relative">
                     <div class="dropdown-btn flex items-center w-full p-16 cursor-pointer min-h-72"
                          data-bs-toggle="dropdown"

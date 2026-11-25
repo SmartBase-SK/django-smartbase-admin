@@ -1303,3 +1303,18 @@ msgstr ""
 
 msgid "Language"
 msgstr ""
+
+msgid "Quick navigation"
+msgstr "Gyors navigáció"
+
+msgid "Search pages, actions and records"
+msgstr "Oldalak, műveletek és rekordok keresése"
+
+msgid "Quick actions"
+msgstr "Gyors műveletek"
+
+msgid "Pages"
+msgstr "Oldalak"
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr "Nyomja meg: <span class=\"key\">Enter</span> a kiválasztáshoz, <span class=\"key\">↑</span> <span class=\"key\">↓</span> vagy <span class=\"key\">Tab</span> a navigációhoz, <span class=\"key\">Esc</span> a bezáráshoz"

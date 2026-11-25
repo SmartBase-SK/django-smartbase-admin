@@ -1,0 +1,25 @@
+{% load i18n %}
+<div id="sb-quick-search" class="quick-search hidden" data-url="{% url 'sb_admin:quick_search' %}" role="dialog" aria-modal="true" aria-label="{% trans 'Quick navigation' %}">
+    <div class="quick-search-backdrop js-quick-search-close"></div>
+    <div class="quick-search-dialog">
+        <div class="quick-search-input-row">
+            <svg class="w-20 h-20 flex-shrink-0 text-dark">
+                <use xlink:href="#Search"></use>
+            </svg>
+            <input type="text" class="quick-search-input js-quick-search-input" autocomplete="off" spellcheck="false"
+                   placeholder="{% trans 'Search pages, actions and records' %}"
+                   role="combobox" aria-expanded="true" aria-controls="sb-quick-search-results" aria-autocomplete="list">
+            <button type="button" class="quick-search-clear js-quick-search-clear hidden" aria-label="{% trans 'Clear' %}">
+                <svg class="w-20 h-20">
+                    <use xlink:href="#Close-one"></use>
+                </svg>
+            </button>
+        </div>
+        <div id="sb-quick-search-results" class="quick-search-results custom-scrollbar js-quick-search-results" role="listbox"></div>
+        <div class="quick-search-footer">
+            {% blocktrans trimmed %}
+                Press <span class="key">Enter</span> to select, <span class="key">↑</span> <span class="key">↓</span> or <span class="key">Tab</span> to navigate, <span class="key">Esc</span> to close
+            {% endblocktrans %}
+        </div>
+    </div>
+</div>

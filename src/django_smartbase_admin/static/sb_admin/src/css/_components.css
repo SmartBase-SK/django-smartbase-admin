@@ -10,6 +10,7 @@
 @import "components/_permission-tree.css";
 @import "components/_media_picker.css";
 @import "components/_richtext.css";
+@import "components/_quick_search.css";
 
 @layer components {
     fieldset, .stacked-row {

@@ -1,0 +1,106 @@
+@layer components {
+    .quick-search {
+        position: fixed;
+        inset: 0;
+        z-index: 1015;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 12vh 1rem 1rem;
+
+        &.hidden {
+            display: none;
+        }
+    }
+
+    .quick-search-backdrop {
+        @apply bg-dark-a/50;
+        position: absolute;
+        inset: 0;
+        backdrop-filter: blur(.25rem);
+    }
+
+    .quick-search-dialog {
+        @apply relative flex flex-col w-full bg-light rounded-lg shadow border border-dark-200 overflow-hidden;
+        max-width: 40rem;
+        max-height: 76vh;
+    }
+
+    .quick-search-input-row {
+        @apply flex items-center gap-x-12 px-16 border-b border-dark-200;
+        min-height: 3.5rem;
+    }
+
+    .quick-search .quick-search-input {
+        @apply flex-1 min-w-0 text-16 text-dark-900 p-0;
+        height: auto;
+        border: 0 !important;
+        outline: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+
+        &::placeholder {
+            @apply text-dark;
+        }
+    }
+
+    .quick-search-clear {
+        @apply flex-center flex-shrink-0 text-dark hover:text-dark-900;
+
+        &.hidden {
+            display: none;
+        }
+    }
+
+    .quick-search-results {
+        @apply overflow-auto py-8;
+
+        &:empty {
+            display: none;
+        }
+    }
+
+    .quick-search-section + .quick-search-section {
+        @apply border-t border-dark-200 mt-8 pt-8;
+    }
+
+    .quick-search-section-title {
+        @apply px-16 pt-8 pb-4 text-12 leading-16 text-dark;
+    }
+
+    .quick-search-item {
+        @apply flex items-center gap-x-12 mx-8 px-8 py-8 rounded text-dark-900;
+
+        &.active {
+            @apply bg-dark-100;
+        }
+    }
+
+    .quick-search-item-icon {
+        @apply flex-center flex-shrink-0 w-20 h-20 text-dark-600;
+    }
+
+    .quick-search-item-text {
+        @apply flex flex-col min-w-0;
+    }
+
+    .quick-search-item-title {
+        @apply text-14 leading-20 font-semibold truncate;
+    }
+
+    .quick-search-item-description {
+        @apply text-12 leading-16 text-dark truncate;
+    }
+
+    .quick-search-empty {
+        @apply px-16 py-24 text-14 text-dark text-center;
+    }
+
+    .quick-search-footer {
+        @apply flex flex-wrap items-center gap-4 px-16 py-12 border-t border-dark-200 text-12 leading-16 text-dark;
+
+        .key {
+            @apply mx-2;
+        }
+    }
+}
