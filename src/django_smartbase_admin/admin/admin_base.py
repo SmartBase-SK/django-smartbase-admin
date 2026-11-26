@@ -60,6 +60,7 @@ from django_smartbase_admin.audit.views import (
 )
 from django_smartbase_admin.engine.actions import SBAdminCustomAction, sbadmin_action
 from django_smartbase_admin.engine.fake_inline import SBAdminFakeInlineMixin
+from django_smartbase_admin.engine.quick_search import SBAdminQuickSearchMixin
 from django_smartbase_admin.engine.inline_formset import LoadedRowsPkFormsetMixin
 from django_smartbase_admin.engine.inline_pagination import (
     TabularInlinePaginated,
@@ -968,6 +969,7 @@ class SBAdminNestedInlineFormSet(SBAdminInlineFormSetMixin, NestedInlineFormSet)
 
 
 class SBAdmin(
+    SBAdminQuickSearchMixin,
     SBAdminInlineAndAdminCommon,
     SBAdminBaseQuerysetMixin,
     SBAdminBaseListView,

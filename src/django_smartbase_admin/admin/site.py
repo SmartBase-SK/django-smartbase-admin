@@ -144,6 +144,7 @@ class SBAdminSite(admin.AdminSite):
             PasswordChangeDoneView,
         )
         from django_smartbase_admin.views.media_picker_view import MediaPickerView
+        from django_smartbase_admin.views.quick_search_view import QuickSearchView
         from django_smartbase_admin.views.user_config_view import ColorSchemeView
         from django_smartbase_admin.views.view_on_site_redirect_view import (
             ViewOnSiteRedirectView,
@@ -224,6 +225,11 @@ class SBAdminSite(admin.AdminSite):
                     "global-filter/",
                     self.admin_view(GlobalFilterView.as_view()),
                     name="global_filter",
+                ),
+                path(
+                    "quick-search/",
+                    self.admin_view(QuickSearchView.as_view()),
+                    name="quick_search",
                 ),
                 path(
                     "media-picker/",

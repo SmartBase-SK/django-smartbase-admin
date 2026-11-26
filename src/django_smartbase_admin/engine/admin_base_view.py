@@ -624,6 +624,9 @@ class SBAdminBaseView(object):
             "configuration": request.request_data.configuration,
             "request_data": request.request_data,
             "admin_title": request.request_data.configuration.get_admin_title(),
+            "quick_search_enabled": request.request_data.configuration.is_quick_search_enabled(
+                request
+            ),
             "add_label": self.get_add_label(request, object_id),
             "change_label": self.get_change_label(request, object_id),
             "DETAIL_STRUCTURE_RIGHT_CLASS": DETAIL_STRUCTURE_RIGHT_CLASS,

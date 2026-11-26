@@ -25,6 +25,7 @@ window.bootstrap5 = {
 }
 
 import Sidebar from "./sidebar"
+import QuickSearch from "./quick_search"
 import Datepicker from "./datepicker"
 import Range from "./range"
 import Sorting from "./sorting"
@@ -109,6 +110,7 @@ class Main {
         }
 
         new Sidebar()
+        this.quickSearch = new QuickSearch()
         this.initInputs()
         new Sorting()
         this.autocomplete = new Autocomplete()

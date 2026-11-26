@@ -1303,3 +1303,18 @@ msgstr ""
 
 msgid "Language"
 msgstr ""
+
+msgid "Quick navigation"
+msgstr "Brza navigacija"
+
+msgid "Search pages, actions and records"
+msgstr "Pretraži stranice, radnje i zapise"
+
+msgid "Quick actions"
+msgstr "Brze radnje"
+
+msgid "Pages"
+msgstr "Stranice"
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr "Pritisnite <span class=\"key\">Enter</span> za odabir, <span class=\"key\">↑</span> <span class=\"key\">↓</span> ili <span class=\"key\">Tab</span> za kretanje, <span class=\"key\">Esc</span> za zatvaranje"

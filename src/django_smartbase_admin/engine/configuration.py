@@ -212,6 +212,9 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
     link_history_to_audit = True
     messaging_config = None
     mcp_whoami_sbadmin = None
+    quick_search_enabled = True
+    quick_search_use_search_fields = True
+    quick_search_actions = None
 
     def __init__(
         self,
@@ -541,6 +544,12 @@ class SBAdminRoleConfiguration(metaclass=Singleton):
         request,
     ) -> bool:
         return not is_modal(request)
+
+    def is_quick_search_enabled(self, request) -> bool:
+        return bool(self.quick_search_enabled)
+
+    def get_quick_search_actions(self, request):
+        return self.quick_search_actions
 
     def get_admin_title(self):
         return self.admin_title

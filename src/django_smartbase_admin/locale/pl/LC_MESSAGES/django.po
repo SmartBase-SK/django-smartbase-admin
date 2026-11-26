@@ -1303,3 +1303,18 @@ msgstr ""
 
 msgid "Language"
 msgstr ""
+
+msgid "Quick navigation"
+msgstr "Szybka nawigacja"
+
+msgid "Search pages, actions and records"
+msgstr "Szukaj stron, akcji i rekordów"
+
+msgid "Quick actions"
+msgstr "Szybkie akcje"
+
+msgid "Pages"
+msgstr "Strony"
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr "Naciśnij <span class=\"key\">Enter</span>, aby wybrać, <span class=\"key\">↑</span> <span class=\"key\">↓</span> lub <span class=\"key\">Tab</span>, aby nawigować, <span class=\"key\">Esc</span>, aby zamknąć"

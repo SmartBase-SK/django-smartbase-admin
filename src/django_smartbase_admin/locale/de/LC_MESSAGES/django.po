@@ -1423,3 +1423,18 @@ msgstr ""
 #, python-format
 #~ msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
 #~ msgstr "Möchten Sie die ausgewählten %(objects_name)s wirklich löschen? Alle folgenden Objekte und ihre verwandten Einträge werden gelöscht:"
+
+msgid "Quick navigation"
+msgstr "Schnellnavigation"
+
+msgid "Search pages, actions and records"
+msgstr "Seiten, Aktionen und Datensätze suchen"
+
+msgid "Quick actions"
+msgstr "Schnellaktionen"
+
+msgid "Pages"
+msgstr "Seiten"
+
+msgid "Press <span class=\"key\">Enter</span> to select, <span class=\"key\">↑</span> <span class=\"key\">↓</span> or <span class=\"key\">Tab</span> to navigate, <span class=\"key\">Esc</span> to close"
+msgstr "Drücken Sie <span class=\"key\">Enter</span> zum Auswählen, <span class=\"key\">↑</span> <span class=\"key\">↓</span> oder <span class=\"key\">Tab</span> zum Navigieren, <span class=\"key\">Esc</span> zum Schließen"
