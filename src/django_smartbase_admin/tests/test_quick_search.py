@@ -8,6 +8,7 @@ from django_smartbase_admin.admin.site import sb_admin_site
 from django_smartbase_admin.engine.configuration import SBAdminRoleConfiguration
 from django_smartbase_admin.engine.quick_search import (
     QuickSearchService,
+    SBAdminQuickAction,
     normalize_text,
     search_terms,
     text_rank,
@@ -48,10 +49,11 @@ def menu(label, url="", view_id=None, icon=None, sub_items=None):
     }
 
 
-def fake_request(menu_items, view_map, enabled=True):
+def fake_request(menu_items, view_map, enabled=True, actions=None):
     configuration = SimpleNamespace(
         view_map=view_map,
         is_quick_search_enabled=lambda request: enabled,
+        get_quick_search_actions=lambda request: actions,
     )
     request = RequestFactory().get("/quick-search/")
     request.request_data = SimpleNamespace(
@@ -97,8 +99,8 @@ class QuickSearchServiceTest(SimpleTestCase):
             "settings": self.settings,
         }
 
-    def search(self, term):
-        request = fake_request(self.menu_items, self.view_map)
+    def search(self, term, actions=None):
+        request = fake_request(self.menu_items, self.view_map, actions=actions)
         return {
             section["key"]: section["items"]
             for section in QuickSearchService(request).search(term)
@@ -115,6 +117,53 @@ class QuickSearchServiceTest(SimpleTestCase):
         titles = [page["title"] for page in self.search("")["pages"]]
         self.assertNotIn("Hidden", titles)
         self.assertEqual(titles, ["Products", "Gift vouchers", "Settings"])
+
+    def test_predefined_actions_replace_the_suggestions(self):
+        actions = self.search(
+            "",
+            actions=[
+                SBAdminQuickAction(view_id="vouchers", label="New gift voucher"),
+                SBAdminQuickAction(view_id="settings"),
+                SBAdminQuickAction(view_id="unknown"),
+                SBAdminQuickAction(label="Import", url="/import/", icon="Import"),
+                SBAdminQuickAction(view_id="products", url=lambda r: "/report/"),
+            ],
+        )["actions"]
+        self.assertEqual(
+            [(a["title"], a["url"], a["icon"]) for a in actions],
+            [
+                ("New gift voucher", "/add/", "Add-one"),
+                ("Import", "/import/", "Import"),
+                ("Products", "/report/", "Lightning"),
+            ],
+        )
+        self.assertEqual(actions[0]["description"], "Catalog / Gift vouchers")
+
+    def test_typing_searches_list_actions_and_opens_their_view(self):
+        self.products.get_sbadmin_list_actions_processed = lambda request: [
+            SimpleNamespace(
+                title="Download XLSX",
+                sub_actions=[SimpleNamespace(title="Import prices", sub_actions=None)],
+            )
+        ]
+        actions = self.search("prices")["actions"]
+        self.assertEqual(
+            [(a["title"], a["url"], a["description"]) for a in actions],
+            [("Import prices", "/products/", "Catalog / Products")],
+        )
+
+    def test_typing_prefers_predefined_then_add_then_list_actions(self):
+        self.products.get_sbadmin_list_actions_processed = lambda request: [
+            SimpleNamespace(title="Add product report", sub_actions=None)
+        ]
+        actions = self.search(
+            "product",
+            actions=[SBAdminQuickAction(label="Product import", url="/import/")],
+        )["actions"]
+        self.assertEqual(
+            [a["title"] for a in actions],
+            ["Product import", "Add product", "Add product report"],
+        )
 
     def test_add_actions_are_sorted_by_name_not_by_add_prefix(self):
         self.vouchers.add_label = None

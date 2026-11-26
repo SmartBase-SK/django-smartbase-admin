@@ -18,11 +18,30 @@ logger = logging.getLogger(__name__)
 QUICK_SEARCH_MIN_LENGTH = 3
 QUICK_SEARCH_MAX_LENGTH = 200
 QUICK_SEARCH_ACTIONS_LIMIT = 5
+QUICK_SEARCH_PREDEFINED_LIMIT = 8
+QUICK_SEARCH_MATCHED_ACTIONS_LIMIT = 8
 QUICK_SEARCH_PAGES_LIMIT = 8
 QUICK_SEARCH_RANK = "_sbadmin_quick_search_rank"
 DEFAULT_ADD_ICON = "Add-one"
+DEFAULT_ACTION_ICON = "Lightning"
 DEFAULT_PAGE_ICON = "Application-menu"
 DEFAULT_RECORD_ICON = "Box"
+
+
+@dataclass
+class SBAdminQuickAction:
+    """Quick action offered by the quick search dialog.
+
+    With ``view_id`` only it is the "Add" action of that view. ``url`` (a string
+    or a callable taking the request) makes it a link; with ``view_id`` too it
+    is shown only to users who have that view in their menu.
+    """
+
+    view_id: str | None = None
+    label: str | None = None
+    url: object = None
+    icon: str | None = None
+    description: str | None = None
 
 
 @dataclass
@@ -244,48 +263,137 @@ class QuickSearchService:
         walk(self.request_data.menu_items or [], [], "")
         return entries
 
-    def add_actions(
-        self, entries: list[_MenuEntry]
-    ) -> list[tuple[str, str, _MenuEntry]]:
-        actions, seen = [], set()
+    def unique_view_entries(self, entries: list[_MenuEntry]) -> list[_MenuEntry]:
+        result, seen = [], set()
         for entry in entries:
-            view = entry.view
-            if view is None or id(view) in seen:
+            if entry.view is None or id(entry.view) in seen:
                 continue
-            get_new_url = getattr(view, "get_new_url", None)
-            if not callable(get_new_url) or not getattr(view, "model", None):
-                continue
-            seen.add(id(view))
-            if not view.has_add_permission(self.request):
-                continue
-            url = get_new_url(self.request)
-            if not url:
-                continue
-            add_label = view.get_add_label(self.request, None)
-            name = str(add_label or view.model._meta.verbose_name)
-            title = f"{_('Add')} {name}" if add_label else f"{_('Add')}: {name}"
-            actions.append((title, name, url, entry))
+            seen.add(id(entry.view))
+            result.append(entry)
+        return result
+
+    def add_action(self, entry: _MenuEntry) -> tuple[str, QuickSearchItem] | None:
+        view = entry.view
+        get_new_url = getattr(view, "get_new_url", None)
+        if not callable(get_new_url) or not getattr(view, "model", None):
+            return None
+        if not view.has_add_permission(self.request):
+            return None
+        url = get_new_url(self.request)
+        if not url:
+            return None
+        add_label = view.get_add_label(self.request, None)
+        name = str(add_label or view.model._meta.verbose_name)
+        title = f"{_('Add')} {name}" if add_label else f"{_('Add')}: {name}"
+        return name, QuickSearchItem(
+            title=title,
+            url=url,
+            description=entry.breadcrumb,
+            icon=DEFAULT_ADD_ICON,
+        )
+
+    def add_actions(self, entries) -> list[tuple[str, QuickSearchItem]]:
+        actions = []
+        for entry in self.unique_view_entries(entries):
+            action = self.add_action(entry)
+            if action:
+                actions.append(action)
         return actions
 
-    def search_actions(self, terms, entries) -> list[QuickSearchItem]:
-        ranked = []
-        for title, name, url, entry in self.add_actions(entries):
-            rank = text_rank(f"{title} {entry.breadcrumb}", terms) if terms else 2
-            if rank is not None:
-                ranked.append(
-                    (
-                        rank,
-                        name,
-                        QuickSearchItem(
-                            title=title,
-                            url=url,
-                            description=entry.breadcrumb,
-                            icon=DEFAULT_ADD_ICON,
-                        ),
-                    )
+    def predefined_actions(self, entries) -> list[tuple[str, QuickSearchItem]] | None:
+        actions = self.configuration.get_quick_search_actions(self.request)
+        if actions is None:
+            return None
+        by_view_id = {
+            entry.view.get_id(): entry for entry in self.unique_view_entries(entries)
+        }
+        result = []
+        for action in actions:
+            entry = by_view_id.get(action.view_id) if action.view_id else None
+            if action.view_id and entry is None:
+                continue
+            if action.url:
+                url = action.url(self.request) if callable(action.url) else action.url
+                item = QuickSearchItem(
+                    title=str(action.label or (entry.label if entry else "")),
+                    url=str(url),
+                    description=entry.breadcrumb if entry else "",
+                    icon=DEFAULT_ACTION_ICON,
                 )
-        ranked.sort(key=lambda row: (row[0], normalize_text(row[1])))
-        return [item for _rank, _name, item in ranked[:QUICK_SEARCH_ACTIONS_LIMIT]]
+            else:
+                added = self.add_action(entry) if entry else None
+                if added is None:
+                    continue
+                item = added[1]
+                if action.label:
+                    item.title = str(action.label)
+            if action.description is not None:
+                item.description = str(action.description)
+            if action.icon:
+                item.icon = action.icon
+            result.append((item.title, item))
+        return result
+
+    def list_actions(self, entries) -> list[tuple[str, QuickSearchItem]]:
+        result = []
+        for entry in self.unique_view_entries(entries):
+            get_actions = getattr(
+                entry.view, "get_sbadmin_list_actions_processed", None
+            )
+            if not callable(get_actions):
+                continue
+            try:
+                actions = list(get_actions(self.request) or [])
+            except Exception:
+                logger.exception(
+                    "Quick search could not list actions of %s", entry.view.get_id()
+                )
+                continue
+            while actions:
+                action = actions.pop(0)
+                actions.extend(getattr(action, "sub_actions", None) or [])
+                title = str(getattr(action, "title", "") or "")
+                if title:
+                    result.append(
+                        (
+                            title,
+                            QuickSearchItem(
+                                title=title,
+                                url=entry.url,
+                                description=entry.breadcrumb,
+                                icon=DEFAULT_ACTION_ICON,
+                            ),
+                        )
+                    )
+        return result
+
+    def search_actions(self, terms, entries) -> list[QuickSearchItem]:
+        predefined = self.predefined_actions(entries)
+        if not terms:
+            if predefined is not None:
+                return [item for _name, item in predefined][
+                    :QUICK_SEARCH_PREDEFINED_LIMIT
+                ]
+            adds = sorted(
+                self.add_actions(entries), key=lambda row: normalize_text(row[0])
+            )
+            return [item for _name, item in adds[:QUICK_SEARCH_ACTIONS_LIMIT]]
+        candidates = [
+            *((0, name, item) for name, item in predefined or []),
+            *((1, name, item) for name, item in self.add_actions(entries)),
+            *((2, name, item) for name, item in self.list_actions(entries)),
+        ]
+        ranked, seen = [], set()
+        for priority, name, item in candidates:
+            key = (normalize_text(item.title), item.url)
+            if key in seen:
+                continue
+            seen.add(key)
+            rank = text_rank(f"{item.title} {item.description}", terms)
+            if rank is not None:
+                ranked.append((rank, priority, normalize_text(name), item))
+        ranked.sort(key=lambda row: row[:3])
+        return [row[3] for row in ranked[:QUICK_SEARCH_MATCHED_ACTIONS_LIMIT]]
 
     def search_pages(self, terms, entries) -> list[QuickSearchItem]:
         ranked = []

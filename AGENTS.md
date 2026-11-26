@@ -2405,11 +2405,32 @@ Every SBAdmin page has a quick search dialog. It opens with `Ctrl + K` (`⌘ + K
 
 | Group | Source | Shown when |
 |-------|--------|------------|
-| Quick actions | "Add ..." links of menu views whose model admin grants `add` permission | always (empty query lists them as suggestions) |
+| Quick actions | Empty query: `quick_search_actions` of the role configuration, or the first "Add ..." links of menu views (alphabetically). Typing: predefined actions, every "Add ..." link and every list action of the menu views (choosing a list action opens its view) | always |
 | Pages | Menu items the user can open, with the menu path as breadcrumb | always |
 | One group per admin | Records of every admin in the menu with `search_fields` (or `sbadmin_quick_search_fields`) | query has at least 3 characters |
 
 Matching ignores case and diacritics, and every word of the query has to match. Keyboard: `↑` / `↓` or `Tab` / `Shift + Tab` move, `Enter` opens (`Ctrl/Cmd + Enter` in a new tab), `Esc` closes.
+
+### Quick actions
+
+The role configuration can pin the actions shown before the user types, in the given order:
+
+```python
+from django_smartbase_admin.engine.quick_search import SBAdminQuickAction
+
+
+class EditorConfiguration(SBAdminRoleConfiguration):
+    quick_search_actions = [
+        SBAdminQuickAction(view_id="blog_article", label=_("New article")),
+        SBAdminQuickAction(view_id="blog_comment"),
+        SBAdminQuickAction(label=_("Import authors"), url=reverse_lazy("blog_import"), icon="Import"),
+    ]
+```
+
+- `view_id` alone is the "Add" action of that view; it is skipped when the view is not in the user's menu or the user lacks `add` permission.
+- `url` (string or callable taking the request) makes a plain link; with `view_id` too, the link is shown only to users who have that view in their menu.
+- `label`, `description` and `icon` override the defaults. Override `get_quick_search_actions(request)` for request-dependent lists; `None` (default) keeps the automatic suggestions.
+- While typing, the predefined actions rank before "Add ..." links, which rank before list actions (`get_sbadmin_list_actions_processed`, so only permitted ones).
 
 ### Searching records
 
