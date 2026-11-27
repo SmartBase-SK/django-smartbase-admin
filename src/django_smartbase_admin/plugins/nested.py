@@ -45,7 +45,6 @@ from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db.models import F, OuterRef, Subquery
 
 from django_smartbase_admin.plugins.base import SBAdminPlugin
-from django_smartbase_admin.services.views import SBAdminViewService
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -180,13 +179,12 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         qs: "QuerySet",
         **kwargs: Any,
     ) -> "QuerySet":
-        """Retain parent grouping on a queryset that can be aggregated.
+        """Restrict aggregates to the parent groups of the filtered rows.
 
-        Django cannot add the annotations required by aggregation after the
-        ``UNION`` returned by :meth:`modify_count_queryset`. Re-wrap those
-        parent ids in a ``pk__in`` subquery so annotations remain selectable.
-        The extra query layer can be slower than counting the plain union,
-        which is why it is used only for aggregates and not pagination counts.
+        Only the primary keys of the returned queryset are used (see
+        :meth:`SBAdminPlugin.modify_aggregate_queryset`), so the parent ids
+        of :meth:`_build_parent_group_qs` are wrapped in a plain ``pk__in``
+        filter without any annotations.
         """
         nested = resolve_nested(action.view, request)
         if nested is None:
@@ -194,16 +192,7 @@ class TabulatorNestedPlugin(SBAdminPlugin):
         parent_ids = cls._build_parent_group_qs(
             action, qs, nested, include_sort_columns=False
         )
-        annotation_names = list(qs.query.annotation_select)
-        annotations = SBAdminViewService.get_annotates(
-            action.view.model,
-            annotation_names,
-            action.column_fields,
-        )
-        queryset = action.get_data_queryset(visible_fields=[])
-        if annotations:
-            queryset = queryset.annotate(**annotations)
-        return queryset.filter(
+        return action.view.model._base_manager.filter(
             **{f"{action.get_pk_field().name}__in": Subquery(parent_ids)}
         )
 
