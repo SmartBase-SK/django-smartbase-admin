@@ -5,7 +5,18 @@ from typing import Any, TYPE_CHECKING
 
 from django.contrib.admin.utils import lookup_spawns_duplicates
 from django.core.exceptions import FieldDoesNotExist, FieldError
-from django.db.models import Avg, Count, Field, Max, Min, Q, Sum, Value
+from django.db.models import (
+    Avg,
+    Count,
+    Field,
+    Max,
+    Min,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+)
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -851,12 +862,78 @@ class SBAdminListAction(SBAdminAction):
             fields.append(sbfield)
         return fields
 
+    def _get_aggregate_annotations(self, fields_and_targets) -> dict:
+        """Annotations that ``(field, target)`` pairs need in an aggregate query.
+
+        Only a target that is the field's own annotation needs one; a model
+        column or the pk (``field`` is ``None``) is used as is. A field whose
+        annotations aggregate a related set (e.g. ``Sum("line__price")``) is
+        computed per object in a correlated subquery, so it can be summed or
+        grouped on like a plain column and its join stays out of the outer
+        query.
+        """
+        model = self.view.model
+        request = self.threadsafe_request
+        annotations: dict = {}
+        for field, target in fields_and_targets:
+            if field is None or target != field.field:
+                continue
+            # ``get_annotates`` clones ``FilteredRelation``s, which can't be
+            # shared between querysets, so each queryset gets its own copy.
+            field_annotations = SBAdminViewService.get_annotates(
+                model, [target], [field]
+            )
+            resolved = (
+                self.view.get_queryset(request)
+                .annotate(**SBAdminViewService.get_annotates(model, [target], [field]))
+                .query.annotations
+            )
+            if any(
+                getattr(resolved.get(name), "contains_aggregate", False)
+                for name in field_annotations
+            ):
+                # Drop any ordering ``get_queryset()`` brings: ordering over a
+                # to-many path would join into the GROUP BY and split the
+                # per-object total, and ``[:1]`` would return one part.
+                field_annotations = {
+                    target: Subquery(
+                        self.view.get_queryset(request)
+                        .order_by()
+                        .filter(pk=OuterRef("pk"))
+                        .annotate(**field_annotations)
+                        .values(target)[:1]
+                    )
+                }
+            annotations.update(field_annotations)
+        return annotations
+
     def get_aggregates(self, aggregate, field_map=None, group_by=None):
         """Compute ``aggregate`` totals over the filtered set.
 
-        Reuses the list's filtered, annotated queryset and runs a single
-        ``values(*group).annotate(**aggs)``. No ``group_by`` collapses to
-        one constant group (``Value(1)``), so the scalar rollup is just the
+        The rows are the list's own: the count queryset's filters and search
+        plus the ``modify_aggregate_queryset`` plugins. Metrics don't run on
+        that queryset, which carries the annotations of every column the
+        filters use. They run on a fresh queryset restricted to its primary
+        keys and annotated only with what the metric and the group columns
+        need (:meth:`_get_aggregate_annotations`). A column annotated over a
+        to-many relation (e.g. ``F("payment__state")`` or
+        ``Sum("line__price")``) therefore can't add its join to the metric
+        query and multiply rows, so totals don't depend on which columns are
+        listed in ``fields``. A plain ``count`` counts distinct objects, so a
+        group column that joins a to-many relation still counts each object
+        once per group. ``sum``/``avg``/``min``/``max`` aren't distinct, so
+        they still multiply when the metric query joins a to-many relation:
+        when grouping by a to-many column (an object with two payments in the
+        same state is summed twice), or when the view's ``get_queryset()``
+        itself joins one (e.g. ``.annotate(n=Count("children"))``), since
+        the metric query starts from it. Keep to-many annotations out of
+        ``get_queryset()`` and on the fields that need them.
+
+        Each metric runs as its own ``values(*group).annotate(metric)``
+        query, merged by group key, so a metric that traverses a to-many
+        relation itself (a multi-valued ``count``) counts the related rows
+        without inflating a sibling. No ``group_by`` collapses to one
+        constant group (``Value(1)``), so the scalar rollup is just the
         degenerate case of the same query.
 
         Without ``group_by`` returns a scalar ``{alias: value}`` dict; with
@@ -866,37 +943,36 @@ class SBAdminListAction(SBAdminAction):
         rather than merged into one flat dict so a group column whose public
         name equals a derived aggregate alias (e.g. a ``count`` field grouped
         on while also aggregating ``count``) can't clobber the other — they
-        live under separate keys. Each metric runs in its own query and is
-        merged by group key, so a metric that traverses a to-many relation (a
-        multi-valued ``count``, or an annotated field that aggregates a related
-        set) can never fan-out-inflate a sibling.
+        live under separate keys.
         """
         specs = self.validate_aggregate(aggregate, field_map=field_map)
         group_fields = self.validate_group_by(group_by, field_map=field_map)
-        # Full base so every aggregable field's annotation is present.
-        queryset = self.get_data_queryset()
         pk_name = self.get_pk_field().name
+        request = self.threadsafe_request
 
-        # Resolve each spec to its ORM target and annotate any expression
-        # value the visible-column set doesn't already cover.
-        extra: dict = {}
+        # Same rows as the count path, carrying only the filters' annotations.
+        rows = self.build_final_data_count_queryset(apply_plugins=False)
+        for plugin in request.request_data.configuration.plugins:
+            rows = plugin.modify_aggregate_queryset(
+                self,
+                request=request,
+                qs=rows,
+            )
+        rows = self.view.get_queryset(request).filter(
+            **{f"{pk_name}__in": rows.values(pk_name)}
+        )
+
+        # Resolve each spec to its ORM target.
         for spec in specs:
             field = spec["sbfield"]
             if field is None:
                 spec["target"] = pk_name
-                continue
-            if spec["fn"] == "count" and field.model_field is not None:
+            elif spec["fn"] == "count" and field.model_field is not None:
                 spec["target"] = field.model_field.name
-                continue
-            spec["target"] = field.field
-            if field.field in queryset.query.annotations or field.annotate is None:
-                continue
-            if field.supporting_annotates:
-                extra.update(field.supporting_annotates)
-            extra[field.field] = field.annotate
+            else:
+                spec["target"] = field.field
 
-        # Resolve group targets the same way; a computed (annotated) group
-        # column needs its expression present before ``.values()``.
+        # Resolve group targets the same way.
         # Keep the caller-facing group key (the declared name they grouped by)
         # separate from the ORM target. They diverge when a declared field's
         # public name differs from its DB column — e.g. an ``id_alias`` method
@@ -912,35 +988,6 @@ class SBAdminListAction(SBAdminAction):
             )
             group_keys.append(field.name)
             group_targets.append(target)
-            if (
-                field.model_field is None
-                and target not in queryset.query.annotations
-                and field.annotate is not None
-            ):
-                if field.supporting_annotates:
-                    extra.update(field.supporting_annotates)
-                extra[target] = field.annotate
-
-        if extra:
-            queryset = queryset.annotate(**extra)
-
-        # Narrow to the same rows as the count path so aggregates match it.
-        queryset = queryset.filter(self.get_filter_from_request())
-        queryset = self.search_in_queryset(queryset)
-        request = self.threadsafe_request
-        for plugin in request.request_data.configuration.plugins:
-            queryset = plugin.modify_aggregate_queryset(
-                self,
-                request=request,
-                qs=queryset,
-            )
-
-        # GROUP BY: no group_by → a single constant group, so the scalar
-        # case falls out of the same path.
-        if group_targets:
-            base = queryset.values(*group_targets)
-        else:
-            base = queryset.annotate(_sb_group=Value(1)).values("_sb_group")
 
         # One query per metric, merged by group key — a metric that
         # traverses a to-many relation never shares a query with (and so
@@ -951,7 +998,26 @@ class SBAdminListAction(SBAdminAction):
         try:
             for spec in specs:
                 alias = spec["alias"]
-                agg = LIST_AGGREGATE_FUNCTIONS[spec["fn"]](spec["target"])
+                # Annotations are built per query: a ``FilteredRelation``
+                # can't be shared between querysets.
+                queryset = rows.annotate(
+                    **self._get_aggregate_annotations(
+                        [
+                            *zip(group_fields, group_targets),
+                            (spec["sbfield"], spec["target"]),
+                        ]
+                    )
+                )
+                # GROUP BY: no group_by → a single constant group, so the
+                # scalar case falls out of the same path.
+                if group_targets:
+                    base = queryset.values(*group_targets)
+                else:
+                    base = queryset.annotate(_sb_group=Value(1)).values("_sb_group")
+                if spec["sbfield"] is None:
+                    agg = Count(pk_name, distinct=True)
+                else:
+                    agg = LIST_AGGREGATE_FUNCTIONS[spec["fn"]](spec["target"])
                 for row in base.annotate(**{alias: agg}).order_by(*group_targets):
                     key = tuple(row[t] for t in group_targets)
                     slot = merged.get(key)

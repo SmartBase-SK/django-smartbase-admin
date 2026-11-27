@@ -11,7 +11,8 @@ Hook pipeline (in call order):
 1. ``modify_tabulator_definition`` — Tabulator JSON sent to the client.
 2. ``modify_count_queryset`` — the qs ``.count()`` runs on (e.g. group
    by parent id so pagination counts parent groups, not rows).
-3. ``modify_aggregate_queryset`` — the qs list aggregates run on. By
+3. ``modify_aggregate_queryset`` — the qs whose rows list aggregates
+   cover; aggregates run on a fresh qs filtered to its primary keys. By
    default delegates to ``modify_count_queryset`` so existing plugins
    preserve their count-shaping behavior for aggregates.
 4. ``modify_base_queryset`` — unfiltered ``.values()``-applied qs;
@@ -116,9 +117,12 @@ class SBAdminPlugin:
         qs: "QuerySet",
         **kwargs: Any,
     ) -> "QuerySet":
-        """Reshape the qs list aggregates run on. The default delegates
-        to the count hook for backwards compatibility with plugins that
-        use the same row grouping for counts and aggregates."""
+        """Reshape the qs whose rows list aggregates cover. Only its
+        primary keys are used: aggregates run on a fresh qs filtered to
+        them (``pk__in``), so the returned qs must support
+        ``.values(pk)``. The default delegates to the count hook for
+        backwards compatibility with plugins that use the same row grouping
+        for counts and aggregates."""
         return cls.modify_count_queryset(
             action,
             request=request,

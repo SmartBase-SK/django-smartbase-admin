@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.db.models import F
+from django.db.models import Count, F
 from django.test import TestCase, override_settings
 from django.urls import path
 from filer.models import Folder
@@ -27,6 +27,12 @@ from django_smartbase_admin.plugins.nested import TabulatorNestedPlugin
 urlpatterns = [path("sb-admin/", sb_admin_site.urls)]
 
 
+def _by_parent(groups):
+    """``group_by=["parent"]`` rows keyed by parent; the NULL group sorts
+    first on SQLite but last on PostgreSQL."""
+    return {row["group"]["parent"]: row["aggregates"] for row in groups}
+
+
 class _Admin(SBAdmin):
     model = Folder
     search_fields = ("name",)
@@ -40,6 +46,11 @@ class _Admin(SBAdmin):
         "count",
         "parent",
         "children",
+        # Columns annotated over the to-many ``children`` relation, like an
+        # order's payment states or its line-item total: ``child_name`` joins
+        # one row per child, ``children_total`` aggregates them per folder.
+        SBAdminField(name="child_name", annotate=F("children__name")),
+        SBAdminField(name="children_total", annotate=Count("children")),
     )
     sbadmin_nested = {"parent_field": "parent"}
 
@@ -56,6 +67,13 @@ class _Admin(SBAdmin):
     @admin.display(ordering="id")
     def count(self, obj):
         return obj.id
+
+
+class _ChildOrderedAdmin(_Admin):
+    # A project ``get_queryset()`` ordered over a to-many path, like
+    # ``order_by("lines__position")``.
+    def get_queryset(self, request=None):
+        return super().get_queryset(request).order_by("children__name")
 
 
 @override_settings(
@@ -306,6 +324,104 @@ class AggregateTests(TestCase):
             result["aggregates"],
             {"count_children": 3, "sum_id": sum(all_ids)},
         )
+
+    def test_to_many_columns_in_fields_do_not_change_aggregates(self):
+        # Showing a column annotated over a to-many relation used to put its
+        # join into the aggregate query, so ``count`` counted join rows, not
+        # folders (p with 3 children was counted 3 times). Totals must be the
+        # same whichever columns are requested.
+        p = Folder.objects.create(name="p")
+        q = Folder.objects.create(name="q")
+        child_ids = [
+            Folder.objects.create(name=n, parent=p).pk for n in ("c1", "c2", "c3")
+        ]
+        aggregate = [{"fn": "count"}, {"fn": "sum", "field": "id"}]
+
+        for extra in ([], ["child_name"], ["children_total"]):
+            with self.subTest(fields=extra):
+                fields = ["id", "name", *extra]
+                result = self._tools().list_rows(
+                    "filer_folder", fields=fields, aggregate=aggregate
+                )
+                self.assertEqual(
+                    result["aggregates"],
+                    {"count": 5, "sum_id": p.pk + q.pk + sum(child_ids)},
+                )
+
+                result = self._tools().list_rows(
+                    "filer_folder",
+                    fields=fields,
+                    group_by=["parent"],
+                    aggregate=aggregate,
+                )
+                self.assertEqual(
+                    _by_parent(result["groups"]),
+                    {
+                        None: {"count": 2, "sum_id": p.pk + q.pk},
+                        p.pk: {"count": 3, "sum_id": sum(child_ids)},
+                    },
+                )
+
+    def test_aggregated_column_is_summed_and_grouped_per_object(self):
+        # ``children_total`` aggregates a related set, like an order total
+        # summed over its lines. Summing or grouping on it uses each folder's
+        # own value, unaffected by the ``child_name`` join in ``fields``.
+        p = Folder.objects.create(name="p")
+        q = Folder.objects.create(name="q")
+        for n in ("p1", "p2", "p3"):
+            Folder.objects.create(name=n, parent=p)
+        Folder.objects.create(name="q1", parent=q)
+        fields = ["id", "name", "child_name"]
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=fields,
+            group_by=["parent"],
+            aggregate=[{"fn": "sum", "field": "children_total"}, {"fn": "count"}],
+        )
+        self.assertEqual(
+            _by_parent(result["groups"]),
+            {
+                None: {"sum_children_total": 4, "count": 2},
+                p.pk: {"sum_children_total": 0, "count": 3},
+                q.pk: {"sum_children_total": 0, "count": 1},
+            },
+        )
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=fields,
+            group_by=["children_total"],
+            aggregate=[{"fn": "count"}],
+        )
+        self.assertEqual(
+            result["groups"],
+            [
+                {"group": {"children_total": 0}, "aggregates": {"count": 4}},
+                {"group": {"children_total": 1}, "aggregates": {"count": 1}},
+                {"group": {"children_total": 3}, "aggregates": {"count": 1}},
+            ],
+        )
+
+    def test_aggregated_column_ignores_admin_ordering_over_relation(self):
+        # The per-object subquery starts from ``get_queryset()``. Keeping its
+        # ``children__name`` ordering there would add that column to the
+        # subquery's GROUP BY, split p's total into one row per child and
+        # return 1.
+        p = Folder.objects.create(name="p")
+        for n in ("p1", "p2", "p3"):
+            Folder.objects.create(name=n, parent=p)
+        sb_admin_site._registry.pop(Folder, None)
+        sb_admin_site.register(Folder, _ChildOrderedAdmin)
+        MCPToolTestConfig().init_view_map()
+
+        result = self._tools().list_rows(
+            "filer_folder",
+            fields=["id", "name"],
+            aggregate=[{"fn": "sum", "field": "children_total"}],
+        )
+
+        self.assertEqual(result["aggregates"], {"sum_children_total": 3})
 
     def test_invalid_group_by_specs_are_rejected(self):
         tools = self._tools()
