@@ -6207,6 +6207,12 @@ Authentication is configured once via `SBADMIN_MCP_REST_AUTHENTICATOR`; host pro
 SBADMIN_MCP_REST_AUTHENTICATOR = "my_project.mcp_auth.MyMCPRestAuthenticator"
 ```
 
+### `list_rows` aggregates
+
+`aggregate` / `group_by` totals don't depend on the listed `fields`: rows come from the count queryset (filters, search, `modify_aggregate_queryset`), and each metric runs on `view.get_queryset().filter(pk__in=rows)` annotated only with what the metric and the group columns need. A field whose annotation aggregates a related set (e.g. `Sum("line__price")`) is computed per object in a correlated subquery; on large row sets this is the slow part (one subquery per row).
+
+Plain `count` is `Count(pk, distinct=True)`; `sum`/`avg`/`min`/`max` aren't distinct, so they still multiply when the metric query joins a to-many relation. That happens when grouping by a to-many column, or when the admin's `get_queryset()` joins one (`.annotate(x=F("children__name"))`, `.annotate(n=Count("children"))`), because every metric query starts from `get_queryset()`. Keep to-many annotations on the fields that need them, not in `get_queryset()`.
+
 ### Autocomplete page size
 
 The `autocomplete` MCP tool takes `page_size` (default `AUTOCOMPLETE_MCP_PAGE_SIZE = 100`, clamped to `AUTOCOMPLETE_MCP_PAGE_SIZE_MAX = 1000`), so an agent can read a whole option list in one call instead of walking pages. It travels as the `__pageSize__` post key and `AutocompleteFilterWidget.get_page_size()` honours it **only when `request.is_mcp`** — browser autocomplete stays on the fixed `AUTOCOMPLETE_PAGE_SIZE = 20`, which the JS infinite scroll and the "show the search box" heuristic both depend on. Invalid or missing values fall back to 20.

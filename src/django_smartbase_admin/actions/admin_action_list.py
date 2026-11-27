@@ -921,7 +921,13 @@ class SBAdminListAction(SBAdminAction):
         query and multiply rows, so totals don't depend on which columns are
         listed in ``fields``. A plain ``count`` counts distinct objects, so a
         group column that joins a to-many relation still counts each object
-        once per group.
+        once per group. ``sum``/``avg``/``min``/``max`` aren't distinct, so
+        they still multiply when the metric query joins a to-many relation:
+        when grouping by a to-many column (an object with two payments in the
+        same state is summed twice), or when the view's ``get_queryset()``
+        itself joins one (e.g. ``.annotate(n=Count("children"))``), since
+        the metric query starts from it. Keep to-many annotations out of
+        ``get_queryset()`` and on the fields that need them.
 
         Each metric runs as its own ``values(*group).annotate(metric)``
         query, merged by group key, so a metric that traverses a to-many
